@@ -1,0 +1,20 @@
+{
+    "name": "GateRush.Runtime",
+    "rootNamespace": "",
+    "references": [
+        "GUID:9a84b11cf7aed4e47b171cd8bdf7c342",
+        "GUID:a5c23bb49da6a21408d725cbeaf2b316",
+        "GUID:69682d5d7711e5d4bba070d138f6a59a",
+        "GUID:2e649107893641c4b81295a13371f116",
+        "GUID:bab4d2eaf4956f74092bab5c63296db0"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
