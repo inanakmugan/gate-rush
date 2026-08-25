@@ -30,19 +30,26 @@ sealed class MoveGenerator
 
 ### `Exhaustive`
 
-For every movable block, in every direction its axis permits, every reachable
-position along the path — plus the **zero-distance move** whenever the block is
-already flush against a compatible open gate.
+For every movable block, run a flood fill from its current position over
+single-cell orthogonal steps in the directions its axis permits, accepting only
+positions where the whole footprint is legal. Emit every position found — plus
+the **zero-distance move** whenever the block is already flush against a
+compatible open gate.
+
+One traversal per block yields the complete set. Do not scan direction by
+direction.
 
 ### `Canonical`
 
-The same enumeration, filtered to positions that can plausibly matter:
+The same flood fill, filtered to positions that can plausibly matter:
 
-1. The **maximum slide** in each permitted direction.
-2. Positions where the block becomes **flush and aligned with a compatible
+1. Positions where the block becomes **flush and aligned with a compatible
    gate** (right colour, sufficient width, full containment).
-3. Positions that **vacate or occupy a generator's spawn cells**.
-4. Positions that **vacate or occupy an elevator region**.
+2. Positions that **vacate or occupy a generator's spawn cells**.
+3. Positions that **vacate or occupy an elevator region**.
+4. Positions where the block **rests against an obstacle** — a wall or another
+   block — in at least one direction. This replaces the old "maximum slide"
+   criterion, which is meaningless once a block can turn corners.
 5. The **zero-distance move** when the block is already at a compatible gate.
 
 ---
@@ -59,9 +66,14 @@ strict subset of the player's, so any solution it finds is one a human could
 play, and it can never declare an unsolvable board solvable. That asymmetry is
 what makes the pruning safe.
 
-**Why pruning is necessary at all.** Free stopping pushes the branching factor to
-roughly 180 on a mid-size board, against 30–40 for Rush Hour. Unpruned
-breadth-first search does not survive that.
+**Enumeration is a flood fill** (D27). Movement is reachability-based, so one
+traversal per block produces the complete move set. This is cheaper than the old
+per-direction scan, not more expensive.
+
+**Why pruning is necessary at all.** A block can reach most of the free area in
+one move, so branching far exceeds Rush Hour's 30–40 and grows as the board
+empties. Unpruned breadth-first search does not survive that. Canonical mode is a
+prerequisite for termination on realistic boards, not an optimisation.
 
 **Enumeration order must be deterministic** in both modes: ascending block index,
 then direction in `Direction` enum order, then ascending distance, with the
@@ -84,11 +96,14 @@ in search output (D10).
 
 ## Tests
 
-- Exhaustive mode emits one move per empty cell along a clear path.
+- Exhaustive mode emits one move per reachable position, including positions
+  reached by turning a corner.
+- No move is emitted for a diagonally adjacent cell whose orthogonal approaches
+  are both blocked.
 - Canonical mode emits a strict subset of exhaustive mode, over a corpus.
 - **Every canonical move is present in the exhaustive set.** Property-style test.
-- Canonical mode includes the maximum slide in every permitted direction.
-- Canonical mode includes a gate-aligned position that is not a maximum slide.
+- Canonical mode includes positions where the block rests against an obstacle.
+- Canonical mode includes a gate-aligned position that rests against nothing.
 - **A zero-distance move is emitted for a block flush against a compatible open
   gate, in both modes.**
 - No zero-distance move is emitted when the block is not at a compatible gate.

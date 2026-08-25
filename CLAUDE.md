@@ -34,6 +34,9 @@ Module specifications live in `docs/MODULES/`.
    message; you may not execute one.
 6. **Never edit files in `docs/`** unless explicitly asked. Those files are the
    owner's design record.
+7. **Never launch Unity from the shell.** The editor is typically already open
+   and a second instance will conflict on the project lock. Ask the owner to
+   compile and run tests in the Unity Editor and report results back.
 
 ## Hard rules
 

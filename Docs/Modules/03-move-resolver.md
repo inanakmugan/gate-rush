@@ -45,10 +45,14 @@ untouched. They never throw for player error.
  1. Validate
       block alive
       CanMove is true (axis, frozen, locked, shutter)
-      TargetOrigin respects the block's MovementAxis
-      the straight path from current origin to target is clear at every step
-      the destination footprint is inside the grid, clear of walls, other
-      living blocks, and closed shutter regions
+      TargetOrigin is REACHABLE from the current origin: there exists a path of
+      single-cell orthogonal steps, using only directions the block's
+      MovementAxis permits, along which EVERY intermediate position is fully
+      legal — whole footprint inside the grid, clear of static walls, clear of
+      other living blocks, outside closed shutter regions.
+      This is a flood fill, not a straight-line scan. The block may turn corners.
+      There is no diagonal step: a target whose only approach is diagonal is
+      unreachable.
 
       ZERO-DISTANCE MOVE: TargetOrigin == current origin. Skip the path check.
       The move is legal only if the block is flush against a compatible open
@@ -104,6 +108,11 @@ differ (D26), no block can match twice within one sweep.
 
 ## Design decisions (owner)
 
+**Movement is reachability-based** (D27). Validation is a flood fill from the
+current position, not a straight-line scan. For multi-cell and L-shaped blocks
+the whole footprint must be legal at every intermediate step, which is what
+prevents such blocks from turning corners in tight spaces.
+
 **One pipeline for moves and jokers** (D9). Rocket is `TryClearBlock`. Broom is
 `TrySweepColor`. There is no second removal path.
 
@@ -149,7 +158,14 @@ of a countdown; it reports seconds earned and the caller applies them.
 ## Tests
 
 **Movement**
-- A block stops on an intermediate empty cell.
+- A block reaches a position around a corner when a free orthogonal route exists.
+- A block cannot reach a diagonally adjacent cell when both orthogonal
+  neighbours are blocked.
+- A 1×1 block turns a corner through a one-cell gap; an L-shaped block in the
+  same gap cannot.
+- An axis-restricted block reaches only positions along its permitted axis, even
+  when a corner route exists for an unrestricted block.
+- A block reaches an intermediate empty cell along its route.
 - A block cannot pass through another block.
 - An axis-restricted block rejects a perpendicular target.
 - A frozen block rejects any move; an unfrozen one accepts.

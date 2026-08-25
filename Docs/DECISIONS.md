@@ -71,14 +71,20 @@ the flag; the type system should make that impossible.
 
 ## D5 — Canonical move set with exhaustive fallback
 
-**Decision.** The move generator has two modes. **Canonical** emits only maximum
-slides, gate-aligned positions, zero-distance clears, and positions that open or
-close a generator or elevator region. **Exhaustive** emits every reachable
-position. The editor tries canonical first and falls back to exhaustive.
+**Decision.** The move generator has two modes. **Canonical** emits only
+gate-aligned positions, zero-distance clears, positions that open or close a
+generator or elevator region, and positions where the block rests against an
+obstacle. **Exhaustive** emits every reachable position. The editor tries
+canonical first and falls back to exhaustive.
 
-**Why.** Free stopping raises the branching factor to roughly 180 on a mid-size
-board, versus 30–40 in Rush Hour. Plain BFS does not survive that. Most
-intermediate stops change nothing.
+**Why.** Under reachability-based movement (D27) a block can reach most of the
+free area of the board in a single move, so the branching factor is far above
+Rush Hour's 30–40 and grows as the board empties. Plain BFS does not survive
+that. The overwhelming majority of reachable positions leave a block resting in
+open space, changing nothing.
+
+Under this movement model canonical pruning is not an optional optimisation but
+a prerequisite for the solver to terminate on realistic boards.
 
 **Safety argument.** Canonical pruning can only produce **false negatives**. Its
 move set is a subset of the player's, so any solution it finds is genuinely
@@ -409,3 +415,45 @@ special handling for that case.
 **Consequence.** Every colour in a block's stack needs a reachable compatible
 gate somewhere in the level, since the block must travel to a different gate for
 each layer. The editor warns when this fails.
+
+---
+
+## D27 — Movement is reachability, not straight-line sliding
+
+**Decision.** A block may move to any position connected to its current one by a
+path of single-cell orthogonal steps, where every intermediate position is fully
+legal. It is not restricted to a straight line and may turn corners.
+
+**Why.** Observation of the reference game. An earlier model assumed a block slid
+along one axis and stopped, and that model was wrong in both directions: it
+forbade legal moves that turn a corner, and — because the motion reads as
+diagonal on screen — it invited the opposite error of allowing true diagonal
+steps.
+
+The decisive observation is a block whose only free neighbour is diagonal: it
+cannot move there. So there is no diagonal step. What looks diagonal is a run of
+orthogonal steps executed too fast to see individually.
+
+**Not teleportation.** The player drags the block; it advances cell by cell and
+halts against obstacles. `Core` records the drag's endpoints, not a jump. The two
+are consistent because reachability is exactly the set of places a finger could
+carry the block — anywhere unreachable, the block would simply stop on the way.
+Blocks occupy whole cells only.
+
+**Consequences.**
+- Path validation in `MoveResolver` becomes a flood fill over legal positions,
+  not a straight-line scan. For multi-cell blocks the whole footprint must be
+  legal at every step, so an L-shaped block may fail to turn a corner a 1×1 block
+  manages.
+- `MoveGenerator` enumerates the flood fill's output. This is cheaper than
+  scanning each direction separately: one traversal yields the complete set.
+- Axis restrictions (M7) still apply — a restricted block uses only its permitted
+  step directions during the traversal.
+- Branching rises substantially, especially in the mid-game as the board empties.
+  Canonical pruning (D5) becomes mandatory rather than merely helpful.
+- "Maximum slide" is no longer meaningful as a canonical criterion and is
+  replaced by "resting against an obstacle."
+
+**Unaffected.** `Move` already carried a target position rather than a direction
+and distance, so its shape is unchanged. Gate compatibility, the event model,
+fixpoint resolution, and progress monotonicity are all untouched.

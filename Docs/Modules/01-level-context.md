@@ -54,14 +54,19 @@ sealed class BlockDefinition
     int? UnfreezeAtClearCount           // null = not frozen
     int? LockId                         // null = not locked
     int RequiredKeyCount                // meaningful only when LockId is set
-    int? KeyId                          // null = carries no key
-    int? KeyTargetLockId                // which lock this key opens
+    int? KeyTargetLockId                // which lock this key opens; null = carries no key
     KeyEffect KeyEffect
     int TimeBonusSeconds                // 0 = none
 ```
 
 Most blocks have a `ColorStack` of length 1. Depth is the ordinary case, not a
 variant type.
+
+A block carries a key when `KeyTargetLockId` has a value — there is no
+separate key identifier. Since `LockId` is unique per level (see below),
+`KeyTargetLockId` alone identifies the pairing. A key id could not have served
+as an identifier anyway: a lock may require more than one key, so multiple
+blocks legitimately carry the same badge.
 
 ### `GateDefinition`
 
@@ -160,7 +165,10 @@ the solver's guarantee.
 
 - Validation in constructors, with messages that name the offending element:
   - grid dimensions positive
-  - `Cells` non-empty, no duplicates, connected
+  - `Cells` non-empty, no duplicates, **orthogonally (4-directional) connected**.
+    Diagonal-only contact is rejected: a diagonally joined shape has no
+    well-defined projection span onto a board edge, which M1's gate-exit rule
+    depends on.
   - `ColorStack` non-empty
   - **no two adjacent entries in `ColorStack` share a colour** (D26)
   - `StartOrigin` places the whole footprint inside the grid, clear of static
@@ -171,9 +179,39 @@ the solver's guarantee.
   - every `KeyTargetLockId` refers to an existing lock
   - every lock has at least `RequiredKeyCount` keys pointing at it
   - `RequiredKeyCount >= 1` whenever `LockId` is set
+  - The lock/key cross-reference scans (the two bullets above) cover **every**
+    block: top-level `Blocks`, plus every `SpawnedBlock` inside
+    `GeneratorDefinition.Queue` and `ElevatorDefinition.Waves`. This is
+    referential integrity only — confirming a key with the right count exists
+    somewhere in level data. Whether a spawned key is actually *reachable* at
+    the point its lock needs it is a solver and editor-warning concern, not a
+    constructor check.
+  - **`LockId` is unique across the whole level**, counting `SpawnedBlock`s in
+    generator queues and elevator waves as well as top-level `Blocks`. A lock's
+    identifier doubles as the badge colour shown to the player (see M8 in
+    `MECHANICS.md`), so two locked blocks sharing an id would be unreadable —
+    the player could not tell which key opens which.
+  - **`Id` is unique within each of `Blocks`, `Gates`, `Shutters`,
+    `Generators`, and `Elevators`.** These ids are looked up and reported in
+    error messages elsewhere in the codebase; a duplicate silently shadows an
+    earlier element.
+  - **Shutter regions must not overlap.** Two shutters covering the same cell
+    is an authoring error, not a case `ShutterAt` should resolve by picking one
+    arbitrarily.
+  - gate `Width >= 1`
+  - `TimeBonusSeconds >= 0`
+  - `UnfreezeAtClearCount >= 0` when set
+  - shutter `Threshold >= 0`
+  - When two blocks overlap at start, the error names **both** blocks, not just
+    the second one placed.
+  - Every entry in `StaticWalls` is inside the grid, and `StaticWalls` contains
+    no duplicates.
 - Efficient lookup structures for `IsStaticWall` and `ShutterAt` — precomputed,
   not linear scans. These are called inside the search loop.
 - `Coord` hashing and equality.
+- `ElevatorDefinition` must defensively copy each inner wave list, not just the
+  outer `Waves` list — otherwise a caller retains a mutable reference into an
+  already-constructed, supposedly-immutable level.
 
 ---
 
@@ -187,3 +225,19 @@ the solver's guarantee.
 - Rejects a lock requiring more keys than exist for it.
 - `ShutterAt` returns the correct shutter for interior, edge, and outside cells.
 - `Coord` equality and hashing behave consistently for equal values.
+- Rejects a duplicate `LockId` shared by two top-level blocks.
+- Rejects a duplicate `LockId` shared between a top-level block and a
+  `SpawnedBlock` in a generator queue.
+- Rejects a duplicate `Id` within `Blocks`, `Gates`, `Shutters`, `Generators`,
+  and `Elevators` respectively.
+- Rejects two shutter regions that overlap.
+- Rejects a gate with `Width` less than 1.
+- Rejects a negative `TimeBonusSeconds`, a negative `UnfreezeAtClearCount`, and
+  a negative shutter `Threshold`.
+- Mutating the caller's wave list after constructing an `ElevatorDefinition`
+  does not change the stored `Waves`.
+- The error thrown for two overlapping blocks at start names both block ids.
+- A lock requiring more than one key is satisfied by two separate blocks that
+  both set `KeyTargetLockId` to it (no key id needed to tell them apart).
+- Rejects a static wall coordinate outside the grid.
+- Rejects a duplicate static wall coordinate.

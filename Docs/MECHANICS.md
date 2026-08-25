@@ -31,14 +31,23 @@ survives it.
 
 ### Movement
 
-- A block moves in the four cardinal directions unless restricted (see M7).
-- A block **may stop on any empty cell along its path.** It is not forced to
-  slide until it hits something. Moving three cells and moving one cell are two
-  distinct legal moves.
-- The path must be clear: every cell the block's footprint would occupy at the
-  destination must be inside the grid, free of static walls, free of other
-  blocks, and not inside a closed shutter region.
+Movement is **dragging, not teleporting**. The player grabs a block and carries
+it with a finger; the block advances one cell at a time and stops when the way
+is blocked. The rule layer records the *result* of that drag — where the block
+started and where it ended.
+
+- A block advances one cell at a time in the four cardinal directions, unless
+  restricted (see M7).
+- **A block may reach any position connected to its start by a path of such
+  steps.** It is not limited to a straight line: it can turn corners. Every
+  intermediate position must be fully legal — the block's whole footprint inside
+  the grid, clear of static walls, other blocks, and closed shutter regions.
+- This is why a block whose only free neighbour is diagonal cannot move there.
+  There is no diagonal step; reaching a diagonal cell requires a free orthogonal
+  route around. In play the intermediate steps pass instantly, so the motion
+  reads as diagonal even though the rule is not.
 - **Blocks never rotate.** A vertical 1×2 block is vertical for the whole level.
+- Blocks occupy whole cells only; there are no intermediate positions.
 - Corridors one cell wide therefore admit only blocks one cell thin in the
   relevant axis. This follows from the rules above; it is not a separate rule.
 
@@ -201,6 +210,9 @@ A block may carry a **lock**; another block may carry a **key**. Lock and key ar
 paired by an identifier rendered as a colour badge, independent of the blocks'
 own colours.
 
+- **Lock identifiers are unique within a level.** The identifier doubles as the
+  badge colour shown to the player, so two locked blocks sharing one would be
+  unreadable — the player could not tell which key opens which.
 - A locked block cannot be moved by the player. Its colour and shape remain
   visible. It still obstructs.
 - **Jokers can still target a locked block.**
@@ -310,6 +322,10 @@ Not runtime rules, but properties the Level Editor should measure and report.
 - **A ready opening move.** At least one block should start flush against a
   matching open gate, cleared by a zero-distance move. A fully packed board is
   not deadlocked as long as this holds — clearing consumes no space.
+- **Presentation must not teleport.** The block follows the pointer cell by cell
+  and halts against obstacles; the player can steer around a blockage without
+  releasing. Snapping straight to the destination would misrepresent the rule
+  and hide why some destinations are unreachable.
 
 ### Editor warnings
 
