@@ -457,3 +457,56 @@ Blocks occupy whole cells only.
 **Unaffected.** `Move` already carried a target position rather than a direction
 and distance, so its shape is unchanged. Gate compatibility, the event model,
 fixpoint resolution, and progress monotonicity are all untouched.
+
+---
+
+## D28 — Precomputed lookups live on `LevelContext`; the occupancy map is lazy per state
+
+**Decision.** `LevelContext` gains two more precomputed lookups alongside
+`staticWallLookup` and its shutter-cell lookup: `specByIndex`, an O(1) map
+from a block's flat index — spanning top-level blocks and every
+generator/elevator spawn slot — to its `BlockSpec`, and a position-based
+shutter lookup. These are exposed as `SpecAt`, `ShutterPositionAt`, and
+`TotalBlockCapacity`. `BoardState` gains a per-state occupancy map (`int[]`,
+cell to living block index or none), built lazily on first use and cached for
+the state's lifetime.
+
+**Why.** `IsCellFree` and the predicates built on it (`CanMove`,
+`CanBeTargeted`) sit directly in the move generator's flood fill (Module 04),
+which calls them potentially hundreds of times per state across millions of
+states during a search. Two different costs were compounding there: resolving
+a block index to its spec, and resolving a shutter cell to its array
+position, both by re-walking data that never changes once a level is loaded;
+and answering "what's at this cell" by scanning every block's footprint from
+scratch on every single call, even though the board only changes once per
+state, not once per call.
+
+**The eager/lazy split.** `specByIndex` and the shutter position lookup are
+built eagerly, in `LevelContext`'s constructor, alongside the lookups already
+there — they are small, bounded by authored level content rather than by
+search size, and every level that gets solved needs both immediately.
+`BoardState`'s hash is likewise eager, because every state the search
+constructs is hashed at least once — that is the entire point of the visited
+set. The occupancy map is the exception: built lazily, on first need, because
+most states a search constructs are discarded as duplicates — rejected by
+hash or equality — before move generation ever runs on them. An eager
+occupancy map would charge every one of those discarded states for a scan
+whose result is never read; a lazy one costs nothing until a state actually
+survives into the frontier.
+
+**Rejected.** An external cache in `GateRush.Core`, keyed off the
+`LevelContext` reference, holding the same precomputed data without touching
+Module 01. Rejected for two reasons. First, it would mean two modules
+independently know how to flatten `Generators`/`Elevators` into one index
+space and walk shutter geometry — knowledge that is really a property of
+`LevelContext`'s own structure, so a change to one walk and not the other
+would break silently rather than fail to compile. Second, it raises a
+lifetime question a field on `LevelContext` never has to answer: keyed off a
+reference with no natural owner, when is an entry evicted? A field dies with
+the `LevelContext` it belongs to — in the Level Editor, opening level after
+level does not accumulate cache entries the way an external table keyed by
+reference would.
+
+**Note.** Closing a module in a prior session does not make it untouchable.
+Architecture grows as needs surface during later modules; this entry is that
+growth, recorded.

@@ -243,9 +243,19 @@ An elevator occupies a rectangular region of arbitrary size.
 - The next wave arrives when the region contains **no blocks at all**.
 - After its final wave is cleared, the elevator is destroyed.
 - A level is not complete while any elevator still has waves pending.
+- Waves arrive fully packed.** The blocks in a wave tile the region exactly:
+every cell covered once, no gaps, no overlaps. Shapes are unrestricted — L
+shapes are common — so the tiling can be intricate, and the interlocking is
+itself part of the puzzle. Placement is authored, since a region usually admits several tilings.
+`SpawnedBlock` therefore needs a position relative to the region's `Min`
+corner for elevator waves; generator output needs none, since its position
+derives from edge and offset. The editor validates the tiling: total cell
+count must equal the region's area, with no overlaps and nothing outside the
+region.
 
 Elevators may sit beneath shutters, and their waves may contain frozen or locked
 blocks. No special handling is required: the fixpoint loop composes these.
+
 
 ---
 
