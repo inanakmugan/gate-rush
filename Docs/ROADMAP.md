@@ -38,7 +38,8 @@ except the editor window.
 | 1.10 | Level Editor window | spec written when reached |
 | 1.11 | A\* + equivalence tests against BFS | spec written when reached |
 | 1.12 | M4 layered blocks | spec written when reached |
-| 1.13 | M6 generators, M9 elevators | spec written when reached |
+| 1.13 | M6 generators, M9 elevators — includes adding a region-relative
+         position to SpawnedBlock for elevator waves | spec written when reached |
 
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
 1.1–1.3 and carry the heaviest test load. Subtle bugs concentrate there.

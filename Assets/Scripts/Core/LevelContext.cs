@@ -10,6 +10,16 @@ namespace GateRush.Core
     /// alongside every <c>BoardState</c> the solver visits, and deliberately
     /// excluded from state hashing.
     /// </summary>
+    /// <remarks>
+    /// Every O(1) lookup this class exposes (<see cref="IsStaticWall"/>,
+    /// <see cref="ShutterAt"/>, <see cref="ShutterPositionAt"/>,
+    /// <see cref="SpecAt"/>) is precomputed once in the constructor. That is
+    /// safe because level data never changes after construction, and cheap
+    /// because it is bounded by authored content, not by how many states the
+    /// search visits — see <c>DECISIONS.md</c> D28 for why these live here
+    /// rather than in an external cache, and why <c>BoardState</c>'s own
+    /// per-state occupancy cache is lazy instead.
+    /// </remarks>
     public sealed class LevelContext
     {
         public int LevelId { get; }
@@ -24,8 +34,17 @@ namespace GateRush.Core
         public int SuggestedTimeBudgetSeconds { get; }
         public int GoldReward { get; }
 
+        /// <summary>
+        /// The total size of the flat block-index space <see cref="SpecAt"/>
+        /// and <c>BoardState</c>'s per-block arrays share: top-level
+        /// <see cref="Blocks"/> plus every block any <see cref="Generators"/>
+        /// queue or <see cref="Elevators"/> wave could ever spawn.
+        /// </summary>
+        public int TotalBlockCapacity { get; }
+
         private readonly HashSet<Coord> staticWallLookup;
-        private readonly Dictionary<Coord, int> shutterLookup;
+        private readonly Dictionary<Coord, int> shutterPositionByCell;
+        private readonly BlockSpec[] specByIndex;
 
         public LevelContext(
             int levelId,
@@ -65,13 +84,19 @@ namespace GateRush.Core
             ValidateUniqueIds(Generators, g => g.Id, "Generator");
             ValidateUniqueIds(Elevators, e => e.Id, "Elevator");
 
-            shutterLookup = BuildShutterLookup(Shutters);
-
             ValidateStaticWalls();
             ValidateBlockPlacement();
             ValidateGates();
             ValidateShutterBounds();
             ValidateLocksAndKeys();
+
+            // Built only after bounds are validated: a shutter whose Max lies
+            // outside the grid would otherwise make BuildShutterPositionLookup
+            // iterate an unbounded region before ValidateShutterBounds ever
+            // gets a chance to reject it.
+            shutterPositionByCell = BuildShutterPositionLookup(Shutters);
+            specByIndex = BuildSpecByIndex(Blocks, Generators, Elevators);
+            TotalBlockCapacity = specByIndex.Length;
         }
 
         private static void ValidateUniqueIds<T>(IReadOnlyList<T> items, Func<T, int> idSelector, string typeName)
@@ -92,30 +117,115 @@ namespace GateRush.Core
         public bool IsStaticWall(Coord c) => staticWallLookup.Contains(c);
 
         /// <summary>The id of the shutter covering this cell, or null if none does.</summary>
-        public int? ShutterAt(Coord c) => shutterLookup.TryGetValue(c, out var id) ? id : (int?)null;
+        public int? ShutterAt(Coord c) =>
+            shutterPositionByCell.TryGetValue(c, out var position) ? Shutters[position].Id : (int?)null;
 
-        private static Dictionary<Coord, int> BuildShutterLookup(IReadOnlyList<ShutterDefinition> shutters)
+        /// <summary>
+        /// The 0-based position in <see cref="Shutters"/> of the shutter
+        /// covering this cell, or null if none does. O(1): callers on a hot
+        /// path (e.g. <c>BoardState.IsCellFree</c>) should prefer this over
+        /// translating <see cref="ShutterAt"/>'s id back to a position
+        /// themselves.
+        /// </summary>
+        public int? ShutterPositionAt(Coord c) =>
+            shutterPositionByCell.TryGetValue(c, out var position) ? position : (int?)null;
+
+        /// <summary>
+        /// The <see cref="BlockSpec"/> for block index <paramref name="blockIndex"/>
+        /// — O(1) regardless of whether the index names a top-level block or a
+        /// generator/elevator spawn slot. See <see cref="TotalBlockCapacity"/>
+        /// for the valid index range.
+        /// </summary>
+        public BlockSpec SpecAt(int blockIndex)
+        {
+            if (blockIndex < 0 || blockIndex >= specByIndex.Length)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(blockIndex), blockIndex,
+                    $"Block index must be within [0, {specByIndex.Length}) — this level's TotalBlockCapacity.");
+            }
+
+            return specByIndex[blockIndex];
+        }
+
+        private static Dictionary<Coord, int> BuildShutterPositionLookup(IReadOnlyList<ShutterDefinition> shutters)
         {
             var lookup = new Dictionary<Coord, int>();
-            foreach (var shutter in shutters)
+            for (var position = 0; position < shutters.Count; position++)
             {
+                var shutter = shutters[position];
                 for (var x = shutter.Min.X; x <= shutter.Max.X; x++)
                 {
                     for (var y = shutter.Min.Y; y <= shutter.Max.Y; y++)
                     {
                         var cell = new Coord(x, y);
-                        if (lookup.TryGetValue(cell, out var existingShutterId))
+                        if (lookup.TryGetValue(cell, out var existingPosition))
                         {
                             throw new ArgumentException(
-                                $"Shutters {existingShutterId} and {shutter.Id} both cover cell {cell}.");
+                                $"Shutters {shutters[existingPosition].Id} and {shutter.Id} both cover cell {cell}.");
                         }
 
-                        lookup[cell] = shutter.Id;
+                        lookup[cell] = position;
                     }
                 }
             }
 
             return lookup;
+        }
+
+        /// <summary>
+        /// Flattens <paramref name="blocks"/>, then every generator queue in
+        /// order, then every elevator wave in order, into the single index
+        /// space <see cref="SpecAt"/> and <c>BoardState</c>'s per-block
+        /// arrays share. Purely a function of already-ordered level data — no
+        /// new authoring input is required.
+        /// </summary>
+        private static BlockSpec[] BuildSpecByIndex(
+            IReadOnlyList<BlockDefinition> blocks,
+            IReadOnlyList<GeneratorDefinition> generators,
+            IReadOnlyList<ElevatorDefinition> elevators)
+        {
+            var capacity = blocks.Count;
+            foreach (var generator in generators)
+            {
+                capacity += generator.Queue.Count;
+            }
+
+            foreach (var elevator in elevators)
+            {
+                foreach (var wave in elevator.Waves)
+                {
+                    capacity += wave.Count;
+                }
+            }
+
+            var specs = new List<BlockSpec>(capacity);
+
+            foreach (var block in blocks)
+            {
+                specs.Add(new BlockSpec(block));
+            }
+
+            foreach (var generator in generators)
+            {
+                foreach (var spawned in generator.Queue)
+                {
+                    specs.Add(new BlockSpec(spawned));
+                }
+            }
+
+            foreach (var elevator in elevators)
+            {
+                foreach (var wave in elevator.Waves)
+                {
+                    foreach (var spawned in wave)
+                    {
+                        specs.Add(new BlockSpec(spawned));
+                    }
+                }
+            }
+
+            return specs.ToArray();
         }
 
         private void ValidateStaticWalls()

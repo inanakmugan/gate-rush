@@ -115,6 +115,20 @@ sealed class ElevatorDefinition
     IReadOnlyList<IReadOnlyList<SpawnedBlock>> Waves   // ordered
 ```
 
+### `BlockSpec` (added in Module 02)
+
+```
+readonly struct BlockSpec
+    IReadOnlyList<Coord> Cells
+    IReadOnlyList<BlockColor> ColorStack
+    int? UnfreezeAtClearCount
+    int? LockId
+```
+
+The fields `BlockDefinition` and `SpawnedBlock` share, unified so a caller that
+only needs this data does not have to care which kind of definition backs a
+given index. Built from either type by `LevelContext.SpecAt` — see below.
+
 ### `LevelContext`
 
 ```
@@ -129,11 +143,25 @@ sealed class LevelContext
     IReadOnlyList<ElevatorDefinition> Elevators
     int SuggestedTimeBudgetSeconds
     int GoldReward
+    int TotalBlockCapacity              // size of the flat index SpecAt resolves
 
     bool IsInsideGrid(Coord c)
     bool IsStaticWall(Coord c)
     int? ShutterAt(Coord c)             // shutter id covering this cell, if any
+    int? ShutterPositionAt(Coord c)     // shutter's 0-based position in Shutters, if any
+    BlockSpec SpecAt(int blockIndex)    // O(1) across top-level blocks and every spawn slot
 ```
+
+`TotalBlockCapacity`, `ShutterPositionAt`, and `SpecAt` were added in Module 02
+(`BoardState`), which needed O(1) resolution from a flat block index — spanning
+top-level blocks and every block any generator or elevator could ever spawn —
+back to that block's spec, and from a cell to the array position of the
+shutter covering it. Both are precomputed once in the constructor, alongside
+`IsStaticWall`'s and `ShutterAt`'s existing lookups, rather than walked on
+every call. See `DECISIONS.md` D28 for why this precomputation belongs here
+rather than in an external, Module-02-owned cache, and why `BoardState`'s
+per-state occupancy cache (also introduced there) is lazy where these are
+eager.
 
 ---
 
@@ -206,8 +234,9 @@ the solver's guarantee.
     the second one placed.
   - Every entry in `StaticWalls` is inside the grid, and `StaticWalls` contains
     no duplicates.
-- Efficient lookup structures for `IsStaticWall` and `ShutterAt` — precomputed,
-  not linear scans. These are called inside the search loop.
+- Efficient lookup structures for `IsStaticWall`, `ShutterAt`/`ShutterPositionAt`,
+  and `SpecAt` — precomputed, not linear scans or per-call walks. These are
+  called inside the search loop.
 - `Coord` hashing and equality.
 - `ElevatorDefinition` must defensively copy each inner wave list, not just the
   outer `Waves` list — otherwise a caller retains a mutable reference into an
@@ -241,3 +270,10 @@ the solver's guarantee.
   both set `KeyTargetLockId` to it (no key id needed to tell them apart).
 - Rejects a static wall coordinate outside the grid.
 - Rejects a duplicate static wall coordinate.
+- `SpecAt` returns a top-level block's own cells and colour stack.
+- `SpecAt` returns a generator's queued spec, and an elevator's wave spec,
+  for indices beyond the top-level block range.
+- `TotalBlockCapacity` counts top-level blocks plus every generator-queued and
+  elevator-wave block.
+- `ShutterPositionAt` returns a shutter's 0-based position in `Shutters`
+  (distinct from `ShutterAt`'s id) for a covered cell, and null otherwise.
