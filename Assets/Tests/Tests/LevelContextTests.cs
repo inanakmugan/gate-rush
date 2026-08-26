@@ -221,6 +221,17 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Constructor_ShutterMaxFarOutsideGrid_ThrowsFromBoundsCheck()
+        {
+            // Bounds must be validated before the position lookup is built —
+            // otherwise this Max would make the lookup iterate on the order of
+            // 10^12 cells before ever getting a chance to reject it.
+            var shutter = new ShutterDefinition(1, new Coord(0, 0), new Coord(1_000_000, 1_000_000), 1, null);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(5, 5, shutters: new[] { shutter }));
+        }
+
+        [Test]
         public void Constructor_LockSatisfiedByTwoBlocksSharingTheSameKeyTargetLockId_Succeeds()
         {
             var locked = CreateBlock(1, new Coord(0, 0), lockId: 5, requiredKeyCount: 2);
@@ -243,6 +254,83 @@ namespace GateRush.Tests
         {
             Assert.Throws<ArgumentException>(
                 () => CreateContext(3, 3, staticWalls: new[] { new Coord(1, 1), new Coord(1, 1) }));
+        }
+
+        [Test]
+        public void SpecAt_TopLevelBlockIndex_ReturnsThatBlocksCellsAndColorStack()
+        {
+            var cells = new[] { new Coord(0, 0), new Coord(1, 0) };
+            var block = CreateBlock(1, new Coord(0, 0), cells: cells);
+
+            var context = CreateContext(3, 3, new[] { block });
+            var spec = context.SpecAt(0);
+
+            Assert.AreEqual(2, spec.Cells.Count);
+            Assert.AreEqual(BlockColor.Red, spec.ColorStack[0]);
+        }
+
+        [Test]
+        public void SpecAt_GeneratorSpawnIndex_ReturnsGeneratorsQueuedSpec()
+        {
+            var generator = new GeneratorDefinition(
+                id: 1, edge: BoardEdge.Top, offset: 0, queue: new[] { CreateSpawnedBlock() });
+
+            var context = CreateContext(3, 3, generators: new[] { generator });
+            var spec = context.SpecAt(0);
+
+            Assert.AreEqual(BlockColor.Blue, spec.ColorStack[0]);
+        }
+
+        [Test]
+        public void SpecAt_ElevatorSpawnIndex_ReturnsElevatorsWaveSpec()
+        {
+            var elevator = new ElevatorDefinition(
+                1, new Coord(0, 0), new Coord(0, 0),
+                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+
+            var context = CreateContext(3, 3, elevators: new[] { elevator });
+            var spec = context.SpecAt(0);
+
+            Assert.AreEqual(BlockColor.Blue, spec.ColorStack[0]);
+        }
+
+        [Test]
+        public void TotalBlockCapacity_CountsTopLevelBlocksGeneratorQueueAndElevatorWaves()
+        {
+            var blockA = CreateBlock(1, new Coord(0, 0));
+            var blockB = CreateBlock(2, new Coord(1, 0));
+            var generator = new GeneratorDefinition(
+                1, BoardEdge.Top, 0, new[] { CreateSpawnedBlock(), CreateSpawnedBlock() });
+            var elevator = new ElevatorDefinition(
+                1, new Coord(0, 2), new Coord(0, 2),
+                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+
+            var context = CreateContext(
+                3, 3, new[] { blockA, blockB }, generators: new[] { generator }, elevators: new[] { elevator });
+
+            Assert.AreEqual(5, context.TotalBlockCapacity);
+        }
+
+        [Test]
+        public void ShutterPositionAt_CellCoveredBySecondShutter_ReturnsItsListPosition()
+        {
+            var shutterA = new ShutterDefinition(1, new Coord(0, 0), new Coord(0, 0), 1, null);
+            var shutterB = new ShutterDefinition(2, new Coord(2, 2), new Coord(2, 2), 1, null);
+
+            var context = CreateContext(3, 3, shutters: new[] { shutterA, shutterB });
+
+            Assert.AreEqual(1, context.ShutterPositionAt(new Coord(2, 2)));
+            Assert.AreEqual(2, context.ShutterAt(new Coord(2, 2)));
+        }
+
+        [Test]
+        public void ShutterPositionAt_CellNotCoveredByAnyShutter_ReturnsNull()
+        {
+            var shutter = new ShutterDefinition(1, new Coord(0, 0), new Coord(0, 0), 1, null);
+
+            var context = CreateContext(3, 3, shutters: new[] { shutter });
+
+            Assert.IsNull(context.ShutterPositionAt(new Coord(2, 2)));
         }
     }
 }
