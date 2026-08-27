@@ -90,6 +90,11 @@ pass finds nothing. The strategy itself does not decide this.
 - Budget checkpoints and which limit is reported when several are near.
 - Whether `PeakFrontierSize` measures the current stratum or the global frontier
   — document the choice, the editor displays it.
+- Cheaper stratum retirement. The visited set can only shrink when the minimum
+  queued progress vector rises; the current implementation re-scans for that on
+  every expansion. Flagging the moment a vector's queued count hits zero and only
+  retiring then would skip most of those scans. Left for a profiling pass —
+  correctness does not depend on it.
 
 ---
 
