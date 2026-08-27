@@ -377,28 +377,57 @@ materials are introduced only alongside actual lights.
 
 ---
 
-## D25 — Exit is move-triggered; zero-distance moves are legal
+## D25 — Exit is a property of the move, not the position
 
-**Decision.** A block flush against a compatible open gate is not cleared
-automatically. The player must push it into the gate, which may be a move of zero
-distance.
+**Decision.** Clearing is triggered by a move, not by where a block sits:
 
-**Why.** This matches the reference game, where a block pre-aligned with its gate
-still has to be deliberately dragged into it. It also means a block can pass in
-front of a compatible gate without exiting, which makes sliding past a gate a
-legitimate manoeuvre rather than an accident.
+> A move that leaves the block flush and aligned with a compatible open gate
+> clears it.
 
-**Consequences.** `Move.TargetOrigin` may equal the current origin;
-`MoveGenerator` must emit those moves; `InputController` must accept a drag whose
-direction is determined but whose distance is zero. Because levels start tightly
-packed, the zero-distance clear is typically the first move of the level.
+There is no parking on a usable gate. Move a block into that position — right
+colour, gate wide enough for the block's projection, projection fully within the
+opening — and it clears immediately.
 
-**Also.** A gate that opens mid-level needs no special rule — the waiting block
-is cleared by an ordinary zero-distance move.
+A block *can* sit flush against a compatible open gate without clearing, but
+only when it did **not** arrive there by a move. Four cases, all observed in the
+reference game:
 
-**Rejected.** Automatic clearing on adjacency. Cleaner to implement and it would
-have removed zero-distance moves entirely, but it contradicts observed behaviour
-and would cause blocks to be lost by accident while manoeuvring.
+1. Level start — the block is authored flush against its gate.
+2. A frozen block (M3) unfreezes while already flush.
+3. A count-gated gate (M2) opens while a block waits in front of it.
+4. A shutter (M5) opens, exposing a block already flush against a gate.
+
+In every one of these the player must still push the block in — a zero-distance
+move (`Move.TargetOrigin == current origin`). That is what makes zero-distance
+moves meaningful rather than redundant, and it is the same interaction as a
+level's opening move, which is almost always case 1.
+
+**Why.** Observation of the reference game. A pre-aligned block is not consumed
+until it is dragged into its gate, yet a block that is *moved* to rest against a
+compatible gate does clear — there is no "leave it parked there safely" state.
+
+**Consequence for the fixpoint loop.** Resolution must never clear a block on
+its own. When condition re-evaluation opens a gate, unfreezes a block, or opens
+a shutter, it does exactly that and stops; a block left flush against a
+now-usable gate waits for the player's next move. Clearing inside the loop is a
+plausible-looking mistake and is wrong.
+
+**Consequence for `MoveGenerator`.** Whether a move clears must be readable from
+the target position alone. It may not depend on where the block came from.
+
+**Consequences elsewhere.** `Move.TargetOrigin` may equal the current origin;
+`MoveGenerator` must emit those moves; `InputController` must accept a drag
+whose direction is determined but whose distance is zero.
+
+**Rejected.** A "newly flush" test — clear only if the block was not already
+flush against that edge before the move. It makes a move's outcome depend on the
+block's previous position, which `MoveGenerator` cannot afford, and it misfires
+on a real case: a block already flush against an edge, slid along that edge into
+a different gate, is never "newly flush" yet must clear.
+
+**Rejected.** Automatic clearing on adjacency, with no move required. It would
+remove zero-distance moves entirely, contradicts observed behaviour, and would
+lose blocks by accident while manoeuvring.
 
 ---
 
@@ -510,3 +539,60 @@ reference would.
 **Note.** Closing a module in a prior session does not make it untouchable.
 Architecture grows as needs surface during later modules; this entry is that
 growth, recorded.
+
+**Later addition (Module 03).** `LevelContext` also precomputes
+`MaxResolutionPasses` — the fixpoint-loop iteration bound `MoveResolver` needs
+(D8). It is the total number of monotonic progress steps the level can contain:
+every clearable colour across every block (top-level and spawned), every
+generator spawn, and every elevator wave. This is a pure function of immutable
+level data and was being recomputed on every `MoveResolver` call over the whole
+flat block-index space; it belongs here for the same reason `specByIndex` does.
+
+---
+
+## D29 — `BlockSpec` carries `Axis`
+
+**Decision.** `MovementAxis Axis` is added to `BlockSpec`, alongside the
+`Cells`, `ColorStack`, `UnfreezeAtClearCount`, and `LockId` it already unifies
+from `BlockDefinition` and `SpawnedBlock`.
+
+**Why.** `MoveResolver` (Module 03) must honour axis restrictions (M7) for every
+block it moves, and it addresses blocks by flat index — the space spanning
+top-level blocks plus every generator/elevator spawn slot that `SpecAt`
+resolves. Reading `Axis` from `LevelContext.Blocks[i]` instead would only work
+for top-level blocks and would reintroduce the second index-to-definition lookup
+path that D28 consolidated into `SpecAt`. `Axis` is the same family of field as
+the ones `BlockSpec` already carries, so this is a one-line addition to the
+struct and its two constructors.
+
+**Note.** Same principle as D28's closing note: closing a module in an earlier
+session does not freeze it. A later module surfacing a real need for one more
+field on a Module 01 type is normal growth, recorded here rather than worked
+around.
+
+---
+
+## D30 — Block cells are normalised at construction
+
+**Decision.** `BlockDefinition` and `SpawnedBlock` shift their `Cells` at
+construction so the component-wise minimum is `(0, 0)`. `BlockDefinition` adds
+the same offset to `StartOrigin` in compensation; absolute cell positions
+(`StartOrigin + cell`) are unchanged.
+
+**Why.** Nothing in the authoring format requires a block's cells to start at
+`(0, 0)`, so without normalisation a block's origin could sit outside the grid
+while its whole footprint is inside it. Normalising makes "a block's origin is
+one of its occupied grid cells" an invariant. That lets the reachability flood
+fill in `MoveResolver` — and in `MoveGenerator` (Module 04), the hottest loop in
+the project — index a visited-set array by origin cell instead of hashing a
+coordinate, and it simplifies the bounding-box arithmetic in the gate-projection
+checks.
+
+**Consequence.** A caller that reads `StartOrigin` back gets the normalised
+value — the grid cell of the footprint's minimum corner — not necessarily the
+number it passed in. The transform preserves every absolute position, so no
+level behaves differently.
+
+**Rejected.** Rejecting non-normalised input as an authoring error. It would
+push a purely mechanical fix onto the level author for no benefit; the editor
+would have to normalise before saving regardless.

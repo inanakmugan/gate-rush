@@ -47,9 +47,10 @@ enum KeyEffect       UnlockMovement, ClearOuterColor
 ```
 sealed class BlockDefinition
     int Id
-    IReadOnlyList<Coord> Cells          // relative to origin; never rotated
+    IReadOnlyList<Coord> Cells          // relative to origin; never rotated;
+                                        //   normalised so the minimum is (0,0) (D30)
     IReadOnlyList<BlockColor> ColorStack // index 0 = outermost
-    Coord StartOrigin
+    Coord StartOrigin                   // shifted to compensate for cell normalisation (D30)
     MovementAxis Axis
     int? UnfreezeAtClearCount           // null = not frozen
     int? LockId                         // null = not locked
@@ -121,6 +122,7 @@ sealed class ElevatorDefinition
 readonly struct BlockSpec
     IReadOnlyList<Coord> Cells
     IReadOnlyList<BlockColor> ColorStack
+    MovementAxis Axis                   // added in Module 03 (D29)
     int? UnfreezeAtClearCount
     int? LockId
 ```
@@ -128,6 +130,8 @@ readonly struct BlockSpec
 The fields `BlockDefinition` and `SpawnedBlock` share, unified so a caller that
 only needs this data does not have to care which kind of definition backs a
 given index. Built from either type by `LevelContext.SpecAt` — see below.
+`Axis` was added in Module 03, which moves blocks by flat index and must honour
+M7 for spawn slots too; see `DECISIONS.md` D29.
 
 ### `LevelContext`
 
@@ -144,6 +148,7 @@ sealed class LevelContext
     int SuggestedTimeBudgetSeconds
     int GoldReward
     int TotalBlockCapacity              // size of the flat index SpecAt resolves
+    int MaxResolutionPasses            // fixpoint-loop bound for MoveResolver; added in Module 03 (D28)
 
     bool IsInsideGrid(Coord c)
     bool IsStaticWall(Coord c)
@@ -191,6 +196,11 @@ the solver's guarantee.
 
 ## Left to you
 
+- **Cell normalisation** (added in Module 03, D30). `BlockDefinition` and
+  `SpawnedBlock` shift `Cells` so the component-wise minimum is `(0,0)`;
+  `BlockDefinition` compensates `StartOrigin` by the same offset. This is an
+  equivalence-preserving transform that makes "a block's origin is one of its
+  occupied grid cells" an invariant the reachability flood fill relies on.
 - Validation in constructors, with messages that name the offending element:
   - grid dimensions positive
   - `Cells` non-empty, no duplicates, **orthogonally (4-directional) connected**.

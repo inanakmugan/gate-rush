@@ -8,6 +8,13 @@ namespace GateRush.Core
     /// axis, and modifier fields as <see cref="BlockDefinition"/>; its position
     /// is not stored here because it derives from where it spawns from.
     /// </summary>
+    /// <remarks>
+    /// <b>Cell normalisation.</b> <see cref="Cells"/> is stored shifted so its
+    /// component-wise minimum is <c>(0, 0)</c>, matching
+    /// <see cref="BlockDefinition"/> (see <c>DECISIONS.md</c> D30). The spawn
+    /// placement computed when this block is delivered (Module 03 / phase 1.13)
+    /// treats that normalised minimum corner as the block's origin.
+    /// </remarks>
     public sealed class SpawnedBlock
     {
         public IReadOnlyList<Coord> Cells { get; }
@@ -39,7 +46,14 @@ namespace GateRush.Core
             BlockValidation.ValidateUnfreezeAtClearCount(unfreezeAtClearCount, description);
             BlockValidation.ValidateTimeBonus(timeBonusSeconds, description);
 
-            Cells = new List<Coord>(cells).AsReadOnly();
+            var minCorner = BlockValidation.MinCorner(cells);
+            var normalizedCells = new Coord[cells.Count];
+            for (var i = 0; i < cells.Count; i++)
+            {
+                normalizedCells[i] = cells[i] - minCorner;
+            }
+
+            Cells = new List<Coord>(normalizedCells).AsReadOnly();
             ColorStack = new List<BlockColor>(colorStack).AsReadOnly();
             Axis = axis;
             UnfreezeAtClearCount = unfreezeAtClearCount;

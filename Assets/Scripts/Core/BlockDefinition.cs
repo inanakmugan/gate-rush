@@ -9,6 +9,14 @@ namespace GateRush.Core
     /// once, so they are a flat set of optional fields rather than a type
     /// hierarchy.
     /// </summary>
+    /// <remarks>
+    /// <b>Cell normalisation.</b> <see cref="Cells"/> is stored shifted so its
+    /// component-wise minimum is <c>(0, 0)</c>, and <see cref="StartOrigin"/> is
+    /// compensated by the same offset. Absolute cell positions
+    /// (<c>StartOrigin + cell</c>) are unchanged, but a caller that reads
+    /// <see cref="StartOrigin"/> back gets the normalised value — always the
+    /// grid cell of the footprint's minimum corner. See <c>DECISIONS.md</c> D30.
+    /// </remarks>
     public sealed class BlockDefinition
     {
         public int Id { get; }
@@ -44,10 +52,17 @@ namespace GateRush.Core
             BlockValidation.ValidateUnfreezeAtClearCount(unfreezeAtClearCount, description);
             BlockValidation.ValidateTimeBonus(timeBonusSeconds, description);
 
+            var minCorner = BlockValidation.MinCorner(cells);
+            var normalizedCells = new Coord[cells.Count];
+            for (var i = 0; i < cells.Count; i++)
+            {
+                normalizedCells[i] = cells[i] - minCorner;
+            }
+
             Id = id;
-            Cells = new List<Coord>(cells).AsReadOnly();
+            Cells = new List<Coord>(normalizedCells).AsReadOnly();
             ColorStack = new List<BlockColor>(colorStack).AsReadOnly();
-            StartOrigin = startOrigin;
+            StartOrigin = startOrigin + minCorner;
             Axis = axis;
             UnfreezeAtClearCount = unfreezeAtClearCount;
             LockId = lockId;

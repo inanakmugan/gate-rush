@@ -13,13 +13,14 @@ namespace GateRush.Tests
             int? lockId = null,
             int requiredKeyCount = 0,
             int? unfreezeAtClearCount = null,
-            int timeBonusSeconds = 0)
+            int timeBonusSeconds = 0,
+            Coord? startOrigin = null)
         {
             return new BlockDefinition(
                 id: 1,
                 cells: cells ?? new[] { new Coord(0, 0) },
                 colorStack: colorStack ?? new[] { BlockColor.Red },
-                startOrigin: new Coord(0, 0),
+                startOrigin: startOrigin ?? new Coord(0, 0),
                 axis: MovementAxis.Free,
                 unfreezeAtClearCount: unfreezeAtClearCount,
                 lockId: lockId,
@@ -105,6 +106,35 @@ namespace GateRush.Tests
             var block = Build(unfreezeAtClearCount: 0);
 
             Assert.AreEqual(0, block.UnfreezeAtClearCount);
+        }
+
+        [Test]
+        public void Constructor_CellsNotAnchoredAtOrigin_NormalisesThemAndCompensatesStartOrigin()
+        {
+            var block = Build(
+                cells: new[] { new Coord(2, 1), new Coord(3, 1) },
+                startOrigin: new Coord(0, 0));
+
+            CollectionAssert.AreEquivalent(
+                new[] { new Coord(0, 0), new Coord(1, 0) }, block.Cells);
+            Assert.AreEqual(new Coord(2, 1), block.StartOrigin);
+        }
+
+        [Test]
+        public void Constructor_CellNormalisation_PreservesAbsoluteCellPositions()
+        {
+            var block = Build(
+                cells: new[] { new Coord(2, 1), new Coord(2, 2) },
+                startOrigin: new Coord(1, 1));
+
+            var absolute = new HashSet<Coord>();
+            foreach (var cell in block.Cells)
+            {
+                absolute.Add(block.StartOrigin + cell);
+            }
+
+            CollectionAssert.AreEquivalent(
+                new[] { new Coord(3, 2), new Coord(3, 3) }, absolute);
         }
     }
 }

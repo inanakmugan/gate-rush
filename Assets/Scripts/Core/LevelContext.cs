@@ -42,6 +42,20 @@ namespace GateRush.Core
         /// </summary>
         public int TotalBlockCapacity { get; }
 
+        /// <summary>
+        /// The largest number of fixpoint passes a cycle-free resolution of any
+        /// action on this level can require: the total count of monotonic
+        /// progress steps the level contains — every colour that can be cleared
+        /// across every block (top-level and spawned), plus every generator
+        /// spawn, plus every elevator wave. <c>MoveResolver</c> guards its
+        /// resolution loop with this and throws when a resolution exceeds it,
+        /// which indicates a cycle in the level data (see <c>DECISIONS.md</c>
+        /// D8). Precomputed here because it is a pure function of immutable level
+        /// data — the same reasoning as <see cref="SpecAt"/> (see
+        /// <c>DECISIONS.md</c> D28).
+        /// </summary>
+        public int MaxResolutionPasses { get; }
+
         private readonly HashSet<Coord> staticWallLookup;
         private readonly Dictionary<Coord, int> shutterPositionByCell;
         private readonly BlockSpec[] specByIndex;
@@ -97,6 +111,32 @@ namespace GateRush.Core
             shutterPositionByCell = BuildShutterPositionLookup(Shutters);
             specByIndex = BuildSpecByIndex(Blocks, Generators, Elevators);
             TotalBlockCapacity = specByIndex.Length;
+            MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
+        }
+
+        private static int ComputeMaxResolutionPasses(
+            IReadOnlyList<BlockSpec> specs,
+            IReadOnlyList<GeneratorDefinition> generators,
+            IReadOnlyList<ElevatorDefinition> elevators)
+        {
+            var passes = 0;
+
+            for (var i = 0; i < specs.Count; i++)
+            {
+                passes += specs[i].ColorStack.Count;
+            }
+
+            for (var g = 0; g < generators.Count; g++)
+            {
+                passes += generators[g].Queue.Count;
+            }
+
+            for (var e = 0; e < elevators.Count; e++)
+            {
+                passes += elevators[e].Waves.Count;
+            }
+
+            return passes;
         }
 
         private static void ValidateUniqueIds<T>(IReadOnlyList<T> items, Func<T, int> idSelector, string typeName)
