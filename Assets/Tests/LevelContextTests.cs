@@ -257,6 +257,25 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Constructor_NonNormalisedBlockWithOutOfGridStartOrigin_ValidatesAndPlacesFootprintCorrectly()
+        {
+            // Cells sit far to the left of their origin; the origin itself is
+            // outside the grid. Normalisation (D30) shifts the cells to a (0,0)
+            // minimum and compensates StartOrigin, and the block's absolute
+            // footprint lands at (0,0)-(1,0), fully inside the 3x3 grid.
+            var block = CreateBlock(
+                1, new Coord(5, 0), cells: new[] { new Coord(-5, 0), new Coord(-4, 0) });
+
+            var context = CreateContext(3, 3, new[] { block });
+
+            var occupied = new HashSet<Coord>(
+                BoardState.CreateInitial(context).OccupiedCells(context, 0));
+
+            Assert.AreEqual(new Coord(0, 0), context.Blocks[0].StartOrigin);
+            CollectionAssert.AreEquivalent(new[] { new Coord(0, 0), new Coord(1, 0) }, occupied);
+        }
+
+        [Test]
         public void SpecAt_TopLevelBlockIndex_ReturnsThatBlocksCellsAndColorStack()
         {
             var cells = new[] { new Coord(0, 0), new Coord(1, 0) };
