@@ -17,6 +17,35 @@ namespace GateRush.Core
             new Coord(0, -1)
         };
 
+        /// <summary>
+        /// The component-wise minimum corner of a non-empty cell set — the
+        /// offset by which <see cref="BlockDefinition"/> and
+        /// <see cref="SpawnedBlock"/> shift their cells at construction so the
+        /// minimum becomes <c>(0, 0)</c>. Call only after
+        /// <see cref="ValidateCells"/> has confirmed the set is non-empty. See
+        /// <c>DECISIONS.md</c> D30 for why that normalisation is done.
+        /// </summary>
+        public static Coord MinCorner(IReadOnlyList<Coord> cells)
+        {
+            var minX = int.MaxValue;
+            var minY = int.MaxValue;
+
+            foreach (var cell in cells)
+            {
+                if (cell.X < minX)
+                {
+                    minX = cell.X;
+                }
+
+                if (cell.Y < minY)
+                {
+                    minY = cell.Y;
+                }
+            }
+
+            return new Coord(minX, minY);
+        }
+
         public static void ValidateCells(IReadOnlyList<Coord> cells, string ownerDescription)
         {
             if (cells == null || cells.Count == 0)

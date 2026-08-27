@@ -13,6 +13,16 @@ namespace GateRush.Core
     {
         public IReadOnlyList<Coord> Cells { get; }
         public IReadOnlyList<BlockColor> ColorStack { get; }
+
+        /// <summary>
+        /// Which cardinal directions this block may move along (M7). Resolved
+        /// through this struct rather than read from <see cref="BlockDefinition"/>
+        /// directly so that <c>MoveResolver</c> and <c>MoveGenerator</c>, which
+        /// address blocks by flat index, do not need a second lookup path for
+        /// generator/elevator spawn slots. See <c>DECISIONS.md</c> D29.
+        /// </summary>
+        public MovementAxis Axis { get; }
+
         public int? UnfreezeAtClearCount { get; }
         public int? LockId { get; }
 
@@ -20,6 +30,7 @@ namespace GateRush.Core
         {
             Cells = block.Cells;
             ColorStack = block.ColorStack;
+            Axis = block.Axis;
             UnfreezeAtClearCount = block.UnfreezeAtClearCount;
             LockId = block.LockId;
         }
@@ -28,6 +39,7 @@ namespace GateRush.Core
         {
             Cells = block.Cells;
             ColorStack = block.ColorStack;
+            Axis = block.Axis;
             UnfreezeAtClearCount = block.UnfreezeAtClearCount;
             LockId = block.LockId;
         }
