@@ -28,11 +28,14 @@ namespace GateRush.Core
     /// shutter-open); the player then clears it with a zero-distance move.</para>
     ///
     /// <para><b>Instance, not static.</b> The resolver holds reusable buffers —
-    /// an event queue, the flood-fill working set, and the successor builder — so
+    /// an event queue, the successor builder, and a private
+    /// <see cref="BlockReachability"/> that owns the flood-fill working set — so
     /// a search that applies millions of moves does not re-allocate them per
-    /// call. It is therefore not thread-safe; that is acceptable because the
-    /// solver is single-threaded and WebGL has no threads anyway. Construct one
-    /// per search, not one per move.</para>
+    /// call. That <see cref="BlockReachability"/> is private and never shared, for
+    /// the reason its own documentation gives: its scan buffers cannot be reused
+    /// by a second caller mid-scan. The resolver is therefore not thread-safe;
+    /// that is acceptable because the solver is single-threaded and WebGL has no
+    /// threads anyway. Construct one per search, not one per move.</para>
     ///
     /// <para><b>Not sealed.</b> <see cref="ReevaluateConditions"/> and
     /// <see cref="CheckSpawnTriggers"/> are <c>internal virtual</c> so this
@@ -42,25 +45,9 @@ namespace GateRush.Core
     /// </remarks>
     public class MoveResolver
     {
-        private static readonly Coord[] FreeSteps =
-        {
-            new Coord(0, 1), new Coord(0, -1), new Coord(-1, 0), new Coord(1, 0)
-        };
-
-        private static readonly Coord[] HorizontalSteps =
-        {
-            new Coord(-1, 0), new Coord(1, 0)
-        };
-
-        private static readonly Coord[] VerticalSteps =
-        {
-            new Coord(0, 1), new Coord(0, -1)
-        };
-
         private readonly Queue<ColorClearedEvent> events = new Queue<ColorClearedEvent>();
-        private readonly Queue<Coord> floodFrontier = new Queue<Coord>();
-        private readonly HashSet<Coord> floodVisited = new HashSet<Coord>();
         private readonly SuccessorBuilder successor = new SuccessorBuilder();
+        private readonly BlockReachability reachability = new BlockReachability();
 
         /// <summary>
         /// Applies a player move. Returns <c>false</c> — leaving
@@ -100,12 +87,13 @@ namespace GateRush.Core
             var isZeroDistance = move.TargetOrigin == currentOrigin;
 
             if (!isZeroDistance &&
-                !IsReachable(ctx, state, blockIndex, currentOrigin, move.TargetOrigin))
+                !reachability.IsReachable(ctx, state, blockIndex, currentOrigin, move.TargetOrigin))
             {
                 return false;
             }
 
-            var clearsAtGate = IsAtCompatibleExitGate(ctx, state, blockIndex, move.TargetOrigin);
+            var clearsAtGate =
+                BlockReachability.IsAtCompatibleExitGate(ctx, state, blockIndex, move.TargetOrigin);
 
             // A zero-distance move is only ever legal as the push that clears a
             // block already sitting at a compatible open gate. Anything else is a
@@ -217,193 +205,6 @@ namespace GateRush.Core
 
             result = ResolveToFixpoint(ctx, successor);
             return true;
-        }
-
-        /// <summary>
-        /// True when <paramref name="targetOrigin"/> is connected to
-        /// <paramref name="fromOrigin"/> by a path of single-cell orthogonal
-        /// steps — in the directions the block's <see cref="MovementAxis"/>
-        /// permits — along which the block's whole footprint is legal at every
-        /// intermediate position. A flood fill, not a straight-line scan: the
-        /// block may turn corners, and a multi-cell or L-shaped block may fail a
-        /// corner a 1x1 block manages (<c>DECISIONS.md</c> D27).
-        /// </summary>
-        private bool IsReachable(
-            LevelContext ctx, BoardState state, int blockIndex, Coord fromOrigin, Coord targetOrigin)
-        {
-            var steps = StepsFor(ctx.SpecAt(blockIndex).Axis);
-
-            floodVisited.Clear();
-            floodFrontier.Clear();
-            floodVisited.Add(fromOrigin);
-            floodFrontier.Enqueue(fromOrigin);
-
-            while (floodFrontier.Count > 0)
-            {
-                var origin = floodFrontier.Dequeue();
-
-                for (var s = 0; s < steps.Length; s++)
-                {
-                    var next = origin + steps[s];
-
-                    if (!floodVisited.Add(next))
-                    {
-                        continue;
-                    }
-
-                    if (!IsFootprintLegal(ctx, state, blockIndex, next))
-                    {
-                        continue;
-                    }
-
-                    if (next == targetOrigin)
-                    {
-                        return true;
-                    }
-
-                    floodFrontier.Enqueue(next);
-                }
-            }
-
-            return false;
-        }
-
-        private static bool IsFootprintLegal(
-            LevelContext ctx, BoardState state, int blockIndex, Coord candidateOrigin)
-        {
-            var cells = ctx.SpecAt(blockIndex).Cells;
-
-            for (var i = 0; i < cells.Count; i++)
-            {
-                if (!state.IsCellFree(ctx, candidateOrigin + cells[i], blockIndex))
-                {
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        private static Coord[] StepsFor(MovementAxis axis)
-        {
-            switch (axis)
-            {
-                case MovementAxis.HorizontalOnly:
-                    return HorizontalSteps;
-                case MovementAxis.VerticalOnly:
-                    return VerticalSteps;
-                default:
-                    return FreeSteps;
-            }
-        }
-
-        /// <summary>
-        /// True when block <paramref name="blockIndex"/> would exit through some
-        /// open gate if its origin were <paramref name="origin"/>: the footprint
-        /// flush against that gate's edge, the gate's colour equal to the block's
-        /// current colour, the gate at least as wide as the footprint's
-        /// projection span onto that edge, and that projection entirely within
-        /// the opening. Non-rectangular footprints project their whole bounding
-        /// extent, not just the cells touching the wall (M1).
-        /// </summary>
-        private static bool IsAtCompatibleExitGate(
-            LevelContext ctx, BoardState state, int blockIndex, Coord origin)
-        {
-            var cells = ctx.SpecAt(blockIndex).Cells;
-
-            var minX = int.MaxValue;
-            var maxX = int.MinValue;
-            var minY = int.MaxValue;
-            var maxY = int.MinValue;
-
-            for (var i = 0; i < cells.Count; i++)
-            {
-                var cell = origin + cells[i];
-                if (cell.X < minX)
-                {
-                    minX = cell.X;
-                }
-
-                if (cell.X > maxX)
-                {
-                    maxX = cell.X;
-                }
-
-                if (cell.Y < minY)
-                {
-                    minY = cell.Y;
-                }
-
-                if (cell.Y > maxY)
-                {
-                    maxY = cell.Y;
-                }
-            }
-
-            var currentColor = state.CurrentColorOf(ctx, blockIndex);
-
-            for (var g = 0; g < ctx.Gates.Count; g++)
-            {
-                if (!state.GateOpen[g])
-                {
-                    continue;
-                }
-
-                var gate = ctx.Gates[g];
-                if (gate.Color != currentColor)
-                {
-                    continue;
-                }
-
-                bool flush;
-                int spanMin;
-                int spanMax;
-
-                switch (gate.Edge)
-                {
-                    case BoardEdge.Bottom:
-                        flush = minY == 0;
-                        spanMin = minX;
-                        spanMax = maxX;
-                        break;
-                    case BoardEdge.Top:
-                        flush = maxY == ctx.Height - 1;
-                        spanMin = minX;
-                        spanMax = maxX;
-                        break;
-                    case BoardEdge.Left:
-                        flush = minX == 0;
-                        spanMin = minY;
-                        spanMax = maxY;
-                        break;
-                    case BoardEdge.Right:
-                        flush = maxX == ctx.Width - 1;
-                        spanMin = minY;
-                        spanMax = maxY;
-                        break;
-                    default:
-                        continue;
-                }
-
-                if (!flush)
-                {
-                    continue;
-                }
-
-                if (spanMax - spanMin + 1 > gate.Width)
-                {
-                    continue;
-                }
-
-                if (spanMin < gate.Offset || spanMax > gate.Offset + gate.Width - 1)
-                {
-                    continue;
-                }
-
-                return true;
-            }
-
-            return false;
         }
 
         /// <summary>

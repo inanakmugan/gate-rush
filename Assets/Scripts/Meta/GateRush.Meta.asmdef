@@ -1,10 +1,10 @@
 {
     "name": "GateRush.Meta",
     "rootNamespace": "",
-    "references": [],
-    "includePlatforms": [
-        "Editor"
+    "references": [
+        "GUID:bab4d2eaf4956f74092bab5c63296db0"
     ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

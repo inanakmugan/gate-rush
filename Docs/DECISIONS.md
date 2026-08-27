@@ -596,3 +596,42 @@ level behaves differently.
 **Rejected.** Rejecting non-normalised input as an authoring error. It would
 push a purely mechanical fix onto the level author for no benefit; the editor
 would have to normalise before saving regardless.
+
+---
+
+## D31 — Reachability and gate-exit geometry extracted to `BlockReachability`
+
+**Decision.** The corner-turning flood fill (D27) and the gate-projection /
+compatibility check both move out of `MoveResolver` into a new engine-free
+`GateRush.Core.BlockReachability`. `MoveResolver` keeps a private instance and
+delegates; `MoveGenerator` (Module 04, `GateRush.Solver`) keeps its own private
+instance and calls the same code.
+
+**Why.** `MoveResolver.IsReachable` validates a single move against the flood
+fill; `MoveGenerator` enumerates that same fill's entire output once per expanded
+search node. Two copies would drift, and a drift is silently wrong in the
+direction that matters least visibly: the generator would offer a move the
+resolver then rejects, or omit one the player could make. One implementation
+makes that unrepresentable — the same reasoning as D28's `SpecAt` and the
+parameter removal from `ClearOuterColor`.
+
+**Rejected.** Reimplementing the flood fill inside `MoveGenerator`, kept
+deliberately identical, with a cross-reference comment in both files. That is
+precisely the arrangement D28 rejected: two modules independently knowing one
+rule, so a change to one and not the other breaks silently rather than failing to
+compile. A comment is not a mechanism.
+
+**Buffers, not sharing.** `BlockReachability` holds the reused BFS frontier and
+an origin-indexed visited map — D30 makes a block's origin a grid cell, so it
+indexes an array with no hashing. Those buffers are overwritten per scan and
+`ReachableOrigins` returns the live buffer by reference, so an instance must
+never be shared between callers or reused across a nested call, which
+`ISearchStrategy` (Module 05) may introduce. Each of `MoveResolver` and
+`MoveGenerator` constructs its own. The stateless predicates
+(`IsAtCompatibleExitGate`, `IsRestingAgainstObstacle`, `IsFootprintLegal`) are
+static and touch no buffer, which is what lets the generator call them while
+iterating the live `reached` list.
+
+**Note.** Same principle as D28's and D29's closing notes: a later module
+surfacing a real need to refactor an earlier one is normal growth, recorded here
+rather than worked around.
