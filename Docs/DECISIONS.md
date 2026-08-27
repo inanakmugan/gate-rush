@@ -635,3 +635,41 @@ iterating the live `reached` list.
 **Note.** Same principle as D28's and D29's closing notes: a later module
 surfacing a real need to refactor an earlier one is normal growth, recorded here
 rather than worked around.
+
+---
+
+## D32 — The progress vector is a `Core` type, read from `BoardState`
+
+**Decision.** The monotonic progress vector that stratifies the search (D6) —
+`(TotalClearCount, generator spawn indices, elevator wave indices)` — is a
+`GateRush.Core` type, `ProgressVector`, obtained from the
+`BoardState.ProgressVector` property. It is not defined in `GateRush.Solver`
+where its first consumer (Module 05's `BreadthFirstStrategy`) lives.
+
+**Why.** Every component is a `BoardState` field, every component is hashed, and
+the monotonicity — no action decreases any component — is an invariant
+`MoveResolver` maintains. The knowledge of *which* fields form the vector is
+therefore `BoardState`'s. Defining it in the solver would split that knowledge
+from the code that defines the fields: when phase 1.13 adds generator and
+elevator progress to `BoardState`, nothing on the solver side would signal that
+the vector must grow a component. `AStarStrategy` (phase 1.11) needs the same
+vector, so it must not be trapped inside one strategy.
+
+**Ordering.** `ProgressVector.CompareTo` is lexicographic — `TotalClearCount`,
+then the spawn indices in `LevelContext` order. Lexicographic order is a linear
+extension of the componentwise partial order, which is what lets the search
+retire a stratum's visited set the moment every live frontier node sits at a
+strictly greater vector: nothing componentwise ≤ the retired vector can still be
+produced.
+
+**Excluded.** `ElevatorWaveActive`. It is set when a wave arrives and cleared
+when the region empties, so it is not monotonic and cannot be a stratification
+key. States that differ only by it stay distinct under `BoardState` hashing.
+
+**Rejected.** A `ProgressVector` in `GateRush.Solver` built from `BoardState`'s
+public getters. Same silent-drift failure as D31 — one rule (which fields advance
+monotonically) known in two places.
+
+**Note.** Same principle as D28's, D29's, and D31's closing notes: a later module
+surfacing a real need to add a small type to `Core` is normal growth, recorded
+rather than worked around.

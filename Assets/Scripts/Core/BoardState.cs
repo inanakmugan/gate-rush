@@ -486,6 +486,15 @@ namespace GateRush.Core
             return true;
         }
 
+        /// <summary>
+        /// This state's <see cref="GateRush.Core.ProgressVector"/> — the
+        /// monotonic vector the solver stratifies its search on
+        /// (<c>DECISIONS.md</c> D6, D32). A pure read of already-stored fields;
+        /// recomputed per call, which is cheap. Fully qualified below because the
+        /// property name shadows the type name inside this class.
+        /// </summary>
+        public ProgressVector ProgressVector => GateRush.Core.ProgressVector.Of(this);
+
         public override int GetHashCode() => hashCode;
 
         public override bool Equals(object obj) => Equals(obj as BoardState);
