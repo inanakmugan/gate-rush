@@ -1,3 +1,16 @@
 {
-	"name": "GateRush.Serialization"
+    "name": "GateRush.Serialization",
+    "rootNamespace": "",
+    "references": [
+        "GUID:9a84b11cf7aed4e47b171cd8bdf7c342"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
 }
