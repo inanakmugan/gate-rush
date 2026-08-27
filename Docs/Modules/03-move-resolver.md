@@ -23,7 +23,8 @@ readonly struct Move
     int BlockIndex
     Coord TargetOrigin        // MAY equal the current origin — see D25
 
-sealed class MoveResolver
+class MoveResolver    // not sealed: two resolution hooks are internal virtual
+                      // so tests can drive the fixpoint loop
     bool TryApplyMove(LevelContext ctx, BoardState state, Move move,
                       out BoardState result)
 
@@ -152,6 +153,12 @@ of a countdown; it reports seconds earned and the caller applies them.
 - Whether the resolver is stateless with static methods or an instance with
   reusable buffers. Prefer whichever keeps allocation low — it runs inside the
   search loop.
+- Tightening `LevelContext.MaxResolutionPasses`. It currently sums every colour
+  in every block's stack (plus generator output and elevator waves), which is a
+  safe but loose upper bound — one pass can clear many colours, so real chains
+  settle in far fewer passes. Harmless while the loop is a no-op; worth
+  revisiting once phase 1.7 shows how deep real chains run, since every surplus
+  pass runs a full condition sweep.
 
 ---
 
@@ -162,7 +169,10 @@ of a countdown; it reports seconds earned and the caller applies them.
 - A block cannot reach a diagonally adjacent cell when both orthogonal
   neighbours are blocked.
 - A 1×1 block turns a corner through a one-cell gap; an L-shaped block in the
-  same gap cannot.
+  same gap cannot. Concretely, in a 1-wide corridor bent 90° (one column arm,
+  one row arm): a 1×1 block traverses it end to end; a vertical 1×2 domino
+  cannot leave the arm it starts in; an L block placed at the bend is completely
+  immobile.
 - An axis-restricted block reaches only positions along its permitted axis, even
   when a corner route exists for an unrestricted block.
 - A block reaches an intermediate empty cell along its route.
@@ -182,6 +192,9 @@ of a countdown; it reports seconds earned and the caller applies them.
   player issues a zero-distance move.
 
 **Gates**
+- A non-zero move that comes to rest in an incompatible gate's mouth (wrong
+  colour, or closed) succeeds and clears nothing — unlike the zero-distance
+  path, where an incompatible gate fails the whole move.
 - A 1×2 vertical block exits a width-1 bottom gate.
 - The same block is rejected by a width-1 side gate and accepted by a width-2
   one.
@@ -201,6 +214,15 @@ of a countdown; it reports seconds earned and the caller applies them.
 
 **Obstruction**
 - A block parked at a gate blocks another block from using it.
+
+**Fixpoint loop (skeleton — via an `internal virtual` test seam)**
+- With a hook scripted to report a change on its first N calls, the loop runs
+  exactly N extra passes and then settles.
+- With a hook scripted to always report a change, the loop throws
+  `InvalidOperationException` once `MaxResolutionPasses` is exceeded, rather than
+  hanging.
+- Both cases run through each hook independently (`ReevaluateConditions` and
+  `CheckSpawnTriggers`), so neither hook's result can be silently dropped.
 
 **Chains**
 - A clear crossing a gate threshold opens that gate in the same pass.
