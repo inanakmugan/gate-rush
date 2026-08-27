@@ -59,6 +59,9 @@ Module specifications live in `docs/MODULES/`.
   network calls in runtime code paths.
 - Sprite materials default to `Sprite-Unlit-Default`. Under the 2D Renderer, lit
   sprites render black when no `Light 2D` is present.
+- **Never write `.meta` files.** Unity generates them on import and assigns each
+  a GUID; a hand-written GUID can be malformed or collide with another asset.
+  Create the asset file and let the open Editor generate its `.meta`.
 
 ## Project layout
 
