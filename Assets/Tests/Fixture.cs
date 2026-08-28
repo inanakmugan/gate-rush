@@ -102,8 +102,9 @@ namespace GateRush.Tests
 
         /// <summary>
         /// A spawned block with the same single-red-1x1 defaults as
-        /// <see cref="Block"/>; its position derives from where it spawns from,
-        /// so it carries none.
+        /// <see cref="Block"/>. Generator output carries no position, so
+        /// <paramref name="regionOrigin"/> defaults to null; an elevator wave
+        /// block must pass its grid cell relative to the region's <c>Min</c>.
         /// </summary>
         internal static SpawnedBlock Spawned(
             IReadOnlyList<BlockColor> colors = null,
@@ -114,7 +115,8 @@ namespace GateRush.Tests
             int requiredKeys = 0,
             int? keyTarget = null,
             KeyEffect keyEffect = KeyEffect.UnlockMovement,
-            int timeBonusSeconds = 0)
+            int timeBonusSeconds = 0,
+            Coord? regionOrigin = null)
         {
             return new SpawnedBlock(
                 cells: cells ?? Cell1x1,
@@ -125,7 +127,8 @@ namespace GateRush.Tests
                 requiredKeyCount: requiredKeys,
                 keyTargetLockId: keyTarget,
                 keyEffect: keyEffect,
-                timeBonusSeconds: timeBonusSeconds);
+                timeBonusSeconds: timeBonusSeconds,
+                regionOrigin: regionOrigin);
         }
 
         /// <summary>

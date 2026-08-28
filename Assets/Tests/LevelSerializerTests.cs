@@ -68,9 +68,23 @@ namespace GateRush.Tests
 
             var elevators = new[]
             {
+                // 2x1 region. Wave 1 tiles it with two 1x1 blocks; wave 2 with a
+                // single 2x1 block — the waves differ in block count, never in
+                // the cells they cover.
                 Elevator(1, new Coord(0, 0), new Coord(1, 0),
-                    new[] { Spawned(colors: new[] { BlockColor.Pink }), Spawned(colors: new[] { BlockColor.Green }) },
-                    new[] { Spawned(colors: new[] { BlockColor.Red }, timeBonusSeconds: 4) }),
+                    new[]
+                    {
+                        Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)),
+                        Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0)),
+                    },
+                    new[]
+                    {
+                        Spawned(
+                            colors: new[] { BlockColor.Red },
+                            cells: new[] { new Coord(0, 0), new Coord(1, 0) },
+                            timeBonusSeconds: 4,
+                            regionOrigin: new Coord(0, 0)),
+                    }),
             };
 
             return Ctx(6, 6, blocks: blocks, gates: gates, shutters: shutters,
@@ -88,6 +102,14 @@ namespace GateRush.Tests
             var twice = LevelSerializer.ToJson(LevelSerializer.FromJson(once));
 
             Assert.AreEqual(once, twice);
+        }
+
+        [Test]
+        public void ToJson_WritesFormatVersion2()
+        {
+            var json = Canonical(LevelSerializer.ToJson(Ctx(3, 3)));
+
+            StringAssert.Contains("\"formatVersion\":2", json);
         }
 
         [Test]
@@ -168,6 +190,9 @@ namespace GateRush.Tests
             Assert.AreEqual(2, elevator.Waves.Count);
             Assert.AreEqual(2, elevator.Waves[0].Count);
             Assert.AreEqual(1, elevator.Waves[1].Count);
+            Assert.AreEqual(new Coord(0, 0), elevator.Waves[0][0].RegionOrigin);
+            Assert.AreEqual(new Coord(1, 0), elevator.Waves[0][1].RegionOrigin);
+            Assert.IsNull(ctx.Generators[0].Queue[0].RegionOrigin);
         }
 
         // -- JsonUtility's limitations, one test each --------------------
@@ -194,8 +219,18 @@ namespace GateRush.Tests
         public void RoundTrip_ElevatorWithTwoUnequalWaves_KeepsBothIntact()
         {
             var elevator = Elevator(1, new Coord(0, 0), new Coord(1, 0),
-                new[] { Spawned(colors: new[] { BlockColor.Pink }), Spawned(colors: new[] { BlockColor.Green }) },
-                new[] { Spawned(colors: new[] { BlockColor.Red }) });
+                new[]
+                {
+                    Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)),
+                    Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0)),
+                },
+                new[]
+                {
+                    Spawned(
+                        colors: new[] { BlockColor.Red },
+                        cells: new[] { new Coord(0, 0), new Coord(1, 0) },
+                        regionOrigin: new Coord(0, 0)),
+                });
             var ctx = Ctx(3, 3, elevators: new[] { elevator });
 
             var restored = LevelSerializer.FromJson(LevelSerializer.ToJson(ctx)).Elevators[0];
@@ -204,6 +239,35 @@ namespace GateRush.Tests
             Assert.AreEqual(2, restored.Waves[0].Count);
             Assert.AreEqual(1, restored.Waves[1].Count);
             Assert.AreEqual(BlockColor.Green, restored.Waves[0][1].ColorStack[0]);
+        }
+
+        [Test]
+        public void RoundTrip_ElevatorWaveRegionOrigin_SurvivesAndGeneratorOutputHasNone()
+        {
+            var elevator = Elevator(1, new Coord(0, 0), new Coord(1, 0),
+                new[]
+                {
+                    Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)),
+                    Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0)),
+                });
+            var generator = Spawner(1, BoardEdge.Top, 0, Spawned(colors: new[] { BlockColor.Red }));
+            var ctx = Ctx(3, 3, generators: new[] { generator }, elevators: new[] { elevator });
+
+            var restored = LevelSerializer.FromJson(LevelSerializer.ToJson(ctx));
+
+            Assert.AreEqual(new Coord(1, 0), restored.Elevators[0].Waves[0][1].RegionOrigin);
+            Assert.IsNull(restored.Generators[0].Queue[0].RegionOrigin);
+        }
+
+        [Test]
+        public void ToJson_ElevatorWaveBlock_WritesHasRegionOriginTrue()
+        {
+            var elevator = Elevator(1, new Coord(0, 0), new Coord(0, 0),
+                new[] { Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)) });
+
+            var json = Canonical(LevelSerializer.ToJson(Ctx(3, 3, elevators: new[] { elevator })));
+
+            StringAssert.Contains("\"hasRegionOrigin\":true", json);
         }
 
         [Test]
@@ -299,6 +363,20 @@ namespace GateRush.Tests
         // -- Structural errors ----------------------------------------
 
         [Test]
+        public void FromJson_FormatVersion1_IsRefused()
+        {
+            // Version 1 predates the elevator wave RegionOrigin (M9); no level was
+            // ever authored at it, so it is refused rather than migrated.
+            var json = FullyPopulatedJson.Replace("\"formatVersion\": 2", "\"formatVersion\": 1");
+
+            var ex = Assert.Throws<LevelSerializationException>(() => LevelSerializer.FromJson(json, "v1.json"));
+
+            StringAssert.Contains("v1.json", ex.Message);
+            StringAssert.Contains("1", ex.Message);
+            StringAssert.Contains("version", ex.Message);
+        }
+
+        [Test]
         public void FromJson_UnsupportedFormatVersion_IsRejectedBeforeConversion()
         {
             // The colour name is also invalid; the version check must fire first.
@@ -318,7 +396,7 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_RequiredArrayAbsent_IsReportedAsNamedErrorNotNullReference()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 3, ""height"": 3,
+            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 3, ""height"": 3,
                 ""blocks"": [ { ""id"": 1, ""colorStack"": [ ""Red"" ], ""axis"": ""Free"",
                 ""keyEffect"": ""UnlockMovement"", ""unfreezeAtClearCount"": -1, ""lockId"": -1,
                 ""keyTargetLockId"": -1 } ] }";
@@ -333,7 +411,7 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_NegativeSentinelOtherThanMinusOne_IsReported()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 3, ""height"": 3,
+            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 3, ""height"": 3,
                 ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
                 ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"", ""unfreezeAtClearCount"": -1,
                 ""lockId"": -5, ""keyTargetLockId"": -1 } ] }";
@@ -366,7 +444,7 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_StructurallyValidButSemanticallyInvalid_IsRejectedByCoreWithCoresMessage()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 5, ""height"": 5,
+            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 5, ""height"": 5,
                 ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
                 ""startOrigin"": { ""x"": 99, ""y"": 99 }, ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
                 ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 } ],
@@ -382,14 +460,14 @@ namespace GateRush.Tests
         // -- Fixtures ------------------------------------------------
 
         private static string ColourNamedJson(string colourName) =>
-            $@"{{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 1, ""height"": 1,
+            $@"{{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 1, ""height"": 1,
                 ""blocks"": [ {{ ""id"": 1, ""cells"": [ {{ ""x"": 0, ""y"": 0 }} ],
                 ""colorStack"": [ ""{colourName}"" ], ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
                 ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 }} ],
                 ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }}";
 
         private const string FullyPopulatedJson = @"{
-  ""formatVersion"": 1,
+  ""formatVersion"": 2,
   ""levelId"": 42,
   ""width"": 6,
   ""height"": 6,
@@ -473,17 +551,20 @@ namespace GateRush.Tests
           ""blocks"": [
             { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Pink"" ], ""axis"": ""Free"",
               ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0 },
+              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 0, ""y"": 0 } },
             { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Green"" ], ""axis"": ""Free"",
               ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0 }
+              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 1, ""y"": 0 } }
           ]
         },
         {
           ""blocks"": [
-            { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ], ""axis"": ""Free"",
-              ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 4 }
+            { ""cells"": [ { ""x"": 0, ""y"": 0 }, { ""x"": 1, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
+              ""axis"": ""Free"", ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0,
+              ""keyTargetLockId"": -1, ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 4,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 0, ""y"": 0 } }
           ]
         }
       ]

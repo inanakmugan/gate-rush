@@ -44,7 +44,7 @@ namespace GateRush.Serialization
         /// attempted, so a later schema change is a migration rather than a hunt
         /// for silently misread levels.
         /// </summary>
-        public const int FormatVersion = 1;
+        public const int FormatVersion = 2;
 
         /// <summary>
         /// The value every nullable <c>int</c> field takes when absent.
@@ -175,6 +175,8 @@ namespace GateRush.Serialization
                 keyTargetLockId = ToSentinel(block.KeyTargetLockId),
                 keyEffect = block.KeyEffect.ToString(),
                 timeBonusSeconds = block.TimeBonusSeconds,
+                hasRegionOrigin = block.RegionOrigin.HasValue,
+                regionOrigin = block.RegionOrigin.HasValue ? ToDto(block.RegionOrigin.Value) : default,
             };
         }
 
@@ -322,7 +324,8 @@ namespace GateRush.Serialization
                 requiredKeyCount: dto.requiredKeyCount,
                 keyTargetLockId: FromSentinel(dto.keyTargetLockId, $"{element}: 'keyTargetLockId'", source),
                 keyEffect: ParseEnum<KeyEffect>(dto.keyEffect, $"{element}: 'keyEffect'", source),
-                timeBonusSeconds: dto.timeBonusSeconds);
+                timeBonusSeconds: dto.timeBonusSeconds,
+                regionOrigin: dto.hasRegionOrigin ? FromDto(dto.regionOrigin) : (Coord?)null);
         }
 
         private static GateDefinition FromDto(GateDto dto, string source)

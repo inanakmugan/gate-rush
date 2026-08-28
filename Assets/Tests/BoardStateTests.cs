@@ -27,8 +27,9 @@ namespace GateRush.Tests
                 requiredKeys: requiredKeyCount,
                 keyTarget: keyTargetLockId);
 
-        private static SpawnedBlock CreateSpawnedBlock(IReadOnlyList<BlockColor> colorStack = null) =>
-            Spawned(colors: colorStack ?? new[] { BlockColor.Purple });
+        private static SpawnedBlock CreateSpawnedBlock(
+            IReadOnlyList<BlockColor> colorStack = null, Coord? regionOrigin = null) =>
+            Spawned(colors: colorStack ?? new[] { BlockColor.Purple }, regionOrigin: regionOrigin);
 
         private static LevelContext CreateContext(
             IReadOnlyList<BlockDefinition> blocks = null,
@@ -60,8 +61,11 @@ namespace GateRush.Tests
             var shutter = new ShutterDefinition(20, new Coord(4, 4), new Coord(5, 5), 3, null);
             var generator = new GeneratorDefinition(30, BoardEdge.Bottom, 3, new[] { CreateSpawnedBlock() });
             var elevator = new ElevatorDefinition(
-                40, new Coord(0, 3), new Coord(1, 3),
-                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock(new[] { BlockColor.Cyan }) } });
+                40, new Coord(0, 3), new Coord(0, 3),
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { CreateSpawnedBlock(new[] { BlockColor.Cyan }, regionOrigin: new Coord(0, 0)) }
+                });
 
             return CreateContext(
                 blocks: new[] { blockA, blockB, blockC },
@@ -375,7 +379,10 @@ namespace GateRush.Tests
         {
             var elevator = new ElevatorDefinition(
                 1, new Coord(0, 0), new Coord(0, 0),
-                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { CreateSpawnedBlock(regionOrigin: new Coord(0, 0)) }
+                });
             var ctx = CreateContext(elevators: new[] { elevator });
 
             var state = BoardState.CreateInitial(ctx);
@@ -493,7 +500,10 @@ namespace GateRush.Tests
         {
             var elevator = new ElevatorDefinition(
                 1, new Coord(0, 0), new Coord(0, 0),
-                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { CreateSpawnedBlock(regionOrigin: new Coord(0, 0)) }
+                });
             var ctx = CreateContext(elevators: new[] { elevator });
             var baseline = BoardState.CreateInitial(ctx);
 
