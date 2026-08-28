@@ -59,6 +59,8 @@ namespace GateRush.Core
         private readonly HashSet<Coord> staticWallLookup;
         private readonly Dictionary<Coord, int> shutterPositionByCell;
         private readonly BlockSpec[] specByIndex;
+        private readonly Dictionary<int, int> lockOwnerByLockId;
+        private readonly Dictionary<int, int[]> keyIndicesByLockId;
 
         public LevelContext(
             int levelId,
@@ -112,6 +114,8 @@ namespace GateRush.Core
             specByIndex = BuildSpecByIndex(Blocks, Generators, Elevators);
             TotalBlockCapacity = specByIndex.Length;
             MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
+            lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
+            keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
         }
 
         private static int ComputeMaxResolutionPasses(
@@ -186,6 +190,93 @@ namespace GateRush.Core
             }
 
             return specByIndex[blockIndex];
+        }
+
+        /// <summary>
+        /// The flat block index that owns lock <paramref name="lockId"/>. Lock
+        /// ids are unique within a level (M8), so this resolves to one block, not
+        /// a set. Precomputed here beside <see cref="SpecAt"/> because
+        /// <c>MoveResolver.ApplyKeyEffects</c> needs it inside the fixpoint drain
+        /// loop, once per key consumed — scanning every block there would repeat
+        /// a walk over data that never changes (see <c>DECISIONS.md</c> D28).
+        /// </summary>
+        public int LockOwnerIndex(int lockId)
+        {
+            if (!lockOwnerByLockId.TryGetValue(lockId, out var index))
+            {
+                throw new ArgumentException(
+                    $"No block in level {LevelId} owns lock {lockId}.", nameof(lockId));
+            }
+
+            return index;
+        }
+
+        /// <summary>
+        /// Every flat block index carrying a key for lock <paramref name="lockId"/>,
+        /// in ascending index order. Empty when nothing targets that lock.
+        /// Precomputed for the same reason as <see cref="LockOwnerIndex"/>:
+        /// <c>MoveResolver</c> counts consumed keys against this list inside the
+        /// drain loop.
+        /// </summary>
+        public IReadOnlyList<int> KeyIndicesForLock(int lockId) =>
+            keyIndicesByLockId.TryGetValue(lockId, out var indices) ? indices : Array.Empty<int>();
+
+        /// <summary>
+        /// Maps each lock id to the flat block index that owns it, over the index
+        /// space <see cref="BuildSpecByIndex"/> produced. Lock id uniqueness is
+        /// already enforced by <see cref="ValidateLocksAndKeys"/>; this only
+        /// records the resolved index.
+        /// </summary>
+        private static Dictionary<int, int> BuildLockOwnerLookup(IReadOnlyList<BlockSpec> specs)
+        {
+            var lookup = new Dictionary<int, int>();
+
+            for (var i = 0; i < specs.Count; i++)
+            {
+                var lockId = specs[i].LockId;
+                if (lockId.HasValue)
+                {
+                    lookup[lockId.Value] = i;
+                }
+            }
+
+            return lookup;
+        }
+
+        /// <summary>
+        /// Maps each targeted lock id to the flat block indices carrying a key
+        /// for it, in ascending index order. That keys point at real locks and
+        /// that each lock has enough of them is already enforced by
+        /// <see cref="ValidateLocksAndKeys"/>.
+        /// </summary>
+        private static Dictionary<int, int[]> BuildKeyIndexLookup(IReadOnlyList<BlockSpec> specs)
+        {
+            var keyLists = new Dictionary<int, List<int>>();
+
+            for (var i = 0; i < specs.Count; i++)
+            {
+                var keyTargetLockId = specs[i].KeyTargetLockId;
+                if (!keyTargetLockId.HasValue)
+                {
+                    continue;
+                }
+
+                if (!keyLists.TryGetValue(keyTargetLockId.Value, out var list))
+                {
+                    list = new List<int>();
+                    keyLists[keyTargetLockId.Value] = list;
+                }
+
+                list.Add(i);
+            }
+
+            var lookup = new Dictionary<int, int[]>(keyLists.Count);
+            foreach (var pair in keyLists)
+            {
+                lookup[pair.Key] = pair.Value.ToArray();
+            }
+
+            return lookup;
         }
 
         private static Dictionary<Coord, int> BuildShutterPositionLookup(IReadOnlyList<ShutterDefinition> shutters)

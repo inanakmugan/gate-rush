@@ -351,5 +351,57 @@ namespace GateRush.Tests
 
             Assert.IsNull(context.ShutterPositionAt(new Coord(2, 2)));
         }
+
+        [Test]
+        public void LockOwnerIndex_ReturnsTheFlatIndexOfTheBlockOwningThatLock()
+        {
+            var key = CreateBlock(1, new Coord(0, 0), keyTargetLockId: 5);
+            var locked = CreateBlock(2, new Coord(1, 0), lockId: 5, requiredKeyCount: 1);
+
+            var context = CreateContext(3, 3, new[] { key, locked });
+
+            Assert.AreEqual(1, context.LockOwnerIndex(5));
+        }
+
+        [Test]
+        public void LockOwnerIndex_ResolvesAcrossTheFlatIndexSpaceIncludingSpawnSlots()
+        {
+            var key = CreateBlock(1, new Coord(0, 0), keyTargetLockId: 5);
+            var generator = new GeneratorDefinition(
+                id: 1, edge: BoardEdge.Top, offset: 0,
+                queue: new[] { CreateSpawnedBlock(lockId: 5, requiredKeyCount: 1) });
+
+            var context = CreateContext(3, 3, new[] { key }, generators: new[] { generator });
+
+            Assert.AreEqual(1, context.LockOwnerIndex(5));
+        }
+
+        [Test]
+        public void LockOwnerIndex_UnknownLockId_Throws()
+        {
+            var context = CreateContext(3, 3);
+
+            Assert.Throws<ArgumentException>(() => context.LockOwnerIndex(42));
+        }
+
+        [Test]
+        public void KeyIndicesForLock_ReturnsEveryBlockCarryingAKeyForThatLock_InIndexOrder()
+        {
+            var locked = CreateBlock(1, new Coord(0, 0), lockId: 5, requiredKeyCount: 2);
+            var keyA = CreateBlock(2, new Coord(1, 0), keyTargetLockId: 5);
+            var keyB = CreateBlock(3, new Coord(2, 0), keyTargetLockId: 5);
+
+            var context = CreateContext(3, 3, new[] { locked, keyA, keyB });
+
+            CollectionAssert.AreEqual(new[] { 1, 2 }, context.KeyIndicesForLock(5));
+        }
+
+        [Test]
+        public void KeyIndicesForLock_LockIdNothingTargets_ReturnsEmpty()
+        {
+            var context = CreateContext(3, 3);
+
+            CollectionAssert.IsEmpty(context.KeyIndicesForLock(999));
+        }
     }
 }
