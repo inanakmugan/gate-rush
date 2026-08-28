@@ -104,8 +104,16 @@ namespace GateRush.Core
             }
         }
 
-        public static void ValidateLock(int? lockId, int requiredKeyCount, string ownerDescription)
+        public static void ValidateLock(
+            int? lockId, int requiredKeyCount, int? keyTargetLockId, string ownerDescription)
         {
+            if (lockId.HasValue && keyTargetLockId.HasValue)
+            {
+                throw new ArgumentException(
+                    $"{ownerDescription} carries both a lock (id {lockId.Value}) and a key (targeting lock " +
+                    $"{keyTargetLockId.Value}); a block may carry one or the other, never both.");
+            }
+
             if (lockId.HasValue && requiredKeyCount < 1)
             {
                 throw new ArgumentException(

@@ -42,7 +42,7 @@ namespace GateRush.Core
 
             BlockValidation.ValidateCells(cells, description);
             BlockValidation.ValidateColorStack(colorStack, description);
-            BlockValidation.ValidateLock(lockId, requiredKeyCount, description);
+            BlockValidation.ValidateLock(lockId, requiredKeyCount, keyTargetLockId, description);
             BlockValidation.ValidateUnfreezeAtClearCount(unfreezeAtClearCount, description);
             BlockValidation.ValidateTimeBonus(timeBonusSeconds, description);
 
