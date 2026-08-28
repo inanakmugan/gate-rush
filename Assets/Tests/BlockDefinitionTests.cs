@@ -12,6 +12,7 @@ namespace GateRush.Tests
             IReadOnlyList<BlockColor> colorStack = null,
             int? lockId = null,
             int requiredKeyCount = 0,
+            int? keyTargetLockId = null,
             int? unfreezeAtClearCount = null,
             int timeBonusSeconds = 0,
             Coord? startOrigin = null)
@@ -25,7 +26,7 @@ namespace GateRush.Tests
                 unfreezeAtClearCount: unfreezeAtClearCount,
                 lockId: lockId,
                 requiredKeyCount: requiredKeyCount,
-                keyTargetLockId: null,
+                keyTargetLockId: keyTargetLockId,
                 keyEffect: KeyEffect.UnlockMovement,
                 timeBonusSeconds: timeBonusSeconds);
         }
@@ -86,6 +87,24 @@ namespace GateRush.Tests
             var block = Build(lockId: 7, requiredKeyCount: 1);
 
             Assert.AreEqual(7, block.LockId);
+        }
+
+        [Test]
+        public void Constructor_CarriesBothALockAndAKey_ThrowsNamingTheBlock()
+        {
+            var ex = Assert.Throws<ArgumentException>(
+                () => Build(lockId: 7, requiredKeyCount: 1, keyTargetLockId: 3));
+
+            StringAssert.Contains("Block 1", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_CarriesOnlyAKey_Succeeds()
+        {
+            var block = Build(keyTargetLockId: 3);
+
+            Assert.AreEqual(3, block.KeyTargetLockId);
+            Assert.IsNull(block.LockId);
         }
 
         [Test]

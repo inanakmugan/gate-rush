@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Core;
 using NUnit.Framework;
 using static GateRush.Tests.Fixture;
@@ -8,16 +9,19 @@ namespace GateRush.Tests
     /// <summary>
     /// Covers Module 03's Phase 1.3 scope — M1 (movement, gate exit,
     /// obstruction), M7 (axis restriction), zero-distance moves, the joker entry
-    /// points — and Module 06's Phase 1.7 additions: M2 (count-gated gates),
+    /// points — Module 06's Phase 1.7 additions: M2 (count-gated gates),
     /// M3 (count-gated blocks), M5's threshold evaluation (shutters opening),
     /// M10 (time-bonus output), the "opening never clears" rule (D25), and the
-    /// fixpoint loop's first real chains.
+    /// fixpoint loop's first real chains — and Module 07's Phase 1.8 additions:
+    /// M8 (locks and keys), where a key's <see cref="KeyEffect.ClearOuterColor"/>
+    /// makes the fixpoint loop feed itself.
     /// </summary>
     /// <remarks>
     /// Still deferred to phase 1.13 (spawners): a generator or elevator wave
-    /// arriving mid-resolution. The "resolution cycle throws" case is exercised
-    /// through <see cref="ScriptedLoopResolver"/> here and does not need real
-    /// level data.
+    /// arriving mid-resolution, and the named "owner not yet spawned" branch in
+    /// <c>ApplyKeyEffects</c> that holds a key rather than consuming it. The
+    /// "resolution cycle throws" case is exercised through
+    /// <see cref="ScriptedLoopResolver"/> here and does not need real level data.
     /// </remarks>
     public class MoveResolverTests
     {
@@ -1153,6 +1157,486 @@ namespace GateRush.Tests
 
             Assert.IsFalse(moved);
             Assert.AreEqual(0, seconds);
+        }
+
+        // ----- M8: locks and keys — key consumption (phase 1.8) --------
+
+        [Test]
+        public void TryApplyMove_KeyCarryingBlockDies_ItsKeyIsMarkedConsumed()
+        {
+            var ctx = Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(3, 0), keyTarget: 5)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(3, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(result.Alive[1]);
+            Assert.IsTrue(result.KeyConsumed[1]);
+        }
+
+        [Test]
+        public void TryApplyMove_LayeredKeyBlockShedsOneColourAndSurvives_DoesNotConsumeItsKey()
+        {
+            var ctx = Ctx(
+                5, 5,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(2, 0),
+                        colors: new[] { BlockColor.Red, BlockColor.Blue }, keyTarget: 5)
+                },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(2, 0)), out var result, out _);
+
+            Assert.IsTrue(result.Alive[1]);
+            Assert.AreEqual(1, result.ClearedColors[1]);
+            Assert.IsFalse(result.KeyConsumed[1], "only the clear that empties the stack delivers the key");
+            Assert.IsFalse(result.Unlocked[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_KeyConsumedExactlyOnce_EvenWhenResolutionContinuesAfterwards()
+        {
+            // The key's death takes TotalClearCount to 1, which then unfreezes
+            // block 3 in a later pass — the resolution keeps running, but the key
+            // is marked consumed exactly once.
+            var ctx = Ctx(
+                6, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(5, 0), keyTarget: 5),
+                    Block(3, new Coord(3, 0), unfreezeAt: 1)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(5, 0)), out var result, out _);
+
+            Assert.IsTrue(result.Unlocked[0]);
+            Assert.IsTrue(result.Unfrozen[2]);
+
+            var consumedCount = 0;
+            foreach (var consumed in result.KeyConsumed)
+            {
+                if (consumed)
+                {
+                    consumedCount++;
+                }
+            }
+
+            Assert.AreEqual(1, consumedCount);
+        }
+
+        // ----- M8: UnlockMovement effect (phase 1.8) -------------------
+
+        [Test]
+        public void TryApplyMove_ALockedBlockCannotMoveAndStillObstructs()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(2, 0), lockId: 5, requiredKeys: 1),
+                    Block(3, new Coord(4, 0), keyTarget: 5)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var lockedMoved = Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(3, 0)), out _, out _);
+            var blockedByLocked = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out _, out _);
+
+            Assert.IsFalse(lockedMoved, "the locked block itself cannot move");
+            Assert.IsFalse(blockedByLocked, "and it still obstructs another block's path");
+        }
+
+        [Test]
+        public void TryApplyMove_KeyDies_UnlocksTheOwnerInTheSameResolutionAndItMovesNext()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), keyTarget: 5)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(1, new Coord(4, 0)), out var afterKey, out _);
+
+            Assert.IsTrue(afterKey.Unlocked[0]);
+
+            var moved = resolver.TryApplyMove(ctx, afterKey, new Move(0, new Coord(2, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.AreEqual(new Coord(2, 0), result.Origins[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_LockRequiringTwoKeys_OpensOnlyOnTheSecond()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[]
+                {
+                    Block(1, new Coord(0, 2), lockId: 5, requiredKeys: 2),
+                    Block(2, new Coord(0, 0), keyTarget: 5),
+                    Block(3, new Coord(2, 0), keyTarget: 5)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 2, 1, BlockColor.Red)
+                });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(1, new Coord(0, 0)), out var afterFirst, out _);
+
+            Assert.IsFalse(afterFirst.Unlocked[0], "one key of two is not enough");
+            Assert.IsTrue(afterFirst.KeyConsumed[1]);
+
+            var moved = resolver.TryApplyMove(
+                ctx, afterFirst, new Move(2, new Coord(2, 0)), out var afterSecond, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(afterSecond.Unlocked[0], "the second key opens it");
+        }
+
+        [Test]
+        public void TryApplyMove_AnUnlockedOwnerStaysUnlockedAcrossLaterMoves()
+        {
+            var ctx = Ctx(
+                5, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 1), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), keyTarget: 5)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(1, new Coord(4, 0)), out var afterKey, out _);
+            resolver.TryApplyMove(ctx, afterKey, new Move(0, new Coord(3, 1)), out var afterMove, out _);
+
+            var moved = resolver.TryApplyMove(ctx, afterMove, new Move(0, new Coord(0, 1)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.Unlocked[0]);
+        }
+
+        // ----- M8: ClearOuterColor effect (phase 1.8) -----------------
+
+        [Test]
+        public void TryApplyMove_KeyWithClearOuterColour_ClearsTheOwnersOuterColourAndRemovesTheLock()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Blue },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(4, 0)), out var result, out _);
+
+            Assert.IsFalse(result.Alive[0], "a single-colour owner dies");
+            Assert.IsTrue(result.Unlocked[0], "and the lock is removed either way");
+            Assert.AreEqual(2, result.TotalClearCount, "the key's own clear plus the effect clear");
+        }
+
+        [Test]
+        public void TryApplyMove_ClearOuterColourOnALayeredOwner_LeavesItAliveUnlockedAndMovable()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0),
+                        colors: new[] { BlockColor.Blue, BlockColor.Green },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(1, new Coord(4, 0)), out var afterKey, out _);
+
+            Assert.IsTrue(afterKey.Alive[0]);
+            Assert.AreEqual(1, afterKey.ClearedColors[0]);
+            Assert.AreEqual(BlockColor.Green, afterKey.CurrentColorOf(ctx, 0));
+            Assert.IsTrue(afterKey.Unlocked[0]);
+
+            var moved = resolver.TryApplyMove(ctx, afterKey, new Move(0, new Coord(2, 0)), out var result, out _);
+
+            Assert.IsTrue(moved, "the formerly locked block now moves");
+            Assert.AreEqual(new Coord(2, 0), result.Origins[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_ClearOuterColourEffect_CreditsTheColourRemovedFromTheOwnerNotTheKeyBlock()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), colors: new[] { BlockColor.Red },
+                        keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(4, 0)), out var result, out _);
+
+            Assert.AreEqual(1, result.ClearCountByColor[(int)BlockColor.Red], "the key block's own red clear");
+            Assert.AreEqual(
+                1, result.ClearCountByColor[(int)BlockColor.Green], "the owner's green, removed by the effect");
+        }
+
+        // ----- M8: a key consumed against a dead target (phase 1.8) ---
+
+        [Test]
+        public void TryApplyMove_RocketKilledTheLockedBlockFirst_ItsKeyIsConsumedButNothingIsApplied()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+
+            resolver.TryClearBlock(ctx, BoardState.CreateInitial(ctx), 0, out var afterRocket, out _);
+
+            Assert.IsFalse(afterRocket.Alive[0]);
+            Assert.IsTrue(afterRocket.Alive[1], "the key block is untouched by a rocket on its target");
+
+            var moved = resolver.TryApplyMove(ctx, afterRocket, new Move(1, new Coord(4, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.KeyConsumed[1], "the key is still spent");
+            Assert.IsFalse(result.Alive[1], "it still leaves only through its own gate");
+            Assert.AreEqual(2, result.TotalClearCount, "rocket clear + key clear only; no effect clear on a dead owner");
+        }
+
+        [Test]
+        public void TrySweepColor_BroomKilledTheLockedBlockFirst_ItsKeyIsConsumedButNothingIsApplied()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Blue },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(4, 0), colors: new[] { BlockColor.Red },
+                        keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+
+            resolver.TrySweepColor(ctx, BoardState.CreateInitial(ctx), BlockColor.Blue, out var afterBroom, out _);
+
+            Assert.IsFalse(afterBroom.Alive[0]);
+
+            var moved = resolver.TryApplyMove(ctx, afterBroom, new Move(1, new Coord(4, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.KeyConsumed[1]);
+            Assert.AreEqual(2, result.TotalClearCount);
+        }
+
+        // ----- M8: jokers do not differentiate a locked block (D11) ---
+
+        [Test]
+        public void TryClearBlock_Rocket_ClearsALockedBlocksOuterColourWithoutUnlockingIt()
+        {
+            var ctx = Ctx(
+                3, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0),
+                        colors: new[] { BlockColor.Red, BlockColor.Blue }, lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(2, 0), keyTarget: 5)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result, out _);
+
+            Assert.IsTrue(cleared);
+            Assert.AreEqual(1, result.ClearedColors[0]);
+            Assert.AreEqual(BlockColor.Blue, result.CurrentColorOf(ctx, 0));
+            Assert.IsFalse(result.Unlocked[0], "the rocket clears a colour; it is not a key");
+        }
+
+        [Test]
+        public void TrySweepColor_Broom_IncludesLockedBlocksShowingItsColour()
+        {
+            var ctx = Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Red }, lockId: 5, requiredKeys: 1),
+                    Block(3, new Coord(3, 0), colors: new[] { BlockColor.Blue }, keyTarget: 5)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out var result, out _);
+
+            Assert.IsTrue(swept);
+            Assert.IsFalse(result.Alive[0]);
+            Assert.IsFalse(result.Alive[1], "the locked block is swept too");
+            Assert.IsTrue(result.Alive[2], "the blue key block is not a red match");
+            Assert.AreEqual(2, result.TotalClearCount);
+        }
+
+        // ----- M8: the fixpoint loop closing on itself (D8) -----------
+
+        [Test]
+        public void TryApplyMove_KeyClearOuterColourCrossesAGateThreshold_GateOpenByResolutionEnd()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Blue },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(5, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Left, 0, 1, BlockColor.Green, openAt: 2)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(5, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(state.GateOpen[1]);
+            Assert.IsTrue(result.GateOpen[1], "the key clear takes the count to 1, the effect clear to 2");
+        }
+
+        [Test]
+        public void TryApplyMove_KeyClearOuterColourCrossesAnUnfreezeThreshold_BlockUnfrozenByResolutionEnd()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Blue },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(5, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(3, new Coord(3, 0), unfreezeAt: 2)
+                },
+                gates: new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(5, 0)), out var result, out _);
+
+            Assert.IsFalse(state.Unfrozen[2]);
+            Assert.IsTrue(result.Unfrozen[2]);
+        }
+
+        [Test]
+        public void TrySweepColor_BroomConsumingSeveralKeysAtOnce_AppliesEveryEffectInOneResolution()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green }, lockId: 1, requiredKeys: 1),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }, lockId: 2, requiredKeys: 1),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }, lockId: 3, requiredKeys: 1),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Red }, keyTarget: 1),
+                    Block(5, new Coord(4, 0), colors: new[] { BlockColor.Red }, keyTarget: 2),
+                    Block(6, new Coord(5, 0), colors: new[] { BlockColor.Red }, keyTarget: 3)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out var result, out _);
+
+            Assert.IsTrue(swept);
+            Assert.IsTrue(result.Unlocked[0]);
+            Assert.IsTrue(result.Unlocked[1]);
+            Assert.IsTrue(result.Unlocked[2]);
+            Assert.IsFalse(result.Alive[3]);
+            Assert.IsFalse(result.Alive[4]);
+            Assert.IsFalse(result.Alive[5]);
+        }
+
+        [Test]
+        public void TryApplyMove_KeyEffectKillsItsTarget_ThatDeathsEventIsDrainedInTheSameResolution()
+        {
+            // The owner's death from ClearOuterColor must feed the same drain:
+            // its clear takes the count from 1 to 2 and opens a count-2 gate,
+            // rather than being deferred to a later action.
+            var ctx = Ctx(
+                6, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Blue },
+                        lockId: 5, requiredKeys: 1),
+                    Block(2, new Coord(5, 0), keyTarget: 5, keyEffect: KeyEffect.ClearOuterColor)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 2, 1, BlockColor.Green, openAt: 2)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(5, 0)), out var result, out _);
+
+            Assert.AreEqual(2, result.TotalClearCount);
+            Assert.IsTrue(result.GateOpen[1]);
+        }
+
+        // ----- M8: resolution stays within the fixpoint bound ---------
+
+        [Test]
+        public void TrySweepColor_ManyIndependentClearOuterColourKeysAtOnce_ResolvesWithinTheFixpointBound()
+        {
+            // Six ClearOuterColor keys, each killing its own single-colour locked
+            // target: twelve clears in one resolution. The lock-or-key rule keeps
+            // this from cascading — no target can itself carry a key — so
+            // MaxResolutionPasses is not exceeded and nothing throws.
+            var blocks = new List<BlockDefinition>();
+            for (var i = 0; i < 6; i++)
+            {
+                blocks.Add(Block(i + 1, new Coord(i, 1),
+                    colors: new[] { BlockColor.Green }, lockId: i + 1, requiredKeys: 1));
+            }
+
+            for (var i = 0; i < 6; i++)
+            {
+                blocks.Add(Block(i + 7, new Coord(i, 0),
+                    colors: new[] { BlockColor.Red }, keyTarget: i + 1, keyEffect: KeyEffect.ClearOuterColor));
+            }
+
+            var ctx = Ctx(6, 2, blocks);
+            var state = BoardState.CreateInitial(ctx);
+
+            Assert.DoesNotThrow(() => Resolver().TrySweepColor(ctx, state, BlockColor.Red, out _, out _));
         }
     }
 }
