@@ -26,6 +26,15 @@ namespace GateRush.Core
         public int? UnfreezeAtClearCount { get; }
         public int? LockId { get; }
 
+        /// <summary>
+        /// Seconds this block adds to the level's countdown when it is destroyed
+        /// — its final colour cleared, not each clear of a stack (M10). Reported
+        /// by <c>MoveResolver</c> as an output; never stored in
+        /// <see cref="BoardState"/>, since <c>Core</c> has no countdown
+        /// (<c>DECISIONS.md</c> D12). Zero for a block carrying no bonus.
+        /// </summary>
+        public int TimeBonusSeconds { get; }
+
         public BlockSpec(BlockDefinition block)
         {
             Cells = block.Cells;
@@ -33,6 +42,7 @@ namespace GateRush.Core
             Axis = block.Axis;
             UnfreezeAtClearCount = block.UnfreezeAtClearCount;
             LockId = block.LockId;
+            TimeBonusSeconds = block.TimeBonusSeconds;
         }
 
         public BlockSpec(SpawnedBlock block)
@@ -42,6 +52,7 @@ namespace GateRush.Core
             Axis = block.Axis;
             UnfreezeAtClearCount = block.UnfreezeAtClearCount;
             LockId = block.LockId;
+            TimeBonusSeconds = block.TimeBonusSeconds;
         }
     }
 }
