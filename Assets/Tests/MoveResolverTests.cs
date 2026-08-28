@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using GateRush.Core;
 using NUnit.Framework;
+using static GateRush.Tests.Fixture;
 
 namespace GateRush.Tests
 {
@@ -17,7 +17,6 @@ namespace GateRush.Tests
     /// </remarks>
     public class MoveResolverTests
     {
-        private static readonly Coord[] Cell1x1 = { new Coord(0, 0) };
         private static readonly Coord[] CellsVertical1x2 = { new Coord(0, 0), new Coord(0, 1) };
         private static readonly Coord[] CellsHorizontal1x3 =
             { new Coord(0, 0), new Coord(1, 0), new Coord(2, 0) };
@@ -32,59 +31,6 @@ namespace GateRush.Tests
         // An L filling the bottom-left of its bounding box: (0,0), (1,0), (0,1).
         private static readonly Coord[] CellsLCorner =
             { new Coord(0, 0), new Coord(1, 0), new Coord(0, 1) };
-
-        private static BlockDefinition Block(
-            int id,
-            Coord start,
-            IReadOnlyList<Coord> cells = null,
-            IReadOnlyList<BlockColor> colors = null,
-            MovementAxis axis = MovementAxis.Free,
-            int? unfreezeAt = null,
-            int? lockId = null,
-            int requiredKeys = 0,
-            int? keyTarget = null)
-        {
-            return new BlockDefinition(
-                id: id,
-                cells: cells ?? Cell1x1,
-                colorStack: colors ?? new[] { BlockColor.Red },
-                startOrigin: start,
-                axis: axis,
-                unfreezeAtClearCount: unfreezeAt,
-                lockId: lockId,
-                requiredKeyCount: requiredKeys,
-                keyTargetLockId: keyTarget,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
-
-        private static GateDefinition Gate(
-            int id, BoardEdge edge, int offset, int width, BlockColor color, int? openAt = null)
-        {
-            return new GateDefinition(id, edge, offset, width, color, openAt);
-        }
-
-        private static LevelContext Ctx(
-            int width,
-            int height,
-            IReadOnlyList<BlockDefinition> blocks,
-            IReadOnlyList<GateDefinition> gates = null,
-            IReadOnlyList<ShutterDefinition> shutters = null,
-            IReadOnlyList<Coord> staticWalls = null)
-        {
-            return new LevelContext(
-                levelId: 1,
-                width: width,
-                height: height,
-                staticWalls: staticWalls ?? Array.Empty<Coord>(),
-                blocks: blocks,
-                gates: gates ?? Array.Empty<GateDefinition>(),
-                shutters: shutters ?? Array.Empty<ShutterDefinition>(),
-                generators: Array.Empty<GeneratorDefinition>(),
-                elevators: Array.Empty<ElevatorDefinition>(),
-                suggestedTimeBudgetSeconds: 60,
-                goldReward: 100);
-        }
 
         private static MoveResolver Resolver() => new MoveResolver();
 
@@ -333,7 +279,7 @@ namespace GateRush.Tests
             var ctx = Ctx(
                 5, 1,
                 new[] { Block(1, new Coord(0, 0)) },
-                shutters: new[] { new ShutterDefinition(1, new Coord(2, 0), new Coord(2, 0), 3, null) });
+                shutters: new[] { Shutter(1, new Coord(2, 0), new Coord(2, 0), 3) });
             var state = BoardState.CreateInitial(ctx);
 
             var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out _);
@@ -683,7 +629,7 @@ namespace GateRush.Tests
             var ctx = Ctx(
                 3, 1,
                 new[] { Block(1, new Coord(0, 0)) },
-                shutters: new[] { new ShutterDefinition(1, new Coord(0, 0), new Coord(0, 0), 3, null) });
+                shutters: new[] { Shutter(1, new Coord(0, 0), new Coord(0, 0), 3) });
             var state = BoardState.CreateInitial(ctx);
 
             var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result);

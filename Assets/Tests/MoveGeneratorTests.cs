@@ -1,9 +1,9 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using GateRush.Core;
 using GateRush.Solver;
 using NUnit.Framework;
+using static GateRush.Tests.Fixture;
 
 namespace GateRush.Tests
 {
@@ -19,66 +19,6 @@ namespace GateRush.Tests
     /// </remarks>
     public class MoveGeneratorTests
     {
-        private static readonly Coord[] Cell1x1 = { new Coord(0, 0) };
-
-        private static BlockDefinition Block(
-            int id,
-            Coord start,
-            IReadOnlyList<Coord> cells = null,
-            IReadOnlyList<BlockColor> colors = null,
-            MovementAxis axis = MovementAxis.Free,
-            int? unfreezeAt = null,
-            int? lockId = null,
-            int requiredKeys = 0,
-            int? keyTarget = null)
-        {
-            return new BlockDefinition(
-                id: id,
-                cells: cells ?? Cell1x1,
-                colorStack: colors ?? new[] { BlockColor.Red },
-                startOrigin: start,
-                axis: axis,
-                unfreezeAtClearCount: unfreezeAt,
-                lockId: lockId,
-                requiredKeyCount: requiredKeys,
-                keyTargetLockId: keyTarget,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
-
-        private static GateDefinition Gate(
-            int id, BoardEdge edge, int offset, int width, BlockColor color, int? openAt = null)
-        {
-            return new GateDefinition(id, edge, offset, width, color, openAt);
-        }
-
-        private static ElevatorDefinition Elevator(int id, Coord min, Coord max)
-        {
-            return new ElevatorDefinition(id, min, max, waves: null);
-        }
-
-        private static LevelContext Ctx(
-            int width,
-            int height,
-            IReadOnlyList<BlockDefinition> blocks,
-            IReadOnlyList<GateDefinition> gates = null,
-            IReadOnlyList<ElevatorDefinition> elevators = null,
-            IReadOnlyList<Coord> staticWalls = null)
-        {
-            return new LevelContext(
-                levelId: 1,
-                width: width,
-                height: height,
-                staticWalls: staticWalls ?? Array.Empty<Coord>(),
-                blocks: blocks,
-                gates: gates ?? Array.Empty<GateDefinition>(),
-                shutters: Array.Empty<ShutterDefinition>(),
-                generators: Array.Empty<GeneratorDefinition>(),
-                elevators: elevators ?? Array.Empty<ElevatorDefinition>(),
-                suggestedTimeBudgetSeconds: 60,
-                goldReward: 100);
-        }
-
         private static MoveGenerator Generator() => new MoveGenerator();
 
         private static List<Move> Generate(LevelContext ctx, BoardState state, MoveGenMode mode) =>
