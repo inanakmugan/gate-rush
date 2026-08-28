@@ -6,14 +6,18 @@ using static GateRush.Tests.Fixture;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Module 03's Phase 1.3 scope: M1 (movement, gate exit, obstruction),
-    /// M7 (axis restriction), zero-distance moves, and the joker entry points.
+    /// Covers Module 03's Phase 1.3 scope — M1 (movement, gate exit,
+    /// obstruction), M7 (axis restriction), zero-distance moves, the joker entry
+    /// points — and Module 06's Phase 1.7 additions: M2 (count-gated gates),
+    /// M3 (count-gated blocks), M5's threshold evaluation (shutters opening),
+    /// M10 (time-bonus output), the "opening never clears" rule (D25), and the
+    /// fixpoint loop's first real chains.
     /// </summary>
     /// <remarks>
-    /// Deferred until later phases give the resolver something to chain on:
-    /// a gate/shutter that opens mid-resolution, the broom cascade stress test,
-    /// and the "resolution cycle throws" test. None can be built without the
-    /// condition system (phase 1.7) or spawners (phase 1.13).
+    /// Still deferred to phase 1.13 (spawners): a generator or elevator wave
+    /// arriving mid-resolution. The "resolution cycle throws" case is exercised
+    /// through <see cref="ScriptedLoopResolver"/> here and does not need real
+    /// level data.
     /// </remarks>
     public class MoveResolverTests
     {
@@ -97,7 +101,7 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 3, new[] { Block(1, new Coord(0, 0)) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 2)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 2)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(new Coord(2, 2), result.Origins[0]);
@@ -112,7 +116,7 @@ namespace GateRush.Tests
                 staticWalls: new[] { new Coord(0, 1), new Coord(1, 0) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -137,7 +141,7 @@ namespace GateRush.Tests
                 staticWalls: BentCorridorWalls());
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(new Coord(3, 0), result.Origins[0]);
@@ -152,7 +156,7 @@ namespace GateRush.Tests
                 staticWalls: BentCorridorWalls());
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -167,7 +171,7 @@ namespace GateRush.Tests
                 staticWalls: BentCorridorWalls());
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -179,7 +183,7 @@ namespace GateRush.Tests
             var ctx = Ctx(4, 1, new[] { Block(1, new Coord(0, 0)) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(new Coord(2, 0), result.Origins[0]);
@@ -193,7 +197,7 @@ namespace GateRush.Tests
                 new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 0)) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -209,7 +213,7 @@ namespace GateRush.Tests
                 new[] { Block(1, new Coord(0, 0), axis: MovementAxis.HorizontalOnly) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(new Coord(2, 0), result.Origins[0]);
@@ -225,7 +229,7 @@ namespace GateRush.Tests
                 new[] { Block(1, new Coord(0, 0), axis: MovementAxis.HorizontalOnly) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 2)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 2)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -239,7 +243,7 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0), unfreezeAt: 5) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -250,7 +254,7 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0), unfreezeAt: 0) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(new Coord(1, 0), result.Origins[0]);
@@ -268,7 +272,7 @@ namespace GateRush.Tests
                 });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -282,7 +286,7 @@ namespace GateRush.Tests
                 shutters: new[] { Shutter(1, new Coord(2, 0), new Coord(2, 0), 3) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -298,7 +302,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsFalse(result.Alive[0]);
@@ -311,7 +315,7 @@ namespace GateRush.Tests
             var ctx = Ctx(5, 5, new[] { Block(1, new Coord(2, 2)) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 2)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 2)), out var result, out _);
 
             Assert.IsFalse(moved);
             Assert.IsNull(result);
@@ -326,7 +330,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsTrue(result.Alive[0]);
@@ -344,7 +348,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsFalse(result.Alive[0]);
@@ -362,7 +366,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsFalse(result.Alive[0]);
@@ -377,7 +381,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Left, 1, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 1)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 1)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -391,7 +395,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Left, 1, 2, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 1)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 1)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsFalse(result.Alive[0]);
@@ -406,7 +410,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -420,7 +424,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 1, 2, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsFalse(result.Alive[0]);
@@ -435,7 +439,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -449,7 +453,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Blue) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -463,7 +467,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red, openAt: 5) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -477,7 +481,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 3, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -495,7 +499,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Blue) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsTrue(result.Alive[0]);
@@ -513,7 +517,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red, openAt: 5) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(moved);
             Assert.IsTrue(result.Alive[0]);
@@ -531,7 +535,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.IsTrue(result.Alive[0]);
             Assert.AreEqual(1, result.ClearedColors[0]);
@@ -548,9 +552,9 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var resolver = Resolver();
             resolver.TryApplyMove(
-                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(2, 0)), out var afterFirst);
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(2, 0)), out var afterFirst, out _);
 
-            var movedAgain = resolver.TryApplyMove(ctx, afterFirst, new Move(0, new Coord(2, 0)), out _);
+            var movedAgain = resolver.TryApplyMove(ctx, afterFirst, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsFalse(movedAgain);
         }
@@ -564,7 +568,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result);
+            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out var result, out _);
 
             Assert.AreEqual(1, result.ClearCountByColor[(int)BlockColor.Red]);
             Assert.AreEqual(0, result.ClearCountByColor[(int)BlockColor.Blue]);
@@ -588,7 +592,7 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _);
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsFalse(moved);
         }
@@ -601,7 +605,7 @@ namespace GateRush.Tests
             var ctx = Ctx(4, 4, new[] { Block(1, new Coord(0, 0)) });
             var state = BoardState.CreateInitial(ctx);
 
-            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 3)), out var result);
+            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 3)), out var result, out _);
 
             Assert.AreEqual(new Coord(3, 3), result.Origins[0]);
             Assert.IsTrue(result.Alive[0]);
@@ -616,7 +620,7 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0), unfreezeAt: 5) });
             var state = BoardState.CreateInitial(ctx);
 
-            var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result);
+            var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result, out _);
 
             Assert.IsTrue(cleared);
             Assert.IsFalse(result.Alive[0]);
@@ -632,7 +636,7 @@ namespace GateRush.Tests
                 shutters: new[] { Shutter(1, new Coord(0, 0), new Coord(0, 0), 3) });
             var state = BoardState.CreateInitial(ctx);
 
-            var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result);
+            var cleared = Resolver().TryClearBlock(ctx, state, 0, out var result, out _);
 
             Assert.IsFalse(cleared);
             Assert.IsNull(result);
@@ -651,7 +655,7 @@ namespace GateRush.Tests
                 });
             var state = BoardState.CreateInitial(ctx);
 
-            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out var result);
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out var result, out _);
 
             Assert.IsTrue(swept);
             Assert.IsFalse(result.Alive[0]);
@@ -666,7 +670,7 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }) });
             var state = BoardState.CreateInitial(ctx);
 
-            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Green, out var result);
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Green, out var result, out _);
 
             Assert.IsFalse(swept);
             Assert.IsNull(result);
@@ -693,7 +697,7 @@ namespace GateRush.Tests
             var state = BoardState.CreateInitial(ctx);
             var resolver = new ScriptedLoopResolver(hook, changingPasses: 3);
 
-            var moved = resolver.TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _);
+            var moved = resolver.TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _);
 
             Assert.IsTrue(moved);
             Assert.AreEqual(3, resolver.ChangesReported);
@@ -708,7 +712,7 @@ namespace GateRush.Tests
             var resolver = new ScriptedLoopResolver(hook, int.MaxValue);
 
             Assert.Throws<InvalidOperationException>(
-                () => resolver.TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _));
+                () => resolver.TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out _, out _));
         }
 
         // ----- Successor independence ----------------------------------
@@ -722,10 +726,433 @@ namespace GateRush.Tests
                 gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var state = BoardState.CreateInitial(ctx);
 
-            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _);
+            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out _);
 
             Assert.IsTrue(state.Alive[0]);
             Assert.AreEqual(0, state.TotalClearCount);
+        }
+
+        // ----- M2: count-gated gates (phase 1.7) -------------------------
+
+        [Test]
+        public void CreateInitial_GateWithNoThreshold_IsOpen()
+        {
+            var ctx = Ctx(
+                3, 1,
+                new[] { Block(1, new Coord(0, 0)) },
+                gates: new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+
+            Assert.IsTrue(BoardState.CreateInitial(ctx).GateOpen[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_CrossingAGateThreshold_OpensThatGateInTheSameResolution()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0)) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red, openAt: 1)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(state.GateOpen[1]);
+            Assert.IsTrue(result.GateOpen[1]);
+        }
+
+        [Test]
+        public void TryApplyMove_AnOpenedGateStaysOpenAcrossAFurtherMove()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0)) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red, openAt: 1)
+                });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterOpen, out _);
+
+            var moved = resolver.TryApplyMove(ctx, afterOpen, new Move(1, new Coord(4, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(result.Alive[1]);
+            Assert.IsTrue(result.GateOpen[1]);
+        }
+
+        // ----- M3: count-gated (frozen) blocks (phase 1.7) --------------
+
+        [Test]
+        public void TryApplyMove_AFrozenBlockCannotMoveButStillObstructs()
+        {
+            var ctx = Ctx(
+                4, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 0), unfreezeAt: 5) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var movedFrozen = Resolver().TryApplyMove(ctx, state, new Move(1, new Coord(3, 0)), out _, out _);
+            var blockedByFrozen = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out _, out _);
+
+            Assert.IsFalse(movedFrozen);
+            Assert.IsFalse(blockedByFrozen);
+        }
+
+        [Test]
+        public void TryApplyMove_CrossingTheUnfreezeThreshold_UnfreezesTheBlockInTheSameResolution()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0), unfreezeAt: 1) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+
+            var cleared = resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterClear, out _);
+
+            Assert.IsTrue(cleared);
+            Assert.IsTrue(afterClear.Unfrozen[1]);
+
+            var moved = resolver.TryApplyMove(ctx, afterClear, new Move(1, new Coord(5, 0)), out var result, out _);
+
+            Assert.IsTrue(moved, "the unfrozen block now moves");
+            Assert.AreEqual(new Coord(5, 0), result.Origins[1]);
+        }
+
+        [Test]
+        public void TryApplyMove_AnUnfrozenBlockStaysUnfrozenAcrossLaterMoves()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0), unfreezeAt: 1) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterClear, out _);
+            resolver.TryApplyMove(ctx, afterClear, new Move(1, new Coord(5, 0)), out var afterMove, out _);
+
+            var moved = resolver.TryApplyMove(ctx, afterMove, new Move(1, new Coord(3, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.Unfrozen[1]);
+        }
+
+        // ----- M5: shutters, threshold evaluation only (phase 1.7) ------
+
+        [Test]
+        public void TryApplyMove_ABlockUnderAClosedShutter_CannotBeMoved()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[] { Block(1, new Coord(2, 0)) },
+                shutters: new[] { Shutter(1, new Coord(2, 0), new Coord(2, 0), 3) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(3, 0)), out _, out _);
+
+            Assert.IsFalse(moved);
+        }
+
+        [Test]
+        public void TryApplyMove_AGlobalShutter_OpensOnTheTotalClearCount()
+        {
+            var ctx = Ctx(
+                6, 2,
+                new[] { Block(1, new Coord(0, 0)) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) },
+                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 1), 1) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(state.ShutterOpen[0]);
+            Assert.IsTrue(result.ShutterOpen[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_AColourBoundShutter_OpensOnItsColourAndNotOnOthers()
+        {
+            var ctx = Ctx(
+                7, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }),
+                    Block(2, new Coord(4, 0), colors: new[] { BlockColor.Blue })
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Blue)
+                },
+                shutters: new[] { Shutter(1, new Coord(6, 0), new Coord(6, 1), 1, BlockColor.Blue) });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterRed, out _);
+            var movedBlue = resolver.TryApplyMove(ctx, afterRed, new Move(1, new Coord(4, 0)), out var afterBlue, out _);
+
+            Assert.IsTrue(movedBlue);
+            Assert.IsFalse(afterRed.ShutterOpen[0], "a red clear does not satisfy a blue-bound threshold");
+            Assert.IsTrue(afterBlue.ShutterOpen[0]);
+        }
+
+        [Test]
+        public void TryApplyMove_AfterAShutterOpens_TheBlockUnderItBecomesTargetable()
+        {
+            var ctx = Ctx(
+                6, 2,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(3, 0)) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) },
+                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 1), 1) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(state.CanBeTargeted(ctx, 1));
+            Assert.IsTrue(result.CanBeTargeted(ctx, 1));
+        }
+
+        // ----- Opening never clears — the three cases (D25) -------------
+
+        [Test]
+        public void TryApplyMove_GateOpensWithACompatibleBlockFlushAgainstIt_DoesNotClearIt()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0)) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red, openAt: 1)
+                });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterOpen, out _);
+
+            Assert.IsTrue(afterOpen.GateOpen[1]);
+            Assert.IsTrue(afterOpen.Alive[1], "the waiting block is not cleared by the gate opening");
+            Assert.AreEqual(0, afterOpen.ClearedColors[1]);
+
+            var pushed = resolver.TryApplyMove(ctx, afterOpen, new Move(1, new Coord(4, 0)), out var afterPush, out _);
+
+            Assert.IsTrue(pushed, "a zero-distance move then clears it");
+            Assert.IsFalse(afterPush.Alive[1]);
+            Assert.AreEqual(2, afterPush.TotalClearCount);
+        }
+
+        [Test]
+        public void TryApplyMove_BlockUnfreezesWhileFlushAgainstACompatibleOpenGate_DoesNotClearIt()
+        {
+            var ctx = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0), unfreezeAt: 1) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red)
+                });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterUnfreeze, out _);
+
+            Assert.IsTrue(afterUnfreeze.Unfrozen[1]);
+            Assert.IsTrue(afterUnfreeze.Alive[1], "unfreezing does not clear the block");
+            Assert.AreEqual(0, afterUnfreeze.ClearedColors[1]);
+
+            var pushed = resolver.TryApplyMove(ctx, afterUnfreeze, new Move(1, new Coord(4, 0)), out var afterPush, out _);
+
+            Assert.IsTrue(pushed);
+            Assert.IsFalse(afterPush.Alive[1]);
+        }
+
+        [Test]
+        public void TryApplyMove_ShutterOpensExposingABlockFlushAgainstACompatibleOpenGate_DoesNotClearIt()
+        {
+            var ctx = Ctx(
+                6, 2,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(4, 0)) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red)
+                },
+                shutters: new[] { Shutter(1, new Coord(4, 0), new Coord(4, 1), 1) });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var afterOpen, out _);
+
+            Assert.IsTrue(afterOpen.ShutterOpen[0]);
+            Assert.IsTrue(afterOpen.Alive[1], "the exposed block is not cleared by the shutter opening");
+            Assert.AreEqual(0, afterOpen.ClearedColors[1]);
+
+            var pushed = resolver.TryApplyMove(ctx, afterOpen, new Move(1, new Coord(4, 0)), out var afterPush, out _);
+
+            Assert.IsTrue(pushed);
+            Assert.IsFalse(afterPush.Alive[1]);
+        }
+
+        // ----- Chains: the fixpoint loop's first real work (D8) --------
+
+        [Test]
+        public void TryApplyMove_OneClearCrossesAGateAndAFrozenBlockThreshold_BothInOneResolution()
+        {
+            var ctx = Ctx(
+                7, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(4, 0)),
+                    Block(3, new Coord(5, 0), unfreezeAt: 1)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 4, 1, BlockColor.Red, openAt: 1)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.GateOpen[1]);
+            Assert.IsTrue(result.Unfrozen[2]);
+        }
+
+        [Test]
+        public void TrySweepColor_CrossesSeveralThresholdsInOneResolution()
+        {
+            var ctx = Ctx(
+                6, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Red }),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Red }),
+                    Block(4, new Coord(4, 0), colors: new[] { BlockColor.Blue }, unfreezeAt: 3)
+                },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red, openAt: 2) },
+                shutters: new[] { Shutter(1, new Coord(5, 0), new Coord(5, 1), 3, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out var result, out _);
+
+            Assert.IsTrue(swept);
+            Assert.AreEqual(3, result.TotalClearCount);
+            Assert.IsTrue(result.GateOpen[0], "gate threshold 2 crossed");
+            Assert.IsTrue(result.Unfrozen[3], "frozen block threshold 3 crossed");
+            Assert.IsTrue(result.ShutterOpen[0], "red-bound shutter threshold 3 crossed");
+        }
+
+        [Test]
+        public void TryApplyMove_AColourBoundShutterAndAGlobalGate_CrossOnTheSameClear()
+        {
+            var ctx = Ctx(
+                6, 2,
+                new[] { Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }) },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 3, 1, BlockColor.Green, openAt: 1)
+                },
+                shutters: new[] { Shutter(1, new Coord(5, 0), new Coord(5, 1), 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.GateOpen[1], "global-count gate crossed");
+            Assert.IsTrue(result.ShutterOpen[0], "colour-bound shutter crossed");
+        }
+
+        // ----- M10: time-bonus blocks (phase 1.7) ----------------------
+
+        [Test]
+        public void TryApplyMove_ABlockWithNoBonus_ReportsZeroSeconds()
+        {
+            var ctx = Ctx(
+                5, 5,
+                new[] { Block(1, new Coord(2, 0)) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 0)), out _, out var seconds);
+
+            Assert.AreEqual(0, seconds);
+        }
+
+        [Test]
+        public void TryApplyMove_ALayeredBonusBlock_ReportsItsSecondsOnlyWhenTheFinalColourClears()
+        {
+            var ctx = Ctx(
+                5, 5,
+                new[]
+                {
+                    Block(1, new Coord(2, 0),
+                        colors: new[] { BlockColor.Red, BlockColor.Blue }, timeBonusSeconds: 7)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 2, 1, BlockColor.Blue)
+                });
+            var resolver = Resolver();
+
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(2, 0)), out var afterRed, out var redBonus);
+            resolver.TryApplyMove(ctx, afterRed, new Move(0, new Coord(1, 4)), out var afterMove, out var moveBonus);
+            resolver.TryApplyMove(ctx, afterMove, new Move(0, new Coord(2, 4)), out _, out var blueBonus);
+
+            Assert.AreEqual(0, redBonus, "the red clear leaves the block alive");
+            Assert.AreEqual(0, moveBonus, "the reposition past the top edge clears nothing");
+            Assert.AreEqual(7, blueBonus, "the blue clear destroys the block");
+        }
+
+        [Test]
+        public void TrySweepColor_KillingSeveralBonusBlocks_ReportsTheSum()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }, timeBonusSeconds: 4),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Red }, timeBonusSeconds: 5),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Red }, timeBonusSeconds: 6)
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var swept = Resolver().TrySweepColor(ctx, state, BlockColor.Red, out _, out var seconds);
+
+            Assert.IsTrue(swept);
+            Assert.AreEqual(15, seconds);
+        }
+
+        [Test]
+        public void TryApplyMove_AFailedMove_ReportsZeroSeconds()
+        {
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), timeBonusSeconds: 9),
+                    Block(2, new Coord(2, 0))
+                });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(4, 0)), out _, out var seconds);
+
+            Assert.IsFalse(moved);
+            Assert.AreEqual(0, seconds);
         }
     }
 }

@@ -30,7 +30,7 @@ namespace GateRush.Tests
             foreach (var move in solution)
             {
                 Assert.IsTrue(
-                    resolver.TryApplyMove(ctx, state, move, out state),
+                    resolver.TryApplyMove(ctx, state, move, out state, out _),
                     $"replay rejected {move}");
             }
 

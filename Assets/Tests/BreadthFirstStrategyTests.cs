@@ -272,6 +272,43 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Search_TimeBonusOnABoard_ExploresAnIdenticalStateSpace()
+        {
+            // Time is outside the search space (D12): an M10 bonus is not a
+            // BoardState field, so the two boards must explore the *same* states,
+            // not merely reach the same answer. A weaker move-count check would
+            // pass even if the bonus had leaked into BoardState.
+            var plain = Ctx(
+                5, 5,
+                new[] { Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }) },
+                new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 2, 1, BlockColor.Blue)
+                });
+            var withBonus = Ctx(
+                5, 5,
+                new[]
+                {
+                    Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }, timeBonusSeconds: 30)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 2, 1, BlockColor.Blue)
+                });
+            var strategy = new BreadthFirstStrategy();
+
+            var plainResult = strategy.Search(plain, BoardState.CreateInitial(plain), Budget(MoveGenMode.Exhaustive));
+            var bonusResult = strategy.Search(withBonus, BoardState.CreateInitial(withBonus), Budget(MoveGenMode.Exhaustive));
+
+            Assert.AreEqual(SolveStatus.Solvable, plainResult.Status);
+            Assert.AreEqual(plainResult.Status, bonusResult.Status);
+            Assert.AreEqual(plainResult.Solution.Count, bonusResult.Solution.Count);
+            Assert.AreEqual(plainResult.ExploredStateCount, bonusResult.ExploredStateCount);
+        }
+
+        [Test]
         public void Search_EveryReturnedMoveReplaysThroughTheResolver_AndReachesSolved()
         {
             var strategy = new BreadthFirstStrategy();

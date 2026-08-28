@@ -114,7 +114,7 @@ namespace GateRush.Tests
             var ctx = Ctx(4, 1, new[] { Block(1, new Coord(0, 0)) }, Array.Empty<GateDefinition>());
             var before = BoardState.CreateInitial(ctx);
 
-            new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after);
+            new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after, out _);
 
             Assert.GreaterOrEqual(after.ProgressVector.CompareTo(before.ProgressVector), 0);
             Assert.AreEqual(0, after.ProgressVector.CompareTo(before.ProgressVector),
@@ -130,7 +130,7 @@ namespace GateRush.Tests
                 new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var before = BoardState.CreateInitial(ctx);
 
-            new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after);
+            new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after, out _);
 
             Assert.Greater(after.ProgressVector.CompareTo(before.ProgressVector), 0);
         }
