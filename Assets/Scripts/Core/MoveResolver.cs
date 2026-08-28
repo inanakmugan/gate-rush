@@ -13,13 +13,15 @@ namespace GateRush.Core
     /// <remarks>
     /// <para><b>Scope.</b> This class implements M1 (movement and gate exit),
     /// M7 (axis restriction), the count-based unlocks M2 (gates), M3 (frozen
-    /// blocks) and M5's threshold evaluation (shutters), and M10 (time-bonus
-    /// blocks report their seconds when they die). The fixpoint loop
-    /// (<c>DECISIONS.md</c> D8) drives real work through
-    /// <see cref="ReevaluateConditions"/>. Its spawn-trigger and key-effect
-    /// steps remain extension points that do nothing yet — see
-    /// <see cref="CheckSpawnTriggers"/> (M6/M9, phase 1.13) and
-    /// <see cref="ApplyKeyEffects"/> (M8, phase 1.8).</para>
+    /// blocks) and M5's threshold evaluation (shutters), M8 (locks and keys),
+    /// and M10 (time-bonus blocks report their seconds when they die). The
+    /// fixpoint loop (<c>DECISIONS.md</c> D8) drives real work through
+    /// <see cref="ReevaluateConditions"/> and <see cref="ApplyKeyEffects"/> —
+    /// the latter is where the loop first closes a cycle, since a key's
+    /// <see cref="KeyEffect.ClearOuterColor"/> emits a fresh event the same
+    /// drain then processes. Its spawn-trigger step remains an extension point
+    /// that does nothing yet — see <see cref="CheckSpawnTriggers"/> (M6/M9,
+    /// phase 1.13).</para>
     ///
     /// <para><b>Exit is a property of the move, not the position</b>
     /// (<c>DECISIONS.md</c> D25). A move — zero-distance or not — that leaves a
@@ -274,7 +276,7 @@ namespace GateRush.Core
         /// block's stack and the count already cleared — it is never passed in,
         /// so a caller cannot credit the wrong colour when a block is cleared
         /// more than once in one resolution (a broom clear followed by a key
-        /// effect, once phase 1.8 lands). Bumps the cleared-colour count,
+        /// effect on the same block, say). Bumps the cleared-colour count,
         /// enqueues the <see cref="ColorClearedEvent"/> every counter listens to,
         /// and — when that was the block's last colour — marks it dead so its
         /// cells read free and adds its <see cref="BlockSpec.TimeBonusSeconds"/>
@@ -353,18 +355,113 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// EXTENSION POINT — phase 1.8 (M8 locks and keys). When a block that
-        /// carried a key has just died (final colour cleared), this must mark
-        /// that key consumed on the successor and apply its
-        /// <see cref="KeyEffect"/> to the target lock:
-        /// <see cref="KeyEffect.UnlockMovement"/> flips <c>Unlocked</c> once
-        /// enough keys are consumed; <see cref="KeyEffect.ClearOuterColor"/>
-        /// calls <see cref="ClearOuterColor"/> on the target, which enqueues a
-        /// fresh event that this same drain loop then processes. No-op while only
-        /// M1 and M7 are implemented.
+        /// M8. Called once per dequeued <see cref="ColorClearedEvent"/> inside
+        /// <see cref="DrainEvents"/>. When the cleared block has just <em>died</em>
+        /// carrying a key (a shed layer delivers nothing), marks that key consumed
+        /// and, once its target lock has collected <see cref="BlockSpec.RequiredKeyCount"/>
+        /// consumed keys, applies the effect exactly once:
+        /// <see cref="KeyEffect.UnlockMovement"/> flips the owner's <c>Unlocked</c>
+        /// flag and stops; <see cref="KeyEffect.ClearOuterColor"/> flips it
+        /// <em>and</em> calls <see cref="ClearOuterColor"/> on the owner, whose
+        /// fresh event this same drain loop then processes — the one place the
+        /// fixpoint loop feeds itself (<c>DECISIONS.md</c> D8).
+        /// <para>
+        /// A key consumed against an owner that is already dead (destroyed by a
+        /// joker before its key arrived, D11) or already unlocked applies
+        /// nothing; the key-carrying block stays on the board as an ordinary
+        /// block. The lock-or-key rule (a block carries one, never both) bounds
+        /// this: a key's effect can clear its target, but that target holds a
+        /// lock and so cannot itself carry a key, so one key produces at most one
+        /// extra clear and <see cref="LevelContext.MaxResolutionPasses"/> is not
+        /// threatened.
+        /// </para>
         /// </summary>
         private void ApplyKeyEffects(LevelContext ctx, SuccessorBuilder builder, ColorClearedEvent cleared)
         {
+            var keyIndex = cleared.BlockIndex;
+
+            // A shed layer delivers nothing: only the clear that empties a
+            // key-carrying block's stack — leaving it dead — delivers its key.
+            if (builder.IsAlive(keyIndex))
+            {
+                return;
+            }
+
+            var keyTargetLockId = ctx.SpecAt(keyIndex).KeyTargetLockId;
+            if (!keyTargetLockId.HasValue)
+            {
+                return;
+            }
+
+            // A key delivers at most once. The death that delivers it is drained
+            // once, but guard rather than assume.
+            if (builder.IsKeyConsumed(keyIndex))
+            {
+                return;
+            }
+
+            var lockId = keyTargetLockId.Value;
+            var keyEffect = ctx.SpecAt(keyIndex).KeyEffect;
+            var ownerIndex = ctx.LockOwnerIndex(lockId);
+
+            // EXTENSION POINT — phase 1.13 (M6/M9). The lock's owner is a
+            // generator/elevator slot that has not spawned yet: Alive is false
+            // but for a different reason than "destroyed", and BoardState's index
+            // scheme says so explicitly (an unspawned slot keeps
+            // UnspawnedOrigin; a destroyed block keeps the grid cell it died on).
+            // Such a key must be HELD, not consumed — consuming it now would
+            // leave the block permanently locked once it lands, with no visible
+            // cause and no way for a designer to see why the solver calls the
+            // level unsolvable. The pass that spawns the owner
+            // (CheckSpawnTriggers) will raise conditionsDirty; phase 1.13 must
+            // re-evaluate held keys there. Behaviour today is unchanged — no
+            // level has spawners yet — but this branch is named, not folded into
+            // the dead-owner case below.
+            if (!builder.IsAlive(ownerIndex) &&
+                builder.GetOrigin(ownerIndex) == BoardState.UnspawnedOrigin)
+            {
+                return;
+            }
+
+            builder.ConsumeKey(keyIndex);
+
+            var requiredKeys = ctx.SpecAt(ownerIndex).RequiredKeyCount;
+            var consumedKeys = 0;
+            var keyIndices = ctx.KeyIndicesForLock(lockId);
+            for (var i = 0; i < keyIndices.Count; i++)
+            {
+                if (builder.IsKeyConsumed(keyIndices[i]))
+                {
+                    consumedKeys++;
+                }
+            }
+
+            if (consumedKeys < requiredKeys)
+            {
+                return;
+            }
+
+            if (!builder.IsAlive(ownerIndex))
+            {
+                // Destroyed by a rocket or broom before its key arrived (locked
+                // blocks are targetable, D11). The key is spent; nothing to
+                // apply.
+                return;
+            }
+
+            if (builder.IsUnlocked(ownerIndex))
+            {
+                // Cannot happen with a once-only trigger, but guard rather than
+                // assume.
+                return;
+            }
+
+            builder.Unlock(ownerIndex);
+
+            if (keyEffect == KeyEffect.ClearOuterColor)
+            {
+                ClearOuterColor(ctx, builder, ownerIndex);
+            }
         }
 
         /// <summary>
@@ -497,6 +594,8 @@ namespace GateRush.Core
             private byte[] clearedColors;
             private bool[] alive;
             private bool[] unfrozen;
+            private bool[] unlocked;
+            private bool[] keyConsumed;
             private bool[] gateOpen;
             private bool[] shutterOpen;
             private int[] clearCountByColor;
@@ -509,6 +608,8 @@ namespace GateRush.Core
                 clearedColors = null;
                 alive = null;
                 unfrozen = null;
+                unlocked = null;
+                keyConsumed = null;
                 gateOpen = null;
                 shutterOpen = null;
                 clearCountByColor = null;
@@ -535,6 +636,22 @@ namespace GateRush.Core
             public bool IsUnfrozen(int index) =>
                 unfrozen != null ? unfrozen[index] : source.Unfrozen[index];
 
+            public bool IsUnlocked(int index) =>
+                unlocked != null ? unlocked[index] : source.Unlocked[index];
+
+            public bool IsKeyConsumed(int index) =>
+                keyConsumed != null ? keyConsumed[index] : source.KeyConsumed[index];
+
+            /// <summary>
+            /// The block's origin as this successor currently has it — the
+            /// pending value if <see cref="SetOrigin"/> has touched this index,
+            /// otherwise the source's. Lets <c>ApplyKeyEffects</c> tell a
+            /// destroyed lock owner (a real grid origin) from a not-yet-spawned
+            /// one (<see cref="BoardState.UnspawnedOrigin"/>).
+            /// </summary>
+            public Coord GetOrigin(int index) =>
+                origins != null ? origins[index] : source.Origins[index];
+
             public bool IsGateOpen(int index) =>
                 gateOpen != null ? gateOpen[index] : source.GateOpen[index];
 
@@ -555,6 +672,18 @@ namespace GateRush.Core
             public void Unfreeze(int index) =>
                 Materialize(ref unfrozen, source.Unfrozen)[index] = true;
 
+            /// <summary>Unlocks block <paramref name="index"/> (M8). Permanent —
+            /// a newly exposed colour is never locked (<c>MECHANICS.md</c> M8)
+            /// and nothing re-locks a block.</summary>
+            public void Unlock(int index) =>
+                Materialize(ref unlocked, source.Unlocked)[index] = true;
+
+            /// <summary>Marks the key carried by block <paramref name="index"/>
+            /// consumed (M8). Permanent — a key delivers at most once, on the
+            /// clear that empties its carrier's stack.</summary>
+            public void ConsumeKey(int index) =>
+                Materialize(ref keyConsumed, source.KeyConsumed)[index] = true;
+
             /// <summary>Opens gate <paramref name="index"/> (M2). Permanent.</summary>
             public void OpenGate(int index) =>
                 Materialize(ref gateOpen, source.GateOpen)[index] = true;
@@ -574,7 +703,7 @@ namespace GateRush.Core
                     clearedColors ?? source.ClearedColors,
                     alive ?? source.Alive,
                     unfrozen ?? source.Unfrozen,
-                    source.Unlocked,
+                    unlocked ?? source.Unlocked,
                     gateOpen ?? source.GateOpen,
                     shutterOpen ?? source.ShutterOpen,
                     source.GeneratorIndex,
@@ -582,7 +711,7 @@ namespace GateRush.Core
                     source.ElevatorWaveActive,
                     totalClearCount,
                     clearCountByColor ?? source.ClearCountByColor,
-                    source.KeyConsumed);
+                    keyConsumed ?? source.KeyConsumed);
 
             private static T[] Materialize<T>(ref T[] slot, IReadOnlyList<T> original)
             {
