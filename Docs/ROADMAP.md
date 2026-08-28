@@ -32,7 +32,7 @@ except the editor window.
 | 1.4 | `MoveGenerator` | `MODULES/04-move-generator.md` |
 | 1.5 | `ISearchStrategy` + BFS | `MODULES/05-search-strategy.md` |
 | 1.6 | Test corpus — hand-built 3×3 to 5×5 boards | — |
-| 1.7 | Condition system + M2, M3, M10 | spec written when reached |
+| 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `MODULES/06-conditions.md` |
 | 1.8 | M8 locks/keys, M5 shutters | spec written when reached |
 | 1.9 | Serialization (JSON DTOs) | spec written when reached |
 | 1.10 | Level Editor window | spec written when reached |

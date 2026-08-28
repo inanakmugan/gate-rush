@@ -95,6 +95,14 @@ pass finds nothing. The strategy itself does not decide this.
   every expansion. Flagging the moment a vector's queued count hits zero and only
   retiring then would skip most of those scans. Left for a profiling pass —
   correctness does not depend on it.
+- The per-vector queued counts (`queuedByVector`) are balanced by hand: one
+  `Increment` per enqueue, one `Decrement` per dequeue, and `Decrement` throws on
+  a missing key. A future `continue` that skips its `Decrement` would let
+  `RetireStrata` retire a stratum early. That does not corrupt the answer — the
+  search re-expands the states it wrongly forgot and still returns the shortest
+  solution — but it is slower, and no test catches it. If the enqueue/dequeue
+  sites grow, fold the count maintenance into the queue wrapper so it cannot
+  drift.
 
 ---
 

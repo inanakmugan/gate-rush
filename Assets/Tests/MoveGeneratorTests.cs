@@ -354,7 +354,7 @@ namespace GateRush.Tests
             foreach (var move in moves)
             {
                 Assert.IsTrue(
-                    resolver.TryApplyMove(ctx, state, move, out _),
+                    resolver.TryApplyMove(ctx, state, move, out _, out _),
                     $"resolver rejected an enumerated {mode} move: {move}");
             }
         }

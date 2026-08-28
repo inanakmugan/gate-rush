@@ -11,13 +11,15 @@ namespace GateRush.Core
     /// no second removal path (see <c>DECISIONS.md</c> D9).
     /// </summary>
     /// <remarks>
-    /// <para><b>Scope.</b> This class currently implements M1 (movement and gate
-    /// exit) and M7 (axis restriction) only. The fixpoint loop
-    /// (<c>DECISIONS.md</c> D8) is fully built, but its condition-re-evaluation,
-    /// spawn-trigger, and key-effect steps are extension points that do nothing
-    /// yet — see <see cref="ReevaluateConditions"/>,
-    /// <see cref="CheckSpawnTriggers"/>, and <see cref="ApplyKeyEffects"/>. Until
-    /// those are filled in, no action produces a chain longer than one pass.</para>
+    /// <para><b>Scope.</b> This class implements M1 (movement and gate exit),
+    /// M7 (axis restriction), the count-based unlocks M2 (gates), M3 (frozen
+    /// blocks) and M5's threshold evaluation (shutters), and M10 (time-bonus
+    /// blocks report their seconds when they die). The fixpoint loop
+    /// (<c>DECISIONS.md</c> D8) drives real work through
+    /// <see cref="ReevaluateConditions"/>. Its spawn-trigger and key-effect
+    /// steps remain extension points that do nothing yet — see
+    /// <see cref="CheckSpawnTriggers"/> (M6/M9, phase 1.13) and
+    /// <see cref="ApplyKeyEffects"/> (M8, phase 1.8).</para>
     ///
     /// <para><b>Exit is a property of the move, not the position</b>
     /// (<c>DECISIONS.md</c> D25). A move — zero-distance or not — that leaves a
@@ -40,8 +42,9 @@ namespace GateRush.Core
     /// <para><b>Not sealed.</b> <see cref="ReevaluateConditions"/> and
     /// <see cref="CheckSpawnTriggers"/> are <c>internal virtual</c> so this
     /// assembly's tests can subclass the resolver and script the fixpoint loop —
-    /// proving it runs multiple passes and honours its iteration bound while both
-    /// hooks are still no-ops. Production code never subclasses this type.</para>
+    /// proving it runs multiple passes and honours its iteration bound
+    /// independently of what either hook does for real. Production code never
+    /// subclasses this type.</para>
     /// </remarks>
     public class MoveResolver
     {
@@ -50,17 +53,45 @@ namespace GateRush.Core
         private readonly BlockReachability reachability = new BlockReachability();
 
         /// <summary>
-        /// Applies a player move. Returns <c>false</c> — leaving
-        /// <paramref name="result"/> null — when the move is not legal: the block
-        /// cannot move (dead, frozen, locked, shuttered, or axis-forbidden), the
-        /// target is not reachable by a corner-turning flood fill of fully-legal
-        /// intermediate positions, or the move is zero-distance and the block is
-        /// not flush against a compatible open gate. Never throws for player
-        /// error.
+        /// Seconds contributed by every time-bonus block (M10) that died during
+        /// the resolution currently in progress. Reset by <see cref="BeginResolution"/>
+        /// at the start of each entry point and surfaced to the caller as an
+        /// <c>out</c> parameter — never stored in <see cref="BoardState"/>,
+        /// because <c>Core</c> has no countdown (<c>DECISIONS.md</c> D12).
         /// </summary>
-        public bool TryApplyMove(LevelContext ctx, BoardState state, Move move, out BoardState result)
+        private int accumulatedTimeBonusSeconds;
+
+        /// <summary>
+        /// Set whenever something an unlock threshold reads has changed since
+        /// <see cref="ReevaluateConditions"/> last scanned: a clear drained from
+        /// the event queue (<see cref="DrainEvents"/>), or a block spawned by
+        /// <see cref="CheckSpawnTriggers"/>. <see cref="ReevaluateConditions"/>
+        /// clears it when it scans and returns immediately when it is not set —
+        /// the fixpoint loop calls the hook on every pass and most passes change
+        /// nothing. <see cref="BeginResolution"/> lowers it per resolution; a
+        /// plain reposition raises it never and is never scanned.
+        /// </summary>
+        private bool conditionsDirty;
+
+        /// <summary>
+        /// Applies a player move. Returns <c>false</c> — leaving
+        /// <paramref name="result"/> null and <paramref name="timeBonusSeconds"/>
+        /// zero — when the move is not legal: the block cannot move (dead,
+        /// frozen, locked, shuttered, or axis-forbidden), the target is not
+        /// reachable by a corner-turning flood fill of fully-legal intermediate
+        /// positions, or the move is zero-distance and the block is not flush
+        /// against a compatible open gate. Never throws for player error.
+        /// <para><paramref name="timeBonusSeconds"/> is the sum of every
+        /// time-bonus block (M10) destroyed anywhere in this resolution — a
+        /// single clear, or a chain — for the caller to add to its countdown
+        /// (<c>DECISIONS.md</c> D12).</para>
+        /// </summary>
+        public bool TryApplyMove(
+            LevelContext ctx, BoardState state, Move move,
+            out BoardState result, out int timeBonusSeconds)
         {
             result = null;
+            timeBonusSeconds = 0;
 
             if (ctx == null)
             {
@@ -105,6 +136,7 @@ namespace GateRush.Core
 
             successor.Reset(state);
             events.Clear();
+            BeginResolution();
 
             successor.SetOrigin(blockIndex, move.TargetOrigin);
 
@@ -114,19 +146,26 @@ namespace GateRush.Core
             }
 
             result = ResolveToFixpoint(ctx, successor);
+            timeBonusSeconds = accumulatedTimeBonusSeconds;
             return true;
         }
 
         /// <summary>
         /// Clears one block's current colour with no movement and no gate
         /// requirement — the rocket joker and the <see cref="KeyEffect.ClearOuterColor"/>
-        /// key effect both enter here. Returns <c>false</c> when the block cannot
-        /// be targeted (dead, or under a closed shutter); frozen and locked
-        /// blocks <em>can</em> be targeted (see <c>DECISIONS.md</c> D11).
+        /// key effect both enter here. Returns <c>false</c> — leaving
+        /// <paramref name="timeBonusSeconds"/> zero — when the block cannot be
+        /// targeted (dead, or under a closed shutter); frozen and locked blocks
+        /// <em>can</em> be targeted (see <c>DECISIONS.md</c> D11).
+        /// <paramref name="timeBonusSeconds"/> sums the M10 bonuses of every
+        /// block destroyed in the resulting resolution.
         /// </summary>
-        public bool TryClearBlock(LevelContext ctx, BoardState state, int blockIndex, out BoardState result)
+        public bool TryClearBlock(
+            LevelContext ctx, BoardState state, int blockIndex,
+            out BoardState result, out int timeBonusSeconds)
         {
             result = null;
+            timeBonusSeconds = 0;
 
             if (ctx == null)
             {
@@ -150,23 +189,31 @@ namespace GateRush.Core
 
             successor.Reset(state);
             events.Clear();
+            BeginResolution();
 
             ClearOuterColor(ctx, successor, blockIndex);
 
             result = ResolveToFixpoint(ctx, successor);
+            timeBonusSeconds = accumulatedTimeBonusSeconds;
             return true;
         }
 
         /// <summary>
         /// Clears <paramref name="color"/> from every targetable block currently
-        /// showing it — the broom joker. Returns <c>false</c> when no targetable
-        /// block matches (the caller can then decline to consume the joker).
-        /// Because adjacent colour-stack layers differ (<c>DECISIONS.md</c> D26),
-        /// no block matches twice in one sweep.
+        /// showing it — the broom joker. Returns <c>false</c> — leaving
+        /// <paramref name="timeBonusSeconds"/> zero — when no targetable block
+        /// matches (the caller can then decline to consume the joker). Because
+        /// adjacent colour-stack layers differ (<c>DECISIONS.md</c> D26), no
+        /// block matches twice in one sweep. <paramref name="timeBonusSeconds"/>
+        /// sums the M10 bonuses of every block destroyed in the resulting
+        /// resolution — a broom can kill several bonus-carrying blocks at once.
         /// </summary>
-        public bool TrySweepColor(LevelContext ctx, BoardState state, BlockColor color, out BoardState result)
+        public bool TrySweepColor(
+            LevelContext ctx, BoardState state, BlockColor color,
+            out BoardState result, out int timeBonusSeconds)
         {
             result = null;
+            timeBonusSeconds = 0;
 
             if (ctx == null)
             {
@@ -180,6 +227,7 @@ namespace GateRush.Core
 
             successor.Reset(state);
             events.Clear();
+            BeginResolution();
 
             var sweptAny = false;
             for (var i = 0; i < ctx.TotalBlockCapacity; i++)
@@ -204,7 +252,20 @@ namespace GateRush.Core
             }
 
             result = ResolveToFixpoint(ctx, successor);
+            timeBonusSeconds = accumulatedTimeBonusSeconds;
             return true;
+        }
+
+        /// <summary>
+        /// Resets the per-resolution accumulators the three entry points share:
+        /// the M10 time-bonus sum and <see cref="ReevaluateConditions"/>'s
+        /// last-scanned marker. Call once per action, after
+        /// <see cref="SuccessorBuilder.Reset"/> and before the first clear.
+        /// </summary>
+        private void BeginResolution()
+        {
+            accumulatedTimeBonusSeconds = 0;
+            conditionsDirty = false;
         }
 
         /// <summary>
@@ -216,12 +277,16 @@ namespace GateRush.Core
         /// effect, once phase 1.8 lands). Bumps the cleared-colour count,
         /// enqueues the <see cref="ColorClearedEvent"/> every counter listens to,
         /// and — when that was the block's last colour — marks it dead so its
-        /// cells read free. The block's origin is left untouched: a cleared block
-        /// stays at the gate mouth and keeps obstructing it (M1, D25).
+        /// cells read free and adds its <see cref="BlockSpec.TimeBonusSeconds"/>
+        /// (M10) to <see cref="accumulatedTimeBonusSeconds"/>. The bonus lands
+        /// only on the death, not on each clear of a layered stack. The block's
+        /// origin is left untouched: a cleared block stays at the gate mouth and
+        /// keeps obstructing it (M1, D25).
         /// </summary>
         private void ClearOuterColor(LevelContext ctx, SuccessorBuilder builder, int blockIndex)
         {
-            var colorStack = ctx.SpecAt(blockIndex).ColorStack;
+            var spec = ctx.SpecAt(blockIndex);
+            var colorStack = spec.ColorStack;
             var alreadyCleared = builder.GetClearedColors(blockIndex);
             var color = colorStack[alreadyCleared];
 
@@ -231,13 +296,7 @@ namespace GateRush.Core
             if (alreadyCleared + 1 >= colorStack.Count)
             {
                 builder.SetAlive(blockIndex, false);
-
-                // EXTENSION POINT — phase 1.7 (M10 time-bonus blocks). A block
-                // dying here contributes its TimeBonusSeconds to the level's
-                // effective time budget, reported to the caller as an output
-                // rather than stored in BoardState (Core has no countdown).
-                // Not computed this phase, and BlockSpec does not yet expose
-                // TimeBonusSeconds.
+                accumulatedTimeBonusSeconds += spec.TimeBonusSeconds;
             }
         }
 
@@ -288,6 +347,7 @@ namespace GateRush.Core
                 var cleared = events.Dequeue();
                 builder.IncrementTotalClearCount();
                 builder.IncrementClearCountByColor((int)cleared.Color);
+                conditionsDirty = true;
                 ApplyKeyEffects(ctx, builder, cleared);
             }
         }
@@ -308,23 +368,99 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// EXTENSION POINT — phase 1.7 (M2 count-gated gates, M3 count-gated
-        /// blocks) and phase 1.8 (M5 shutters). Re-evaluates every unlock
-        /// condition against the counters the drain loop has just advanced and
-        /// <b>opens</b> gates, <b>unfreezes</b> blocks, and <b>opens</b> shutters
-        /// whose thresholds are now met.
+        /// Re-evaluates every count-based unlock against the counters the drain
+        /// loop has just advanced and <b>opens</b> count-gated gates (M2),
+        /// <b>unfreezes</b> count-gated blocks (M3), and <b>opens</b> shutters
+        /// (M5) whose thresholds are now met. All three go through the one
+        /// predicate <see cref="UnlockConditions.IsThresholdMet"/>.
         /// <para>
-        /// It must do only that and then stop. In particular it must <b>not</b>
+        /// It does only that and then stops. In particular it does <b>not</b>
         /// clear a block left flush against a gate it opens — exit is
         /// move-triggered, and that block waits for the player's next (possibly
         /// zero-distance) move (D25). Clearing here is a plausible-looking
         /// mistake and is wrong.
         /// </para>
-        /// Returns true iff it changed any field. No-op — returns false — while
-        /// only M1 and M7 are implemented. <c>internal virtual</c> so tests can
-        /// drive the fixpoint loop; see the class remarks.
+        /// <para>
+        /// The M3 scan visits only blocks that are currently alive. A
+        /// not-yet-spawned generator/elevator slot is skipped; the pass that
+        /// spawns it raises <see cref="conditionsDirty"/>, so the next pass
+        /// scans it once it exists. A full sweep of
+        /// <see cref="LevelContext.TotalBlockCapacity"/> would re-check
+        /// non-existent blocks on every pass of every move.
+        /// </para>
+        /// <para>
+        /// Skips the whole scan when <see cref="conditionsDirty"/> is not set —
+        /// nothing a threshold reads has changed since the last scan — and
+        /// clears the flag when it does scan. Returns true iff it changed any
+        /// field. <c>internal virtual</c> so tests can drive the fixpoint loop;
+        /// see the class remarks.
+        /// </para>
         /// </summary>
-        internal virtual bool ReevaluateConditions(LevelContext ctx, SuccessorBuilder builder) => false;
+        internal virtual bool ReevaluateConditions(LevelContext ctx, SuccessorBuilder builder)
+        {
+            if (!conditionsDirty)
+            {
+                // Nothing a threshold depends on has changed since the last
+                // scan, so no gate, block or shutter can have newly unlocked.
+                return false;
+            }
+
+            conditionsDirty = false;
+
+            var totalClearCount = builder.TotalClearCount;
+            var clearCountByColor = builder.ClearCountByColor;
+            var changed = false;
+
+            for (var g = 0; g < ctx.Gates.Count; g++)
+            {
+                if (builder.IsGateOpen(g))
+                {
+                    continue;
+                }
+
+                var openAt = ctx.Gates[g].OpenAtClearCount;
+                if (openAt.HasValue &&
+                    UnlockConditions.IsThresholdMet(totalClearCount, clearCountByColor, openAt.Value, null))
+                {
+                    builder.OpenGate(g);
+                    changed = true;
+                }
+            }
+
+            for (var i = 0; i < ctx.TotalBlockCapacity; i++)
+            {
+                if (!builder.IsAlive(i) || builder.IsUnfrozen(i))
+                {
+                    continue;
+                }
+
+                var unfreezeAt = ctx.SpecAt(i).UnfreezeAtClearCount;
+                if (unfreezeAt.HasValue &&
+                    UnlockConditions.IsThresholdMet(totalClearCount, clearCountByColor, unfreezeAt.Value, null))
+                {
+                    builder.Unfreeze(i);
+                    changed = true;
+                }
+            }
+
+            for (var s = 0; s < ctx.Shutters.Count; s++)
+            {
+                if (builder.IsShutterOpen(s))
+                {
+                    continue;
+                }
+
+                var shutter = ctx.Shutters[s];
+                if (UnlockConditions.IsThresholdMet(
+                        totalClearCount, clearCountByColor, shutter.Threshold, shutter.RequiredColor))
+                {
+                    builder.OpenShutter(s);
+                    changed = true;
+                }
+            }
+
+            return changed;
+        }
 
         /// <summary>
         /// EXTENSION POINT — phase 1.13 (M6 generators, M9 elevators). Spawns the
@@ -332,9 +468,11 @@ namespace GateRush.Core
         /// places the next elevator wave when its region holds no blocks. Both
         /// advance a monotonic progress index, which is why
         /// <see cref="LevelContext.MaxResolutionPasses"/> counts them. Returns
-        /// true iff it spawned anything. No-op — returns false — while only M1
-        /// and M7 are implemented. <c>internal virtual</c> so tests can drive the
-        /// fixpoint loop; see the class remarks.
+        /// true iff it spawned anything, and must raise
+        /// <see cref="conditionsDirty"/> when it does so a spawned block's
+        /// unlock threshold is re-evaluated on the next pass. No-op — returns
+        /// false — while only M1 and M7 are implemented. <c>internal virtual</c>
+        /// so tests can drive the fixpoint loop; see the class remarks.
         /// </summary>
         internal virtual bool CheckSpawnTriggers(LevelContext ctx, SuccessorBuilder builder) => false;
 
@@ -358,6 +496,9 @@ namespace GateRush.Core
             private Coord[] origins;
             private byte[] clearedColors;
             private bool[] alive;
+            private bool[] unfrozen;
+            private bool[] gateOpen;
+            private bool[] shutterOpen;
             private int[] clearCountByColor;
             private int totalClearCount;
 
@@ -367,12 +508,38 @@ namespace GateRush.Core
                 origins = null;
                 clearedColors = null;
                 alive = null;
+                unfrozen = null;
+                gateOpen = null;
+                shutterOpen = null;
                 clearCountByColor = null;
                 totalClearCount = newSource.TotalClearCount;
             }
 
+            /// <summary>The running total clear count, advanced by the drain
+            /// loop — the counter every non-colour-bound unlock threshold
+            /// (M2, M3, and global M5 shutters) is compared against.</summary>
+            public int TotalClearCount => totalClearCount;
+
+            /// <summary>The running per-colour clear counts. Returns the source
+            /// array by reference until the first <see cref="IncrementClearCountByColor"/>
+            /// copies it — safe for the read-only use
+            /// <see cref="UnlockConditions.IsThresholdMet"/> makes of it.</summary>
+            public IReadOnlyList<int> ClearCountByColor => clearCountByColor ?? source.ClearCountByColor;
+
             public byte GetClearedColors(int index) =>
                 clearedColors != null ? clearedColors[index] : source.ClearedColors[index];
+
+            public bool IsAlive(int index) =>
+                alive != null ? alive[index] : source.Alive[index];
+
+            public bool IsUnfrozen(int index) =>
+                unfrozen != null ? unfrozen[index] : source.Unfrozen[index];
+
+            public bool IsGateOpen(int index) =>
+                gateOpen != null ? gateOpen[index] : source.GateOpen[index];
+
+            public bool IsShutterOpen(int index) =>
+                shutterOpen != null ? shutterOpen[index] : source.ShutterOpen[index];
 
             public void SetOrigin(int index, Coord value) =>
                 Materialize(ref origins, source.Origins)[index] = value;
@@ -382,6 +549,19 @@ namespace GateRush.Core
 
             public void SetAlive(int index, bool value) =>
                 Materialize(ref alive, source.Alive)[index] = value;
+
+            /// <summary>Unfreezes block <paramref name="index"/> (M3). Permanent —
+            /// nothing in the game re-freezes a block (D6).</summary>
+            public void Unfreeze(int index) =>
+                Materialize(ref unfrozen, source.Unfrozen)[index] = true;
+
+            /// <summary>Opens gate <paramref name="index"/> (M2). Permanent.</summary>
+            public void OpenGate(int index) =>
+                Materialize(ref gateOpen, source.GateOpen)[index] = true;
+
+            /// <summary>Opens shutter <paramref name="index"/> (M5). Permanent.</summary>
+            public void OpenShutter(int index) =>
+                Materialize(ref shutterOpen, source.ShutterOpen)[index] = true;
 
             public void IncrementTotalClearCount() => totalClearCount++;
 
@@ -393,10 +573,10 @@ namespace GateRush.Core
                     origins ?? source.Origins,
                     clearedColors ?? source.ClearedColors,
                     alive ?? source.Alive,
-                    source.Unfrozen,
+                    unfrozen ?? source.Unfrozen,
                     source.Unlocked,
-                    source.GateOpen,
-                    source.ShutterOpen,
+                    gateOpen ?? source.GateOpen,
+                    shutterOpen ?? source.ShutterOpen,
                     source.GeneratorIndex,
                     source.ElevatorWaveIndex,
                     source.ElevatorWaveActive,
