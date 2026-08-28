@@ -153,7 +153,9 @@ namespace GateRush.Solver
 
                 foreach (var move in generator.Generate(ctx, node.State, budget.Mode))
                 {
-                    if (!resolver.TryApplyMove(ctx, node.State, move, out var successor))
+                    // Time bonuses (M10) are outside the search space (D12); the
+                    // solver discards them.
+                    if (!resolver.TryApplyMove(ctx, node.State, move, out var successor, out _))
                     {
                         // The canonical and exhaustive move sets are both
                         // subsets of what the resolver accepts (Module 04's
