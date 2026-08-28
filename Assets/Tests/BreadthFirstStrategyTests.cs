@@ -4,6 +4,8 @@ using System.Linq;
 using GateRush.Core;
 using GateRush.Solver;
 using NUnit.Framework;
+using static GateRush.Tests.Fixture;
+using static GateRush.Tests.Solve;
 
 namespace GateRush.Tests
 {
@@ -15,69 +17,6 @@ namespace GateRush.Tests
     /// </summary>
     public class BreadthFirstStrategyTests
     {
-        private static readonly Coord[] Cell1x1 = { new Coord(0, 0) };
-
-        private static BlockDefinition Block(
-            int id,
-            Coord start,
-            IReadOnlyList<BlockColor> colors = null,
-            MovementAxis axis = MovementAxis.Free)
-        {
-            return new BlockDefinition(
-                id: id,
-                cells: Cell1x1,
-                colorStack: colors ?? new[] { BlockColor.Red },
-                startOrigin: start,
-                axis: axis,
-                unfreezeAtClearCount: null,
-                lockId: null,
-                requiredKeyCount: 0,
-                keyTargetLockId: null,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
-
-        private static GateDefinition Gate(int id, BoardEdge edge, int offset, int width, BlockColor color) =>
-            new GateDefinition(id, edge, offset, width, color, null);
-
-        private static LevelContext Ctx(
-            int width,
-            int height,
-            IReadOnlyList<BlockDefinition> blocks,
-            IReadOnlyList<GateDefinition> gates = null)
-        {
-            return new LevelContext(
-                levelId: 1,
-                width: width,
-                height: height,
-                staticWalls: Array.Empty<Coord>(),
-                blocks: blocks,
-                gates: gates ?? Array.Empty<GateDefinition>(),
-                shutters: Array.Empty<ShutterDefinition>(),
-                generators: Array.Empty<GeneratorDefinition>(),
-                elevators: Array.Empty<ElevatorDefinition>(),
-                suggestedTimeBudgetSeconds: 60,
-                goldReward: 100);
-        }
-
-        private static SearchBudget Budget(
-            MoveGenMode mode, int maxDepth = 64, int maxExplored = 500_000, long maxMs = 10_000) =>
-            new SearchBudget(maxDepth, maxExplored, maxMs, mode);
-
-        private static BoardState Replay(LevelContext ctx, BoardState initial, IReadOnlyList<Move> solution)
-        {
-            var resolver = new MoveResolver();
-            var state = initial;
-            foreach (var move in solution)
-            {
-                Assert.IsTrue(
-                    resolver.TryApplyMove(ctx, state, move, out state),
-                    $"replay rejected {move}");
-            }
-
-            return state;
-        }
-
         // ----- Corpus -------------------------------------------------------
 
         /// <summary>

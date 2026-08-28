@@ -1,7 +1,7 @@
 using System;
-using System.Collections.Generic;
 using GateRush.Core;
 using NUnit.Framework;
+using static GateRush.Tests.Fixture;
 
 namespace GateRush.Tests
 {
@@ -19,8 +19,6 @@ namespace GateRush.Tests
     /// </remarks>
     public class ProgressVectorTests
     {
-        private static readonly Coord[] Cell1x1 = { new Coord(0, 0) };
-
         // ----- Direct construction via the internal BoardState ctor -----------
 
         /// <summary>
@@ -110,39 +108,6 @@ namespace GateRush.Tests
 
         // ----- Monotonicity across a real resolver action --------------------
 
-        private static BlockDefinition Block(int id, Coord start, IReadOnlyList<BlockColor> colors = null)
-        {
-            return new BlockDefinition(
-                id: id,
-                cells: Cell1x1,
-                colorStack: colors ?? new[] { BlockColor.Red },
-                startOrigin: start,
-                axis: MovementAxis.Free,
-                unfreezeAtClearCount: null,
-                lockId: null,
-                requiredKeyCount: 0,
-                keyTargetLockId: null,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
-
-        private static LevelContext Ctx(int width, int height, IReadOnlyList<BlockDefinition> blocks,
-            IReadOnlyList<GateDefinition> gates)
-        {
-            return new LevelContext(
-                levelId: 1,
-                width: width,
-                height: height,
-                staticWalls: Array.Empty<Coord>(),
-                blocks: blocks,
-                gates: gates,
-                shutters: Array.Empty<ShutterDefinition>(),
-                generators: Array.Empty<GeneratorDefinition>(),
-                elevators: Array.Empty<ElevatorDefinition>(),
-                suggestedTimeBudgetSeconds: 60,
-                goldReward: 100);
-        }
-
         [Test]
         public void ProgressVector_DoesNotDecreaseAcrossANonClearingMove()
         {
@@ -162,7 +127,7 @@ namespace GateRush.Tests
             var ctx = Ctx(
                 5, 5,
                 new[] { Block(1, new Coord(2, 0)) },
-                new[] { new GateDefinition(1, BoardEdge.Bottom, 2, 1, BlockColor.Red, null) });
+                new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
             var before = BoardState.CreateInitial(ctx);
 
             new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after);

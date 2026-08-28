@@ -2,11 +2,15 @@ using System;
 using System.Collections.Generic;
 using GateRush.Core;
 using NUnit.Framework;
+using static GateRush.Tests.Fixture;
 
 namespace GateRush.Tests
 {
     public class BoardStateTests
     {
+        // Thin forwarders onto the shared Fixture builder. Kept because this
+        // file's helpers use a Create* prefix and CreateContext pins a 6x6 grid;
+        // forwarding leaves the 34 call sites and the fixed size untouched.
         private static BlockDefinition CreateBlock(
             int id,
             Coord startOrigin,
@@ -14,56 +18,25 @@ namespace GateRush.Tests
             int? unfreezeAtClearCount = null,
             int? lockId = null,
             int requiredKeyCount = 0,
-            int? keyTargetLockId = null)
-        {
-            return new BlockDefinition(
-                id: id,
-                cells: new[] { new Coord(0, 0) },
-                colorStack: colorStack ?? new[] { BlockColor.Red },
-                startOrigin: startOrigin,
-                axis: MovementAxis.Free,
-                unfreezeAtClearCount: unfreezeAtClearCount,
+            int? keyTargetLockId = null) =>
+            Block(
+                id, startOrigin,
+                colors: colorStack,
+                unfreezeAt: unfreezeAtClearCount,
                 lockId: lockId,
-                requiredKeyCount: requiredKeyCount,
-                keyTargetLockId: keyTargetLockId,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
+                requiredKeys: requiredKeyCount,
+                keyTarget: keyTargetLockId);
 
-        private static SpawnedBlock CreateSpawnedBlock(IReadOnlyList<BlockColor> colorStack = null)
-        {
-            return new SpawnedBlock(
-                cells: new[] { new Coord(0, 0) },
-                colorStack: colorStack ?? new[] { BlockColor.Purple },
-                axis: MovementAxis.Free,
-                unfreezeAtClearCount: null,
-                lockId: null,
-                requiredKeyCount: 0,
-                keyTargetLockId: null,
-                keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
-        }
+        private static SpawnedBlock CreateSpawnedBlock(IReadOnlyList<BlockColor> colorStack = null) =>
+            Spawned(colors: colorStack ?? new[] { BlockColor.Purple });
 
         private static LevelContext CreateContext(
             IReadOnlyList<BlockDefinition> blocks = null,
             IReadOnlyList<GateDefinition> gates = null,
             IReadOnlyList<ShutterDefinition> shutters = null,
             IReadOnlyList<GeneratorDefinition> generators = null,
-            IReadOnlyList<ElevatorDefinition> elevators = null)
-        {
-            return new LevelContext(
-                levelId: 1,
-                width: 6,
-                height: 6,
-                staticWalls: Array.Empty<Coord>(),
-                blocks: blocks ?? Array.Empty<BlockDefinition>(),
-                gates: gates ?? Array.Empty<GateDefinition>(),
-                shutters: shutters ?? Array.Empty<ShutterDefinition>(),
-                generators: generators ?? Array.Empty<GeneratorDefinition>(),
-                elevators: elevators ?? Array.Empty<ElevatorDefinition>(),
-                suggestedTimeBudgetSeconds: 60,
-                goldReward: 100);
-        }
+            IReadOnlyList<ElevatorDefinition> elevators = null) =>
+            Ctx(6, 6, blocks, gates, shutters, generators, elevators);
 
         /// <summary>
         /// Populates every field group at least once: 3 top-level blocks (one
