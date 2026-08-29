@@ -35,10 +35,10 @@ except the editor window.
 | 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `MODULES/06-conditions.md` |
 | 1.8 | M8 locks and keys | `MODULES/07-locks-and-keys.md` |
 | 1.9 | Serialization (JSON DTOs) | `MODULES/08-serialization.md` |
-| 1.10 | Level Editor window | spec written when reached |
+| 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `MODULES/09-level-editor.md` |
 | 1.11 | A\* + equivalence tests against BFS | spec written when reached |
 | 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | — |
-| 1.13 | M6 generators, M9 elevators — includes adding a region-relative
+| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached |
          position to SpawnedBlock for elevator waves | spec written when reached |
 
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
