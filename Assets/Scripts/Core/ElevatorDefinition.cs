@@ -92,7 +92,7 @@ namespace GateRush.Core
             var copy = new List<IReadOnlyList<SpawnedBlock>>(waves.Count);
             foreach (var wave in waves)
             {
-                copy.Add(new List<SpawnedBlock>(wave).AsReadOnly());
+                copy.Add(new List<SpawnedBlock>(wave ?? Array.Empty<SpawnedBlock>()).AsReadOnly());
             }
 
             return copy.AsReadOnly();

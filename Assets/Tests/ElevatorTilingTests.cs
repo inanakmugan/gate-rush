@@ -80,15 +80,22 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Check_GeneratorStyleBlockListIsUnaffected_ExactTilingStillDetected()
+        public void Check_OneBlockCoversTheWholeRegion_IsExact()
         {
-            // A generator queue never calls this; the point is only that a wave
-            // built the ordinary way still reads as exact.
             var wave = new[] { At(0, 0, new[] { new Coord(0, 0), new Coord(0, 1) }) };
 
             var result = ElevatorTiling.Check(new Coord(0, 0), new Coord(0, 1), wave);
 
             Assert.IsTrue(result.IsExact);
+        }
+
+        [Test]
+        public void Check_NullWave_ReportsEveryRegionCellUncovered()
+        {
+            var result = ElevatorTiling.Check(new Coord(0, 0), new Coord(1, 0), null);
+
+            Assert.IsFalse(result.IsExact);
+            Assert.AreEqual(2, result.UncoveredCells.Count);
         }
     }
 }

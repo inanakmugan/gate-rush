@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace GateRush.Core
@@ -68,9 +69,13 @@ namespace GateRush.Core
             var outside = new List<Coord>();
             var withoutOrigin = new List<int>();
 
-            for (var b = 0; b < wave.Count; b++)
+            // An absent or empty wave covers nothing: every region cell reads as
+            // uncovered. A draft under edit reaches here legitimately.
+            var blocks = wave ?? Array.Empty<SpawnedBlock>();
+
+            for (var b = 0; b < blocks.Count; b++)
             {
-                var block = wave[b];
+                var block = blocks[b];
                 if (!block.RegionOrigin.HasValue)
                 {
                     withoutOrigin.Add(b);

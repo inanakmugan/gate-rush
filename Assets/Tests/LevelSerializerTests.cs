@@ -444,20 +444,59 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_StructurallyValidButSemanticallyInvalid_IsRejectedByCoreWithCoresMessage()
         {
-            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 5, ""height"": 5,
-                ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
-                ""startOrigin"": { ""x"": 99, ""y"": 99 }, ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
-                ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 } ],
-                ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }";
-
             // Core's ArgumentException, not this layer's LevelSerializationException:
             // a "helpful" duplicate grid-bounds check here would change the type and fail this.
-            var ex = Assert.Throws<ArgumentException>(() => LevelSerializer.FromJson(json, "outside.json"));
+            var ex = Assert.Throws<ArgumentException>(
+                () => LevelSerializer.FromJson(BlockOutsideGridJson, "outside.json"));
 
             StringAssert.Contains("outside the 5x5 grid", ex.Message);
         }
 
+        // -- ParseDto: the load half that stops at the DTO ----------
+
+        [Test]
+        public void ParseDto_StructurallyValidButSemanticallyInvalid_ReturnsTheDto()
+        {
+            // The same JSON FromJson rejects through Core: ParseDto must hand it
+            // back so the editor can open a broken level and repair it.
+            var dto = LevelSerializer.ParseDto(BlockOutsideGridJson, "outside.json");
+
+            Assert.AreEqual(5, dto.width);
+            Assert.AreEqual(99, dto.blocks[0].startOrigin.x);
+        }
+
+        [Test]
+        public void ParseDto_UnsupportedFormatVersion_Throws()
+        {
+            var json = FullyPopulatedJson.Replace("\"formatVersion\": 2", "\"formatVersion\": 1");
+
+            Assert.Throws<LevelSerializationException>(() => LevelSerializer.ParseDto(json, "v1.json"));
+        }
+
+        [Test]
+        public void ParseDto_MalformedText_Throws()
+        {
+            Assert.Throws<LevelSerializationException>(
+                () => LevelSerializer.ParseDto("this is not json at all", "broken.json"));
+        }
+
+        [Test]
+        public void ToJson_LevelDtoOverload_RoundTripsThroughParseDto()
+        {
+            var once = LevelSerializer.ToJson(CorpusLevel());
+
+            var twice = LevelSerializer.ToJson(LevelSerializer.ParseDto(once));
+
+            Assert.AreEqual(once, twice);
+        }
+
         // -- Fixtures ------------------------------------------------
+
+        private const string BlockOutsideGridJson = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 5, ""height"": 5,
+            ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
+            ""startOrigin"": { ""x"": 99, ""y"": 99 }, ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
+            ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 } ],
+            ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }";
 
         private static string ColourNamedJson(string colourName) =>
             $@"{{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 1, ""height"": 1,

@@ -22,6 +22,17 @@ namespace GateRush.Serialization
     /// <see cref="LevelSerializationException"/>.
     /// </para>
     /// <para>
+    /// That structural work is split across two stages so the Level Editor can
+    /// stop at the first. <see cref="ParseDto"/> does only what decides whether
+    /// the text is a DTO at all — JSON, an object, a known <c>formatVersion</c> —
+    /// and returns the raw <see cref="LevelDto"/>; the DTO-to-<c>Core</c>
+    /// conversion (enum names, sentinels, required arrays, then
+    /// <see cref="LevelContext"/>'s own constructor) is the second stage.
+    /// <see cref="FromJson"/> runs both; the editor runs <see cref="ParseDto"/>
+    /// alone so a semantically broken level can still be opened and repaired
+    /// (see Module 09).
+    /// </para>
+    /// <para>
     /// <em>Semantic</em> validation — blocks inside the grid, cells connected,
     /// ids unique, keys pointing at real locks — belongs to <c>Core</c> and is
     /// left entirely to <see cref="LevelContext"/>'s constructor. Those
@@ -70,26 +81,39 @@ namespace GateRush.Serialization
         }
 
         /// <summary>
-        /// Parses <paramref name="json"/> into a <see cref="LevelContext"/>.
+        /// Serializes a raw <see cref="LevelDto"/> to pretty-printed JSON — the
+        /// save half of the Level Editor's <c>draft -&gt; LevelDto -&gt; JSON</c>
+        /// path (see Module 09). No structural or semantic checking: a
+        /// half-built level is a normal thing to save, and the editor has
+        /// already reported whatever is wrong with it.
         /// </summary>
-        /// <param name="json">The level JSON.</param>
-        /// <param name="sourceName">
-        /// The file name or other origin, used only in error messages so a human
-        /// diagnosing a malformed level knows which file and which element to
-        /// look at. Optional.
-        /// </param>
+        public static string ToJson(LevelDto dto)
+        {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            return JsonUtility.ToJson(dto, prettyPrint: true);
+        }
+
+        /// <summary>
+        /// Parses <paramref name="json"/> into a raw <see cref="LevelDto"/> and
+        /// stops there — the load half of the Level Editor's
+        /// <c>JSON -&gt; LevelDto -&gt; draft</c> path (see Module 09). It performs
+        /// only the checks that decide whether the text can become a DTO
+        /// <em>at all</em>: it is non-empty, it is JSON, it is a JSON object, and
+        /// its <c>formatVersion</c> is one this build understands. A level that
+        /// is structurally readable but semantically broken — a block outside the
+        /// grid, a key pointing at no lock — comes back as a DTO here so the one
+        /// tool that could repair it can open it. <see cref="FromJson"/> is this
+        /// followed by the DTO-to-<c>Core</c> conversion.
+        /// </summary>
         /// <exception cref="LevelSerializationException">
-        /// The text is not JSON, its <c>formatVersion</c> is not
-        /// <see cref="FormatVersion"/>, an enum name does not parse, a required
-        /// array is absent, or a sentinel field holds a negative other than
-        /// <c>-1</c>.
+        /// The text is empty, is not JSON, is not a JSON object, or carries a
+        /// <c>formatVersion</c> other than <see cref="FormatVersion"/>.
         /// </exception>
-        /// <exception cref="ArgumentException">
-        /// The JSON is structurally sound but describes an invalid level. Raised
-        /// by <see cref="LevelContext"/>'s constructor, with <c>Core</c>'s
-        /// message.
-        /// </exception>
-        public static LevelContext FromJson(string json, string sourceName = null)
+        public static LevelDto ParseDto(string json, string sourceName = null)
         {
             var source = sourceName ?? "(unnamed source)";
 
@@ -120,7 +144,33 @@ namespace GateRush.Serialization
                     $"this build reads version {FormatVersion}.");
             }
 
-            return FromDto(dto, source);
+            return dto;
+        }
+
+        /// <summary>
+        /// Parses <paramref name="json"/> into a <see cref="LevelContext"/>.
+        /// </summary>
+        /// <param name="json">The level JSON.</param>
+        /// <param name="sourceName">
+        /// The file name or other origin, used only in error messages so a human
+        /// diagnosing a malformed level knows which file and which element to
+        /// look at. Optional.
+        /// </param>
+        /// <exception cref="LevelSerializationException">
+        /// The text is not JSON, its <c>formatVersion</c> is not
+        /// <see cref="FormatVersion"/>, an enum name does not parse, a required
+        /// array is absent, or a sentinel field holds a negative other than
+        /// <c>-1</c>.
+        /// </exception>
+        /// <exception cref="ArgumentException">
+        /// The JSON is structurally sound but describes an invalid level. Raised
+        /// by <see cref="LevelContext"/>'s constructor, with <c>Core</c>'s
+        /// message.
+        /// </exception>
+        public static LevelContext FromJson(string json, string sourceName = null)
+        {
+            var source = sourceName ?? "(unnamed source)";
+            return FromDto(ParseDto(json, source), source);
         }
 
         // -- Core -> DTO ------------------------------------------------------
