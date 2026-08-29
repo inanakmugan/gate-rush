@@ -322,8 +322,27 @@ namespace GateRush.Serialization
 
         // -- DTO -> Core ----------------------------------------------------
 
-        private static LevelContext FromDto(LevelDto dto, string source)
+        /// <summary>
+        /// Converts an already-parsed <see cref="LevelDto"/> to a
+        /// <see cref="LevelContext"/> — the second stage <see cref="FromJson"/>
+        /// runs after <see cref="ParseDto"/>, exposed on its own so the Level
+        /// Editor's <c>draft -&gt; LevelDto -&gt; LevelContext</c> path (Module 09)
+        /// can validate on every edit without round-tripping through JSON text.
+        /// Does the enum-name, sentinel and required-array structural checks
+        /// (raising <see cref="LevelSerializationException"/>), then hands the
+        /// result to <see cref="LevelContext"/>'s constructor, whose
+        /// <see cref="ArgumentException"/>s propagate with <c>Core</c>'s wording.
+        /// The <c>formatVersion</c> check is <see cref="ParseDto"/>'s job and is
+        /// not repeated here.
+        /// </summary>
+        public static LevelContext FromDto(LevelDto dto, string sourceName = null)
         {
+            if (dto == null)
+            {
+                throw new ArgumentNullException(nameof(dto));
+            }
+
+            var source = sourceName ?? "(unnamed source)";
             var staticWalls = FromCoordDtos(dto.staticWalls);
             var blocks = ConvertEach(dto.blocks, d => FromDto(d, source));
             var gates = ConvertEach(dto.gates, d => FromDto(d, source));
