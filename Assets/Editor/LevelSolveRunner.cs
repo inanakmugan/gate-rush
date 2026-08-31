@@ -87,7 +87,18 @@ namespace GateRush.Editor
             this.strategyFactory = strategyFactory ?? (() => new BreadthFirstStrategy());
         }
 
-        public LevelSolveResult Run(LevelContext ctx, SearchBudget canonicalBudget, SearchBudget exhaustiveBudget)
+        /// <param name="stageStarting">
+        /// Invoked with <see cref="MoveGenMode.Canonical"/> just before the
+        /// canonical search and, if it runs, with <see cref="MoveGenMode.Exhaustive"/>
+        /// just before the exhaustive one. The search is synchronous and opaque,
+        /// so this is the only progress signal a caller gets — the editor uses it
+        /// to raise a progress bar.
+        /// </param>
+        public LevelSolveResult Run(
+            LevelContext ctx,
+            SearchBudget canonicalBudget,
+            SearchBudget exhaustiveBudget,
+            Action<MoveGenMode> stageStarting = null)
         {
             if (ctx == null)
             {
@@ -106,6 +117,7 @@ namespace GateRush.Editor
 
             var initial = BoardState.CreateInitial(ctx);
 
+            stageStarting?.Invoke(MoveGenMode.Canonical);
             var canonical = strategyFactory().Search(ctx, initial, canonicalBudget);
             if (canonical.Status == SolveStatus.Solvable)
             {
@@ -113,6 +125,7 @@ namespace GateRush.Editor
                     LevelSolveVerdict.Solvable, canonical.Solution, MoveGenMode.Canonical, canonical, null);
             }
 
+            stageStarting?.Invoke(MoveGenMode.Exhaustive);
             var exhaustive = strategyFactory().Search(ctx, initial, exhaustiveBudget);
             switch (exhaustive.Status)
             {

@@ -80,15 +80,27 @@ namespace GateRush.Tests
         public void Run_CanonicalDoesNotSolve_RetriedExhaustivelyAndSolved()
         {
             var spy = new RecordingStrategy();
+            var stages = new List<MoveGenMode>();
 
             // Canonical budget too small to finish; exhaustive budget generous.
             var result = new LevelSolveRunner(() => spy)
-                .Run(TwoZeroDistanceClears(), Canonical(maxExplored: 1), Exhaustive());
+                .Run(TwoZeroDistanceClears(), Canonical(maxExplored: 1), Exhaustive(), stages.Add);
 
             Assert.AreEqual(LevelSolveVerdict.Solvable, result.Verdict);
             Assert.AreEqual(MoveGenMode.Exhaustive, result.SolvedBy);
             CollectionAssert.AreEqual(new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive }, spy.Searches);
+            CollectionAssert.AreEqual(new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive }, stages);
             Assert.AreEqual(2, result.Solution.Count);
+        }
+
+        [Test]
+        public void Run_CanonicalSolves_TheExhaustiveStageIsNeverAnnounced()
+        {
+            var stages = new List<MoveGenMode>();
+
+            new LevelSolveRunner().Run(OneZeroDistanceClear(), Canonical(), Exhaustive(), stages.Add);
+
+            CollectionAssert.AreEqual(new[] { MoveGenMode.Canonical }, stages);
         }
 
         [Test]
