@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5811853539149cc4093abbed005d5943, type: 3}
+  m_Name: LevelEditorSettings
+  m_EditorClassIdentifier: GateRush.Editor::GateRush.Editor.LevelEditorSettings
+  canonicalMaxDepth: 200
+  canonicalMaxExploredStates: 200000
+  canonicalMaxWallClockMs: 5000
+  exhaustiveMaxDepth: 400
+  exhaustiveMaxExploredStates: 1000000
+  exhaustiveMaxWallClockMs: 15000
+  timeBudgetBaseSeconds: 10
+  timeBudgetSecondsPerMove: 3
+  timeBudgetRoundingSeconds: 5
