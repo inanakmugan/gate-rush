@@ -525,7 +525,7 @@ survives into the frontier.
 
 **Rejected.** An external cache in `GateRush.Core`, keyed off the
 `LevelContext` reference, holding the same precomputed data without touching
-Module 01. Rejected for two reasons. First, it would mean two modules
+Module 01. Rejected for two reasons. First, it would mean two Modules
 independently know how to flatten `Generators`/`Elevators` into one index
 space and walk shutter geometry — knowledge that is really a property of
 `LevelContext`'s own structure, so a change to one walk and not the other

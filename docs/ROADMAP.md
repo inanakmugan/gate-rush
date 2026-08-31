@@ -24,22 +24,22 @@ means cleaning up every leak that accumulated in the meantime.
 Grid, blocks, gates, resolution, search, tests, editor. No Unity scene involved
 except the editor window.
 
-| # | Module | Spec |
-|---|---|---|
-| 1.1 | `Coord`, `LevelContext`, definitions | `MODULES/01-level-context.md` |
-| 1.2 | `BoardState` | `MODULES/02-board-state.md` |
-| 1.3 | `MoveResolver` (fixpoint skeleton, M1 + M7 only) | `MODULES/03-move-resolver.md` |
-| 1.4 | `MoveGenerator` | `MODULES/04-move-generator.md` |
-| 1.5 | `ISearchStrategy` + BFS | `MODULES/05-search-strategy.md` |
-| 1.6 | Test corpus — hand-built 3×3 to 5×5 boards | — |
-| 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `MODULES/06-conditions.md` |
-| 1.8 | M8 locks and keys | `MODULES/07-locks-and-keys.md` |
-| 1.9 | Serialization (JSON DTOs) | `MODULES/08-serialization.md` |
-| 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `MODULES/09-level-editor.md` |
-| 1.11 | A\* + equivalence tests against BFS | spec written when reached |
-| 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | — |
-| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached |
-         position to SpawnedBlock for elevator waves | spec written when reached |
+| # | Module | Spec                            |
+|---|---|---------------------------------|
+| 1.1 | `Coord`, `LevelContext`, definitions | `Modules/01-level-context.md`   |
+| 1.2 | `BoardState` | `Modules/02-board-state.md`     |
+| 1.3 | `MoveResolver` (fixpoint skeleton, M1 + M7 only) | `Modules/03-move-resolver.md`   |
+| 1.4 | `MoveGenerator` | `Modules/04-move-generator.md`  |
+| 1.5 | `ISearchStrategy` + BFS | `Modules/05-search-strategy.md` |
+| 1.6 | Test corpus — hand-built 3×3 to 5×5 boards | —                               |
+| 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `Modules/06-conditions.md`      |
+| 1.8 | M8 locks and keys | `Modules/07-locks-and-keys.md`  |
+| 1.9 | Serialization (JSON DTOs) | `Modules/08-serialization.md`   |
+| 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `Modules/09-level-editor.md`    |
+| 1.11 | A\* + equivalence tests against BFS | spec written when reached       |
+| 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | —                               |
+| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached       |
+        
 
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
 1.1–1.3 and carry the heaviest test load. Subtle bugs concentrate there.

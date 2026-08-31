@@ -261,6 +261,14 @@ it is exactly the question the solver answers.
 - Whether the `Resources/Levels` dropdown watches the folder or refreshes on
   demand.
 - How a wave's tiling status is computed cheaply enough to show live.
+- **The solve runs synchronously on the UI thread.** A level that hits both
+  budgets freezes the editor for up to their sum (default 5s + 15s). A progress
+  bar is raised for each stage so it reads as working rather than hung, but it
+  cannot show real progress — the search is opaque. Acceptable because most
+  levels finish in milliseconds and both budgets are editable in
+  `LevelEditorSettings`. Making the search step-able (so the window can drive it
+  from `EditorApplication.update` and stay responsive) is real work and should
+  be a deliberate decision, not a surprise six months from now.
 
 ---
 
