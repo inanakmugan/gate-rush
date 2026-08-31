@@ -346,29 +346,14 @@ namespace GateRush.Editor
                         continue;
                     }
 
-                    var converted = new List<SpawnedBlock>();
-                    var convertible = true;
-                    foreach (var block in wave.Blocks)
-                    {
-                        if (TryConvert(block, out var spawned))
-                        {
-                            converted.Add(spawned);
-                        }
-                        else
-                        {
-                            convertible = false;
-                            break;
-                        }
-                    }
-
-                    if (!convertible)
+                    var tiling = DraftTiling.Check(elevator, wave);
+                    if (tiling == null)
                     {
                         // A block-shape problem surfaces through ToContext; the
                         // tiling of an unbuildable wave is not meaningful.
                         continue;
                     }
 
-                    var tiling = ElevatorTiling.Check(elevator.Min, elevator.Max, converted);
                     if (tiling.IsExact)
                     {
                         continue;
@@ -405,30 +390,6 @@ namespace GateRush.Editor
             }
 
             return string.Join(", ", parts);
-        }
-
-        private static bool TryConvert(SpawnedBlockDraft draft, out SpawnedBlock spawned)
-        {
-            try
-            {
-                spawned = new SpawnedBlock(
-                    cells: draft.Cells.ToArray(),
-                    colorStack: draft.ColorStack.ToArray(),
-                    axis: draft.Axis,
-                    unfreezeAtClearCount: draft.UnfreezeAtClearCount,
-                    lockId: draft.LockId,
-                    requiredKeyCount: draft.RequiredKeyCount,
-                    keyTargetLockId: draft.KeyTargetLockId,
-                    keyEffect: draft.KeyEffect,
-                    timeBonusSeconds: draft.TimeBonusSeconds,
-                    regionOrigin: draft.RegionOrigin);
-                return true;
-            }
-            catch (ArgumentException)
-            {
-                spawned = null;
-                return false;
-            }
         }
 
         // -- Opening-move checks (need a valid context) -------------
