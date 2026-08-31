@@ -9,14 +9,6 @@ namespace GateRush.Core
     /// </summary>
     internal static class BlockValidation
     {
-        private static readonly Coord[] OrthogonalNeighbors =
-        {
-            new Coord(1, 0),
-            new Coord(-1, 0),
-            new Coord(0, 1),
-            new Coord(0, -1)
-        };
-
         /// <summary>
         /// The component-wise minimum corner of a non-empty cell set — the
         /// offset by which <see cref="BlockDefinition"/> and
@@ -62,24 +54,7 @@ namespace GateRush.Core
                 }
             }
 
-            var reached = new HashSet<Coord> { cells[0] };
-            var frontier = new Queue<Coord>();
-            frontier.Enqueue(cells[0]);
-
-            while (frontier.Count > 0)
-            {
-                var current = frontier.Dequeue();
-                foreach (var offset in OrthogonalNeighbors)
-                {
-                    var neighbor = current + offset;
-                    if (seen.Contains(neighbor) && reached.Add(neighbor))
-                    {
-                        frontier.Enqueue(neighbor);
-                    }
-                }
-            }
-
-            if (reached.Count != seen.Count)
+            if (!BlockShape.IsOrthogonallyConnected(cells))
             {
                 throw new ArgumentException(
                     $"{ownerDescription} has cells that are not orthogonally connected.");
