@@ -58,5 +58,15 @@ namespace GateRush.Tests
 
             Object.DestroyImmediate(settings);
         }
+
+        [Test]
+        public void Defaults_UndoStackDepth_Is50()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(50, settings.UndoStackDepth);
+
+            Object.DestroyImmediate(settings);
+        }
     }
 }

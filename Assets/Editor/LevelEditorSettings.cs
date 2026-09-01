@@ -46,6 +46,9 @@ namespace GateRush.Editor
         [Header("Generator queue entry free draw (docs/Modules/09a follow-up): a queue entry has no board to place on, so its free draw is bounded to a fixed square rather than the grid's own size")]
         [SerializeField] private int queueEntryFreeDrawGridSize = 5;
 
+        [Header("Undo (docs/Modules/09a, Session C): depth of the level editor's undo stack. A level's DTO is a few kilobytes, so memory is not a consideration.")]
+        [SerializeField] private int undoStackDepth = 50;
+
         public SearchBudget CanonicalBudget => new SearchBudget(
             canonicalMaxDepth, canonicalMaxExploredStates, canonicalMaxWallClockMs, MoveGenMode.Canonical);
 
@@ -77,6 +80,9 @@ namespace GateRush.Editor
         /// a realistic level would need is larger than that anyway.
         /// </summary>
         public int QueueEntryFreeDrawGridSize => queueEntryFreeDrawGridSize;
+
+        /// <summary>The Level Editor undo stack's depth (docs/Modules/09a, Session C). Default 50.</summary>
+        public int UndoStackDepth => undoStackDepth;
 
         private const string AssetPath = "Assets/Editor/LevelEditorSettings.asset";
 

@@ -58,7 +58,30 @@ namespace GateRush.Editor
         /// </summary>
         private readonly HashSet<SpawnedBlockDraft> queueEntriesInFreeMode = new HashSet<SpawnedBlockDraft>();
 
-        private object selection;
+        private DraftHistory history;
+
+        private object selectionValue;
+
+        /// <summary>
+        /// Backed by <see cref="selectionValue"/> rather than a plain field so
+        /// every existing assignment site keeps working unchanged while still
+        /// telling <see cref="history"/> that a repeated focus key can no longer
+        /// mean "still editing the same thing" (docs/Modules/09a, Session C):
+        /// two different objects can present an identically shaped panel, so the
+        /// same control id can land on two unrelated fields once the selection
+        /// changes between them. Wave scope is covered transitively — entering
+        /// or leaving it always clears the selection.
+        /// </summary>
+        private object selection
+        {
+            get => selectionValue;
+            set
+            {
+                selectionValue = value;
+                history?.BreakCoalescing();
+            }
+        }
+
         private int scopeElevator = -1;
         private int scopeWave = -1;
 
@@ -98,6 +121,8 @@ namespace GateRush.Editor
             if (draft == null)
             {
                 draft = LevelDraft.NewEmpty(6, 6);
+                history = new DraftHistory(settings.UndoStackDepth);
+                history.Reset(draft.ToDto());
                 SyncGridFields();
             }
 
@@ -121,6 +146,27 @@ namespace GateRush.Editor
             if (draft == null)
             {
                 OnEnable();
+            }
+
+            // A text field keeps keyboard focus in IMGUI until something else
+            // explicitly claims it. Clicking the grid, a toolbar button, an
+            // outline list entry, a tool, or a shape preset does not — none of
+            // that code touches keyboard focus — so without this, focus (and
+            // EditorGUIUtility.editingTextField) would stick to whatever field
+            // was last edited for the rest of the session. Two consequences:
+            // the undo shortcut's editingTextField guard below would swallow
+            // every future Ctrl+Z, and a value the designer typed and then
+            // abandoned by clicking elsewhere would never commit.
+            // EditorGUIUtility.editingTextField is the documented way to end
+            // the active text edit — a recycled editor holds the typed string
+            // and parses it into the value on focus loss, which setting this
+            // false forces — before this frame routes the click to whatever it
+            // actually landed on. One check here covers every click in the
+            // window rather than repeating it at each place that handles one.
+            if (Event.current.type == EventType.MouseDown)
+            {
+                GUIUtility.keyboardControl = 0;
+                EditorGUIUtility.editingTextField = false;
             }
 
             DrawToolbar();
@@ -158,6 +204,7 @@ namespace GateRush.Editor
         {
             dirty = true;
             solve = null;
+            history.Record(draft.ToDto(), GUIUtility.keyboardControl);
             Revalidate();
         }
 
@@ -949,9 +996,14 @@ namespace GateRush.Editor
         /// <summary>
         /// Items 5 and 6: Escape cancels a pending free-draw selection and
         /// Delete removes the current selection, called once per frame from the
-        /// end of <see cref="OnGUI"/>. Guarded by <see cref="EditorGUIUtility.editingTextField"/>
-        /// so typing in a properties field — deleting a character while editing
-        /// a threshold, say — never reaches the selection instead of the field.
+        /// end of <see cref="OnGUI"/>. Session C, follow-up 2: Enter (either the
+        /// main-row or numpad key) commits a pending free-draw selection through
+        /// the same <see cref="PlaceFreeBlock"/> the Place button calls, so
+        /// validity is handled in one place rather than duplicated here. Guarded
+        /// by <see cref="EditorGUIUtility.editingTextField"/> so typing in a
+        /// properties field — deleting a character while editing a threshold, or
+        /// pressing Enter to commit a text field's own value — never reaches the
+        /// selection or the free-draw pending cells instead of the field.
         /// A live drag's own Escape handling in <see cref="HandleGridInput"/>
         /// runs earlier in the same event and consumes it via
         /// <see cref="GUIUtility.ExitGUI"/>, which unwinds the rest of this
@@ -973,12 +1025,88 @@ namespace GateRush.Editor
                 return;
             }
 
+            if ((e.keyCode == KeyCode.Return || e.keyCode == KeyCode.KeypadEnter) && freeCells.Count > 0)
+            {
+                PlaceFreeBlock();
+                e.Use();
+                return;
+            }
+
             if (e.keyCode == KeyCode.Delete && selection != null)
             {
                 DeleteSelection();
                 e.Use();
                 GUIUtility.ExitGUI();
             }
+
+            // Session C (docs/Modules/09a): editor-only undo/redo over LevelDto
+            // snapshots. Guarded by the same editingTextField check above so a
+            // field's own native text-undo keeps working while it has focus.
+            var modifier = e.control || e.command;
+            if (modifier && e.keyCode == KeyCode.Z && !e.shift)
+            {
+                PerformUndo();
+                e.Use();
+                return;
+            }
+
+            if (modifier && (e.keyCode == KeyCode.Y || (e.keyCode == KeyCode.Z && e.shift)))
+            {
+                PerformRedo();
+                e.Use();
+            }
+        }
+
+        private void PerformUndo()
+        {
+            var target = history.Undo();
+            if (target != null)
+            {
+                ApplyHistorySnapshot(target);
+            }
+        }
+
+        private void PerformRedo()
+        {
+            var target = history.Redo();
+            if (target != null)
+            {
+                ApplyHistorySnapshot(target);
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the draft from an undo/redo snapshot and clears every window
+        /// field that held a reference into the draft <see cref="LevelDraft.FromDto"/>
+        /// just replaced (docs/Modules/09a, Session C): the live drag, the
+        /// free-draw staging cells, and the queue entries the designer had put
+        /// into Free mode. The selection is the one field that is not simply
+        /// dropped: undoing a properties-panel edit is the common case, and the
+        /// edited object is still there — only clearing the selection would blank
+        /// the panel and hide exactly what was just reverted. A
+        /// <see cref="SelectionKey"/> captured from the old selection before the
+        /// rebuild is resolved against the new draft afterward, so the selection
+        /// carries over when the equivalent object survives and clears only when
+        /// it does not (docs/Modules/09a, Session C, follow-up 1).
+        /// <see cref="scopeElevator"/> and <see cref="scopeWave"/> are left alone
+        /// — they are indices, not references, and <see cref="InWaveScope"/>
+        /// already falls back to the board if the rebuilt draft no longer has
+        /// that elevator or wave.
+        /// </summary>
+        private void ApplyHistorySnapshot(LevelDto dto)
+        {
+            var selectionKey = SelectionKey.Capture(selection, CurrentScopeWave());
+
+            draft = LevelDraft.FromDto(dto);
+            selection = selectionKey.Resolve(draft, CurrentScopeWave());
+            dragKind = DragKind.None;
+            freeCells.Clear();
+            queueEntriesInFreeMode.Clear();
+            dirty = true;
+            solve = null;
+            SyncGridFields();
+            Revalidate();
+            Repaint();
         }
 
         /// <summary>Gate and generator markers sit on the edge, outside the grid, and are picked by their own rects.</summary>
@@ -1890,6 +2018,7 @@ namespace GateRush.Editor
         private void NewLevel()
         {
             draft = LevelDraft.NewEmpty(newWidth, newHeight);
+            history.Reset(draft.ToDto());
             assetPath = null;
             dirty = false;
             solve = null;
@@ -1939,6 +2068,7 @@ namespace GateRush.Editor
             {
                 var dto = LevelSerializer.ParseDto(File.ReadAllText(path), Path.GetFileName(path));
                 draft = LevelDraft.FromDto(dto);
+                history.Reset(draft.ToDto());
                 assetPath = path;
                 dirty = false;
                 solve = null;
@@ -2012,6 +2142,10 @@ namespace GateRush.Editor
         private bool InWaveScope() =>
             scopeElevator >= 0 && scopeElevator < draft.Elevators.Count
             && scopeWave >= 0 && scopeWave < draft.Elevators[scopeElevator].Waves.Count;
+
+        /// <summary>The wave the current scope points at in the current <see cref="draft"/>, or <c>null</c> outside wave scope.</summary>
+        private WaveDraft CurrentScopeWave() =>
+            InWaveScope() ? draft.Elevators[scopeElevator].Waves[scopeWave] : null;
 
         private void EnterWaveScope(ElevatorDraft elevator, int waveIndex)
         {
