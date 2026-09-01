@@ -44,6 +44,13 @@ except the editor window.
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
 1.1–1.3 and carry the heaviest test load. Subtle bugs concentrate there.
 
+**Next after 1.10.** A generator gains a `Width`, mirroring the gate it is the
+inverse of (M6): the marker draws at that width, and a queue block whose
+projection exceeds it is a warning, the mirror of "a compatible gate exists but
+is too narrow". `SpawnedBlockDraft` gains a stable `Id` in the same change —
+both touch the level DTO, and no level has been authored yet, so the format can
+still change for free. Spec written when reached.
+
 ---
 
 ## Phase 2 — Playable single level

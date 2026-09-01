@@ -191,12 +191,10 @@ nothing, exhaustive with 15s / 1M. Only if both come back empty is the verdict
 than in the strategy — the strategy honours a budget, the caller decides the
 policy. Both budgets are editable in the window.
 
-**No undo.** Level editing is free-form and reversible by hand: delete the block,
-place it again. An undo stack would be a substantial piece of the module for a
-tool used by one person on small boards.
-
-The rule this replaces it with: **no irreversible edit without confirmation.**
-Anything that discards work asks first.
+**Undo.** The editor has undo and redo over level snapshots — D33 records why
+the original "no undo" here was reversed. Destructive edits still confirm first:
+undo makes a shrunken grid recoverable, but saying what will be lost beforehand
+is clearer than offering to reverse it afterwards.
 
 **Destructive edits confirm.** Shrinking a grid can push blocks, gates and
 shutters outside it. Rather than silently dropping them or refusing the resize,
