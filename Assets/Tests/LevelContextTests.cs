@@ -32,7 +32,8 @@ namespace GateRush.Tests
         private static SpawnedBlock CreateSpawnedBlock(
             int? keyTargetLockId = null,
             int? lockId = null,
-            int requiredKeyCount = 0)
+            int requiredKeyCount = 0,
+            Coord? regionOrigin = null)
         {
             return new SpawnedBlock(
                 cells: new[] { new Coord(0, 0) },
@@ -43,7 +44,8 @@ namespace GateRush.Tests
                 requiredKeyCount: requiredKeyCount,
                 keyTargetLockId: keyTargetLockId,
                 keyEffect: KeyEffect.UnlockMovement,
-                timeBonusSeconds: 0);
+                timeBonusSeconds: 0,
+                regionOrigin: regionOrigin);
         }
 
         private static LevelContext CreateContext(
@@ -305,7 +307,10 @@ namespace GateRush.Tests
         {
             var elevator = new ElevatorDefinition(
                 1, new Coord(0, 0), new Coord(0, 0),
-                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { CreateSpawnedBlock(regionOrigin: new Coord(0, 0)) }
+                });
 
             var context = CreateContext(3, 3, elevators: new[] { elevator });
             var spec = context.SpecAt(0);
@@ -322,7 +327,10 @@ namespace GateRush.Tests
                 1, BoardEdge.Top, 0, new[] { CreateSpawnedBlock(), CreateSpawnedBlock() });
             var elevator = new ElevatorDefinition(
                 1, new Coord(0, 2), new Coord(0, 2),
-                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock() } });
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { CreateSpawnedBlock(regionOrigin: new Coord(0, 0)) }
+                });
 
             var context = CreateContext(
                 3, 3, new[] { blockA, blockB }, generators: new[] { generator }, elevators: new[] { elevator });

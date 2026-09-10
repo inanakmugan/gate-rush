@@ -20,63 +20,10 @@ namespace GateRush.Tests
 
         // -- A corpus level exercising every DTO field ---------------------
 
-        /// <summary>
-        /// One level that carries, between its parts, every field of every DTO:
-        /// a nullable that is set (block 1's unfreeze) and ones that are not, a
-        /// layered block, two axis-restricted blocks, two lock/key pairs — one
-        /// key of each <see cref="KeyEffect"/> — a time bonus, a colour-bound
-        /// shutter and a global one, a generator queue, an elevator with two
-        /// waves of unequal length, and a static wall.
-        /// </summary>
-        private static LevelContext CorpusLevel()
-        {
-            var blocks = new[]
-            {
-                Block(1, new Coord(2, 1),
-                    cells: new[] { new Coord(0, 0), new Coord(0, 1) },
-                    colors: new[] { BlockColor.Blue, BlockColor.Yellow },
-                    axis: MovementAxis.VerticalOnly,
-                    unfreezeAt: 3,
-                    timeBonusSeconds: 5),
-                Block(2, new Coord(4, 1), colors: new[] { BlockColor.Green },
-                    lockId: 7, requiredKeys: 1),
-                Block(3, new Coord(5, 1), colors: new[] { BlockColor.Red },
-                    keyTarget: 7, keyEffect: KeyEffect.ClearOuterColor),
-                Block(4, new Coord(3, 0), colors: new[] { BlockColor.Orange },
-                    lockId: 8, requiredKeys: 1),
-                Block(5, new Coord(2, 0), colors: new[] { BlockColor.Purple },
-                    keyTarget: 8, keyEffect: KeyEffect.UnlockMovement),
-            };
-
-            var gates = new[]
-            {
-                Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Blue),
-                Gate(2, BoardEdge.Top, 0, 2, BlockColor.Green, openAt: 4),
-            };
-
-            var shutters = new[]
-            {
-                Shutter(1, new Coord(3, 3), new Coord(4, 4), threshold: 2, requiredColor: BlockColor.Yellow),
-                Shutter(2, new Coord(0, 3), new Coord(1, 4), threshold: 5),
-            };
-
-            var generators = new[]
-            {
-                Spawner(1, BoardEdge.Left, 0,
-                    Spawned(colors: new[] { BlockColor.Cyan }, axis: MovementAxis.HorizontalOnly)),
-            };
-
-            var elevators = new[]
-            {
-                Elevator(1, new Coord(0, 0), new Coord(1, 0),
-                    new[] { Spawned(colors: new[] { BlockColor.Pink }), Spawned(colors: new[] { BlockColor.Green }) },
-                    new[] { Spawned(colors: new[] { BlockColor.Red }, timeBonusSeconds: 4) }),
-            };
-
-            return Ctx(6, 6, blocks: blocks, gates: gates, shutters: shutters,
-                generators: generators, elevators: elevators,
-                staticWalls: new[] { new Coord(0, 5) });
-        }
+        // The shared "every field of every type" level lives in Corpus so the
+        // draft round trip reads the same fixture — a new schema field then
+        // breaks both round trips until it is carried through everywhere.
+        private static LevelContext CorpusLevel() => Corpus.EveryFieldLevel();
 
         // -- Round trip ---------------------------------------------------
 
@@ -88,6 +35,14 @@ namespace GateRush.Tests
             var twice = LevelSerializer.ToJson(LevelSerializer.FromJson(once));
 
             Assert.AreEqual(once, twice);
+        }
+
+        [Test]
+        public void ToJson_WritesFormatVersion2()
+        {
+            var json = Canonical(LevelSerializer.ToJson(Ctx(3, 3)));
+
+            StringAssert.Contains("\"formatVersion\":2", json);
         }
 
         [Test]
@@ -168,6 +123,9 @@ namespace GateRush.Tests
             Assert.AreEqual(2, elevator.Waves.Count);
             Assert.AreEqual(2, elevator.Waves[0].Count);
             Assert.AreEqual(1, elevator.Waves[1].Count);
+            Assert.AreEqual(new Coord(0, 0), elevator.Waves[0][0].RegionOrigin);
+            Assert.AreEqual(new Coord(1, 0), elevator.Waves[0][1].RegionOrigin);
+            Assert.IsNull(ctx.Generators[0].Queue[0].RegionOrigin);
         }
 
         // -- JsonUtility's limitations, one test each --------------------
@@ -194,8 +152,18 @@ namespace GateRush.Tests
         public void RoundTrip_ElevatorWithTwoUnequalWaves_KeepsBothIntact()
         {
             var elevator = Elevator(1, new Coord(0, 0), new Coord(1, 0),
-                new[] { Spawned(colors: new[] { BlockColor.Pink }), Spawned(colors: new[] { BlockColor.Green }) },
-                new[] { Spawned(colors: new[] { BlockColor.Red }) });
+                new[]
+                {
+                    Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)),
+                    Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0)),
+                },
+                new[]
+                {
+                    Spawned(
+                        colors: new[] { BlockColor.Red },
+                        cells: new[] { new Coord(0, 0), new Coord(1, 0) },
+                        regionOrigin: new Coord(0, 0)),
+                });
             var ctx = Ctx(3, 3, elevators: new[] { elevator });
 
             var restored = LevelSerializer.FromJson(LevelSerializer.ToJson(ctx)).Elevators[0];
@@ -204,6 +172,35 @@ namespace GateRush.Tests
             Assert.AreEqual(2, restored.Waves[0].Count);
             Assert.AreEqual(1, restored.Waves[1].Count);
             Assert.AreEqual(BlockColor.Green, restored.Waves[0][1].ColorStack[0]);
+        }
+
+        [Test]
+        public void RoundTrip_ElevatorWaveRegionOrigin_SurvivesAndGeneratorOutputHasNone()
+        {
+            var elevator = Elevator(1, new Coord(0, 0), new Coord(1, 0),
+                new[]
+                {
+                    Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)),
+                    Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0)),
+                });
+            var generator = Spawner(1, BoardEdge.Top, 0, Spawned(colors: new[] { BlockColor.Red }));
+            var ctx = Ctx(3, 3, generators: new[] { generator }, elevators: new[] { elevator });
+
+            var restored = LevelSerializer.FromJson(LevelSerializer.ToJson(ctx));
+
+            Assert.AreEqual(new Coord(1, 0), restored.Elevators[0].Waves[0][1].RegionOrigin);
+            Assert.IsNull(restored.Generators[0].Queue[0].RegionOrigin);
+        }
+
+        [Test]
+        public void ToJson_ElevatorWaveBlock_WritesHasRegionOriginTrue()
+        {
+            var elevator = Elevator(1, new Coord(0, 0), new Coord(0, 0),
+                new[] { Spawned(colors: new[] { BlockColor.Pink }, regionOrigin: new Coord(0, 0)) });
+
+            var json = Canonical(LevelSerializer.ToJson(Ctx(3, 3, elevators: new[] { elevator })));
+
+            StringAssert.Contains("\"hasRegionOrigin\":true", json);
         }
 
         [Test]
@@ -299,6 +296,20 @@ namespace GateRush.Tests
         // -- Structural errors ----------------------------------------
 
         [Test]
+        public void FromJson_FormatVersion1_IsRefused()
+        {
+            // Version 1 predates the elevator wave RegionOrigin (M9); no level was
+            // ever authored at it, so it is refused rather than migrated.
+            var json = FullyPopulatedJson.Replace("\"formatVersion\": 2", "\"formatVersion\": 1");
+
+            var ex = Assert.Throws<LevelSerializationException>(() => LevelSerializer.FromJson(json, "v1.json"));
+
+            StringAssert.Contains("v1.json", ex.Message);
+            StringAssert.Contains("1", ex.Message);
+            StringAssert.Contains("version", ex.Message);
+        }
+
+        [Test]
         public void FromJson_UnsupportedFormatVersion_IsRejectedBeforeConversion()
         {
             // The colour name is also invalid; the version check must fire first.
@@ -318,7 +329,7 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_RequiredArrayAbsent_IsReportedAsNamedErrorNotNullReference()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 3, ""height"": 3,
+            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 3, ""height"": 3,
                 ""blocks"": [ { ""id"": 1, ""colorStack"": [ ""Red"" ], ""axis"": ""Free"",
                 ""keyEffect"": ""UnlockMovement"", ""unfreezeAtClearCount"": -1, ""lockId"": -1,
                 ""keyTargetLockId"": -1 } ] }";
@@ -333,7 +344,7 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_NegativeSentinelOtherThanMinusOne_IsReported()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 3, ""height"": 3,
+            var json = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 3, ""height"": 3,
                 ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
                 ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"", ""unfreezeAtClearCount"": -1,
                 ""lockId"": -5, ""keyTargetLockId"": -1 } ] }";
@@ -366,30 +377,69 @@ namespace GateRush.Tests
         [Test]
         public void FromJson_StructurallyValidButSemanticallyInvalid_IsRejectedByCoreWithCoresMessage()
         {
-            var json = @"{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 5, ""height"": 5,
-                ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
-                ""startOrigin"": { ""x"": 99, ""y"": 99 }, ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
-                ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 } ],
-                ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }";
-
             // Core's ArgumentException, not this layer's LevelSerializationException:
             // a "helpful" duplicate grid-bounds check here would change the type and fail this.
-            var ex = Assert.Throws<ArgumentException>(() => LevelSerializer.FromJson(json, "outside.json"));
+            var ex = Assert.Throws<ArgumentException>(
+                () => LevelSerializer.FromJson(BlockOutsideGridJson, "outside.json"));
 
             StringAssert.Contains("outside the 5x5 grid", ex.Message);
         }
 
+        // -- ParseDto: the load half that stops at the DTO ----------
+
+        [Test]
+        public void ParseDto_StructurallyValidButSemanticallyInvalid_ReturnsTheDto()
+        {
+            // The same JSON FromJson rejects through Core: ParseDto must hand it
+            // back so the editor can open a broken level and repair it.
+            var dto = LevelSerializer.ParseDto(BlockOutsideGridJson, "outside.json");
+
+            Assert.AreEqual(5, dto.width);
+            Assert.AreEqual(99, dto.blocks[0].startOrigin.x);
+        }
+
+        [Test]
+        public void ParseDto_UnsupportedFormatVersion_Throws()
+        {
+            var json = FullyPopulatedJson.Replace("\"formatVersion\": 2", "\"formatVersion\": 1");
+
+            Assert.Throws<LevelSerializationException>(() => LevelSerializer.ParseDto(json, "v1.json"));
+        }
+
+        [Test]
+        public void ParseDto_MalformedText_Throws()
+        {
+            Assert.Throws<LevelSerializationException>(
+                () => LevelSerializer.ParseDto("this is not json at all", "broken.json"));
+        }
+
+        [Test]
+        public void ToJson_LevelDtoOverload_RoundTripsThroughParseDto()
+        {
+            var once = LevelSerializer.ToJson(CorpusLevel());
+
+            var twice = LevelSerializer.ToJson(LevelSerializer.ParseDto(once));
+
+            Assert.AreEqual(once, twice);
+        }
+
         // -- Fixtures ------------------------------------------------
 
+        private const string BlockOutsideGridJson = @"{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 5, ""height"": 5,
+            ""blocks"": [ { ""id"": 1, ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
+            ""startOrigin"": { ""x"": 99, ""y"": 99 }, ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
+            ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 } ],
+            ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }";
+
         private static string ColourNamedJson(string colourName) =>
-            $@"{{ ""formatVersion"": 1, ""levelId"": 1, ""width"": 1, ""height"": 1,
+            $@"{{ ""formatVersion"": 2, ""levelId"": 1, ""width"": 1, ""height"": 1,
                 ""blocks"": [ {{ ""id"": 1, ""cells"": [ {{ ""x"": 0, ""y"": 0 }} ],
                 ""colorStack"": [ ""{colourName}"" ], ""axis"": ""Free"", ""keyEffect"": ""UnlockMovement"",
                 ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""keyTargetLockId"": -1 }} ],
                 ""staticWalls"": [], ""gates"": [], ""shutters"": [], ""generators"": [], ""elevators"": [] }}";
 
         private const string FullyPopulatedJson = @"{
-  ""formatVersion"": 1,
+  ""formatVersion"": 2,
   ""levelId"": 42,
   ""width"": 6,
   ""height"": 6,
@@ -473,17 +523,20 @@ namespace GateRush.Tests
           ""blocks"": [
             { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Pink"" ], ""axis"": ""Free"",
               ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0 },
+              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 0, ""y"": 0 } },
             { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Green"" ], ""axis"": ""Free"",
               ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0 }
+              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 0,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 1, ""y"": 0 } }
           ]
         },
         {
           ""blocks"": [
-            { ""cells"": [ { ""x"": 0, ""y"": 0 } ], ""colorStack"": [ ""Red"" ], ""axis"": ""Free"",
-              ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0, ""keyTargetLockId"": -1,
-              ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 4 }
+            { ""cells"": [ { ""x"": 0, ""y"": 0 }, { ""x"": 1, ""y"": 0 } ], ""colorStack"": [ ""Red"" ],
+              ""axis"": ""Free"", ""unfreezeAtClearCount"": -1, ""lockId"": -1, ""requiredKeyCount"": 0,
+              ""keyTargetLockId"": -1, ""keyEffect"": ""UnlockMovement"", ""timeBonusSeconds"": 4,
+              ""hasRegionOrigin"": true, ""regionOrigin"": { ""x"": 0, ""y"": 0 } }
           ]
         }
       ]

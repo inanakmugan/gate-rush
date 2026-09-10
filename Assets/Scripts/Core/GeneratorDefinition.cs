@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace GateRush.Core
@@ -18,7 +19,18 @@ namespace GateRush.Core
             Id = id;
             Edge = edge;
             Offset = offset;
-            Queue = new List<SpawnedBlock>(queue ?? System.Array.Empty<SpawnedBlock>()).AsReadOnly();
+            Queue = new List<SpawnedBlock>(queue ?? Array.Empty<SpawnedBlock>()).AsReadOnly();
+
+            for (var i = 0; i < Queue.Count; i++)
+            {
+                if (Queue[i].RegionOrigin.HasValue)
+                {
+                    throw new ArgumentException(
+                        $"Generator {id} queue entry {i} carries a RegionOrigin. Generator output has no " +
+                        "authored position — it derives from the generator's edge and offset — so the value " +
+                        "would do nothing; it belongs only on elevator wave blocks (M9).");
+                }
+            }
         }
     }
 }

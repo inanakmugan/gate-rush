@@ -9,7 +9,8 @@
         "GateRush.Platform",
         "GateRush.Serialization",
         "DOTween.Modules",
-        "GateRush.Solver"
+        "GateRush.Solver",
+        "GateRush.Editor"
     ],
     "includePlatforms": [
         "Editor"

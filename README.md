@@ -61,14 +61,14 @@ Full write-up: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
 ## Documentation
 
-| Document | Contents |
-|---|---|
+| Document                                       | Contents |
+|------------------------------------------------|---|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Layers, dependency rules, core concepts |
-| [`docs/MECHANICS.md`](docs/MECHANICS.md) | Normative rules for all ten mechanics |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Decision record with rejected alternatives |
-| [`docs/MODULES/`](docs/MODULES/) | Per-module specifications |
-| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | Coding standards |
-| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Build order |
+| [`docs/MECHANICS.md`](docs/MECHANICS.md)       | Normative rules for all ten mechanics |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md)       | Decision record with rejected alternatives |
+| [`docs/Modules/`](docs/Modules/)               | Per-module specifications |
+| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md)   | Coding standards |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md)           | Build order |
 
 ## On process
 

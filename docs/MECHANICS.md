@@ -190,7 +190,13 @@ A generator sits on a board edge and pushes blocks inward — the inverse of a g
   incoming block's colour. This is presentation only.
 - After its sequence is exhausted, the generator is destroyed.
 - A level is not complete while any generator still has output pending.
-
+- A generator spans one or two cells of its edge — the reference game never shows
+a wider one. A queued block's projection onto that edge (the same projection a
+gate measures) may not exceed the generator's width; its extent into the board
+is unconstrained. A block spawns aligned to the generator's offset.
+- Edge features never overlap. Two gates, two generators, or a gate and a
+generator on the same edge may sit side by side, but their spans are disjoint.
+An overlap is a level data error, not a warning.
 ---
 
 ## M7 — Axis-restricted blocks

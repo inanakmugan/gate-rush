@@ -16,11 +16,11 @@ WebGL and Android.
 
 `docs/DECISIONS.md` and `docs/ROADMAP.md` are not auto-loaded. Read them on
 request or when a task touches a decision you want to understand.
-Module specifications live in `docs/MODULES/`.
+Module specifications live in `docs/Modules/`.
 
 ## Working agreement
 
-1. **One module per session.** Work from a single spec file in `docs/MODULES/`.
+1. **One module per session.** Work from a single spec file in `docs/Modules/`.
    Do not start adjacent modules "while you're in there."
 2. **Plan before writing.** Restate the module's responsibility and public
    surface in your own words, list the files you intend to create, and wait for

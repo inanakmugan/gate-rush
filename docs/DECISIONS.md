@@ -525,7 +525,7 @@ survives into the frontier.
 
 **Rejected.** An external cache in `GateRush.Core`, keyed off the
 `LevelContext` reference, holding the same precomputed data without touching
-Module 01. Rejected for two reasons. First, it would mean two modules
+Module 01. Rejected for two reasons. First, it would mean two Modules
 independently know how to flatten `Generators`/`Elevators` into one index
 space and walk shutter geometry — knowledge that is really a property of
 `LevelContext`'s own structure, so a change to one walk and not the other
@@ -673,3 +673,97 @@ monotonically) known in two places.
 **Note.** Same principle as D28's, D29's, and D31's closing notes: a later module
 surfacing a real need to add a small type to `Core` is normal growth, recorded
 rather than worked around.
+
+---
+
+## D33 — The level editor has undo
+
+**Decision.** The Level Editor has undo and redo (Ctrl+Z, Ctrl+Y and
+Ctrl+Shift+Z) over whole-level snapshots, to a depth set in
+`LevelEditorSettings`. Typing into one field is one undo step. Selection
+survives an undo whenever the selected object can still be identified in the
+restored level.
+
+**What this reverses.** `09-level-editor.md` originally said no undo, on the
+reasoning that level editing is free-form and reversible by hand — delete the
+block, place it again — and that an undo stack was a substantial piece of work
+for a tool used by one person on small boards.
+
+**Why.** That reasoning did not survive contact with the tool. The hand reaches
+for Ctrl+Z before the conscious thought arrives, and an editor that does not
+answer feels broken regardless of whether the edit could have been reversed
+manually.
+
+It was also far cheaper than estimated, because the estimate assumed a command
+stack. `LevelDraft.ToDto()` already produces a complete snapshot, and
+`ToDto → FromDto` was already proven lossless by a test over the shared corpus.
+So undo is a list of snapshots: every mutation already funnels through one hook,
+that hook gained one line, and every existing mutation became undoable without
+being touched. No mutation needs to know how to reverse itself, and no future
+one will.
+
+**Rejected.** A command stack, each mutation paired with its reverse. More code
+for the same result, and every mutation added later would owe a reverse — the
+kind of obligation that is silently forgotten.
+
+**Consequences worth recording.**
+
+- The hook runs after a mutation, not before, so the history keeps a trailing
+  snapshot of the state before the current mutation rather than being handed
+  one.
+- A sustained edit — typing a number — fires the hook per keystroke. Entries
+  coalesce while the focused control is unchanged, and the chain breaks on any
+  selection change, because the same field in two identically shaped panels
+  lands on the same control. A click anywhere ends the active text edit;
+  without that, the guard that keeps Ctrl+Z from hijacking a field's own text
+  undo swallowed every Ctrl+Z after the first.
+- The original rule was that selection is never restored. Revised: it is
+  restored when the object survives, resolved by id — or, for a wave block,
+  which has no id, by index verified against its origin and cells, so restoring
+  a deletion can never shift the selection onto a neighbour. Undoing a field
+  edit with the panel going blank made the original rule untenable.
+- Wave scope survives undo: it is index-based, and `InWaveScope` already falls
+  back to the board when the rebuilt level no longer has that wave.
+
+**Unchanged.** D14. The game has no undo; the in-level button is restart. This
+decision is about the authoring tool, not the player.
+
+---
+
+## D34 — Generators have a width, capped at two
+
+**Decision.** `GeneratorDefinition` gains an authored `Width` of 1 or 2 cells
+along its edge. A queued block whose projection onto the edge exceeds the width
+is a warning in the editor, the mirror of "a compatible gate exists but is too
+narrow". A block spawns aligned to the generator's offset. Gates and generators
+on the same edge never overlap; an overlap is a level data error. The cap of two
+is a rule of the game, held as a named constant in `Core`.
+
+**Why.** M6 defines a generator as the inverse of a gate, and a gate has a
+colour, a width, and a projection rule. Its inverse had an edge and an offset
+and nothing to say how wide it was — so the editor's marker had no width to draw
+and the validator had no rule to check. Giving it the gate's width closes both
+gaps with a rule the project already has.
+
+The cap comes from observation of the reference game, which never shows a
+generator wider than two cells (the same basis as D16 and D25). It costs almost
+nothing: of the ten shape presets only the three-long one *along* the edge is
+excluded, since the width bounds the projection, not the depth.
+
+**Why offset-aligned.** With a width of two and a one-wide block there are two
+places it could spawn. Aligning to the offset is the simplest deterministic rule
+and adds no field. A per-entry spawn offset — the generator counterpart of an
+elevator wave's `RegionOrigin` — is deferred, not rejected, exactly as
+`RegionOrigin` itself was deferred until authoring needed it.
+
+**Rejected.** A width derived from the widest queued block. No field, but no
+designer control and nothing to warn about, and the marker would silently grow
+with the queue.
+
+**Also.** `SpawnedBlockDraft` gains a stable per-list `Id`, so a selected wave
+block or queue entry can be found again after an undo rebuilds the draft
+(D33's index-and-shape verification was a stopgap). It is an authoring identity
+only — `Core` addresses spawned blocks by flat index (D28) — so it lives in the
+DTO and the draft, not in `Core`. `formatVersion` goes to 3; version 2 is
+refused. No level has been authored, so no migration path is needed, as with
+1 → 2.

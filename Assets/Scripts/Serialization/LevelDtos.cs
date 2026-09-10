@@ -5,9 +5,7 @@ namespace GateRush.Serialization
     // ---------------------------------------------------------------------------
     // Wire schema — one worked example
     //
-    // Read this before the nine types below. When the format changes (phase 1.13
-    // adds a region-relative position to spawned blocks and bumps formatVersion)
-    // or when the Level Editor spec is written, one example is faster to absorb
+    // Read this before the nine types below. One example is faster to absorb
     // than nine class definitions.
     //
     // Every enum is a name, never an integer: "Red", not 3 — an inserted enum
@@ -19,8 +17,16 @@ namespace GateRush.Serialization
     // deep ("waves": [ { "blocks": [ ... ] } ]) because JsonUtility cannot write
     // a jagged array.
     //
+    // A spawned block in an elevator wave carries a region-relative position:
+    // "hasRegionOrigin": true with "regionOrigin": { "x": .., "y": .. }. An
+    // explicit flag, not a -1 sentinel, because a region origin has no sign
+    // convention to lean on. Generator output has no authored position, so it
+    // writes "hasRegionOrigin": false and the "regionOrigin" object is ignored.
+    // This position (and formatVersion 2) arrived with the Level Editor, which
+    // needs it because a region usually admits several tilings.
+    //
     // {
-    //   "formatVersion": 1,
+    //   "formatVersion": 2,
     //   "levelId": 42,
     //   "width": 5,
     //   "height": 5,
@@ -53,13 +59,19 @@ namespace GateRush.Serialization
     //       "queue": [ { "cells": [ { "x": 0, "y": 0 } ], "colorStack": [ "Red" ],
     //                    "axis": "Free", "unfreezeAtClearCount": -1, "lockId": -1,
     //                    "requiredKeyCount": 0, "keyTargetLockId": -1,
-    //                    "keyEffect": "UnlockMovement", "timeBonusSeconds": 0 } ] }
+    //                    "keyEffect": "UnlockMovement", "timeBonusSeconds": 0,
+    //                    "hasRegionOrigin": false, "regionOrigin": { "x": 0, "y": 0 } } ] }
     //   ],
     //   "elevators": [
     //     { "id": 1, "min": { "x": 0, "y": 0 }, "max": { "x": 1, "y": 0 },
     //       "waves": [
-    //         { "blocks": [ { ...spawned block... }, { ...spawned block... } ] },
-    //         { "blocks": [ { ...spawned block... } ] }   // two waves, unequal
+    //         // wave 1 tiles the 2x1 region with two 1x1 blocks
+    //         { "blocks": [ { ...spawned, "hasRegionOrigin": true, "regionOrigin": { "x": 0, "y": 0 } },
+    //                       { ...spawned, "hasRegionOrigin": true, "regionOrigin": { "x": 1, "y": 0 } } ] },
+    //         // wave 2 tiles the same region with one 2x1 block — waves differ in
+    //         // block count, never in the cells they cover
+    //         { "blocks": [ { ...spawned, "cells": [ {"x":0,"y":0}, {"x":1,"y":0} ],
+    //                         "hasRegionOrigin": true, "regionOrigin": { "x": 0, "y": 0 } } ] }
     //       ] }
     //   ],
     //   "suggestedTimeBudgetSeconds": 90,
@@ -186,10 +198,12 @@ namespace GateRush.Serialization
     }
 
     /// <summary>
-    /// A block awaiting delivery by a generator or elevator. Carries no position:
-    /// generator output derives its position from the edge and offset, and the
-    /// region-relative position elevator waves will need arrives with phase 1.13,
-    /// alongside a <c>formatVersion</c> bump.
+    /// A block awaiting delivery by a generator or elevator. Generator output
+    /// derives its position from the edge and offset and sets
+    /// <see cref="hasRegionOrigin"/> false. An elevator wave block sets it true
+    /// and fills <see cref="regionOrigin"/> with the grid cell, relative to the
+    /// region's <c>Min</c>, that its footprint's minimum corner occupies (M9) —
+    /// a region usually admits several tilings, so the wave has to say which.
     /// </summary>
     [Serializable]
     public sealed class SpawnedBlockDto
@@ -203,5 +217,18 @@ namespace GateRush.Serialization
         public int keyTargetLockId;
         public string keyEffect;
         public int timeBonusSeconds;
+
+        /// <summary>
+        /// Whether <see cref="regionOrigin"/> carries a value. An explicit flag
+        /// rather than a <c>-1</c> sentinel, because a region origin has no sign
+        /// convention that <c>-1</c> could safely fall outside.
+        /// </summary>
+        public bool hasRegionOrigin;
+
+        /// <summary>
+        /// The region-relative position of an elevator wave block. Read only
+        /// when <see cref="hasRegionOrigin"/> is true.
+        /// </summary>
+        public CoordDto regionOrigin;
     }
 }
