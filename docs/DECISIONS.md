@@ -727,3 +727,43 @@ kind of obligation that is silently forgotten.
 
 **Unchanged.** D14. The game has no undo; the in-level button is restart. This
 decision is about the authoring tool, not the player.
+
+---
+
+## D34 — Generators have a width, capped at two
+
+**Decision.** `GeneratorDefinition` gains an authored `Width` of 1 or 2 cells
+along its edge. A queued block whose projection onto the edge exceeds the width
+is a warning in the editor, the mirror of "a compatible gate exists but is too
+narrow". A block spawns aligned to the generator's offset. Gates and generators
+on the same edge never overlap; an overlap is a level data error. The cap of two
+is a rule of the game, held as a named constant in `Core`.
+
+**Why.** M6 defines a generator as the inverse of a gate, and a gate has a
+colour, a width, and a projection rule. Its inverse had an edge and an offset
+and nothing to say how wide it was — so the editor's marker had no width to draw
+and the validator had no rule to check. Giving it the gate's width closes both
+gaps with a rule the project already has.
+
+The cap comes from observation of the reference game, which never shows a
+generator wider than two cells (the same basis as D16 and D25). It costs almost
+nothing: of the ten shape presets only the three-long one *along* the edge is
+excluded, since the width bounds the projection, not the depth.
+
+**Why offset-aligned.** With a width of two and a one-wide block there are two
+places it could spawn. Aligning to the offset is the simplest deterministic rule
+and adds no field. A per-entry spawn offset — the generator counterpart of an
+elevator wave's `RegionOrigin` — is deferred, not rejected, exactly as
+`RegionOrigin` itself was deferred until authoring needed it.
+
+**Rejected.** A width derived from the widest queued block. No field, but no
+designer control and nothing to warn about, and the marker would silently grow
+with the queue.
+
+**Also.** `SpawnedBlockDraft` gains a stable per-list `Id`, so a selected wave
+block or queue entry can be found again after an undo rebuilds the draft
+(D33's index-and-shape verification was a stopgap). It is an authoring identity
+only — `Core` addresses spawned blocks by flat index (D28) — so it lives in the
+DTO and the draft, not in `Core`. `formatVersion` goes to 3; version 2 is
+refused. No level has been authored, so no migration path is needed, as with
+1 → 2.
