@@ -68,5 +68,15 @@ namespace GateRush.Tests
 
             Object.DestroyImmediate(settings);
         }
+
+        [Test]
+        public void Defaults_QueueEntryFreeDrawMaxDepth_Is4()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(4, settings.QueueEntryFreeDrawMaxDepth);
+
+            Object.DestroyImmediate(settings);
+        }
     }
 }

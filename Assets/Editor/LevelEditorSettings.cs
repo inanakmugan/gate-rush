@@ -43,8 +43,8 @@ namespace GateRush.Editor
         [SerializeField] private float warningsListMinHeight = 70f;
         [SerializeField] private float canvasMinHeight = 220f;
 
-        [Header("Generator queue entry free draw (docs/Modules/09a follow-up): a queue entry has no board to place on, so its free draw is bounded to a fixed square rather than the grid's own size")]
-        [SerializeField] private int queueEntryFreeDrawGridSize = 5;
+        [Header("Generator queue entry free draw (docs/Modules/09a follow-up, D34): bounded along the generator's edge by its width, and into the board by this depth")]
+        [SerializeField] private int queueEntryFreeDrawMaxDepth = 4;
 
         [Header("Undo (docs/Modules/09a, Session C): depth of the level editor's undo stack. A level's DTO is a few kilobytes, so memory is not a consideration.")]
         [SerializeField] private int undoStackDepth = 50;
@@ -74,12 +74,15 @@ namespace GateRush.Editor
         public float CanvasMinHeight => canvasMinHeight;
 
         /// <summary>
-        /// The side length of the fixed square a generator queue entry's free
-        /// draw is bounded to. A 5x5 default covers a T, an S/Z, a 2x3 or a plus
-        /// shape; a generator sits on a board edge and pushes inward, so nothing
-        /// a realistic level would need is larger than that anyway.
+        /// How far a generator queue entry's free draw extends into the board.
+        /// The grid is sized per axis (<see cref="QueueEntryDrawBounds"/>): the
+        /// axis along the generator's edge is capped at the generator's own
+        /// width (D34), and the axis into the board at this value. A block's
+        /// extent into the board is unconstrained by the rules (M6), so this is
+        /// a draw-surface bound only; the default of 4 covers an I-tetromino
+        /// pushed straight in. Default 4.
         /// </summary>
-        public int QueueEntryFreeDrawGridSize => queueEntryFreeDrawGridSize;
+        public int QueueEntryFreeDrawMaxDepth => queueEntryFreeDrawMaxDepth;
 
         /// <summary>The Level Editor undo stack's depth (docs/Modules/09a, Session C). Default 50.</summary>
         public int UndoStackDepth => undoStackDepth;
