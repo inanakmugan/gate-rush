@@ -73,20 +73,21 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// A generator on <paramref name="edge"/> whose ordered output is
-        /// <paramref name="queue"/>. Named <c>Spawner</c> rather than
-        /// <c>Generator</c> so it never collides with a test's local
-        /// <c>Generator()</c> factory under <c>using static</c>.
+        /// A generator on <paramref name="edge"/>, <paramref name="width"/> cells
+        /// wide, whose ordered output is <paramref name="queue"/>. Named
+        /// <c>Spawner</c> rather than <c>Generator</c> so it never collides with a
+        /// test's local <c>Generator()</c> factory under <c>using static</c>.
         /// </summary>
         /// <remarks>
-        /// No caller yet: generators cannot appear in a level until phase 1.13.
-        /// Present now so that phase's first generator fixture has one obvious
-        /// place to be built, alongside <see cref="Spawned"/> and the rest.
+        /// <paramref name="width"/> is required rather than defaulted: it is
+        /// bounded to <c>[1, GeneratorDefinition.MaxWidth]</c> and decides which
+        /// queued blocks fit (M6, D34), so a fixture should say what it means to
+        /// test rather than inherit a silent 1.
         /// </remarks>
         internal static GeneratorDefinition Spawner(
-            int id, BoardEdge edge, int offset, params SpawnedBlock[] queue)
+            int id, BoardEdge edge, int offset, int width, params SpawnedBlock[] queue)
         {
-            return new GeneratorDefinition(id, edge, offset, queue);
+            return new GeneratorDefinition(id, edge, offset, width, queue);
         }
 
         /// <summary>

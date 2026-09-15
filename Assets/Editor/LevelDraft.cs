@@ -147,6 +147,7 @@ namespace GateRush.Editor
                     Id = gen.id,
                     Edge = loader.ParseEnum<BoardEdge>(gen.edge, label, "a board edge"),
                     Offset = gen.offset,
+                    Width = gen.width,
                 };
 
                 var queue = gen.queue ?? Array.Empty<SpawnedBlockDto>();
@@ -247,6 +248,7 @@ namespace GateRush.Editor
             public SpawnedBlockDraft Spawned(SpawnedBlockDto sb, string element) =>
                 new SpawnedBlockDraft
                 {
+                    Id = sb.id,
                     Cells = Coords(sb.cells),
                     ColorStack = ColorList(sb.colorStack, element),
                     Axis = ParseEnum<MovementAxis>(sb.axis, element, "an axis"),
@@ -309,6 +311,7 @@ namespace GateRush.Editor
                     id = g.Id,
                     edge = g.Edge.ToString(),
                     offset = g.Offset,
+                    width = g.Width,
                     queue = Map(g.Queue, SpawnedToDto),
                 }),
                 elevators = Map(Elevators, e => new ElevatorDto
@@ -324,6 +327,7 @@ namespace GateRush.Editor
         private static SpawnedBlockDto SpawnedToDto(SpawnedBlockDraft sb) =>
             new SpawnedBlockDto
             {
+                id = sb.Id,
                 cells = CoordDtos(sb.Cells),
                 colorStack = ColorNames(sb.ColorStack),
                 axis = sb.Axis.ToString(),
@@ -393,7 +397,7 @@ namespace GateRush.Editor
             var generators = new List<int>();
             foreach (var g in Generators)
             {
-                if (EdgeSpanEscapes(g.Edge, g.Offset, 1, newWidth, newHeight))
+                if (EdgeSpanEscapes(g.Edge, g.Offset, g.Width, newWidth, newHeight))
                 {
                     generators.Add(g.Id);
                 }
@@ -584,6 +588,16 @@ namespace GateRush.Editor
         public int Id { get; set; }
         public BoardEdge Edge { get; set; }
         public int Offset { get; set; }
+
+        /// <summary>
+        /// How many cells of <see cref="Edge"/> the generator spans (M6, D34).
+        /// Defaults to 1 rather than <c>int</c>'s implicit 0, which falls outside
+        /// the <c>[1, GeneratorDefinition.MaxWidth]</c> range <c>Core</c> accepts:
+        /// a draft may legitimately hold an invalid width the designer typed, but
+        /// no construction path should hand one out unasked.
+        /// </summary>
+        public int Width { get; set; } = 1;
+
         public List<SpawnedBlockDraft> Queue { get; set; } = new List<SpawnedBlockDraft>();
     }
 
@@ -607,6 +621,17 @@ namespace GateRush.Editor
     /// </summary>
     public sealed class SpawnedBlockDraft
     {
+        /// <summary>
+        /// Identity within the one list this block belongs to — a generator queue
+        /// or an elevator wave — and nowhere else; two waves may each hold an
+        /// entry with id 1. It is what lets <see cref="SelectionKey"/> find a
+        /// selected entry again after an undo rebuilds the draft, which an index
+        /// cannot do because restoring a deletion shifts every later index.
+        /// <c>Core</c> never sees it: spawned blocks are addressed there by flat
+        /// index (D28), so this is authoring identity only (D34).
+        /// </summary>
+        public int Id { get; set; }
+
         public List<Coord> Cells { get; set; } = new List<Coord>();
         public List<BlockColor> ColorStack { get; set; } = new List<BlockColor>();
         public MovementAxis Axis { get; set; }

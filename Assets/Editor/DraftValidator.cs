@@ -24,6 +24,13 @@ namespace GateRush.Editor
         /// <summary>A gate of the right colour exists but every one is too narrow for the block's projection.</summary>
         GateTooNarrowForBlock,
 
+        /// <summary>
+        /// A block in a generator's queue projects onto the generator's edge
+        /// wider than the generator is — the mirror of
+        /// <see cref="GateTooNarrowForBlock"/>, for a gate's inverse (M6, D34).
+        /// </summary>
+        GeneratorTooNarrowForQueuedBlock,
+
         /// <summary>An axis-restricted block has no gate of a needed colour on an edge it can reach (M7).</summary>
         AxisRestrictedBlockHasNoGate,
 
@@ -95,6 +102,7 @@ namespace GateRush.Editor
             }
 
             AddColorAndGateWarnings(draft, blockLikes, warnings);
+            AddGeneratorWidthWarnings(draft, warnings);
             AddAxisRestrictionWarnings(draft, blockLikes, warnings);
             AddThresholdWarnings(draft, blockLikes, warnings);
             AddLockKeyWarnings(blockLikes, warnings);
@@ -140,7 +148,7 @@ namespace GateRush.Editor
                         continue;
                     }
 
-                    var bestDeficit = matching.Min(g => Projection(block.Cells, g.Edge) - g.Width);
+                    var bestDeficit = matching.Min(g => BlockShape.ProjectionOnto(block.Cells, g.Edge) - g.Width);
                     if (bestDeficit > 0)
                     {
                         var widest = matching.Max(g => g.Width);
@@ -149,6 +157,42 @@ namespace GateRush.Editor
                             $"{block.Label}'s {color} layer has no wide-enough gate: the widest {color} gate is " +
                             $"{widest}, but the block's projection onto its edge is larger by {bestDeficit}."));
                     }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reports a queued block wider than the generator that has to push it
+        /// out. A generator is a gate's inverse and measures the same projection
+        /// a gate does (M6): the block's extent along the generator's edge may not
+        /// exceed the generator's width, while its extent into the board is
+        /// unconstrained. A width outside <c>[1, MaxWidth]</c> is <c>Core</c>'s
+        /// error to throw, not this warning's to repeat, so an invalid width is
+        /// skipped here — <see cref="DraftWarningCategory.DraftDoesNotFormValidLevel"/>
+        /// already carries it.
+        /// </summary>
+        private static void AddGeneratorWidthWarnings(LevelDraft draft, List<DraftWarning> warnings)
+        {
+            foreach (var generator in draft.Generators)
+            {
+                if (generator.Width < 1 || generator.Width > GeneratorDefinition.MaxWidth)
+                {
+                    continue;
+                }
+
+                for (var i = 0; i < generator.Queue.Count; i++)
+                {
+                    var projection = BlockShape.ProjectionOnto(generator.Queue[i].Cells, generator.Edge);
+                    if (projection <= generator.Width)
+                    {
+                        continue;
+                    }
+
+                    warnings.Add(new DraftWarning(
+                        DraftWarningCategory.GeneratorTooNarrowForQueuedBlock,
+                        $"Generator {generator.Id} queue entry {i} projects {projection} cells onto the " +
+                        $"{generator.Edge} edge, but the generator is only {generator.Width} wide, so that block " +
+                        "can never be pushed out."));
                 }
             }
         }
@@ -489,28 +533,6 @@ namespace GateRush.Editor
                     }
                 }
             }
-        }
-
-        /// <summary>
-        /// The block footprint's extent along <paramref name="edge"/> — the span
-        /// the gate on that edge must be at least as wide as (M1). The whole
-        /// footprint projects, not just the cells touching the wall.
-        /// </summary>
-        private static int Projection(IReadOnlyList<Coord> cells, BoardEdge edge)
-        {
-            if (cells.Count == 0)
-            {
-                return 0;
-            }
-
-            var minX = cells.Min(c => c.X);
-            var maxX = cells.Max(c => c.X);
-            var minY = cells.Min(c => c.Y);
-            var maxY = cells.Max(c => c.Y);
-
-            return edge == BoardEdge.Top || edge == BoardEdge.Bottom
-                ? maxX - minX + 1
-                : maxY - minY + 1;
         }
     }
 }

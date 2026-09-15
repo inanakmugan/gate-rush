@@ -42,7 +42,28 @@ namespace GateRush.Tests
 
             Assert.AreEqual(5, ctx.Blocks.Count);
             Assert.AreEqual(new Coord(1, 0), ctx.Elevators[0].Waves[0][1].RegionOrigin);
+            Assert.AreEqual(2, ctx.Generators[0].Width);
             Assert.IsNull(ctx.Generators[0].Queue[0].RegionOrigin);
+        }
+
+        [Test]
+        public void FromDto_SpawnedBlockIds_AreReadVerbatimRatherThanRenumbered()
+        {
+            // The id is what lets SelectionKey find a wave block again after an
+            // undo rebuilds the draft. Renumbering by position on load would make
+            // it another name for the index and reintroduce exactly the shifting
+            // the id exists to survive — so ids that are not in list order must
+            // come back in the order the file gave them (D34).
+            var dto = LevelSerializer.ParseDto(LevelSerializer.ToJson(Corpus.EveryFieldLevel()));
+            var wave = dto.elevators[0].waves[0];
+            wave.blocks[0].id = 9;
+            wave.blocks[1].id = 4;
+
+            var draft = LevelDraft.FromDto(dto);
+
+            var blocks = draft.Elevators[0].Waves[0].Blocks;
+            Assert.AreEqual(9, blocks[0].Id);
+            Assert.AreEqual(4, blocks[1].Id);
         }
 
         [Test]

@@ -87,5 +87,57 @@ namespace GateRush.Tests
             Assert.AreEqual(4, draft.Width);
             Assert.AreEqual(4, draft.Height);
         }
+
+        // -- Generators (D34: the resize span is the authored Width) -------
+
+        /// <summary>
+        /// A width-2 generator at offset 3 of a 5-long edge spans [3, 5). Shrink
+        /// the edge to 4 and it no longer fits, even though its offset is still on
+        /// the board — which is exactly what a width-1 generator at the same
+        /// offset would survive. Before D34 the resize preview measured every
+        /// generator as 1 cell wide, so this case was reported as lossless and the
+        /// generator silently outlived the edge it sat on.
+        /// </summary>
+        [Test]
+        public void PreviewResize_ShrinkClippingOnlyTheSecondCellOfAWideGenerator_ReportsIt()
+        {
+            var draft = LevelDraft.NewEmpty(5, 5);
+            draft.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 3, Width = 2,
+            });
+
+            var impact = draft.PreviewResize(4, 5);
+
+            CollectionAssert.AreEquivalent(new[] { 1 }, impact.RemovedGeneratorIds);
+        }
+
+        [Test]
+        public void PreviewResize_SameShrinkWithAOneWideGeneratorAtThatOffset_IsLossless()
+        {
+            var draft = LevelDraft.NewEmpty(5, 5);
+            draft.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 3, Width = 1,
+            });
+
+            var impact = draft.PreviewResize(4, 5);
+
+            Assert.IsTrue(impact.IsLossless);
+        }
+
+        [Test]
+        public void ApplyResize_ShrinkClippingAWideGenerator_RemovesIt()
+        {
+            var draft = LevelDraft.NewEmpty(5, 5);
+            draft.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 3, Width = 2,
+            });
+
+            draft.ApplyResize(4, 5);
+
+            Assert.AreEqual(0, draft.Generators.Count);
+        }
     }
 }

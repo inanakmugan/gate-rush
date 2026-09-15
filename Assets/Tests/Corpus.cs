@@ -17,10 +17,10 @@ namespace GateRush.Tests
         /// Carries, between its parts: a nullable that is set (block 1's
         /// unfreeze) and ones that are not, a layered block, axis-restricted
         /// blocks, two lock/key pairs — one key of each <see cref="KeyEffect"/> —
-        /// a time bonus, a colour-bound shutter and a global one, a generator
-        /// queue, an elevator with two waves of unequal block count that both
-        /// tile the region (so each wave block carries a RegionOrigin), and a
-        /// static wall.
+        /// a time bonus, a colour-bound shutter and a global one, a generator two
+        /// cells wide with a queue, an elevator with two waves of unequal block
+        /// count that both tile the region (so each wave block carries a
+        /// RegionOrigin), and a static wall.
         /// </summary>
         internal static LevelContext EveryFieldLevel()
         {
@@ -56,7 +56,10 @@ namespace GateRush.Tests
 
             var generators = new[]
             {
-                Spawner(1, BoardEdge.Left, 0,
+                // Width 2, not the default 1, so the round trips actually carry
+                // the field rather than agreeing on a value either side would
+                // produce by accident.
+                Spawner(1, BoardEdge.Left, 0, 2,
                     Spawned(colors: new[] { BlockColor.Cyan }, axis: MovementAxis.HorizontalOnly)),
             };
 

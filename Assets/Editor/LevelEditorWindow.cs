@@ -595,34 +595,16 @@ namespace GateRush.Editor
             }
         }
 
-        // A4/#2: the marker is as wide as the widest queued block projects onto
-        // this generator's edge — derived every draw, never stored, so it cannot
-        // go stale when the queue changes. Runtime spawning (1.13) is unaffected;
-        // each block still arrives at its own size.
+        // D34: the marker spans the generator's authored Width. It was previously
+        // derived from the widest queued block, which D34 rejected — there was
+        // nothing for the designer to set, nothing for the validator to warn
+        // about, and the marker grew silently as the queue changed. A queue entry
+        // too wide for this span is now a warning
+        // (GeneratorTooNarrowForQueuedBlock), not a reason to redraw the edge.
         private static Rect GeneratorMarkerRect(EditorGridLayout layout, GeneratorDraft generator) =>
             EditorGrid.EdgeMarker(
-                layout, generator.Edge, generator.Offset, QueueProjection(generator),
+                layout, generator.Edge, generator.Offset, generator.Width,
                 Mathf.Max(6f, layout.CellSize * 0.5f));
-
-        /// <summary>
-        /// The widest projection of any block in the generator's queue onto the
-        /// generator's edge (<see cref="BlockShape.ProjectionOnto"/>), at least 1
-        /// for an empty queue.
-        /// </summary>
-        private static int QueueProjection(GeneratorDraft generator)
-        {
-            var widest = 1;
-            foreach (var block in generator.Queue)
-            {
-                var projection = BlockShape.ProjectionOnto(block.Cells, generator.Edge);
-                if (projection > widest)
-                {
-                    widest = projection;
-                }
-            }
-
-            return widest;
-        }
 
         private static void DrawInwardTriangle(Rect r, BoardEdge edge, Color color)
         {
@@ -1204,13 +1186,15 @@ namespace GateRush.Editor
 
             if (InWaveScope())
             {
+                var wave = CurrentScopeWave();
                 var spawned = new SpawnedBlockDraft
                 {
+                    Id = NextId(wave.Blocks.Select(b => b.Id)),
                     Cells = new List<Coord>(footprint),
                     ColorStack = { BlockColor.Red },
                     RegionOrigin = cell,
                 };
-                draft.Elevators[scopeElevator].Waves[scopeWave].Blocks.Add(spawned);
+                wave.Blocks.Add(spawned);
                 selection = spawned;
                 Mutated();
             }
@@ -1315,13 +1299,15 @@ namespace GateRush.Editor
 
             if (InWaveScope())
             {
+                var wave = CurrentScopeWave();
                 var spawned = new SpawnedBlockDraft
                 {
+                    Id = NextId(wave.Blocks.Select(b => b.Id)),
                     Cells = normalised,
                     ColorStack = { BlockColor.Red },
                     RegionOrigin = min,
                 };
-                draft.Elevators[scopeElevator].Waves[scopeWave].Blocks.Add(spawned);
+                wave.Blocks.Add(spawned);
                 selection = spawned;
                 Mutated();
             }
@@ -1376,6 +1362,7 @@ namespace GateRush.Editor
                 Id = NextId(draft.Generators.Select(g => g.Id)),
                 Edge = edge,
                 Offset = offset,
+                Width = 1,
             };
             draft.Generators.Add(generator);
             selection = generator;
@@ -1537,7 +1524,7 @@ namespace GateRush.Editor
         /// </summary>
         private void DrawWaveBlockProperties(SpawnedBlockDraft block)
         {
-            DrawSpawnedBlockFields(block, showPosition: true, showShapePicker: false);
+            DrawSpawnedBlockFields(block, showPosition: true, queueOwner: null);
             DeleteButton();
         }
 
@@ -1550,7 +1537,13 @@ namespace GateRush.Editor
         /// closes that gap for both a wave block and a queue entry rather than
         /// widening it with a second, divergent copy.
         /// </summary>
-        private void DrawSpawnedBlockFields(SpawnedBlockDraft block, bool showPosition, bool showShapePicker)
+        /// <param name="queueOwner">
+        /// The generator whose queue <paramref name="block"/> belongs to, or
+        /// <c>null</c> for a wave block. Only a queue entry gets the shape
+        /// picker, and its Free-draw grid is bounded by this generator's edge
+        /// and width, so the owner is exactly the condition for drawing one.
+        /// </param>
+        private void DrawSpawnedBlockFields(SpawnedBlockDraft block, bool showPosition, GeneratorDraft queueOwner)
         {
             if (showPosition && block.RegionOrigin.HasValue)
             {
@@ -1561,9 +1554,9 @@ namespace GateRush.Editor
             // placement time — clicking the grid. A queue entry is created by
             // a button and never touches the palette, so without this it can
             // only ever be the 1x1 "+ Add to queue" defaults to.
-            if (showShapePicker)
+            if (queueOwner != null)
             {
-                DrawQueueEntryShapeField(block);
+                DrawQueueEntryShapeField(block, queueOwner);
             }
 
             DrawColorStack(block.ColorStack);
@@ -1591,9 +1584,11 @@ namespace GateRush.Editor
         /// grid to draw on") stopped being true once the shape preview
         /// (<see cref="EditorGrid.DrawCellPreview"/>) existed to draw on. With
         /// Free selected, that same preview area becomes the click surface —
-        /// <see cref="DrawQueueEntryFreeDrawGrid"/> — bounded to a fixed square
-        /// (<see cref="LevelEditorSettings.QueueEntryFreeDrawGridSize"/>) since a
-        /// queue entry has no board to place on and thus nothing else to bound it.
+        /// <see cref="DrawQueueEntryFreeDrawGrid"/> — bounded by the owning
+        /// generator (<see cref="QueueEntryDrawBounds"/>) since a queue entry has
+        /// no board to place on. The list itself is not filtered by that bound:
+        /// a preset that does not fit the generator is flagged by the same
+        /// <c>GeneratorTooNarrowForQueuedBlock</c> warning as a free-drawn shape.
         /// </summary>
         private static readonly ShapePreset[] QueueEntryShapePresets =
         {
@@ -1615,7 +1610,7 @@ namespace GateRush.Editor
         /// hide the draw surface. <see cref="CurrentQueueEntryShape"/>'s preset
         /// lookup only labels an entry the designer has not put into Free mode.
         /// </summary>
-        private void DrawQueueEntryShapeField(SpawnedBlockDraft entry)
+        private void DrawQueueEntryShapeField(SpawnedBlockDraft entry, GeneratorDraft generator)
         {
             var current = queueEntriesInFreeMode.Contains(entry) ? ShapePreset.Free : CurrentQueueEntryShape(entry);
             var currentIndex = Array.IndexOf(QueueEntryShapePresets, current);
@@ -1638,38 +1633,46 @@ namespace GateRush.Editor
             if (current == ShapePreset.Free)
             {
                 queueEntriesInFreeMode.Add(entry); // idempotent — this is the "stays in Free" half of the fix
-                DrawQueueEntryFreeDrawGrid(entry);
+                DrawQueueEntryFreeDrawGrid(entry, generator);
             }
             else
             {
-                var side = settings.QueueEntryFreeDrawGridSize * EditorGrid.PreviewCellSize;
+                // A square as deep as the Free grid, so switching modes does not
+                // make the box jump; the preview lays itself out from the shape's
+                // own bounding box, so it need not track the generator's width.
+                var side = Math.Max(1, settings.QueueEntryFreeDrawMaxDepth) * EditorGrid.PreviewCellSize;
                 var rect = GUILayoutUtility.GetRect(side, side, GUILayout.Width(side));
                 EditorGrid.DrawCellPreview(rect, entry.Cells, PreviewFillColor);
             }
         }
 
         /// <summary>
-        /// The interactive draw surface Free selects: a fixed
-        /// <see cref="LevelEditorSettings.QueueEntryFreeDrawGridSize"/>-square
-        /// grid — click a cell to add it, click again to remove it — reusing
-        /// <see cref="EditorGrid.DrawCells"/> rather than the passive preview,
-        /// since this one needs real click targets. The grid's own extent is
-        /// what bounds the shape: every cell a click can land on is already
-        /// inside it, so nothing further has to check the bound separately.
+        /// The interactive draw surface Free selects — click a cell to add it,
+        /// click again to remove it — reusing <see cref="EditorGrid.DrawCells"/>
+        /// rather than the passive preview, since this one needs real click
+        /// targets. Sized by <see cref="QueueEntryDrawBounds"/>: the generator's
+        /// width along its edge, <see cref="LevelEditorSettings.QueueEntryFreeDrawMaxDepth"/>
+        /// into the board, grown to keep any stale cell outside those caps
+        /// visible. Cells in that grown margin draw dimmer and are remove-only.
         /// </summary>
-        private void DrawQueueEntryFreeDrawGrid(SpawnedBlockDraft entry)
+        private void DrawQueueEntryFreeDrawGrid(SpawnedBlockDraft entry, GeneratorDraft generator)
         {
-            var gridSize = Math.Max(1, settings.QueueEntryFreeDrawGridSize);
-            var side = gridSize * EditorGrid.PreviewCellSize;
-            var rect = GUILayoutUtility.GetRect(side, side, GUILayout.Width(side));
-            var layout = new EditorGridLayout(rect, gridSize, gridSize);
+            var bounds = QueueEntryDrawBounds.For(
+                generator.Edge, generator.Width, settings.QueueEntryFreeDrawMaxDepth, entry.Cells);
+            var width = bounds.Columns * EditorGrid.PreviewCellSize;
+            var height = bounds.Rows * EditorGrid.PreviewCellSize;
+            var rect = GUILayoutUtility.GetRect(width, height, GUILayout.Width(width));
+            var layout = new EditorGridLayout(rect, bounds.Columns, bounds.Rows);
 
-            EditorGrid.DrawCells(layout, cell => entry.Cells.Contains(cell) ? PreviewFillColor : FreeDrawBackground);
+            EditorGrid.DrawCells(layout, cell =>
+                entry.Cells.Contains(cell) ? PreviewFillColor
+                : bounds.AllowsNewCell(cell) ? FreeDrawBackground
+                : FreeDrawOutOfBoundsBackground);
 
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && layout.TryPick(e.mousePosition, out var clicked))
             {
-                ToggleQueueEntryFreeCell(entry, clicked);
+                ToggleQueueEntryFreeCell(entry, clicked, bounds);
                 e.Use();
                 Mutated();
                 Repaint();
@@ -1678,12 +1681,15 @@ namespace GateRush.Editor
 
         private static readonly Color PreviewFillColor = new Color(0.6f, 0.85f, 0.95f);
         private static readonly Color FreeDrawBackground = new Color(0.22f, 0.22f, 0.25f);
+        private static readonly Color FreeDrawOutOfBoundsBackground = new Color(0.12f, 0.12f, 0.14f);
 
         /// <summary>
         /// Adds or removes <paramref name="cell"/> from <paramref name="entry"/>'s
         /// <c>Cells</c>, mirroring the board's own free draw
         /// (<see cref="ToggleFreeCell"/>) exactly on connectivity — the same
         /// <see cref="BlockShape"/> calls, not a second copy of the rule (D31).
+        /// An add must also fall inside <paramref name="bounds"/>' caps; a
+        /// removal never checks them, so a stale cell beyond them stays removable.
         /// </summary>
         /// <remarks>
         /// Deliberately does not normalise. Doing so on every click pinned the
@@ -1699,7 +1705,7 @@ namespace GateRush.Editor
         /// copy when it needs to compare against a preset — that is the one
         /// place it actually matters.
         /// </remarks>
-        private void ToggleQueueEntryFreeCell(SpawnedBlockDraft entry, Coord cell)
+        private void ToggleQueueEntryFreeCell(SpawnedBlockDraft entry, Coord cell, QueueEntryDrawBounds bounds)
         {
             if (entry.Cells.Contains(cell))
             {
@@ -1709,7 +1715,8 @@ namespace GateRush.Editor
                     entry.Cells = remainder;
                 }
             }
-            else if (entry.Cells.Count == 0 || entry.Cells.Any(c => BlockShape.AreOrthogonallyAdjacent(c, cell)))
+            else if (bounds.AllowsNewCell(cell)
+                && (entry.Cells.Count == 0 || entry.Cells.Any(c => BlockShape.AreOrthogonallyAdjacent(c, cell))))
             {
                 entry.Cells = new List<Coord>(entry.Cells) { cell };
             }
@@ -1781,6 +1788,14 @@ namespace GateRush.Editor
             generator.Edge = (BoardEdge)EditorGUILayout.EnumPopup("Edge", generator.Edge);
             generator.Offset = EditorGUILayout.IntField("Offset", generator.Offset);
 
+            // A plain IntField, like a gate's width: the [1, MaxWidth] bound is a
+            // rule of the game, and Core throwing on a value outside it surfaces
+            // as a DraftDoesNotFormValidLevel warning the designer can read.
+            // Clamping in the widget would enforce the same rule silently, in a
+            // second place, and teach nobody what it is.
+            generator.Width = EditorGUILayout.IntField(
+                $"Width (1-{GeneratorDefinition.MaxWidth})", generator.Width);
+
             EditorGUILayout.LabelField("Queue", EditorStyles.miniBoldLabel);
             for (var i = 0; i < generator.Queue.Count; i++)
             {
@@ -1827,8 +1842,8 @@ namespace GateRush.Editor
 
                 // showPosition: false — generator output has no position to
                 // author; it derives from the generator's own edge and offset.
-                // showShapePicker: true — see DrawSpawnedBlockFields.
-                DrawSpawnedBlockFields(entry, showPosition: false, showShapePicker: true);
+                // queueOwner: generator — see DrawSpawnedBlockFields.
+                DrawSpawnedBlockFields(entry, showPosition: false, queueOwner: generator);
 
                 EditorGUILayout.EndVertical();
             }
@@ -1837,6 +1852,7 @@ namespace GateRush.Editor
             {
                 generator.Queue.Add(new SpawnedBlockDraft
                 {
+                    Id = NextId(generator.Queue.Select(b => b.Id)),
                     Cells = new List<Coord>(ShapePresets.Cells(ShapePreset.Single)),
                     ColorStack = { BlockColor.Red },
                 });

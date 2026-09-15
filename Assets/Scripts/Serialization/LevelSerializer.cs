@@ -55,7 +55,7 @@ namespace GateRush.Serialization
         /// attempted, so a later schema change is a migration rather than a hunt
         /// for silently misread levels.
         /// </summary>
-        public const int FormatVersion = 2;
+        public const int FormatVersion = 3;
 
         /// <summary>
         /// The value every nullable <c>int</c> field takes when absent.
@@ -212,10 +212,15 @@ namespace GateRush.Serialization
             };
         }
 
-        private static SpawnedBlockDto ToDto(SpawnedBlock block)
+        /// <summary>
+        /// Converts one spawned block, stamping it with <paramref name="id"/> —
+        /// see <see cref="ToSpawnedDtos"/> for where that id comes from.
+        /// </summary>
+        private static SpawnedBlockDto ToDto(SpawnedBlock block, int id)
         {
             return new SpawnedBlockDto
             {
+                id = id,
                 cells = ToCoordDtos(block.Cells),
                 colorStack = ToColorNames(block.ColorStack),
                 axis = block.Axis.ToString(),
@@ -228,6 +233,26 @@ namespace GateRush.Serialization
                 hasRegionOrigin = block.RegionOrigin.HasValue,
                 regionOrigin = block.RegionOrigin.HasValue ? ToDto(block.RegionOrigin.Value) : default,
             };
+        }
+
+        /// <summary>
+        /// Converts one generator queue or one elevator wave, numbering its
+        /// entries from 1. <c>Core</c> keeps no authoring identity for a spawned
+        /// block — it addresses them by flat index (D28) — so the list position is
+        /// the only id a level built from a <see cref="LevelContext"/> can carry,
+        /// and it is the same id the Level Editor would have written for a
+        /// never-edited list. The numbering is per list, matching
+        /// <see cref="SpawnedBlockDto.id"/>'s scope.
+        /// </summary>
+        private static SpawnedBlockDto[] ToSpawnedDtos(IReadOnlyList<SpawnedBlock> blocks)
+        {
+            var result = new SpawnedBlockDto[blocks.Count];
+            for (var i = 0; i < blocks.Count; i++)
+            {
+                result[i] = ToDto(blocks[i], i + 1);
+            }
+
+            return result;
         }
 
         private static GateDto ToDto(GateDefinition gate)
@@ -262,7 +287,8 @@ namespace GateRush.Serialization
                 id = generator.Id,
                 edge = generator.Edge.ToString(),
                 offset = generator.Offset,
-                queue = ToArray(generator.Queue, b => ToDto(b)),
+                width = generator.Width,
+                queue = ToSpawnedDtos(generator.Queue),
             };
         }
 
@@ -271,7 +297,7 @@ namespace GateRush.Serialization
             var waves = new WaveDto[elevator.Waves.Count];
             for (var i = 0; i < elevator.Waves.Count; i++)
             {
-                waves[i] = new WaveDto { blocks = ToArray(elevator.Waves[i], b => ToDto(b)) };
+                waves[i] = new WaveDto { blocks = ToSpawnedDtos(elevator.Waves[i]) };
             }
 
             return new ElevatorDto
@@ -382,6 +408,13 @@ namespace GateRush.Serialization
                 timeBonusSeconds: dto.timeBonusSeconds);
         }
 
+        /// <summary>
+        /// Converts a spawned block to <c>Core</c>, dropping
+        /// <see cref="SpawnedBlockDto.id"/>: it is authoring identity for the
+        /// Level Editor, and <c>Core</c> addresses spawned blocks by flat index
+        /// (<c>DECISIONS.md</c> D28 and D34). Nothing in <c>Core</c> has a field
+        /// to put it in, which is the intended shape, not an omission.
+        /// </summary>
         private static SpawnedBlock FromDto(SpawnedBlockDto dto, string element, string source)
         {
             return new SpawnedBlock(
@@ -436,6 +469,7 @@ namespace GateRush.Serialization
                 id: dto.id,
                 edge: ParseEnum<BoardEdge>(dto.edge, $"{element}: 'edge'", source),
                 offset: dto.offset,
+                width: dto.width,
                 queue: queue);
         }
 

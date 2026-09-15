@@ -114,6 +114,7 @@ namespace GateRush.Tests
                 id: 1,
                 edge: BoardEdge.Top,
                 offset: 0,
+                width: 1,
                 queue: new[] { CreateSpawnedBlock(keyTargetLockId: 5) });
 
             var context = CreateContext(3, 3, new[] { locked }, generators: new[] { generator });
@@ -176,10 +177,95 @@ namespace GateRush.Tests
         [Test]
         public void Constructor_DuplicateGeneratorIds_Throws()
         {
-            var generatorA = new GeneratorDefinition(1, BoardEdge.Top, 0, Array.Empty<SpawnedBlock>());
-            var generatorB = new GeneratorDefinition(1, BoardEdge.Bottom, 0, Array.Empty<SpawnedBlock>());
+            var generatorA = new GeneratorDefinition(1, BoardEdge.Top, 0, 1, Array.Empty<SpawnedBlock>());
+            var generatorB = new GeneratorDefinition(1, BoardEdge.Bottom, 0, 1, Array.Empty<SpawnedBlock>());
 
             Assert.Throws<ArgumentException>(() => CreateContext(3, 3, generators: new[] { generatorA, generatorB }));
+        }
+
+        // -- Edge features: fit and non-overlap (M6, D34) ---------------
+
+        private static GateDefinition CreateGate(int id, BoardEdge edge, int offset, int width) =>
+            new GateDefinition(id, edge, offset, width, BlockColor.Red, openAtClearCount: null);
+
+        private static GeneratorDefinition CreateGenerator(int id, BoardEdge edge, int offset, int width) =>
+            new GeneratorDefinition(id, edge, offset, width, Array.Empty<SpawnedBlock>());
+
+        [Test]
+        public void Constructor_GateSpanExceedsEdgeLength_Throws()
+        {
+            var gate = CreateGate(1, BoardEdge.Top, offset: 5, width: 2);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(6, 6, gates: new[] { gate }));
+        }
+
+        [Test]
+        public void Constructor_GeneratorSpanExceedsEdgeLength_Throws()
+        {
+            var generator = CreateGenerator(1, BoardEdge.Top, offset: 5, width: 2);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(6, 6, generators: new[] { generator }));
+        }
+
+        [Test]
+        public void Constructor_GeneratorOffsetNegative_Throws()
+        {
+            var generator = CreateGenerator(1, BoardEdge.Left, offset: -1, width: 1);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(6, 6, generators: new[] { generator }));
+        }
+
+        [Test]
+        public void Constructor_TwoGatesOverlappingOnTheSameEdge_Throws()
+        {
+            var wide = CreateGate(1, BoardEdge.Top, offset: 0, width: 2);
+            var inside = CreateGate(2, BoardEdge.Top, offset: 1, width: 1);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(6, 6, gates: new[] { wide, inside }));
+        }
+
+        [Test]
+        public void Constructor_GateAndGeneratorOverlappingOnTheSameEdge_Throws()
+        {
+            var gate = CreateGate(1, BoardEdge.Bottom, offset: 1, width: 2);
+            var generator = CreateGenerator(2, BoardEdge.Bottom, offset: 2, width: 1);
+
+            var ex = Assert.Throws<ArgumentException>(
+                () => CreateContext(6, 6, gates: new[] { gate }, generators: new[] { generator }));
+
+            StringAssert.Contains("Gate 1", ex.Message);
+            StringAssert.Contains("Generator 2", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_TwoGeneratorsOverlappingOnTheSameEdge_Throws()
+        {
+            var wide = CreateGenerator(1, BoardEdge.Left, offset: 0, width: 2);
+            var inside = CreateGenerator(2, BoardEdge.Left, offset: 1, width: 1);
+
+            Assert.Throws<ArgumentException>(() => CreateContext(6, 6, generators: new[] { wide, inside }));
+        }
+
+        [Test]
+        public void Constructor_GateAndGeneratorAdjacentButDisjointOnTheSameEdge_Succeeds()
+        {
+            // M6 allows side by side, only not overlapping: [0, 2) then [2, 4).
+            var gate = CreateGate(1, BoardEdge.Top, offset: 0, width: 2);
+            var generator = CreateGenerator(1, BoardEdge.Top, offset: 2, width: 2);
+
+            var context = CreateContext(6, 6, gates: new[] { gate }, generators: new[] { generator });
+
+            Assert.AreEqual(2, context.Generators[0].Width);
+        }
+
+        [Test]
+        public void Constructor_GateAndGeneratorAtTheSameOffsetOnDifferentEdges_Succeeds()
+        {
+            var gate = CreateGate(1, BoardEdge.Top, offset: 0, width: 2);
+            var generator = CreateGenerator(1, BoardEdge.Bottom, offset: 0, width: 2);
+
+            Assert.DoesNotThrow(
+                () => CreateContext(6, 6, gates: new[] { gate }, generators: new[] { generator }));
         }
 
         [Test]
@@ -208,6 +294,7 @@ namespace GateRush.Tests
                 id: 1,
                 edge: BoardEdge.Top,
                 offset: 0,
+                width: 1,
                 queue: new[] { CreateSpawnedBlock(lockId: 5, requiredKeyCount: 1) });
 
             Assert.Throws<ArgumentException>(() => CreateContext(3, 3, new[] { block }, generators: new[] { generator }));
@@ -294,7 +381,7 @@ namespace GateRush.Tests
         public void SpecAt_GeneratorSpawnIndex_ReturnsGeneratorsQueuedSpec()
         {
             var generator = new GeneratorDefinition(
-                id: 1, edge: BoardEdge.Top, offset: 0, queue: new[] { CreateSpawnedBlock() });
+                id: 1, edge: BoardEdge.Top, offset: 0, width: 1, queue: new[] { CreateSpawnedBlock() });
 
             var context = CreateContext(3, 3, generators: new[] { generator });
             var spec = context.SpecAt(0);
@@ -324,7 +411,7 @@ namespace GateRush.Tests
             var blockA = CreateBlock(1, new Coord(0, 0));
             var blockB = CreateBlock(2, new Coord(1, 0));
             var generator = new GeneratorDefinition(
-                1, BoardEdge.Top, 0, new[] { CreateSpawnedBlock(), CreateSpawnedBlock() });
+                1, BoardEdge.Top, 0, 1, new[] { CreateSpawnedBlock(), CreateSpawnedBlock() });
             var elevator = new ElevatorDefinition(
                 1, new Coord(0, 2), new Coord(0, 2),
                 new IReadOnlyList<SpawnedBlock>[]
@@ -376,7 +463,7 @@ namespace GateRush.Tests
         {
             var key = CreateBlock(1, new Coord(0, 0), keyTargetLockId: 5);
             var generator = new GeneratorDefinition(
-                id: 1, edge: BoardEdge.Top, offset: 0,
+                id: 1, edge: BoardEdge.Top, offset: 0, width: 1,
                 queue: new[] { CreateSpawnedBlock(lockId: 5, requiredKeyCount: 1) });
 
             var context = CreateContext(3, 3, new[] { key }, generators: new[] { generator });

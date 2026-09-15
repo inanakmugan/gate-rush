@@ -25,8 +25,16 @@ namespace GateRush.Serialization
     // This position (and formatVersion 2) arrived with the Level Editor, which
     // needs it because a region usually admits several tilings.
     //
+    // A generator carries a "width" of 1 or 2 cells along its edge, the same
+    // geometry its inverse the gate has: a queued block's projection onto that
+    // edge may not exceed it, and a spawning block aligns to the offset. A
+    // spawned block also carries an "id", unique within its own queue or wave
+    // and nowhere else — authoring identity for the Level Editor's selection and
+    // undo, which Core never reads (it addresses spawned blocks by flat index).
+    // Both fields, and formatVersion 3, arrived with D34.
+    //
     // {
-    //   "formatVersion": 2,
+    //   "formatVersion": 3,
     //   "levelId": 42,
     //   "width": 5,
     //   "height": 5,
@@ -55,8 +63,8 @@ namespace GateRush.Serialization
     //       "threshold": 2, "requiredColor": "Yellow" }   // colour-bound shutter
     //   ],
     //   "generators": [
-    //     { "id": 1, "edge": "Top", "offset": 0,
-    //       "queue": [ { "cells": [ { "x": 0, "y": 0 } ], "colorStack": [ "Red" ],
+    //     { "id": 1, "edge": "Top", "offset": 0, "width": 1,
+    //       "queue": [ { "id": 1, "cells": [ { "x": 0, "y": 0 } ], "colorStack": [ "Red" ],
     //                    "axis": "Free", "unfreezeAtClearCount": -1, "lockId": -1,
     //                    "requiredKeyCount": 0, "keyTargetLockId": -1,
     //                    "keyEffect": "UnlockMovement", "timeBonusSeconds": 0,
@@ -166,13 +174,18 @@ namespace GateRush.Serialization
         public string requiredColor;
     }
 
-    /// <summary>A generator and its ordered output queue.</summary>
+    /// <summary>
+    /// A generator and its ordered output queue. <see cref="width"/> is how many
+    /// cells of its edge it spans — 1 or 2 (M6) — which a queued block's
+    /// projection onto that edge may not exceed.
+    /// </summary>
     [Serializable]
     public sealed class GeneratorDto
     {
         public int id;
         public string edge;
         public int offset;
+        public int width;
         public SpawnedBlockDto[] queue;
     }
 
@@ -208,6 +221,19 @@ namespace GateRush.Serialization
     [Serializable]
     public sealed class SpawnedBlockDto
     {
+        /// <summary>
+        /// Identity within this block's own list — one generator queue or one
+        /// elevator wave — and nowhere else: two waves may both hold an entry
+        /// with id 1. It exists so the Level Editor can find a selected entry
+        /// again after an undo rebuilds the draft from a snapshot, which index
+        /// alone cannot do (restoring a deletion shifts every later index).
+        /// <c>Core</c> never reads it — it addresses spawned blocks by flat index
+        /// (<c>DECISIONS.md</c> D28) — so a level written from a
+        /// <c>LevelContext</c>, which carries no authoring identity, gets its
+        /// list position here.
+        /// </summary>
+        public int id;
+
         public CoordDto[] cells;
         public string[] colorStack;
         public string axis;
