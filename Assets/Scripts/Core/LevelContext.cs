@@ -102,7 +102,7 @@ namespace GateRush.Core
 
             ValidateStaticWalls();
             ValidateBlockPlacement();
-            ValidateGates();
+            ValidateEdgeFeatures();
             ValidateShutterBounds();
             ValidateLocksAndKeys();
 
@@ -409,20 +409,98 @@ namespace GateRush.Core
             }
         }
 
-        private void ValidateGates()
+        /// <summary>
+        /// One gate or generator reduced to the only three things the edge rules
+        /// care about: which edge it sits on and the half-open span
+        /// <c>[Offset, Offset + Width)</c> of that edge it occupies. The label
+        /// carries its identity into the error message.
+        /// </summary>
+        private readonly struct EdgeFeature
         {
+            public string Label { get; }
+            public BoardEdge Edge { get; }
+            public int Offset { get; }
+            public int Width { get; }
+
+            public EdgeFeature(string label, BoardEdge edge, int offset, int width)
+            {
+                Label = label;
+                Edge = edge;
+                Offset = offset;
+                Width = width;
+            }
+
+            /// <summary>One past the last cell of the edge this feature occupies.</summary>
+            public int End => Offset + Width;
+
+            public bool OverlapsOnSameEdge(EdgeFeature other) =>
+                Edge == other.Edge && Offset < other.End && other.Offset < End;
+        }
+
+        /// <summary>
+        /// Checks every edge feature — gate or generator — twice: its span must
+        /// fall within the length of the edge it sits on, and it must not overlap
+        /// any other feature on that same edge. Gates and generators go through
+        /// one pass over one list because M6 states the rule once for all three
+        /// pairings: "two gates, two generators, or a gate and a generator on the
+        /// same edge may sit side by side, but their spans are disjoint. An
+        /// overlap is a level data error, not a warning."
+        /// </summary>
+        /// <remarks>
+        /// The pairwise comparison is quadratic, which is irrelevant here: it is
+        /// bounded by how many edge features an author placed and runs once, at
+        /// construction.
+        /// </remarks>
+        private void ValidateEdgeFeatures()
+        {
+            var features = new List<EdgeFeature>(Gates.Count + Generators.Count);
+
             foreach (var gate in Gates)
             {
-                var edgeLength = gate.Edge == BoardEdge.Top || gate.Edge == BoardEdge.Bottom ? Width : Height;
+                features.Add(new EdgeFeature($"Gate {gate.Id}", gate.Edge, gate.Offset, gate.Width));
+            }
 
-                if (gate.Offset < 0 || gate.Offset + gate.Width > edgeLength)
+            foreach (var generator in Generators)
+            {
+                features.Add(new EdgeFeature(
+                    $"Generator {generator.Id}", generator.Edge, generator.Offset, generator.Width));
+            }
+
+            foreach (var feature in features)
+            {
+                var edgeLength = EdgeLength(feature.Edge);
+
+                if (feature.Offset < 0 || feature.End > edgeLength)
                 {
                     throw new ArgumentException(
-                        $"Gate {gate.Id} on edge {gate.Edge} with offset {gate.Offset} and width {gate.Width} " +
-                        $"does not fit within the edge length of {edgeLength}.");
+                        $"{feature.Label} on edge {feature.Edge} with offset {feature.Offset} and width " +
+                        $"{feature.Width} does not fit within the edge length of {edgeLength}.");
+                }
+            }
+
+            for (var i = 0; i < features.Count; i++)
+            {
+                for (var j = i + 1; j < features.Count; j++)
+                {
+                    if (!features[i].OverlapsOnSameEdge(features[j]))
+                    {
+                        continue;
+                    }
+
+                    throw new ArgumentException(
+                        $"{features[i].Label} and {features[j].Label} overlap on edge {features[i].Edge}: " +
+                        $"spans [{features[i].Offset}, {features[i].End}) and " +
+                        $"[{features[j].Offset}, {features[j].End}). Edge features never overlap (M6).");
                 }
             }
         }
+
+        /// <summary>
+        /// How many cells long <paramref name="edge"/> is: the grid's width for
+        /// the top and bottom edges, its height for the left and right.
+        /// </summary>
+        private int EdgeLength(BoardEdge edge) =>
+            edge == BoardEdge.Top || edge == BoardEdge.Bottom ? Width : Height;
 
         private void ValidateShutterBounds()
         {

@@ -59,7 +59,7 @@ namespace GateRush.Tests
 
             var gate = new GateDefinition(10, BoardEdge.Top, 0, 1, BlockColor.Red, openAtClearCount: 2);
             var shutter = new ShutterDefinition(20, new Coord(4, 4), new Coord(5, 5), 3, null);
-            var generator = new GeneratorDefinition(30, BoardEdge.Bottom, 3, new[] { CreateSpawnedBlock() });
+            var generator = new GeneratorDefinition(30, BoardEdge.Bottom, 3, 1, new[] { CreateSpawnedBlock() });
             var elevator = new ElevatorDefinition(
                 40, new Coord(0, 3), new Coord(0, 3),
                 new IReadOnlyList<SpawnedBlock>[]
@@ -363,7 +363,7 @@ namespace GateRush.Tests
         [Test]
         public void IsSolved_InitialStateWithOnlyAGeneratorQueue_ReturnsFalse()
         {
-            var generator = new GeneratorDefinition(1, BoardEdge.Top, 0, new[] { CreateSpawnedBlock() });
+            var generator = new GeneratorDefinition(1, BoardEdge.Top, 0, 1, new[] { CreateSpawnedBlock() });
             var ctx = CreateContext(generators: new[] { generator });
 
             var state = BoardState.CreateInitial(ctx);

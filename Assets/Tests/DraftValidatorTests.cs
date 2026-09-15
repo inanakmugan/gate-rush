@@ -91,6 +91,111 @@ namespace GateRush.Tests
             Assert.IsFalse(Warns(draft, DraftWarningCategory.GateTooNarrowForBlock));
         }
 
+        // -- GeneratorTooNarrowForQueuedBlock --------------------
+
+        [Test]
+        public void GeneratorTooNarrowForQueuedBlock_TwoWideBlockInAOneWideGenerator_Fires()
+        {
+            var draft = Draft(4, 4, d =>
+            {
+                d.Generators.Add(new GeneratorDraft
+                {
+                    Id = 1, Edge = BoardEdge.Top, Offset = 0, Width = 1,
+                    Queue =
+                    {
+                        new SpawnedBlockDraft
+                        {
+                            Id = 1,
+                            Cells = { new Coord(0, 0), new Coord(1, 0) },
+                            ColorStack = { BlockColor.Red },
+                        },
+                    },
+                });
+            });
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.GeneratorTooNarrowForQueuedBlock));
+        }
+
+        [Test]
+        public void GeneratorTooNarrowForQueuedBlock_GeneratorWideEnough_Silent()
+        {
+            var draft = Draft(4, 4, d =>
+            {
+                d.Generators.Add(new GeneratorDraft
+                {
+                    Id = 1, Edge = BoardEdge.Top, Offset = 0, Width = 2,
+                    Queue =
+                    {
+                        new SpawnedBlockDraft
+                        {
+                            Id = 1,
+                            Cells = { new Coord(0, 0), new Coord(1, 0) },
+                            ColorStack = { BlockColor.Red },
+                        },
+                    },
+                });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.GeneratorTooNarrowForQueuedBlock));
+        }
+
+        [Test]
+        public void GeneratorTooNarrowForQueuedBlock_DepthIntoTheBoardIsNotMeasured_Silent()
+        {
+            // The width bounds the projection onto the edge, not the extent into
+            // the board (M6): a 1x2 block standing away from a Top-edge generator
+            // projects 1, so a 1-wide generator can push it out.
+            var draft = Draft(4, 4, d =>
+            {
+                d.Generators.Add(new GeneratorDraft
+                {
+                    Id = 1, Edge = BoardEdge.Top, Offset = 0, Width = 1,
+                    Queue =
+                    {
+                        new SpawnedBlockDraft
+                        {
+                            Id = 1,
+                            Cells = { new Coord(0, 0), new Coord(0, 1) },
+                            ColorStack = { BlockColor.Red },
+                        },
+                    },
+                });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.GeneratorTooNarrowForQueuedBlock));
+        }
+
+        [Test]
+        public void GeneratorTooNarrowForQueuedBlock_WidthAboveMaxWidth_Silent()
+        {
+            // A width outside [1, MaxWidth] is Core's error to throw, and the
+            // DraftDoesNotFormValidLevel warning already carries it. Warning about
+            // the queue on top of that would report one broken generator twice and
+            // point the designer at the queue when the width is what is wrong.
+            var draft = Draft(6, 6, d =>
+            {
+                d.Generators.Add(new GeneratorDraft
+                {
+                    Id = 1, Edge = BoardEdge.Top, Offset = 0,
+                    Width = GeneratorDefinition.MaxWidth + 1,
+                    Queue =
+                    {
+                        new SpawnedBlockDraft
+                        {
+                            Id = 1,
+                            Cells =
+                            {
+                                new Coord(0, 0), new Coord(1, 0), new Coord(2, 0), new Coord(3, 0),
+                            },
+                            ColorStack = { BlockColor.Red },
+                        },
+                    },
+                });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.GeneratorTooNarrowForQueuedBlock));
+        }
+
         // -- AxisRestrictedBlockHasNoGate -----------------------
 
         [Test]

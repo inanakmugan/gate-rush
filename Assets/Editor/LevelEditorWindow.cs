@@ -595,34 +595,16 @@ namespace GateRush.Editor
             }
         }
 
-        // A4/#2: the marker is as wide as the widest queued block projects onto
-        // this generator's edge — derived every draw, never stored, so it cannot
-        // go stale when the queue changes. Runtime spawning (1.13) is unaffected;
-        // each block still arrives at its own size.
+        // D34: the marker spans the generator's authored Width. It was previously
+        // derived from the widest queued block, which D34 rejected — there was
+        // nothing for the designer to set, nothing for the validator to warn
+        // about, and the marker grew silently as the queue changed. A queue entry
+        // too wide for this span is now a warning
+        // (GeneratorTooNarrowForQueuedBlock), not a reason to redraw the edge.
         private static Rect GeneratorMarkerRect(EditorGridLayout layout, GeneratorDraft generator) =>
             EditorGrid.EdgeMarker(
-                layout, generator.Edge, generator.Offset, QueueProjection(generator),
+                layout, generator.Edge, generator.Offset, generator.Width,
                 Mathf.Max(6f, layout.CellSize * 0.5f));
-
-        /// <summary>
-        /// The widest projection of any block in the generator's queue onto the
-        /// generator's edge (<see cref="BlockShape.ProjectionOnto"/>), at least 1
-        /// for an empty queue.
-        /// </summary>
-        private static int QueueProjection(GeneratorDraft generator)
-        {
-            var widest = 1;
-            foreach (var block in generator.Queue)
-            {
-                var projection = BlockShape.ProjectionOnto(block.Cells, generator.Edge);
-                if (projection > widest)
-                {
-                    widest = projection;
-                }
-            }
-
-            return widest;
-        }
 
         private static void DrawInwardTriangle(Rect r, BoardEdge edge, Color color)
         {
@@ -1204,13 +1186,15 @@ namespace GateRush.Editor
 
             if (InWaveScope())
             {
+                var wave = CurrentScopeWave();
                 var spawned = new SpawnedBlockDraft
                 {
+                    Id = NextId(wave.Blocks.Select(b => b.Id)),
                     Cells = new List<Coord>(footprint),
                     ColorStack = { BlockColor.Red },
                     RegionOrigin = cell,
                 };
-                draft.Elevators[scopeElevator].Waves[scopeWave].Blocks.Add(spawned);
+                wave.Blocks.Add(spawned);
                 selection = spawned;
                 Mutated();
             }
@@ -1315,13 +1299,15 @@ namespace GateRush.Editor
 
             if (InWaveScope())
             {
+                var wave = CurrentScopeWave();
                 var spawned = new SpawnedBlockDraft
                 {
+                    Id = NextId(wave.Blocks.Select(b => b.Id)),
                     Cells = normalised,
                     ColorStack = { BlockColor.Red },
                     RegionOrigin = min,
                 };
-                draft.Elevators[scopeElevator].Waves[scopeWave].Blocks.Add(spawned);
+                wave.Blocks.Add(spawned);
                 selection = spawned;
                 Mutated();
             }
@@ -1376,6 +1362,7 @@ namespace GateRush.Editor
                 Id = NextId(draft.Generators.Select(g => g.Id)),
                 Edge = edge,
                 Offset = offset,
+                Width = 1,
             };
             draft.Generators.Add(generator);
             selection = generator;
@@ -1781,6 +1768,14 @@ namespace GateRush.Editor
             generator.Edge = (BoardEdge)EditorGUILayout.EnumPopup("Edge", generator.Edge);
             generator.Offset = EditorGUILayout.IntField("Offset", generator.Offset);
 
+            // A plain IntField, like a gate's width: the [1, MaxWidth] bound is a
+            // rule of the game, and Core throwing on a value outside it surfaces
+            // as a DraftDoesNotFormValidLevel warning the designer can read.
+            // Clamping in the widget would enforce the same rule silently, in a
+            // second place, and teach nobody what it is.
+            generator.Width = EditorGUILayout.IntField(
+                $"Width (1-{GeneratorDefinition.MaxWidth})", generator.Width);
+
             EditorGUILayout.LabelField("Queue", EditorStyles.miniBoldLabel);
             for (var i = 0; i < generator.Queue.Count; i++)
             {
@@ -1837,6 +1832,7 @@ namespace GateRush.Editor
             {
                 generator.Queue.Add(new SpawnedBlockDraft
                 {
+                    Id = NextId(generator.Queue.Select(b => b.Id)),
                     Cells = new List<Coord>(ShapePresets.Cells(ShapePreset.Single)),
                     ColorStack = { BlockColor.Red },
                 });

@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Linq;
-using GateRush.Core;
 
 namespace GateRush.Editor
 {
@@ -12,28 +10,21 @@ namespace GateRush.Editor
     /// pointing at a discarded draft.
     /// </summary>
     /// <remarks>
-    /// <see cref="BlockDraft"/>, <see cref="GateDraft"/>, <see cref="ShutterDraft"/>,
-    /// <see cref="GeneratorDraft"/> and <see cref="ElevatorDraft"/> all carry an
-    /// <c>Id</c> that round-trips through the DTO, so those resolve by id.
-    /// <see cref="SpawnedBlockDraft"/> has none: the only one ever selected is a
-    /// wave block, identified by its index within the current wave, since wave
-    /// scope is preserved across undo. A generator's queue entries are never the
-    /// selection — the generator is — so they need no key of their own.
-    /// <para><b>Index alone is not identity.</b> Undoing a deletion shifts every
-    /// later index down, so "index 1" can mean a different block before and
-    /// after the same undo — restoring wave [A, B, C], deleting A, selecting C
-    /// (now index 1), then undoing must not land on B, which the restored draft
-    /// also has at index 1. The key therefore also carries the captured block's
-    /// <see cref="SpawnedBlockDraft.RegionOrigin"/> and <see cref="SpawnedBlockDraft.Cells"/>,
-    /// and <see cref="Resolve"/> re-checks both before accepting the
-    /// index-matched candidate. Two blocks with identical origin and cells
-    /// cannot coexist in one valid wave, so a match is a real match; the only
-    /// case this newly clears rather than restores is undoing a move of the
-    /// selected block itself, where its origin no longer matches — the
-    /// conservative outcome. A stable <c>Id</c> on <see cref="SpawnedBlockDraft"/>,
-    /// the same identity the other five draft types already carry, would make
-    /// this check unnecessary; that belongs with the generator-width round,
-    /// which is already changing that DTO, not here.</para>
+    /// Every draft type this key can name carries an <c>Id</c> that round-trips
+    /// through the DTO, so every case resolves the same way: find the object with
+    /// that id. <see cref="BlockDraft"/>, <see cref="GateDraft"/>,
+    /// <see cref="ShutterDraft"/>, <see cref="GeneratorDraft"/> and
+    /// <see cref="ElevatorDraft"/> are looked up in the draft's own lists;
+    /// a <see cref="SpawnedBlockDraft"/> is looked up within one wave, since its
+    /// id is unique to that wave and not across the level (D34). A generator's
+    /// queue entries are never the selection — the generator is — so a queue
+    /// entry's id is never captured here.
+    /// <para>An id, not an index: restoring a deletion shifts every later index
+    /// down, so "index 1" can mean a different block before and after the same
+    /// undo. Until <see cref="SpawnedBlockDraft"/> had an id of its own, a wave
+    /// block was matched by index and its captured origin and cells re-checked to
+    /// catch exactly that — a stopgap D33 recorded as waiting for D34's id, and
+    /// which the id now replaces outright.</para>
     /// </remarks>
     public readonly struct SelectionKey
     {
@@ -41,50 +32,41 @@ namespace GateRush.Editor
 
         private readonly Kind kind;
         private readonly int id;
-        private readonly int waveBlockIndex;
-        private readonly Coord? waveBlockRegionOrigin;
-        private readonly IReadOnlyList<Coord> waveBlockCells;
 
-        private SelectionKey(
-            Kind kind, int id, int waveBlockIndex, Coord? waveBlockRegionOrigin, IReadOnlyList<Coord> waveBlockCells)
+        private SelectionKey(Kind kind, int id)
         {
             this.kind = kind;
             this.id = id;
-            this.waveBlockIndex = waveBlockIndex;
-            this.waveBlockRegionOrigin = waveBlockRegionOrigin;
-            this.waveBlockCells = waveBlockCells;
         }
 
         /// <summary>No selection, or a selection this key cannot represent.</summary>
-        public static readonly SelectionKey None = new SelectionKey(Kind.None, 0, 0, null, null);
+        public static readonly SelectionKey None = new SelectionKey(Kind.None, 0);
 
         /// <summary>
         /// Captures <paramref name="selection"/> as it stands before a draft
         /// rebuild. <paramref name="scopeWave"/> is the wave the current scope
-        /// points at, or <c>null</c> when not in wave scope — needed only to find
-        /// a <see cref="SpawnedBlockDraft"/>'s index and shape.
+        /// points at, or <c>null</c> when not in wave scope; a
+        /// <see cref="SpawnedBlockDraft"/> that is not in that wave cannot be
+        /// named by this key, because its id means nothing outside its own list.
         /// </summary>
         public static SelectionKey Capture(object selection, WaveDraft scopeWave)
         {
             switch (selection)
             {
                 case BlockDraft block:
-                    return new SelectionKey(Kind.Block, block.Id, 0, null, null);
+                    return new SelectionKey(Kind.Block, block.Id);
                 case GateDraft gate:
-                    return new SelectionKey(Kind.Gate, gate.Id, 0, null, null);
+                    return new SelectionKey(Kind.Gate, gate.Id);
                 case ShutterDraft shutter:
-                    return new SelectionKey(Kind.Shutter, shutter.Id, 0, null, null);
+                    return new SelectionKey(Kind.Shutter, shutter.Id);
                 case GeneratorDraft generator:
-                    return new SelectionKey(Kind.Generator, generator.Id, 0, null, null);
+                    return new SelectionKey(Kind.Generator, generator.Id);
                 case ElevatorDraft elevator:
-                    return new SelectionKey(Kind.Elevator, elevator.Id, 0, null, null);
+                    return new SelectionKey(Kind.Elevator, elevator.Id);
                 case SpawnedBlockDraft waveBlock when scopeWave != null:
-                {
-                    var index = scopeWave.Blocks.IndexOf(waveBlock);
-                    return index >= 0
-                        ? new SelectionKey(Kind.WaveBlock, 0, index, waveBlock.RegionOrigin, waveBlock.Cells.ToList())
+                    return scopeWave.Blocks.Contains(waveBlock)
+                        ? new SelectionKey(Kind.WaveBlock, waveBlock.Id)
                         : None;
-                }
 
                 default:
                     return None;
@@ -95,10 +77,9 @@ namespace GateRush.Editor
         /// Finds the equivalent object in <paramref name="draft"/>, or
         /// <c>null</c> if it no longer exists. <paramref name="scopeWave"/> must
         /// be the wave at the same scope indices in the rebuilt draft — scope
-        /// indices themselves survive undo unchanged (docs/Modules/09a, Session C).
-        /// A <see cref="Kind.WaveBlock"/> candidate at the captured index is
-        /// accepted only if its <see cref="SpawnedBlockDraft.RegionOrigin"/> and
-        /// <see cref="SpawnedBlockDraft.Cells"/> still match what was captured.
+        /// indices themselves survive undo unchanged (docs/Modules/09a,
+        /// Session C) — and is where a <see cref="Kind.WaveBlock"/> id is
+        /// resolved.
         /// </summary>
         public object Resolve(LevelDraft draft, WaveDraft scopeWave)
         {
@@ -122,24 +103,11 @@ namespace GateRush.Editor
                 case Kind.Elevator:
                     return draft.Elevators.FirstOrDefault(e => e.Id == targetId);
                 case Kind.WaveBlock:
-                {
-                    if (scopeWave == null || waveBlockIndex < 0 || waveBlockIndex >= scopeWave.Blocks.Count)
-                    {
-                        return null;
-                    }
-
-                    var candidate = scopeWave.Blocks[waveBlockIndex];
-                    return candidate.RegionOrigin == waveBlockRegionOrigin && SameCells(candidate.Cells, waveBlockCells)
-                        ? (object)candidate
-                        : null;
-                }
+                    return scopeWave?.Blocks.FirstOrDefault(b => b.Id == targetId);
 
                 default:
                     return null;
             }
         }
-
-        private static bool SameCells(IReadOnlyList<Coord> a, IReadOnlyList<Coord> b) =>
-            a.Count == b.Count && a.All(b.Contains);
     }
 }
