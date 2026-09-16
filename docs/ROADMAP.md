@@ -55,13 +55,32 @@ still change for free. Spec written when reached.
 
 ## Phase 2 — Playable single level
 
-Board rendering, pointer input, DOTween movement, countdown, win/lose. No menus,
-one hardcoded level.
+Board rendering, pointer input, DOTween movement, countdown, win/lose. No
+menus, one hardcoded level.
+
+Split into three steps so a design or data-model problem surfaces before
+Runtime code exists, and a feel problem surfaces before animation and UI
+polish exist:
+
+**2.0 — Author and solver-validate the hardcoded level(s).** Done entirely
+in the Level Editor (Save + Validate, already built in 1.10) — no Runtime
+code touched. Every board tested so far has been a small hand-built
+synthetic corpus; this is the first time the editor, the solver, and
+serialization run against a real, non-trivial level. Cheaper to find an
+editor or data-model gap here than after 2.1 depends on the level format.
+
+**2.1 — Static skeleton.** Render the board, wire pointer input straight to
+`MoveResolver`, apply moves instantly — no animation, no countdown, no
+win/lose UI. Proves the simulation and input are wired correctly before any
+presentation exists. This is the first point the game is actually
+playable by hand.
+
+**2.2 — Polish.** DOTween movement, countdown, win/lose UI, layered on top
+of 2.1 once the core loop is confirmed correct.
 
 Watch the zero-distance move here: a drag with a determined direction but no
-displacement must still clear a block at a gate. This is the first move of most
-levels and is easy to lose in input handling.
-
+displacement must still clear a block at a gate. This is the first move of
+most levels and is easy to lose in input handling.
 ---
 
 ## Phase 3 — First WebGL build
