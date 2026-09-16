@@ -130,13 +130,58 @@ pass finds nothing. The strategy itself does not decide this.
 
 ---
 
-## Later: `AStarStrategy` (phase 1.11)
+## Implemented: `AStarStrategy` (phase 1.11)
 
-Admissible heuristic: the total number of colours remaining across all living
-blocks, plus pending generator and elevator output. Each colour requires at least
-one action, so the heuristic never overestimates.
+Behind the same `ISearchStrategy` interface as `BreadthFirstStrategy`,
+sharing `SearchBudget`/`SolveResult` and the same budget-checkpoint cadence
+(`SearchBudget.WallClockPollInterval`, moved here from
+`BreadthFirstStrategy` so both strategies share it).
 
-An admissible heuristic means A\* returns the **same optimum** as breadth-first
-search while expanding far fewer nodes. The equivalence test between the two
-strategies is the proof that the optimisation is sound, and is the reason
-`ISearchStrategy` exists as an interface rather than a single class.
+**Open set.** A hand-written binary min-heap (`.NET Standard 2.1` has no
+built-in `PriorityQueue<T>`). Tie-break order is a total order so heap
+layout never affects which node pops first: lower `f = g + h`, then higher
+`g` (so a goal state — `h = 0` — pops first among equal-`f` ties), then
+lower insertion sequence number.
+
+**Goal test on pop, not on generation** — required because A\*, unlike BFS,
+does not expand in depth order.
+
+**Duplicate states.** A `Dictionary<BoardState, Node>` tracks the best
+known `g` per state. A strictly shorter path to an already-open state
+replaces the record and marks the old entry superseded; superseded heap
+entries are skipped on pop rather than removed from the heap (lazy
+deletion), and are not counted as expansions.
+
+**No reopening.** With a consistent heuristic, a closed (already-expanded)
+node should never need reopening. `Search` throws
+`InvalidOperationException` if a shorter path to a closed state is found
+anyway — that would mean the heuristic is not actually consistent, which is
+a bug to fix, not a case to handle at runtime.
+
+**No stratification**, unlike BFS. A\* interleaves progress strata by
+ordering on `f`, so BFS's stratum-retirement optimisation does not apply;
+A\*'s memory is bounded by the states it actually touches, already a subset
+of what BFS touches on the same board.
+
+**Heuristic:** see D3 for `h = C - F` and why "at least one unconsumed
+`ClearOuterColor` key" replaces the plain colour-remaining count.
+
+**Shared corpus.** `BreadthFirstStrategyTests` and `AStarStrategyTests` run
+against the same `SearchCorpus`, including a board built specifically to
+distinguish "at least one" from "every" in the `F` count (a lock needing
+two keys, one `ClearOuterColor` and one `UnlockMovement`; optimum 2).
+
+### `AStarStrategy` tests (in addition to the outcome/budget/reproducibility
+tests mirrored from `BreadthFirstStrategyTests`)
+
+- Matches `BreadthFirstStrategy` on status and move count across the whole
+  corpus — the proof the heuristic is sound enough to ship.
+- Expands strictly fewer states than `BreadthFirstStrategy` on an open board
+  with many pointless destinations.
+- The heuristic never exceeds the hand-verified optimum, for every corpus
+  board (admissibility).
+- The heuristic never drops by more than one per move, and is exactly zero
+  on a solved state, over every reachable state of every corpus board
+  (consistency — checked over the full state graph, not just the start).
+- The mixed-key-effect lock board's heuristic is exactly 2, not 3 — the
+  regression case for the `F` formula.

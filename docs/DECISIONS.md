@@ -42,17 +42,33 @@ impossible to diagnose.
 ## D3 — BFS first, A\* second, behind an interface
 
 **Decision.** `ISearchStrategy` with a breadth-first implementation as the
-reference, and A\* added later as an optimisation. Tests assert both return the
-same move count on the same corpus.
+reference, and `AStarStrategy` (phase 1.11) as an optimisation behind the
+same interface. Tests assert both return the same move count on the same
+corpus.
 
 **Why.** Difficulty is measured in moves, so the solver must return the
-*shortest* solution. BFS guarantees that and is simple enough to be obviously
-correct. A\* with an admissible heuristic — the count of colours remaining,
-since each needs at least one action — returns the same optimum while expanding
-far fewer nodes.
+*shortest* solution. BFS guarantees that and is simple enough to be
+obviously correct. A\* trades that simplicity for speed via an admissible
+heuristic, while still returning the same optimum.
 
-**Rejected.** DFS. It finds *a* solution, not the shortest, which would corrupt
-the difficulty measure and therefore the time budget.
+**Heuristic: `h = C - F`.** A plain colour-remaining count is *not*
+admissible once `KeyEffect.ClearOuterColor` is involved: a single move can
+clear two colours at once, when it completes a lock's `RequiredKeyCount`
+and the completing key is `ClearOuterColor`. Since a block can carry a lock
+or a key but never both (`BlockValidation.ValidateLock`), at most one such
+bonus clear can chain per move. `C` is the plain count — colours remaining
+on living blocks, plus colours still queued in generators and elevators.
+`F` is the count of still-locked locks that have *at least one* unconsumed
+`ClearOuterColor` key. Subtracting "at least one" rather than requiring
+*every* unconsumed key be `ClearOuterColor` is what keeps `h` from
+overestimating on a lock with mixed-effect keys: the deciding case is a
+lock needing two keys, one `ClearOuterColor` and one `UnlockMovement`, with
+a 2-move optimum — "every" gives `h = 3` there.
+
+**Rejected.** DFS, for the reason above. Also rejected: counting a lock in
+`F` only when *every* unconsumed key targeting it is `ClearOuterColor` —
+still admissible, but weaker, and shown to overestimate on the
+mixed-key-effect corpus board (Module 05).
 
 ---
 

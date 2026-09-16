@@ -42,6 +42,17 @@ namespace GateRush.Solver
         public long MaxWallClockMs { get; }
 
         /// <summary>
+        /// How often a strategy polls <see cref="MaxWallClockMs"/> — once every
+        /// this many expansions rather than every one.
+        /// <c>Stopwatch.ElapsedMilliseconds</c> queries the OS timer on each read,
+        /// and the expansion loop is the hottest in the project; the budget is a
+        /// coarse safety ceiling, so a few hundred extra expansions before it
+        /// trips do not matter. Shared here so every strategy honours the limit
+        /// at the same cadence.
+        /// </summary>
+        internal const int WallClockPollInterval = 1024;
+
+        /// <summary>
         /// Which move set the search branches on. The editor runs
         /// <see cref="MoveGenMode.Canonical"/> first and falls back to
         /// <see cref="MoveGenMode.Exhaustive"/> with a larger budget only when the

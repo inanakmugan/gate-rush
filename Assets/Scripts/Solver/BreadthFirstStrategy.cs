@@ -58,15 +58,6 @@ namespace GateRush.Solver
             this.stratifyVisitedSet = stratifyVisitedSet;
         }
 
-        /// <summary>
-        /// How often the wall-clock budget is polled — once every this many
-        /// expansions rather than every one. <c>Stopwatch.ElapsedMilliseconds</c>
-        /// queries the OS timer on each read, and this is the hottest loop in the
-        /// project; the budget is a coarse safety ceiling, so a few hundred extra
-        /// expansions before it trips do not matter.
-        /// </summary>
-        private const int WallClockPollInterval = 1024;
-
         /// <inheritdoc />
         public SolveResult Search(LevelContext ctx, BoardState initial, SearchBudget budget)
         {
@@ -126,7 +117,7 @@ namespace GateRush.Solver
                 // it. The explored-state count is a cheap int compare; the
                 // wall clock is polled only every WallClockPollInterval.
                 if (explored >= budget.MaxExploredStates
-                    || (explored > 0 && explored % WallClockPollInterval == 0
+                    || (explored > 0 && explored % SearchBudget.WallClockPollInterval == 0
                         && stopwatch.ElapsedMilliseconds > budget.MaxWallClockMs))
                 {
                     truncated = true;

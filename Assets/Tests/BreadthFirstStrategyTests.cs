@@ -1,10 +1,10 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using GateRush.Core;
 using GateRush.Solver;
 using NUnit.Framework;
 using static GateRush.Tests.Fixture;
+using static GateRush.Tests.SearchCorpus;
 using static GateRush.Tests.Solve;
 
 namespace GateRush.Tests
@@ -17,95 +17,6 @@ namespace GateRush.Tests
     /// </summary>
     public class BreadthFirstStrategyTests
     {
-        // ----- Corpus -------------------------------------------------------
-
-        /// <summary>
-        /// Boards with a hand-verified shortest solution length. Each is chosen so
-        /// canonical pruning does not lengthen the optimum, so both modes agree.
-        /// </summary>
-        private static IEnumerable<(string name, LevelContext ctx, BoardState initial, int optimum)> SolvableCorpus()
-        {
-            var slide = Ctx(5, 1, new[] { Block(1, new Coord(2, 0)) }, new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
-            yield return ("lone block slides to its gate", slide, BoardState.CreateInitial(slide), 1);
-
-            var twoInLine = Ctx(
-                6, 1,
-                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)) },
-                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
-            yield return ("far block waits for the near one", twoInLine, BoardState.CreateInitial(twoInLine), 2);
-
-            var threeInLine = Ctx(
-                7, 1,
-                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)), Block(3, new Coord(2, 0)) },
-                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
-            yield return ("three in a row, forced order", threeInLine, BoardState.CreateInitial(threeInLine), 3);
-
-            var fourInLine = Ctx(
-                8, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)),
-                    Block(3, new Coord(2, 0)), Block(4, new Coord(3, 0))
-                },
-                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
-            yield return ("four in a row, forced order", fourInLine, BoardState.CreateInitial(fourInLine), 4);
-
-            var layered = Ctx(
-                5, 5,
-                new[] { Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }) },
-                new[]
-                {
-                    Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Top, 2, 1, BlockColor.Blue)
-                });
-            yield return ("layered block, one gate per colour", layered, BoardState.CreateInitial(layered), 2);
-
-            var packed = PackedFourColourBoard();
-            yield return ("fully packed, every block pre-aligned", packed, BoardState.CreateInitial(packed), 4);
-        }
-
-        private static LevelContext PackedFourColourBoard()
-        {
-            return Ctx(
-                2, 2,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }),
-                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }),
-                    Block(3, new Coord(0, 1), colors: new[] { BlockColor.Green }),
-                    Block(4, new Coord(1, 1), colors: new[] { BlockColor.Yellow })
-                },
-                new[]
-                {
-                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Blue),
-                    Gate(3, BoardEdge.Top, 0, 1, BlockColor.Green),
-                    Gate(4, BoardEdge.Top, 1, 1, BlockColor.Yellow)
-                });
-        }
-
-        private static IEnumerable<(string name, LevelContext ctx, BoardState initial)> UnsolvableCorpus()
-        {
-            var noGate = Ctx(3, 3, new[] { Block(1, new Coord(1, 1)) }, new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Blue) });
-            yield return ("block colour has no matching gate", noGate, BoardState.CreateInitial(noGate));
-
-            var obstructed = Ctx(
-                3, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0)),
-                    Block(2, new Coord(2, 0), colors: new[] { BlockColor.Blue }, axis: MovementAxis.VerticalOnly)
-                },
-                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
-            yield return ("only exit parked shut by an immovable block", obstructed, BoardState.CreateInitial(obstructed));
-
-            var deadLayer = Ctx(
-                5, 5,
-                new[] { Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }) },
-                new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
-            yield return ("layered block's second colour has no gate", deadLayer, BoardState.CreateInitial(deadLayer));
-        }
-
         // ----- Basic outcomes --------------------------------------------
 
         [Test]
@@ -351,11 +262,7 @@ namespace GateRush.Tests
             var stratified = new BreadthFirstStrategy(stratifyVisitedSet: true);
             var plain = new BreadthFirstStrategy(stratifyVisitedSet: false);
 
-            var boards = SolvableCorpus()
-                .Select(b => (b.name, b.ctx, b.initial))
-                .Concat(UnsolvableCorpus());
-
-            foreach (var (name, ctx, initial) in boards)
+            foreach (var (name, ctx, initial) in WholeCorpus())
             {
                 foreach (var mode in new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive })
                 {
