@@ -1,0 +1,245 @@
+using System.Collections.Generic;
+using System.Linq;
+using GateRush.Core;
+using static GateRush.Tests.Fixture;
+
+namespace GateRush.Tests
+{
+    /// <summary>
+    /// The boards every <c>ISearchStrategy</c> is tested against: solvable
+    /// boards with a hand-verified shortest solution, and boards with no
+    /// solution at all. Shared so <c>BreadthFirstStrategyTests</c> and
+    /// <c>AStarStrategyTests</c> run the same corpus — the A\*/breadth-first
+    /// equivalence test means nothing if the two suites could drift apart.
+    /// </summary>
+    /// <remarks>
+    /// Every solvable board is chosen so canonical pruning does not lengthen the
+    /// optimum, so both <c>MoveGenMode</c>s agree on it. A board with no keys has
+    /// an optimum of at least its colour count, since every clear then costs a
+    /// move of its own; most boards below meet that bound exactly, which is what
+    /// makes their optima easy to verify by hand. Grid conventions: y = 0 is the
+    /// bottom row, and an edge feature's offset is measured along its edge.
+    /// </remarks>
+    internal static class SearchCorpus
+    {
+        internal static IEnumerable<(string name, LevelContext ctx, BoardState initial, int optimum)> SolvableCorpus()
+        {
+            var slide = Ctx(5, 1, new[] { Block(1, new Coord(2, 0)) }, new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+            yield return ("lone block slides to its gate", slide, BoardState.CreateInitial(slide), 1);
+
+            var twoInLine = Ctx(
+                6, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)) },
+                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            yield return ("far block waits for the near one", twoInLine, BoardState.CreateInitial(twoInLine), 2);
+
+            var threeInLine = Ctx(
+                7, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)), Block(3, new Coord(2, 0)) },
+                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            yield return ("three in a row, forced order", threeInLine, BoardState.CreateInitial(threeInLine), 3);
+
+            var fourInLine = Ctx(
+                8, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0)),
+                    Block(3, new Coord(2, 0)), Block(4, new Coord(3, 0))
+                },
+                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            yield return ("four in a row, forced order", fourInLine, BoardState.CreateInitial(fourInLine), 4);
+
+            var layered = Ctx(
+                5, 5,
+                new[] { Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }) },
+                new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 2, 1, BlockColor.Blue)
+                });
+            yield return ("layered block, one gate per colour", layered, BoardState.CreateInitial(layered), 2);
+
+            var packed = PackedFourColourBoard();
+            yield return ("fully packed, every block pre-aligned", packed, BoardState.CreateInitial(packed), 4);
+
+            var loose = LooseBlocksOneGateBoard();
+            yield return ("three loose blocks share one gate", loose, BoardState.CreateInitial(loose), 3);
+
+            // M2: the blue gate stays closed until the red clear opens it.
+            var countGatedGate = Ctx(
+                2, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }) },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue, openAt: 1)
+                });
+            yield return ("count-gated gate opens after the first clear", countGatedGate,
+                BoardState.CreateInitial(countGatedGate), 2);
+
+            // M3: the blue block cannot move until the red clear unfreezes it.
+            var frozen = Ctx(
+                2, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, unfreezeAt: 1)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
+                });
+            yield return ("frozen block thaws after the first clear", frozen, BoardState.CreateInitial(frozen), 2);
+
+            // M5: a colour-bound shutter over the blue block opens on one red clear.
+            var shuttered = Ctx(
+                2, 1,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }) },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
+                },
+                shutters: new[] { Shutter(1, new Coord(1, 0), new Coord(1, 0), threshold: 1, requiredColor: BlockColor.Red) });
+            yield return ("shutter opens on a red clear", shuttered, BoardState.CreateInitial(shuttered), 2);
+
+            // M8: the key only unlocks, so the locked block still costs its own move.
+            var unlockKey = Ctx(
+                2, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
+                });
+            yield return ("unlock-movement key frees the locked block", unlockKey, BoardState.CreateInitial(unlockKey), 2);
+
+            // M8: clearing the key block clears the locked block in the same move —
+            // two colours, one move.
+            var clearKey = Ctx(
+                2, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
+                });
+            yield return ("clear-outer-colour key clears the lock for free", clearKey, BoardState.CreateInitial(clearKey), 1);
+
+            var mixed = MixedKeyEffectLockBoard();
+            yield return ("mixed key effects, last key consumed decides", mixed, BoardState.CreateInitial(mixed), 2);
+        }
+
+        internal static IEnumerable<(string name, LevelContext ctx, BoardState initial)> UnsolvableCorpus()
+        {
+            var noGate = Ctx(3, 3, new[] { Block(1, new Coord(1, 1)) }, new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Blue) });
+            yield return ("block colour has no matching gate", noGate, BoardState.CreateInitial(noGate));
+
+            var obstructed = Ctx(
+                3, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(2, 0), colors: new[] { BlockColor.Blue }, axis: MovementAxis.VerticalOnly)
+                },
+                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            yield return ("only exit parked shut by an immovable block", obstructed, BoardState.CreateInitial(obstructed));
+
+            var deadLayer = Ctx(
+                5, 5,
+                new[] { Block(1, new Coord(2, 4), colors: new[] { BlockColor.Red, BlockColor.Blue }) },
+                new[] { Gate(1, BoardEdge.Bottom, 2, 1, BlockColor.Red) });
+            yield return ("layered block's second colour has no gate", deadLayer, BoardState.CreateInitial(deadLayer));
+        }
+
+        /// <summary>Every board in both corpora, without the optimum.</summary>
+        internal static IEnumerable<(string name, LevelContext ctx, BoardState initial)> WholeCorpus()
+        {
+            return SolvableCorpus()
+                .Select(b => (b.name, b.ctx, b.initial))
+                .Concat(UnsolvableCorpus());
+        }
+
+        /// <summary>
+        /// A 2x2 board with no free cell, every block already flush against its
+        /// own gate. Optimum 4: four zero-distance clears.
+        /// </summary>
+        internal static LevelContext PackedFourColourBoard()
+        {
+            return Ctx(
+                2, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red }),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }),
+                    Block(3, new Coord(0, 1), colors: new[] { BlockColor.Green }),
+                    Block(4, new Coord(1, 1), colors: new[] { BlockColor.Yellow })
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Blue),
+                    Gate(3, BoardEdge.Top, 0, 1, BlockColor.Green),
+                    Gate(4, BoardEdge.Top, 1, 1, BlockColor.Yellow)
+                });
+        }
+
+        /// <summary>
+        /// Three red blocks spread over an open 5x5 grid, one red gate at the
+        /// bottom-left corner of the left edge. Optimum 3: the corner block clears
+        /// in place, and each destroyed block frees the gate for the next, which
+        /// reaches it in one move. The open grid gives every block dozens of
+        /// pointless destinations — the branching breadth-first search must wade
+        /// through and A\* should not.
+        /// </summary>
+        internal static LevelContext LooseBlocksOneGateBoard()
+        {
+            return Ctx(
+                5, 5,
+                new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 2)), Block(3, new Coord(4, 4)) },
+                new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+        }
+
+        /// <summary>
+        /// One blue lock needing two keys: a red <see cref="KeyEffect.ClearOuterColor"/>
+        /// key and a green <see cref="KeyEffect.UnlockMovement"/> key. Every block
+        /// is flush against its own gate on a packed 3x1 row. The key consumed
+        /// last decides the effect: green then red clears the lock for free
+        /// (2 moves); red then green only unlocks it, costing a third move.
+        /// Optimum 2.
+        /// </summary>
+        /// <remarks>
+        /// The regression board for the heuristic's free-clear count. A criterion
+        /// requiring <em>every</em> unconsumed key to be
+        /// <see cref="KeyEffect.ClearOuterColor"/> gives <c>h = 3</c> here at the
+        /// start — an overestimate of the 2-move optimum.
+        /// </remarks>
+        internal static LevelContext MixedKeyEffectLockBoard()
+        {
+            return Ctx(
+                3, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 2),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green },
+                        keyTarget: 1, keyEffect: KeyEffect.UnlockMovement)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 1, 1, BlockColor.Blue),
+                    Gate(3, BoardEdge.Right, 0, 1, BlockColor.Green)
+                });
+        }
+    }
+}

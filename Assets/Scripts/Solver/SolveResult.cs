@@ -26,21 +26,24 @@ namespace GateRush.Solver
         public int ExploredStateCount { get; }
 
         /// <summary>
-        /// The largest the breadth-first frontier queue grew. Stratification
-        /// scopes the visited set, not the queue, so a stratified and a
-        /// non-stratified run of the same board report the same value here — a
-        /// divergence would be a bug. <see cref="PeakRetainedStateCount"/> is the
-        /// number that legitimately differs between the two.
+        /// The largest the strategy's frontier grew: the breadth-first queue, or
+        /// the A\* open set including superseded entries not yet popped (they
+        /// occupy memory until they are). For <see cref="BreadthFirstStrategy"/>,
+        /// stratification scopes the visited set, not the queue, so a stratified
+        /// and a non-stratified run of the same board report the same value here
+        /// — a divergence would be a bug. <see cref="PeakRetainedStateCount"/> is
+        /// the number that legitimately differs between the two.
         /// </summary>
         public int PeakFrontierSize { get; }
 
         /// <summary>
         /// The high-water mark of states held in the visited set(s) at one time.
-        /// With <c>stratifyVisitedSet</c> this drops below
-        /// <see cref="ExploredStateCount"/> as retired strata are released;
-        /// without it the visited set only ever grows, so this equals the number
-        /// of distinct states visited. The editor can show the gap as the memory
-        /// the stratification saved.
+        /// For <see cref="BreadthFirstStrategy"/> with <c>stratifyVisitedSet</c>
+        /// this drops below <see cref="ExploredStateCount"/> as retired strata are
+        /// released; without it — and always for <see cref="AStarStrategy"/>,
+        /// which does not stratify — the set only ever grows, so this equals the
+        /// number of distinct states reached. The editor can show the gap as the
+        /// memory the stratification saved.
         /// </summary>
         public int PeakRetainedStateCount { get; }
 
