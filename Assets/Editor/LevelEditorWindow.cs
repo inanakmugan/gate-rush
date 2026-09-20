@@ -32,7 +32,7 @@ namespace GateRush.Editor
         private const int PaletteShapePreviewCells = 4;
 
         /// <summary>What a live drag is currently doing. Set on mouse down, cleared on mouse up or Escape; the draft itself is never touched until a legal mouse-up applies it (docs/Modules/09a, Session B, Part 2).</summary>
-        private enum DragKind { None, BoardBlock, WaveBlock, RegionMove, RegionCreate }
+        private enum DragKind { None, BoardBlock, WaveBlock, RegionMove, RegionCreate, EdgeFeature }
 
         [MenuItem("Window/Gate Rush/Level Editor")]
         public static void Open() => GetWindow<LevelEditorWindow>("Level Editor");
@@ -93,6 +93,13 @@ namespace GateRush.Editor
         private Coord dragGrabOffset;
         private Coord dragCandidateOrigin;
         private bool dragCandidateLegal;
+
+        /// <summary>The gate or generator being dragged, and the whole placement it would land in — a drag can carry it onto a different edge, so the candidate is an edge and an offset together (docs/Modules/09a).</summary>
+        private object dragEdgeFeature;
+        private int dragEdgeGrabOffset;
+        private BoardEdge dragEdgeCandidateEdge;
+        private int dragEdgeCandidateOffset;
+        private bool dragEdgeCandidateLegal;
 
         private EditorTool dragRegionTool;
         private ShutterDraft dragShutter;
@@ -407,6 +414,7 @@ namespace GateRush.Editor
             var layout = new EditorGridLayout(padded, columns, rows);
 
             EditorGrid.DrawCells(layout, FillOf);
+            DrawBlockOutlines(layout);
 
             if (!InWaveScope())
             {
@@ -414,7 +422,6 @@ namespace GateRush.Editor
             }
 
             DrawSelectionOutline(layout);
-            DrawDragPreview(layout);
 
             if (tool == EditorTool.Block && shape == ShapePreset.Free)
             {
@@ -426,9 +433,14 @@ namespace GateRush.Editor
 
             if (!InWaveScope())
             {
-                DrawGateMarkers(layout);
-                DrawGeneratorMarkers(layout);
+                DrawEdgeMarkers(layout);
             }
+
+            // Last, so a drag preview is never hidden by what it is being
+            // dragged over. That matters most for an edge feature: the candidate
+            // a designer must see refused is precisely the one landing on
+            // another marker, which would otherwise be drawn on top of it.
+            DrawDragPreview(layout);
 
             HandleGridInput(layout);
 
@@ -502,6 +514,154 @@ namespace GateRush.Editor
         private static readonly Color ShutterTint = new Color(0.42f, 0.58f, 0.95f);
         private static readonly Color ElevatorTint = new Color(0.95f, 0.66f, 0.24f);
 
+        /// <summary>The stroke along a block's own outer edge — darker and thicker than <c>EditorGrid</c>'s cell lines, which run between every pair of cells including two inside one block.</summary>
+        private static readonly Color BlockBoundaryColor = new Color(0f, 0f, 0f, 0.8f);
+
+        private const float BlockBoundaryThickness = 1.5f;
+
+        /// <summary>
+        /// Makes each block read as one shape. <see cref="FillOf"/> colours a
+        /// cell by its block's colour and has no way to say where one block
+        /// stops, and <see cref="EditorGrid.DrawCells"/> rules a faint line
+        /// between every pair of cells without knowing which block either
+        /// belongs to. So two things are needed, in this order: the grid line at
+        /// a seam <em>inside</em> a block is painted out, and a bold stroke is
+        /// added at the block's true outer edge. Both sets come from
+        /// <see cref="BlockOutline"/>, computed from the footprint itself
+        /// (docs/Modules/09a).
+        /// </summary>
+        /// <remarks>
+        /// The two passes are global rather than per block — every erasure, then
+        /// every stroke — because a draft may hold two overlapping blocks, and
+        /// one block's erasure must not land on another block's finished stroke.
+        /// </remarks>
+        private void DrawBlockOutlines(EditorGridLayout layout)
+        {
+            var footprints = ScopeFootprints();
+
+            foreach (var footprint in footprints)
+            {
+                EraseInteriorSeams(layout, footprint.Cells, footprint.Origin, footprint.Fill);
+            }
+
+            foreach (var footprint in footprints)
+            {
+                DrawFootprintBoundary(layout, footprint.Cells, footprint.Origin);
+            }
+        }
+
+        /// <summary>
+        /// Every block drawn in the current scope, with the fill
+        /// <see cref="FillOf"/> gave it. Gathered once so the erasure and stroke
+        /// passes cannot disagree about which blocks are on screen.
+        /// </summary>
+        private List<(IReadOnlyList<Coord> Cells, Coord Origin, Color Fill)> ScopeFootprints()
+        {
+            var footprints = new List<(IReadOnlyList<Coord> Cells, Coord Origin, Color Fill)>();
+
+            if (InWaveScope())
+            {
+                foreach (var block in draft.Elevators[scopeElevator].Waves[scopeWave].Blocks)
+                {
+                    if (block.RegionOrigin.HasValue)
+                    {
+                        footprints.Add((block.Cells, block.RegionOrigin.Value, Palette(FirstColor(block.ColorStack))));
+                    }
+                }
+
+                return footprints;
+            }
+
+            foreach (var block in draft.Blocks)
+            {
+                footprints.Add((block.Cells, block.StartOrigin, Palette(FirstColor(block.ColorStack))));
+            }
+
+            return footprints;
+        }
+
+        /// <summary>
+        /// Paints out the grid line at every seam that falls inside one block,
+        /// in that block's own fill colour, so an L or a 1x3 reads as one shape
+        /// instead of two or three.
+        /// </summary>
+        /// <remarks>
+        /// Both cells either side of an interior seam repaint it, and only one
+        /// of the two actually covers the original line:
+        /// <see cref="EditorGrid.DrawCells"/> draws a cell's own top and left
+        /// lines only, so the seam between cells A and B lives at whichever of
+        /// them owns that side — B's left line, never A's right. A's repaint
+        /// lands one pixel column short of it, on a pixel that was already
+        /// correct. That is harmless here purely because A and B belong to the
+        /// same block and so share its fill colour: the no-op is painting the
+        /// right colour over the right colour, not painting nothing. Anything
+        /// reusing this where the two sides may differ in colour would have to
+        /// paint only the side that owns the line.
+        /// </remarks>
+        private static void EraseInteriorSeams(
+            EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin, Color fill)
+        {
+            foreach (var interior in BlockOutline.InteriorEdges(cells))
+            {
+                if (!TryCellRect(layout, origin + interior.Cell, out var r))
+                {
+                    continue;
+                }
+
+                EditorGUI.DrawRect(SideRect(r, interior.Side, EditorGrid.LineThickness), fill);
+            }
+        }
+
+        private static void DrawFootprintBoundary(EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin)
+        {
+            foreach (var boundary in BlockOutline.Edges(cells))
+            {
+                if (!TryCellRect(layout, origin + boundary.Cell, out var r))
+                {
+                    continue;
+                }
+
+                EditorGUI.DrawRect(SideRect(r, boundary.Side, BlockBoundaryThickness), BlockBoundaryColor);
+            }
+        }
+
+        /// <summary>The screen rect of a cell, or false when it falls off the grid — a draft may hold a block partly outside, and only its on-screen part draws.</summary>
+        private static bool TryCellRect(EditorGridLayout layout, Coord cell, out Rect rect)
+        {
+            if (cell.X < 0 || cell.X >= layout.Columns || cell.Y < 0 || cell.Y >= layout.Rows)
+            {
+                rect = default;
+                return false;
+            }
+
+            rect = layout.CellRect(cell);
+            return true;
+        }
+
+        /// <summary>
+        /// A band of <paramref name="thickness"/> pixels along one side of a
+        /// cell, always within the cell's own rect. Shared by the interior
+        /// erasure and the boundary stroke so the two cannot end up describing
+        /// the same side differently.
+        /// </summary>
+        private static Rect SideRect(Rect cell, Direction side, float thickness)
+        {
+            switch (side)
+            {
+                // +Y is up in cell space and down in GUI space, so Up is the
+                // rect's top edge — the same flip EditorGridLayout.CellRect
+                // makes, and the only place it matters here.
+                case Direction.Up:
+                    return new Rect(cell.x, cell.y, cell.width, thickness);
+                case Direction.Down:
+                    return new Rect(cell.x, cell.yMax - thickness, cell.width, thickness);
+                case Direction.Left:
+                    return new Rect(cell.x, cell.y, thickness, cell.height);
+                default:
+                    return new Rect(cell.xMax - thickness, cell.y, thickness, cell.height);
+            }
+        }
+
         private void DrawSelectionOutline(EditorGridLayout layout)
         {
             var color = new Color(1f, 0.85f, 0.2f);
@@ -544,6 +704,20 @@ namespace GateRush.Editor
                     var tint = dragRegionTool == EditorTool.Shutter ? ShutterTint : ElevatorTint;
                     OutlineRegionRect(layout, dragRegionCandidateMin, dragRegionCandidateMax, Color.Lerp(tint, Color.white, 0.4f), 2.5f);
                     break;
+
+                case DragKind.EdgeFeature:
+                {
+                    // Drawn in lane 0, over whatever sits there: the preview is
+                    // where the feature would land, and a candidate that lands on
+                    // a neighbour is illegal anyway and reads red.
+                    var span = EdgeFeatures.Of(dragEdgeFeature).Value;
+                    var candidate = new EdgeFeatureSpan(
+                        span.Owner, dragEdgeCandidateEdge, dragEdgeCandidateOffset, span.Width);
+                    EditorGUI.DrawRect(
+                        EdgeMarkerRect(layout, candidate, 0),
+                        dragEdgeCandidateLegal ? new Color(0.4f, 0.95f, 0.5f, 0.75f) : new Color(0.95f, 0.3f, 0.3f, 0.75f));
+                    break;
+                }
             }
         }
 
@@ -562,49 +736,78 @@ namespace GateRush.Editor
             }
         }
 
-        private void DrawGateMarkers(EditorGridLayout layout)
-        {
-            foreach (var gate in draft.Gates)
-            {
-                var rect = GateMarkerRect(layout, gate);
-                EditorGUI.DrawRect(rect, Palette(gate.Color));
-                if (ReferenceEquals(selection, gate))
-                {
-                    EditorGrid.DrawOutline(rect, Color.white, 1.5f);
-                }
-            }
-        }
-
-        private static Rect GateMarkerRect(EditorGridLayout layout, GateDraft gate) =>
-            EditorGrid.EdgeMarker(layout, gate.Edge, gate.Offset, gate.Width, Mathf.Max(4f, layout.CellSize * 0.35f));
-
-        // A4: a generator's marker is a triangle pointing inward, in a neutral
-        // colour — its queue can be any mix of colours, so none of them is
-        // "its" colour. Functional, not final art.
-        private void DrawGeneratorMarkers(EditorGridLayout layout)
+        // A4: a gate's marker is a coloured bar and a generator's is a triangle
+        // pointing inward in a neutral colour — a generator's queue can be any
+        // mix of colours, so none of them is "its" colour. Functional, not final
+        // art. Both kinds draw in one pass because lanes (below) are assigned
+        // across all edge features at once: a gate and a generator can contend
+        // for the same edge cells exactly as two generators can (M6).
+        private void DrawEdgeMarkers(EditorGridLayout layout)
         {
             var neutral = new Color(0.78f, 0.78f, 0.82f);
-            foreach (var generator in draft.Generators)
+            var spans = EdgeFeatures.Enumerate(draft);
+            var lanes = EdgeFeatures.Lanes(spans);
+
+            for (var i = 0; i < spans.Count; i++)
             {
-                var rect = GeneratorMarkerRect(layout, generator);
-                DrawInwardTriangle(rect, generator.Edge, neutral);
-                if (ReferenceEquals(selection, generator))
+                var rect = EdgeMarkerRect(layout, spans[i], lanes[i]);
+
+                if (spans[i].Owner is GateDraft gate)
+                {
+                    EditorGUI.DrawRect(rect, Palette(gate.Color));
+                }
+                else
+                {
+                    DrawInwardTriangle(rect, spans[i].Edge, neutral);
+                }
+
+                if (ReferenceEquals(selection, spans[i].Owner))
                 {
                     EditorGrid.DrawOutline(rect, Color.white, 1.5f);
                 }
             }
         }
 
-        // D34: the marker spans the generator's authored Width. It was previously
-        // derived from the widest queued block, which D34 rejected — there was
-        // nothing for the designer to set, nothing for the validator to warn
-        // about, and the marker grew silently as the queue changed. A queue entry
-        // too wide for this span is now a warning
+        // D34: a marker spans its feature's authored Width. The generator's was
+        // previously derived from the widest queued block, which D34 rejected —
+        // there was nothing for the designer to set, nothing for the validator to
+        // warn about, and the marker grew silently as the queue changed. A queue
+        // entry too wide for this span is a warning
         // (GeneratorTooNarrowForQueuedBlock), not a reason to redraw the edge.
-        private static Rect GeneratorMarkerRect(EditorGridLayout layout, GeneratorDraft generator) =>
-            EditorGrid.EdgeMarker(
-                layout, generator.Edge, generator.Offset, generator.Width,
-                Mathf.Max(6f, layout.CellSize * 0.5f));
+        //
+        // The lane pushes a marker further from the grid when it shares edge
+        // cells with one drawn before it. A draft is allowed to hold that
+        // overlap — typing a wider Width into the properties panel authors one,
+        // and Core rejects it only once ToContext runs — so without lanes the
+        // wider marker simply covers its neighbour and the designer cannot see
+        // what they did (docs/Modules/09a).
+        private static Rect EdgeMarkerRect(EditorGridLayout layout, EdgeFeatureSpan span, int lane)
+        {
+            var depth = MarkerDepth(layout, span.Owner);
+            var rect = EditorGrid.EdgeMarker(layout, span.Edge, span.Offset, span.Width, depth);
+            return lane == 0 ? rect : PushedOutward(rect, span.Edge, lane * depth);
+        }
+
+        private static float MarkerDepth(EditorGridLayout layout, object owner) =>
+            owner is GateDraft
+                ? Mathf.Max(4f, layout.CellSize * 0.35f)
+                : Mathf.Max(6f, layout.CellSize * 0.5f);
+
+        /// <summary>Moves a marker rect away from the grid, perpendicular to the edge it hangs off.</summary>
+        private static Rect PushedOutward(Rect r, BoardEdge edge, float distance)
+        {
+            switch (edge)
+            {
+                case BoardEdge.Bottom:
+                    return new Rect(r.x, r.y + distance, r.width, r.height);
+                case BoardEdge.Top:
+                    return new Rect(r.x, r.y - distance, r.width, r.height);
+                case BoardEdge.Left:
+                    return new Rect(r.x - distance, r.y, r.width, r.height);
+                default:
+                    return new Rect(r.x + distance, r.y, r.width, r.height);
+            }
+        }
 
         private static void DrawInwardTriangle(Rect r, BoardEdge edge, Color color)
         {
@@ -712,7 +915,7 @@ namespace GateRush.Editor
                 return;
             }
 
-            if (!InWaveScope() && TrySelectEdgeMarker(layout, e.mousePosition))
+            if (!InWaveScope() && TrySelectEdgeMarker(layout, e.mousePosition, controlId))
             {
                 e.Use();
                 // Selecting changes which inspector the properties column draws,
@@ -837,7 +1040,11 @@ namespace GateRush.Editor
                 return true;
             }
 
-            return false; // Gate, Generator: never a drag candidate
+            // Gate and Generator: a press on a grid cell places a feature on the
+            // nearest edge and never drags. Dragging an existing one starts from
+            // its marker instead, which sits outside the grid and is handled by
+            // TrySelectEdgeMarker before this method is reached.
+            return false;
         }
 
         private void BeginBoardBlockDrag(BlockDraft block, Coord cell, int controlId)
@@ -901,6 +1108,20 @@ namespace GateRush.Editor
                     (dragRegionCandidateMin, dragRegionCandidateMax) = DraftDrag.RegionMoveRect(
                         dragRegionOriginalMin, dragRegionOriginalMax, dragRegionAnchorCell, pointerCell, draft.Width, draft.Height);
                     break;
+
+                case DragKind.EdgeFeature:
+                {
+                    // Re-asked every move rather than fixed at the press: the
+                    // same nearest-edge rule that decides where a fresh gate or
+                    // generator is placed also decides where a dragged one lands,
+                    // so the two behave alike and the tie-break lives in one place.
+                    dragEdgeCandidateEdge = EdgeFeatures.NearestEdge(draft, pointerCell);
+                    var alongEdge = EdgeFeatures.AlongEdge(dragEdgeCandidateEdge, pointerCell);
+                    dragEdgeCandidateOffset = DraftDrag.CandidateEdgeOffset(alongEdge, dragEdgeGrabOffset);
+                    dragEdgeCandidateLegal = DraftDrag.IsLegalEdgeFeature(
+                        draft, dragEdgeFeature, dragEdgeCandidateEdge, dragEdgeCandidateOffset);
+                    break;
+                }
             }
 
             Repaint();
@@ -962,6 +1183,19 @@ namespace GateRush.Editor
                     }
 
                     break;
+
+                case DragKind.EdgeFeature:
+                {
+                    var current = EdgeFeatures.Of(dragEdgeFeature).Value;
+                    var moved = dragEdgeCandidateEdge != current.Edge || dragEdgeCandidateOffset != current.Offset;
+                    if (moved && DraftDrag.TryApplyEdgeFeature(
+                            draft, dragEdgeFeature, dragEdgeCandidateEdge, dragEdgeCandidateOffset))
+                    {
+                        Mutated();
+                    }
+
+                    break;
+                }
             }
 
             dragKind = DragKind.None;
@@ -1091,28 +1325,59 @@ namespace GateRush.Editor
             Repaint();
         }
 
-        /// <summary>Gate and generator markers sit on the edge, outside the grid, and are picked by their own rects.</summary>
-        private bool TrySelectEdgeMarker(EditorGridLayout layout, Vector2 mouse)
+        /// <summary>
+        /// Gate and generator markers sit on the edge, outside the grid, and are
+        /// picked by their own rects — the same rects
+        /// <see cref="DrawEdgeMarkers"/> draws, lane offsets included, so a
+        /// marker pushed out to stay visible is still picked where it is seen.
+        /// A press both selects and begins a drag along the edge, mirroring
+        /// <see cref="TryBeginDrag"/> on a board block: whether anything
+        /// actually moves is decided at <see cref="EndDrag"/>, so a
+        /// press-and-release with no movement is a plain selection.
+        /// </summary>
+        private bool TrySelectEdgeMarker(EditorGridLayout layout, Vector2 mouse, int controlId)
         {
-            foreach (var gate in draft.Gates)
-            {
-                if (GateMarkerRect(layout, gate).Contains(mouse))
-                {
-                    selection = gate;
-                    return true;
-                }
-            }
+            var spans = EdgeFeatures.Enumerate(draft);
+            var lanes = EdgeFeatures.Lanes(spans);
 
-            foreach (var generator in draft.Generators)
+            for (var i = 0; i < spans.Count; i++)
             {
-                if (GeneratorMarkerRect(layout, generator).Contains(mouse))
+                if (!EdgeMarkerRect(layout, spans[i], lanes[i]).Contains(mouse))
                 {
-                    selection = generator;
-                    return true;
+                    continue;
                 }
+
+                selection = spans[i].Owner;
+                BeginEdgeFeatureDrag(layout, spans[i], mouse, controlId);
+                return true;
             }
 
             return false;
+        }
+
+        private void BeginEdgeFeatureDrag(EditorGridLayout layout, EdgeFeatureSpan span, Vector2 mouse, int controlId)
+        {
+            // The marker hangs outside the grid, so the pointer's cell is off the
+            // board on the axis perpendicular to the edge — CellAtUnclamped
+            // extrapolates rather than failing, and only the along-edge axis is
+            // read here, which is exactly the one that is still meaningful.
+            var alongEdge = EdgeFeatures.AlongEdge(span.Edge, layout.CellAtUnclamped(mouse));
+
+            dragKind = DragKind.EdgeFeature;
+            dragEdgeFeature = span.Owner;
+
+            // Clamped into the span because the grab offset is an index within
+            // the marker, and it has to stay one: EditorGrid.EdgeMarker clamps
+            // the rect it draws for a feature whose data does not fit its edge,
+            // so a press on such a marker can otherwise yield an index outside
+            // the span — which would then ride along onto every other edge the
+            // drag visits.
+            dragEdgeGrabOffset = Mathf.Clamp(alongEdge - span.Offset, 0, Mathf.Max(0, span.Width - 1));
+
+            dragEdgeCandidateEdge = span.Edge;
+            dragEdgeCandidateOffset = span.Offset;
+            dragEdgeCandidateLegal = true;
+            GUIUtility.hotControl = controlId;
         }
 
         // Session B, Part 1: routed through DraftClickRouting.Route, which scopes
@@ -1224,16 +1489,37 @@ namespace GateRush.Editor
             return true;
         }
 
+        /// <summary>
+        /// Whether one cell can take part of a new block: inside the grid — or,
+        /// in wave scope, inside the elevator's region — and clear of other
+        /// blocks and of static walls. The bounds check goes through
+        /// <see cref="DraftDrag"/>, which already answers the same question for a
+        /// block being moved: a preset footprint reaching past the right edge and
+        /// a dragged block reaching past it are one rule, not two (item 6,
+        /// docs/Modules/09a). <paramref name="occupant"/> stays null when the
+        /// cell is out of bounds or walled — there is nothing there to select.
+        /// </summary>
         private bool CellClearForBlock(Coord at, out object occupant)
         {
             occupant = null;
 
             if (InWaveScope())
             {
-                var wave = draft.Elevators[scopeElevator].Waves[scopeWave];
+                var elevator = draft.Elevators[scopeElevator];
+                if (!DraftDrag.IsInsideRegion(elevator, at))
+                {
+                    return false;
+                }
+
+                var wave = elevator.Waves[scopeWave];
                 occupant = wave.Blocks.FirstOrDefault(
                     b => b.RegionOrigin.HasValue && DraftHitTest.Covers(b.RegionOrigin.Value, b.Cells, at));
                 return occupant == null;
+            }
+
+            if (!DraftDrag.IsInsideBoard(draft, at))
+            {
+                return false;
             }
 
             var hit = DraftHitTest.PickAt(draft, at);
@@ -1336,16 +1622,24 @@ namespace GateRush.Editor
             Mutated();
         }
 
+        /// <summary>The width a newly placed gate or generator starts at; the designer widens it in the properties panel.</summary>
+        private const int NewEdgeFeatureWidth = 1;
+
         private void AddGateOnEdgeNearest(Coord cell)
         {
-            var edge = NearestEdge(cell);
-            var offset = edge == BoardEdge.Top || edge == BoardEdge.Bottom ? cell.X : cell.Y;
+            var edge = EdgeFeatures.NearestEdge(draft, cell);
+            var offset = EdgeFeatures.AlongEdge(edge, cell);
+            if (EdgeSpanTaken(edge, offset, NewEdgeFeatureWidth))
+            {
+                return;
+            }
+
             var gate = new GateDraft
             {
                 Id = NextId(draft.Gates.Select(g => g.Id)),
                 Edge = edge,
                 Offset = offset,
-                Width = 1,
+                Width = NewEdgeFeatureWidth,
                 Color = BlockColor.Red,
             };
             draft.Gates.Add(gate);
@@ -1355,18 +1649,44 @@ namespace GateRush.Editor
 
         private void AddGeneratorOnEdgeNearest(Coord cell)
         {
-            var edge = NearestEdge(cell);
-            var offset = edge == BoardEdge.Top || edge == BoardEdge.Bottom ? cell.X : cell.Y;
+            var edge = EdgeFeatures.NearestEdge(draft, cell);
+            var offset = EdgeFeatures.AlongEdge(edge, cell);
+            if (EdgeSpanTaken(edge, offset, NewEdgeFeatureWidth))
+            {
+                return;
+            }
+
             var generator = new GeneratorDraft
             {
                 Id = NextId(draft.Generators.Select(g => g.Id)),
                 Edge = edge,
                 Offset = offset,
-                Width = 1,
+                Width = NewEdgeFeatureWidth,
             };
             draft.Generators.Add(generator);
             selection = generator;
             Mutated();
+        }
+
+        /// <summary>
+        /// Whether a gate or generator already holds the edge cells a new one
+        /// would take, selecting it if so. M6 is explicit that edge features
+        /// never overlap and that an overlap is a level data error, not a
+        /// warning — so a click does not author one. Selecting what is in the way
+        /// rather than refusing silently mirrors
+        /// <see cref="PlaceOrSelectBlock"/>, where a footprint landing on a block
+        /// selects that block instead of stacking on it.
+        /// </summary>
+        private bool EdgeSpanTaken(BoardEdge edge, int offset, int width)
+        {
+            var blocking = EdgeFeatures.Blocking(draft, edge, offset, width);
+            if (blocking == null)
+            {
+                return false;
+            }
+
+            selection = blocking;
+            return true;
         }
 
         // Session B, Part 2: created with the region a drag-draw describes — a
@@ -1397,27 +1717,6 @@ namespace GateRush.Editor
             draft.Elevators.Add(elevator);
             selection = elevator;
             Mutated();
-        }
-
-        private BoardEdge NearestEdge(Coord cell)
-        {
-            var toLeft = cell.X;
-            var toRight = draft.Width - 1 - cell.X;
-            var toBottom = cell.Y;
-            var toTop = draft.Height - 1 - cell.Y;
-            var min = Mathf.Min(Mathf.Min(toLeft, toRight), Mathf.Min(toBottom, toTop));
-
-            if (min == toBottom)
-            {
-                return BoardEdge.Bottom;
-            }
-
-            if (min == toTop)
-            {
-                return BoardEdge.Top;
-            }
-
-            return min == toLeft ? BoardEdge.Left : BoardEdge.Right;
         }
 
         private static int NextId(IEnumerable<int> existing)

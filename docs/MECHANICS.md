@@ -172,6 +172,10 @@ A rectangular region may be covered by a shutter with a threshold N.
 - A shutter is either **global** (opens at `TotalClearCount >= N`) or
   **colour-bound** (opens at `ClearCountByColour[c] >= N`).
 - Opening is permanent.
+- The region is authored fully packed with blocks, cell for cell — a shutter
+  exists to hide and later reveal blocks, and an empty cell underneath hides
+  nothing. The editor warns, but does not refuse to save, when a region has an
+  uncovered cell.
 
 Shutters are the only thing that makes a block untargetable by jokers.
 
