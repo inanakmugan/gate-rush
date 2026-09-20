@@ -102,6 +102,13 @@ namespace GateRush.Editor
     {
         private static readonly Color LineColor = new Color(0f, 0f, 0f, 0.28f);
 
+        /// <summary>
+        /// How thick the rule between two cells is. Public because a caller that
+        /// paints a grid line out again — the Level Editor does, where a seam
+        /// falls inside one block — has to cover exactly what was drawn here.
+        /// </summary>
+        public const float LineThickness = 1f;
+
         /// <summary>The fixed cell size <see cref="DrawCellPreview"/> renders at — small on purpose, since a preview is read at a glance, not clicked precisely (the queue-entry free-draw grid is the exception; it reuses <see cref="DrawCells"/> instead, since it needs real click targets).</summary>
         public const float PreviewCellSize = 12f;
 
@@ -159,13 +166,15 @@ namespace GateRush.Editor
                     var cell = new Coord(x, y);
                     var rect = layout.CellRect(cell);
                     EditorGUI.DrawRect(rect, fillOf(cell));
-                    EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, 1f), LineColor);
-                    EditorGUI.DrawRect(new Rect(rect.x, rect.y, 1f, rect.height), LineColor);
+                    EditorGUI.DrawRect(new Rect(rect.x, rect.y, rect.width, LineThickness), LineColor);
+                    EditorGUI.DrawRect(new Rect(rect.x, rect.y, LineThickness, rect.height), LineColor);
                 }
             }
 
-            EditorGUI.DrawRect(new Rect(layout.Area.x, layout.Area.yMax - 1f, layout.Area.width, 1f), LineColor);
-            EditorGUI.DrawRect(new Rect(layout.Area.xMax - 1f, layout.Area.y, 1f, layout.Area.height), LineColor);
+            EditorGUI.DrawRect(
+                new Rect(layout.Area.x, layout.Area.yMax - LineThickness, layout.Area.width, LineThickness), LineColor);
+            EditorGUI.DrawRect(
+                new Rect(layout.Area.xMax - LineThickness, layout.Area.y, LineThickness, layout.Area.height), LineColor);
         }
 
         public static void DrawOutline(Rect rect, Color color, float thickness = 2f)

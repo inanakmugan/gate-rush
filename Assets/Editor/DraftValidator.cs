@@ -47,6 +47,13 @@ namespace GateRush.Editor
         ElevatorWaveNotExactTiling,
 
         /// <summary>
+        /// A shutter's region has a cell no block covers (M5). A shutter exists
+        /// to hide blocks and later reveal them, so an empty cell underneath
+        /// hides nothing.
+        /// </summary>
+        ShutterRegionNotFullyCovered,
+
+        /// <summary>
         /// A value in the loaded file could not be read — an unrecognised enum or
         /// colour name — and a default was substituted. Reported so the
         /// substitution is not silent (see <see cref="DraftLoadIssue"/>).
@@ -108,6 +115,7 @@ namespace GateRush.Editor
             AddLockKeyWarnings(blockLikes, warnings);
             AddGateOntoWallWarnings(draft, warnings);
             AddElevatorTilingWarnings(draft, warnings);
+            AddShutterCoverageWarnings(draft, warnings);
 
             LevelContext ctx = null;
             try
@@ -249,6 +257,17 @@ namespace GateRush.Editor
                 }
             }
 
+            foreach (var block in blockLikes)
+            {
+                if (block.UnfreezeAtClearCount.HasValue && block.UnfreezeAtClearCount.Value > totalClears)
+                {
+                    warnings.Add(new DraftWarning(
+                        DraftWarningCategory.ThresholdExceedsAvailableClears,
+                        $"{block.Label} unfreezes at {block.UnfreezeAtClearCount.Value} clears, but the level can " +
+                        $"only produce {totalClears}, so it stays frozen for the whole level (M3)."));
+                }
+            }
+
             foreach (var gate in draft.Gates)
             {
                 if (gate.OpenAtClearCount.HasValue && gate.OpenAtClearCount.Value > totalClears)
@@ -384,12 +403,11 @@ namespace GateRush.Editor
             {
                 for (var w = 0; w < elevator.Waves.Count; w++)
                 {
+                    // An empty wave is not skipped: M9 says waves arrive fully
+                    // packed, so a wave with nothing in it is the loudest
+                    // possible violation of that, and ElevatorTiling.Check
+                    // already reports every region cell as uncovered.
                     var wave = elevator.Waves[w];
-                    if (wave.Blocks.Count == 0)
-                    {
-                        continue;
-                    }
-
                     var tiling = DraftTiling.Check(elevator, wave);
                     if (tiling == null)
                     {
@@ -407,6 +425,70 @@ namespace GateRush.Editor
                         DraftWarningCategory.ElevatorWaveNotExactTiling,
                         $"Elevator {elevator.Id} wave {w} does not tile its region: {DescribeTiling(tiling)}."));
                 }
+            }
+        }
+
+        // -- Shutter region coverage -----------------------------
+
+        /// <summary>
+        /// Reports a shutter whose region has a cell no block covers. M5: the
+        /// region is authored fully packed with blocks, cell for cell, because a
+        /// shutter exists to hide and later reveal blocks and an empty cell
+        /// underneath hides nothing. The parallel to
+        /// <see cref="AddElevatorTilingWarnings"/> is deliberate but the rule is
+        /// weaker: a wave must tile its region <em>exactly</em>, while a shutter
+        /// only has to be covered — a block may straddle the region's boundary,
+        /// and nothing here objects to that.
+        /// </summary>
+        /// <remarks>
+        /// A static wall counts as covering its cell. A wall can never hold a
+        /// block, so demanding one there would be a warning with no correct
+        /// resolution short of moving the wall or the shutter; and a wall hides
+        /// nothing either way, which is what the rule is actually about.
+        /// </remarks>
+        private static void AddShutterCoverageWarnings(LevelDraft draft, List<DraftWarning> warnings)
+        {
+            var covered = new HashSet<Coord>(draft.StaticWalls);
+            foreach (var block in draft.Blocks)
+            {
+                foreach (var relative in block.Cells)
+                {
+                    covered.Add(block.StartOrigin + relative);
+                }
+            }
+
+            foreach (var shutter in draft.Shutters)
+            {
+                var uncovered = 0;
+                Coord? first = null;
+
+                for (var y = shutter.Min.Y; y <= shutter.Max.Y; y++)
+                {
+                    for (var x = shutter.Min.X; x <= shutter.Max.X; x++)
+                    {
+                        var cell = new Coord(x, y);
+                        if (covered.Contains(cell))
+                        {
+                            continue;
+                        }
+
+                        uncovered++;
+                        if (!first.HasValue)
+                        {
+                            first = cell;
+                        }
+                    }
+                }
+
+                if (uncovered == 0)
+                {
+                    continue;
+                }
+
+                warnings.Add(new DraftWarning(
+                    DraftWarningCategory.ShutterRegionNotFullyCovered,
+                    $"Shutter {shutter.Id}'s region is not fully covered: {uncovered} cell(s) uncovered, " +
+                    $"first at {first.Value}. A shutter hides nothing over an empty cell (M5)."));
             }
         }
 
@@ -477,6 +559,7 @@ namespace GateRush.Editor
             public IReadOnlyList<Coord> Cells { get; }
             public IReadOnlyList<BlockColor> ColorStack { get; }
             public MovementAxis Axis { get; }
+            public int? UnfreezeAtClearCount { get; }
             public int? LockId { get; }
             public int RequiredKeyCount { get; }
             public int? KeyTargetLockId { get; }
@@ -486,6 +569,7 @@ namespace GateRush.Editor
                 IReadOnlyList<Coord> cells,
                 IReadOnlyList<BlockColor> colorStack,
                 MovementAxis axis,
+                int? unfreezeAtClearCount,
                 int? lockId,
                 int requiredKeyCount,
                 int? keyTargetLockId)
@@ -494,6 +578,7 @@ namespace GateRush.Editor
                 Cells = cells;
                 ColorStack = colorStack;
                 Axis = axis;
+                UnfreezeAtClearCount = unfreezeAtClearCount;
                 LockId = lockId;
                 RequiredKeyCount = requiredKeyCount;
                 KeyTargetLockId = keyTargetLockId;
@@ -505,7 +590,8 @@ namespace GateRush.Editor
             foreach (var b in draft.Blocks)
             {
                 yield return new BlockLike(
-                    $"Block {b.Id}", b.Cells, b.ColorStack, b.Axis, b.LockId, b.RequiredKeyCount, b.KeyTargetLockId);
+                    $"Block {b.Id}", b.Cells, b.ColorStack, b.Axis, b.UnfreezeAtClearCount,
+                    b.LockId, b.RequiredKeyCount, b.KeyTargetLockId);
             }
 
             foreach (var g in draft.Generators)
@@ -515,7 +601,7 @@ namespace GateRush.Editor
                     var s = g.Queue[i];
                     yield return new BlockLike(
                         $"Generator {g.Id} queue entry {i}", s.Cells, s.ColorStack, s.Axis,
-                        s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
+                        s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
                 }
             }
 
@@ -529,7 +615,7 @@ namespace GateRush.Editor
                         var s = wave.Blocks[i];
                         yield return new BlockLike(
                             $"Elevator {e.Id} wave {w} block {i}", s.Cells, s.ColorStack, s.Axis,
-                            s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
+                            s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
                     }
                 }
             }

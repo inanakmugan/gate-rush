@@ -460,6 +460,200 @@ namespace GateRush.Tests
             Assert.IsFalse(Warns(draft, DraftWarningCategory.UnreadableValueDefaultedOnLoad));
         }
 
+        // -- ElevatorWaveNotExactTiling: the empty wave -------
+
+        [Test]
+        public void ElevatorWaveNotExactTiling_WaveWithNoBlocksAtAll_Fires()
+        {
+            // M9's waves arrive fully packed, so a wave holding nothing is the
+            // loudest violation of that rule rather than a case to skip — which
+            // is what this used to be. The silent counterpart is
+            // ElevatorWaveNotExactTiling_WaveTilesExactly_Silent above.
+            var draft = Draft(3, 3, d => d.Elevators.Add(new ElevatorDraft
+            {
+                Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0),
+                Waves = { new WaveDraft() },
+            }));
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.ElevatorWaveNotExactTiling));
+        }
+
+        [Test]
+        public void ElevatorWaveNotExactTiling_WaveWithNoBlocksAtAll_ReportsEveryRegionCellUncovered()
+        {
+            var draft = Draft(3, 3, d => d.Elevators.Add(new ElevatorDraft
+            {
+                Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0),
+                Waves = { new WaveDraft() },
+            }));
+
+            var message = Message(draft, DraftWarningCategory.ElevatorWaveNotExactTiling);
+
+            StringAssert.Contains("2 cell(s) uncovered", message);
+        }
+
+        // -- ThresholdExceedsAvailableClears: unfreeze (M3) ---
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_BlockUnfreezesAboveTotalClears_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                var block = RedBlock(1, new Coord(0, 0));
+                block.UnfreezeAtClearCount = 5;
+                d.Blocks.Add(block);
+            });
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_BlockUnfreezeWithinReach_Silent()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                var block = RedBlock(1, new Coord(0, 0));
+                block.UnfreezeAtClearCount = 1;
+                d.Blocks.Add(block);
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_BlockUnfreezesAboveTotalClears_NamesTheBlock()
+        {
+            // The category is shared with gates and shutters, so the message has
+            // to say which of the three the designer should go and look at.
+            var draft = Draft(3, 3, d =>
+            {
+                var block = RedBlock(7, new Coord(0, 0));
+                block.UnfreezeAtClearCount = 5;
+                d.Blocks.Add(block);
+            });
+
+            var message = Message(draft, DraftWarningCategory.ThresholdExceedsAvailableClears);
+
+            StringAssert.Contains("Block 7", message);
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_QueuedBlockUnfreezesAboveTotalClears_Fires()
+        {
+            // Generator queue entries and elevator wave blocks are block-likes
+            // too, and an unreachable unfreeze threshold on one is the same fault.
+            var draft = Draft(3, 3, d => d.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 0, Width = 1,
+                Queue =
+                {
+                    new SpawnedBlockDraft
+                    {
+                        Cells = { new Coord(0, 0) },
+                        ColorStack = { BlockColor.Red },
+                        UnfreezeAtClearCount = 9,
+                    },
+                },
+            }));
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
+        }
+
+        // -- ShutterRegionNotFullyCovered (M5) ----------------
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_RegionHasAnEmptyCell_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0), Threshold = 1 });
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+            });
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
+        }
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_EveryRegionCellCovered_Silent()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0), Threshold = 1 });
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+                d.Blocks.Add(RedBlock(2, new Coord(1, 0)));
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
+        }
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_RegionHasAnEmptyCell_ReportsTheCount()
+        {
+            var draft = Draft(4, 4, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 3, Min = new Coord(0, 0), Max = new Coord(1, 1), Threshold = 1 });
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+            });
+
+            var message = Message(draft, DraftWarningCategory.ShutterRegionNotFullyCovered);
+
+            StringAssert.Contains("Shutter 3", message);
+            StringAssert.Contains("3 cell(s) uncovered", message);
+        }
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_CoveringBlockStraddlesTheRegionBoundary_Silent()
+        {
+            // A shutter only has to be covered; unlike an elevator wave it is not
+            // required to be tiled exactly, so a block reaching past the region's
+            // edge still covers the cells it does sit on.
+            var draft = Draft(4, 4, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 1, Min = new Coord(0, 0), Max = new Coord(0, 0), Threshold = 1 });
+                d.Blocks.Add(new BlockDraft
+                {
+                    Id = 1,
+                    Cells = { new Coord(0, 0), new Coord(1, 0) },
+                    ColorStack = { BlockColor.Red },
+                    StartOrigin = new Coord(0, 0),
+                });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
+        }
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_AStaticWallFillsTheRemainingCell_Silent()
+        {
+            // A wall counts as covering its cell (M5): it can never hold a
+            // block, so demanding one there would be a warning with no correct
+            // resolution, and a wall hides nothing either way.
+            var draft = Draft(3, 3, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0), Threshold = 1 });
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+                d.StaticWalls.Add(new Coord(1, 0));
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
+        }
+
+        [Test]
+        public void ShutterRegionNotFullyCovered_WallsElsewhereDoNotExcuseAnEmptyRegionCell_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Shutters.Add(new ShutterDraft { Id = 1, Min = new Coord(0, 0), Max = new Coord(1, 0), Threshold = 1 });
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+                d.StaticWalls.Add(new Coord(2, 2));
+            });
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
+        }
+
+        private static string Message(LevelDraft draft, DraftWarningCategory category) =>
+            new DraftValidator().Validate(draft).First(w => w.Category == category).Message;
+
         private static SpawnedBlockDraft SpawnedCell(Coord regionOrigin) =>
             new SpawnedBlockDraft
             {
