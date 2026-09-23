@@ -137,6 +137,17 @@ namespace GateRush.Tests
 
             var mixed = MixedKeyEffectLockBoard();
             yield return ("mixed key effects, last key consumed decides", mixed, BoardState.CreateInitial(mixed), 2);
+
+            // D35: four interchangeable blocks on an open grid. Every ordering of
+            // them is a different labelling of the same board, so this is the
+            // board the symmetry collapse exists for.
+            var interchangeable = InterchangeableBlocksBoard();
+            yield return ("four interchangeable blocks share one gate", interchangeable,
+                BoardState.CreateInitial(interchangeable), 4);
+
+            var twoColourGroups = TwoInterchangeableGroupsBoard();
+            yield return ("two interchangeable colour groups, one gate each", twoColourGroups,
+                BoardState.CreateInitial(twoColourGroups), 6);
         }
 
         internal static IEnumerable<(string name, LevelContext ctx, BoardState initial)> UnsolvableCorpus()
@@ -207,6 +218,65 @@ namespace GateRush.Tests
                 5, 5,
                 new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 2)), Block(3, new Coord(4, 4)) },
                 new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+        }
+
+        /// <summary>
+        /// Four identical red blocks on an open 3x3 grid with one red gate at the
+        /// bottom of the left edge. Optimum 4: the block already at (0, 0) clears
+        /// in place, and each of the other three reaches that cell in a single
+        /// move once it is free. Four colours with no key means four moves is
+        /// also the lower bound.
+        /// </summary>
+        /// <remarks>
+        /// The D35 board. All four blocks share one spec, so the labelled state
+        /// space carries a factor of 4! of pure duplication that the collapse
+        /// removes; the open grid gives the permutations room to actually be
+        /// reached, which a one-wide corridor would not.
+        /// </remarks>
+        internal static LevelContext InterchangeableBlocksBoard()
+        {
+            return Ctx(
+                3, 3,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(2, 0)),
+                    Block(3, new Coord(1, 1)),
+                    Block(4, new Coord(2, 2))
+                },
+                new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+        }
+
+        /// <summary>
+        /// A fully packed 3x2 board: three green blocks on the bottom row, three
+        /// purple on the top, one green gate at (0, 0)'s left edge and one purple
+        /// gate at (2, 1)'s right edge. Optimum 6 — the six colours, no key, so
+        /// every clear costs its own move.
+        /// </summary>
+        /// <remarks>
+        /// The shape a real authored level takes (D16: packed, with a clear-ready
+        /// opening move) reduced to something whose optimum is checkable by hand,
+        /// and the two-group case: green and purple each form an interchangeable
+        /// group, each funnelling through a single gate.
+        /// </remarks>
+        internal static LevelContext TwoInterchangeableGroupsBoard()
+        {
+            return Ctx(
+                3, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green }),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
+                    Block(4, new Coord(0, 1), colors: new[] { BlockColor.Purple }),
+                    Block(5, new Coord(1, 1), colors: new[] { BlockColor.Purple }),
+                    Block(6, new Coord(2, 1), colors: new[] { BlockColor.Purple })
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Green),
+                    Gate(2, BoardEdge.Right, 1, 1, BlockColor.Purple)
+                });
         }
 
         /// <summary>

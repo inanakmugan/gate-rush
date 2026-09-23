@@ -33,6 +33,7 @@ namespace GateRush.Tests
             var elevatorActive = new bool[elevators.Length];
 
             return new BoardState(
+                symmetry: BlockSymmetry.None,
                 origins: Array.Empty<Coord>(),
                 clearedColors: Array.Empty<byte>(),
                 alive: Array.Empty<bool>(),

@@ -113,7 +113,11 @@ namespace GateRush.Tests
             IReadOnlyList<int> clearCountByColor = null,
             IReadOnlyList<bool> keyConsumed = null)
         {
+            // The baseline's symmetry, so a perturbed fixture stays a state of
+            // the same level — the same inheritance MoveResolver's successor
+            // builder relies on.
             return new BoardState(
+                baseline.Symmetry,
                 origins ?? baseline.Origins,
                 clearedColors ?? baseline.ClearedColors,
                 alive ?? baseline.Alive,
@@ -266,6 +270,122 @@ namespace GateRush.Tests
             var mutated = With(baseline, clearCountByColor: ReplaceAt(baseline.ClearCountByColor, 0, 1));
 
             Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
+        }
+
+        // ----- Interchangeable blocks (D35) --------------------------------
+
+        /// <summary>
+        /// Three interchangeable red-over-blue blocks on an open grid, plus one
+        /// green block that shares no spec with them. Indices 0, 1, 2 form the
+        /// one group; index 3 stands alone. The two-colour stack is what lets a
+        /// test give one group member a shed colour the others have not.
+        /// </summary>
+        private static LevelContext CreateSymmetricContext() =>
+            Ctx(
+                4, 4,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Red, BlockColor.Blue }),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Red, BlockColor.Blue }),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Red, BlockColor.Blue }),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Green })
+                });
+
+        /// <summary>Returns <paramref name="source"/> with the values at the two indices exchanged.</summary>
+        private static T[] Swap<T>(IReadOnlyList<T> source, int first, int second)
+        {
+            var copy = new T[source.Count];
+            for (var i = 0; i < source.Count; i++)
+            {
+                copy[i] = source[i];
+            }
+
+            copy[first] = source[second];
+            copy[second] = source[first];
+            return copy;
+        }
+
+        [Test]
+        public void Equals_TwoInterchangeableBlocksSwapped_IsTheSameStateWithTheSameHash()
+        {
+            var baseline = BoardState.CreateInitial(CreateSymmetricContext());
+
+            var swapped = With(baseline, origins: Swap(baseline.Origins, 0, 2));
+
+            Assert.AreEqual(baseline, swapped);
+            Assert.AreEqual(baseline.GetHashCode(), swapped.GetHashCode());
+        }
+
+        [Test]
+        public void Equals_InterchangeableBlocksSwapped_LeavesOriginsLiterallyAddressed()
+        {
+            // The collapse is the visited set's notion of "seen before" and
+            // nothing more: a Move a search returns names a literal block index,
+            // so the arrays it replays against must keep reporting literal
+            // positions.
+            var baseline = BoardState.CreateInitial(CreateSymmetricContext());
+
+            var swapped = With(baseline, origins: Swap(baseline.Origins, 0, 2));
+
+            Assert.AreEqual(new Coord(2, 0), swapped.Origins[0]);
+            Assert.AreEqual(new Coord(0, 0), swapped.Origins[2]);
+        }
+
+        [Test]
+        public void Equals_SwappingAcrossTwoDifferentSpecs_IsADifferentState()
+        {
+            // Index 3 is the green block: exchanging its position with a
+            // red-over-blue one's genuinely changes the board, and must not
+            // collapse.
+            var baseline = BoardState.CreateInitial(CreateSymmetricContext());
+
+            var swapped = With(baseline, origins: Swap(baseline.Origins, 0, 3));
+
+            Assert.AreNotEqual(baseline, swapped);
+        }
+
+        [Test]
+        public void Equals_InterchangeableBlocksSwappedWithTheirWholeRow_IsTheSameState()
+        {
+            // Relabelling means the whole row travels: block 0 at (0, 0) having
+            // shed a colour is the same board as block 2 sitting there having
+            // shed one, with block 0 at (2, 0) intact.
+            var baseline = BoardState.CreateInitial(CreateSymmetricContext());
+            var oneCleared = With(baseline, clearedColors: ReplaceAt(baseline.ClearedColors, 0, (byte)1));
+
+            var relabelled = With(
+                oneCleared,
+                origins: Swap(oneCleared.Origins, 0, 2),
+                clearedColors: Swap(oneCleared.ClearedColors, 0, 2));
+
+            Assert.AreEqual(oneCleared, relabelled);
+            Assert.AreEqual(oneCleared.GetHashCode(), relabelled.GetHashCode());
+        }
+
+        [Test]
+        public void Equals_InterchangeableBlocksSwappedByOriginAlone_IsADifferentState()
+        {
+            // Moving only the origins leaves the shed colour behind: the block
+            // at (0, 0) is now intact and the one at (2, 0) is not, which is a
+            // genuinely different board rather than a relabelling of this one.
+            var baseline = BoardState.CreateInitial(CreateSymmetricContext());
+            var oneCleared = With(baseline, clearedColors: ReplaceAt(baseline.ClearedColors, 0, (byte)1));
+
+            var originsOnly = With(oneCleared, origins: Swap(oneCleared.Origins, 0, 2));
+
+            Assert.AreNotEqual(oneCleared, originsOnly);
+        }
+
+        [Test]
+        public void Equals_LevelWithNoInterchangeableBlocks_StillComparesByLiteralIndex()
+        {
+            // CreateFullContext has no repeated spec, so the identity order
+            // applies and swapping two blocks' origins is a different state.
+            var baseline = BoardState.CreateInitial(CreateFullContext());
+
+            var swapped = With(baseline, origins: Swap(baseline.Origins, 0, 1));
+
+            Assert.AreNotEqual(baseline, swapped);
         }
 
         [Test]

@@ -13,7 +13,8 @@ namespace GateRush.Core
     /// <remarks>
     /// Every O(1) lookup this class exposes (<see cref="IsStaticWall"/>,
     /// <see cref="ShutterAt"/>, <see cref="ShutterPositionAt"/>,
-    /// <see cref="SpecAt"/>) is precomputed once in the constructor. That is
+    /// <see cref="SpecAt"/>, <see cref="BlockSymmetry"/>) is precomputed once in
+    /// the constructor. That is
     /// safe because level data never changes after construction, and cheap
     /// because it is bounded by authored content, not by how many states the
     /// search visits — see <c>DECISIONS.md</c> D28 for why these live here
@@ -55,6 +56,16 @@ namespace GateRush.Core
         /// <c>DECISIONS.md</c> D28).
         /// </summary>
         public int MaxResolutionPasses { get; }
+
+        /// <summary>
+        /// Which of this level's block indices are interchangeable — blocks
+        /// sharing an identical spec, whose dynamic rows <c>BoardState</c>
+        /// canonicalises before hashing so that permuting them is not mistaken
+        /// for a different board (<c>DECISIONS.md</c> D35). Precomputed here for
+        /// the same reason as <see cref="SpecAt"/>: a pure function of immutable
+        /// level data (D28).
+        /// </summary>
+        public BlockSymmetry BlockSymmetry { get; }
 
         private readonly HashSet<Coord> staticWallLookup;
         private readonly Dictionary<Coord, int> shutterPositionByCell;
@@ -116,6 +127,9 @@ namespace GateRush.Core
             MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
             lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
             keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
+            // Fully qualified because the property name shadows the type name
+            // inside this class — the same shape as BoardState.ProgressVector.
+            BlockSymmetry = GateRush.Core.BlockSymmetry.Of(specByIndex);
         }
 
         private static int ComputeMaxResolutionPasses(

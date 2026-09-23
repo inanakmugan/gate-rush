@@ -783,3 +783,41 @@ only — `Core` addresses spawned blocks by flat index (D28) — so it lives in 
 DTO and the draft, not in `Core`. `formatVersion` goes to 3; version 2 is
 refused. No level has been authored, so no migration path is needed, as with
 1 → 2.
+
+## D35 — Symmetric blocks collapse for search identity
+
+**Decision.** `BoardState`'s hash and equality — used only by a search's
+visited set — treat blocks sharing an identical static spec (shape, colour
+stack, lock/key configuration: everything `LevelContext.SpecAt` fixes per
+index) as interchangeable. Within each such group, the per-index dynamic
+rows (`Origin`, `ClearedColors`, `Alive`, `Unfrozen`, `Unlocked`,
+`KeyConsumed`) are sorted into a canonical order before hashing/comparing.
+The state's real `Origins` array, and the `Move` list a solve returns, are
+untouched and still name literal block indices — a solution stays exactly
+replayable; only the search's "have I seen this configuration before"
+bookkeeping gets symmetry-aware.
+
+**Why.** A level built per D16 (dense, one clear-ready block) commonly
+repeats the same block many times over — nine identical single-cell green
+blocks funnelling through one gate is ordinary, not exotic. Without this,
+every permutation of "which green block sits where" is a distinct state to
+the visited set: for *n* interchangeable blocks that is a factor of *n!* of
+pure, meaningless duplication. On a board with two such groups of 9 and 8,
+that factor is ≈1.46×10¹⁰ — enough on its own to exhaust either search
+strategy's budget on boards a human finds ordinary. This is not the
+branching-factor problem D5's canonical/exhaustive split addresses; it is
+the same state reachable by many different-looking paths, which no move-set
+pruning removes.
+
+**Rejected.** Pruning symmetric moves at generation time — never generate a
+move that swaps two interchangeable blocks' roles. Rejected because
+"interchangeable" is a property of the *current* state, not a fixed pair of
+blocks, and getting this right at generation time risks silently discarding
+a move some other, non-symmetric successor state actually needs. A separate
+canonical-key type computed alongside `BoardState` rather than folded into
+its own hash/equals. Rejected because it doubles the per-state hashing cost
+and creates two identities for the same object that could drift out of
+agreement — exactly what D2's single full-field `Equals` was written to
+avoid.
+
+---
