@@ -223,6 +223,35 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Search_SymmetryCollapsedAndPlainIdentity_ReturnTheSameVerdictAndOptimum_OverTheWholeCorpus()
+        {
+            // The collapse quotients the state graph, and A* trusts a closed set
+            // to be final. That is only safe because the heuristic is a sum of
+            // per-index terms over (spec, row) pairs and so cannot tell two
+            // interchangeable blocks apart — h is identical on states the
+            // collapse merges. If that ever stops being true, the search throws
+            // on an inconsistent heuristic rather than quietly returning a
+            // non-optimum, so this test covers both failures at once.
+            var strategy = new AStarStrategy();
+
+            foreach (var (name, ctx, collapsed) in WholeCorpus())
+            {
+                var plain = BoardState.CreateInitial(ctx, BlockSymmetry.None);
+
+                foreach (var mode in new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive })
+                {
+                    var expected = strategy.Search(ctx, plain, Budget(mode));
+                    var actual = strategy.Search(ctx, collapsed, Budget(mode));
+
+                    Assert.AreEqual(expected.Status, actual.Status, $"[{name}/{mode}] status");
+                    Assert.AreEqual(
+                        expected.Solution.Count, actual.Solution.Count,
+                        $"[{name}/{mode}] the symmetry collapse changed the optimum");
+                }
+            }
+        }
+
+        [Test]
         public void Search_ExploresFewerStatesThanBreadthFirst_OnAnOpenBoard()
         {
             // Every block on the open grid has dozens of pointless destinations.

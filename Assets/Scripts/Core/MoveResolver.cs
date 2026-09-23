@@ -697,8 +697,17 @@ namespace GateRush.Core
             public void IncrementClearCountByColor(int colorIndex) =>
                 Materialize(ref clearCountByColor, source.ClearCountByColor)[colorIndex]++;
 
+            /// <summary>
+            /// The successor. Its interchangeable-block groups come from the
+            /// source state rather than from a <see cref="LevelContext"/> this
+            /// builder would otherwise have to hold: a successor is by
+            /// definition the same level as its source, so inheriting the
+            /// instance makes the two states' identities incapable of
+            /// disagreeing (D35).
+            /// </summary>
             public BoardState Build() =>
                 new BoardState(
+                    source.Symmetry,
                     origins ?? source.Origins,
                     clearedColors ?? source.ClearedColors,
                     alive ?? source.Alive,

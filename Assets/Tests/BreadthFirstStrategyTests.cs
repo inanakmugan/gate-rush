@@ -13,7 +13,8 @@ namespace GateRush.Tests
     /// Covers Module 05: three-valued status, shortest-solution guarantee against
     /// a hand-verified corpus, canonical/exhaustive agreement, the
     /// stratified/non-stratified equivalence that protects the memory
-    /// optimisation, budget behaviour, and reproducibility.
+    /// optimisation, the collapsed/plain-identity equivalence that protects the
+    /// symmetry optimisation (D35), budget behaviour, and reproducibility.
     /// </summary>
     public class BreadthFirstStrategyTests
     {
@@ -275,6 +276,60 @@ namespace GateRush.Tests
                     Assert.AreEqual(b.PeakFrontierSize, a.PeakFrontierSize, $"[{name}/{mode}] frontier peak");
                 }
             }
+        }
+
+        // ----- Symmetry collapse: the state-identity guard (D35) ------------
+
+        [Test]
+        public void Search_SymmetryCollapsedAndPlainIdentity_ReturnTheSameVerdictAndOptimum_OverTheWholeCorpus()
+        {
+            // The collapse changes what counts as "the same state", so this is
+            // the test that has to hold: treating interchangeable blocks as one
+            // may not change a verdict or lengthen an optimum on any board,
+            // symmetric or not. Solutions are compared by length, not element for
+            // element — collapsing prunes one of two equivalent branches, so the
+            // search may legitimately return the other shortest path.
+            var strategy = new BreadthFirstStrategy();
+
+            foreach (var (name, ctx, collapsed) in WholeCorpus())
+            {
+                var plain = BoardState.CreateInitial(ctx, BlockSymmetry.None);
+
+                foreach (var mode in new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive })
+                {
+                    var expected = strategy.Search(ctx, plain, Budget(mode));
+                    var actual = strategy.Search(ctx, collapsed, Budget(mode));
+
+                    Assert.AreEqual(expected.Status, actual.Status, $"[{name}/{mode}] status");
+                    Assert.AreEqual(
+                        expected.Solution.Count, actual.Solution.Count,
+                        $"[{name}/{mode}] the symmetry collapse changed the optimum");
+                }
+            }
+        }
+
+        [Test]
+        public void Search_InterchangeableBlocks_ExploresFewerStatesThanPlainIdentity()
+        {
+            // Four identical blocks on an open grid: 4! labellings of every
+            // configuration, all but one of them pure duplication. The same
+            // search over the same board, differing only in whether that
+            // duplication is recognised.
+            var ctx = InterchangeableBlocksBoard();
+            var strategy = new BreadthFirstStrategy();
+
+            var collapsed = strategy.Search(ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive));
+            var plain = strategy.Search(
+                ctx, BoardState.CreateInitial(ctx, BlockSymmetry.None), Budget(MoveGenMode.Exhaustive));
+
+            Assert.AreEqual(SolveStatus.Solvable, collapsed.Status);
+            Assert.AreEqual(plain.Solution.Count, collapsed.Solution.Count);
+            Assert.Less(
+                collapsed.ExploredStateCount, plain.ExploredStateCount,
+                "the symmetry collapse did not shrink the explored state space");
+            Assert.Less(
+                collapsed.PeakRetainedStateCount, plain.PeakRetainedStateCount,
+                "the symmetry collapse did not shrink the visited set");
         }
 
         [Test]

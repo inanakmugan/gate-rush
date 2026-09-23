@@ -122,5 +122,27 @@ namespace GateRush.Tests
             Assert.AreEqual(LevelSolveVerdict.Unsolvable, result.Verdict);
             CollectionAssert.AreEqual(new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive }, spy.Searches);
         }
+
+        // ----- The combination the Level Editor ships -----------------------
+
+        [Test]
+        public void Run_DrivenByAStar_ReachesTheSameVerdictAndOptimumAsBreadthFirst()
+        {
+            // The editor's Validate button supplies AStarStrategy rather than
+            // taking this runner's breadth-first default, so the pairing itself
+            // needs coverage — every other case here exercises the default or a
+            // spy. D3's own tests already pin that the two strategies agree on
+            // the optimum; this pins that the two-stage policy around them does
+            // too.
+            foreach (var ctx in new[] { OneZeroDistanceClear(), TwoZeroDistanceClears(), Unsolvable() })
+            {
+                var expected = new LevelSolveRunner().Run(ctx, Canonical(), Exhaustive());
+                var actual = new LevelSolveRunner(() => new AStarStrategy()).Run(ctx, Canonical(), Exhaustive());
+
+                Assert.AreEqual(expected.Verdict, actual.Verdict);
+                Assert.AreEqual(expected.SolvedBy, actual.SolvedBy);
+                Assert.AreEqual(expected.Solution.Count, actual.Solution.Count);
+            }
+        }
     }
 }

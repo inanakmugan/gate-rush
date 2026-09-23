@@ -2313,12 +2313,29 @@ namespace GateRush.Editor
             // finally so a throw does not leave it stuck.
             try
             {
-                solve = new LevelSolveRunner().Run(
+                // A* rather than the runner's breadth-first default: it returns
+                // the same optimum while expanding fewer states (D3), which is
+                // the whole reason it was built, and both stages want it.
+                solve = new LevelSolveRunner(() => new AStarStrategy()).Run(
                     ctx, settings.CanonicalBudget, settings.ExhaustiveBudget,
                     stage => EditorUtility.DisplayProgressBar(
                         "Solving…",
                         stage == MoveGenMode.Canonical ? "Canonical search…" : "Exhaustive search…",
                         stage == MoveGenMode.Canonical ? 0.1f : 0.55f));
+            }
+            catch (InvalidOperationException e)
+            {
+                // A* abandons a search whose heuristic has stopped being
+                // consistent rather than return an optimum it cannot vouch for.
+                // Breadth-first search has no such failure, so this catch arrived
+                // with the strategy above: without it the throw would escape
+                // through OnGUI. It reports a bug in the solver, not a problem
+                // with the level, so it says so and leaves the previous verdict
+                // untouched.
+                EditorUtility.DisplayDialog(
+                    "Solver error",
+                    $"The search could not complete:\n\n{e.Message}", "OK");
+                return;
             }
             finally
             {

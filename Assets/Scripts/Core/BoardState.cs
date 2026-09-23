@@ -68,6 +68,27 @@ namespace GateRush.Core
     /// constructs is hashed at least once — that is the point of the visited
     /// set.
     /// </para>
+    /// <para><b>Interchangeable blocks (D35).</b> The per-block loop above does
+    /// not read index <c>i</c> directly: it reads <see cref="Slot"/>, which
+    /// routes through a canonical order computed once in the constructor from
+    /// the level's <see cref="BlockSymmetry"/>. Within each group of blocks
+    /// sharing an identical spec, the rows are sorted, so two boards that differ
+    /// only in <em>which</em> of several identical blocks sits where hash and
+    /// compare as one state instead of <c>n!</c> of them. Without this a level
+    /// with nine interchangeable blocks funnelling through one gate — ordinary
+    /// under D16, not exotic — spends its whole search budget re-exploring the
+    /// same board under different labels.
+    /// <b>Nothing else changes.</b> <see cref="Origins"/> and every other public
+    /// array still report literal, index-addressed values, so a
+    /// <see cref="Move"/> a search returns still names a literal block index and
+    /// replays exactly against the real initial state. Only the visited set's
+    /// notion of "seen this before" is symmetry-aware. <see cref="GetHashCode"/>
+    /// and <see cref="Equals(BoardState)"/> read the <em>same</em> order through
+    /// the same accessor, so a hash collision is always resolved by the
+    /// identically canonicalised comparison — they cannot disagree. On a level
+    /// with no repeated spec the order is the identity and neither the array nor
+    /// the sort is built at all.
+    /// </para>
     /// <para><b>Occupancy map.</b> <see cref="IsCellFree"/> is answered by a
     /// per-state <c>int[]</c> mapping each cell to the living block index
     /// occupying it (or none), built the first time it is needed and cached for
@@ -129,6 +150,25 @@ namespace GateRush.Core
         private readonly int hashCode;
 
         /// <summary>
+        /// The order <see cref="Slot"/> reads per-block rows in: position
+        /// <c>i</c> holds the block index whose row belongs there once each
+        /// interchangeable group's rows are sorted (D35). Null when the level
+        /// has no interchangeable blocks, which is the identity order — the
+        /// common case, and the one that pays nothing for this.
+        /// </summary>
+        private readonly int[] canonicalOrder;
+
+        /// <summary>
+        /// Which block indices this level treats as interchangeable. Held so
+        /// successor states can inherit it without a <see cref="LevelContext"/>
+        /// being threaded through every construction path: a state and every
+        /// state derived from it necessarily share one level, so they share this
+        /// instance. The one piece of static level data this class stores, and
+        /// deliberately not the context itself (D1).
+        /// </summary>
+        internal BlockSymmetry Symmetry { get; }
+
+        /// <summary>
         /// Cell (row-major, <c>y * ctx.Width + x</c>) to living block index, or
         /// -1. Null until <see cref="EnsureOccupancyMap"/> first builds it — see
         /// the class remarks on why this cache is lazy where the hash is not.
@@ -168,7 +208,17 @@ namespace GateRush.Core
         /// changes; never mutate one in place. Callers are also trusted to pass
         /// consistently sized arrays — this constructor does not check.
         /// </remarks>
+        /// <param name="symmetry">
+        /// The level's interchangeable-block groups, from
+        /// <see cref="LevelContext.BlockSymmetry"/> (D35). Every caller building
+        /// a successor passes the source state's <see cref="Symmetry"/>, so the
+        /// whole search shares one instance; a state built with no level behind
+        /// it passes <see cref="BlockSymmetry.None"/>. Its groups must index
+        /// into the per-block arrays passed here — the same sizing contract the
+        /// arrays themselves are held to, and equally unchecked.
+        /// </param>
         internal BoardState(
+            BlockSymmetry symmetry,
             IReadOnlyList<Coord> origins,
             IReadOnlyList<byte> clearedColors,
             IReadOnlyList<bool> alive,
@@ -197,6 +247,10 @@ namespace GateRush.Core
             ClearCountByColor = clearCountByColor;
             KeyConsumed = keyConsumed;
 
+            Symmetry = symmetry ?? BlockSymmetry.None;
+
+            // Built before the hash, which reads rows through it.
+            canonicalOrder = BuildCanonicalOrder();
             hashCode = ComputeHashCode();
         }
 
@@ -205,7 +259,23 @@ namespace GateRush.Core
         /// its <see cref="BlockDefinition.StartOrigin"/>, every spawner slot
         /// inert, every threshold evaluated against zero clears.
         /// </summary>
-        public static BoardState CreateInitial(LevelContext ctx)
+        public static BoardState CreateInitial(LevelContext ctx) =>
+            CreateInitial(ctx, ctx?.BlockSymmetry);
+
+        /// <summary>
+        /// <see cref="CreateInitial(LevelContext)"/> with the interchangeable
+        /// groups chosen by the caller rather than taken from the level.
+        /// </summary>
+        /// <remarks>
+        /// The one reason this exists: passing <see cref="BlockSymmetry.None"/>
+        /// produces an initial state whose whole successor tree carries plain
+        /// position-by-index identity, because every successor inherits its
+        /// source's groups. That is the baseline this assembly's tests compare
+        /// the D35 collapse against — same verdict, same optimum, fewer states —
+        /// the same shape as <c>BreadthFirstStrategy</c>'s non-stratified
+        /// baseline. Production code always wants the public overload.
+        /// </remarks>
+        internal static BoardState CreateInitial(LevelContext ctx, BlockSymmetry symmetry)
         {
             if (ctx == null)
             {
@@ -257,6 +327,7 @@ namespace GateRush.Core
             var clearCountByColor = new int[ColorCount];
 
             return new BoardState(
+                symmetry,
                 origins,
                 clearedColors,
                 alive,
@@ -517,18 +588,52 @@ namespace GateRush.Core
             }
 
             return TotalClearCount == other.TotalClearCount
-                && SequenceEqual(Origins, other.Origins)
-                && SequenceEqual(ClearedColors, other.ClearedColors)
-                && SequenceEqual(Alive, other.Alive)
-                && SequenceEqual(Unfrozen, other.Unfrozen)
-                && SequenceEqual(Unlocked, other.Unlocked)
-                && SequenceEqual(KeyConsumed, other.KeyConsumed)
+                && PerBlockRowsEqual(other)
                 && SequenceEqual(GateOpen, other.GateOpen)
                 && SequenceEqual(ShutterOpen, other.ShutterOpen)
                 && SequenceEqual(GeneratorIndex, other.GeneratorIndex)
                 && SequenceEqual(ElevatorWaveIndex, other.ElevatorWaveIndex)
                 && SequenceEqual(ElevatorWaveActive, other.ElevatorWaveActive)
                 && SequenceEqual(ClearCountByColor, other.ClearCountByColor);
+        }
+
+        /// <summary>
+        /// Compares the six per-block rows of the two states, each read through
+        /// its own <see cref="Slot"/> so interchangeable blocks are compared in
+        /// canonical order rather than by literal index (D35). The whole row is
+        /// compared at each position, not one field across all positions, which
+        /// is what makes a permutation of identical blocks compare equal while
+        /// any genuine difference in a row still fails.
+        /// </summary>
+        /// <remarks>
+        /// Only <see cref="Origins"/>'s length is checked; the other five are
+        /// held to the constructor's documented sizing contract, exactly as
+        /// <see cref="ComputeHashCode"/> holds them.
+        /// </remarks>
+        private bool PerBlockRowsEqual(BoardState other)
+        {
+            if (Origins.Count != other.Origins.Count)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < Origins.Count; i++)
+            {
+                var a = Slot(i);
+                var b = other.Slot(i);
+
+                if (Origins[a] != other.Origins[b]
+                    || ClearedColors[a] != other.ClearedColors[b]
+                    || Alive[a] != other.Alive[b]
+                    || Unfrozen[a] != other.Unfrozen[b]
+                    || Unlocked[a] != other.Unlocked[b]
+                    || KeyConsumed[a] != other.KeyConsumed[b])
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool SequenceEqual<T>(IReadOnlyList<T> a, IReadOnlyList<T> b)
@@ -560,13 +665,14 @@ namespace GateRush.Core
 
                 for (var i = 0; i < Origins.Count; i++)
                 {
-                    hash = HashInt(hash, Origins[i].X);
-                    hash = HashInt(hash, Origins[i].Y);
-                    hash = HashByte(hash, ClearedColors[i]);
-                    hash = HashBool(hash, Alive[i]);
-                    hash = HashBool(hash, Unfrozen[i]);
-                    hash = HashBool(hash, Unlocked[i]);
-                    hash = HashBool(hash, KeyConsumed[i]);
+                    var slot = Slot(i);
+                    hash = HashInt(hash, Origins[slot].X);
+                    hash = HashInt(hash, Origins[slot].Y);
+                    hash = HashByte(hash, ClearedColors[slot]);
+                    hash = HashBool(hash, Alive[slot]);
+                    hash = HashBool(hash, Unfrozen[slot]);
+                    hash = HashBool(hash, Unlocked[slot]);
+                    hash = HashBool(hash, KeyConsumed[slot]);
                 }
 
                 for (var i = 0; i < GateOpen.Count; i++)
@@ -597,6 +703,121 @@ namespace GateRush.Core
 
                 return unchecked((int)hash);
             }
+        }
+
+        /// <summary>
+        /// The block index whose per-block row belongs at position
+        /// <paramref name="position"/> — the identity on a level with no
+        /// interchangeable blocks, and the canonical order otherwise (D35). The
+        /// single accessor both <see cref="ComputeHashCode"/> and
+        /// <see cref="PerBlockRowsEqual"/> read through, which is what
+        /// guarantees the two can never disagree about what a state <em>is</em>.
+        /// </summary>
+        private int Slot(int position) => canonicalOrder == null ? position : canonicalOrder[position];
+
+        /// <summary>
+        /// Sorts each interchangeable group's rows into a fixed order and
+        /// records the result, so that two boards differing only by a
+        /// permutation of identical blocks produce the same sequence of rows
+        /// (D35). Returns null when the level has no group, meaning the identity
+        /// order — no allocation and no sort on levels without repeated specs.
+        /// </summary>
+        /// <remarks>
+        /// Runs once per constructed state, on the same cadence as the hash, and
+        /// touches only the indices that belong to a group. Groups are typically
+        /// small, so the sort is an insertion sort: no delegate, no comparer
+        /// object, no allocation beyond the order array itself.
+        /// </remarks>
+        private int[] BuildCanonicalOrder()
+        {
+            if (Symmetry.IsTrivial)
+            {
+                return null;
+            }
+
+            var order = new int[Origins.Count];
+            for (var i = 0; i < order.Length; i++)
+            {
+                order[i] = i;
+            }
+
+            var groups = Symmetry.RawGroups;
+            for (var g = 0; g < groups.Length; g++)
+            {
+                SortGroup(order, groups[g]);
+            }
+
+            return order;
+        }
+
+        /// <summary>
+        /// Writes the members of one interchangeable group into
+        /// <paramref name="order"/> at that group's own positions, ordered by
+        /// <see cref="CompareRows"/>. The group's positions are unchanged as a
+        /// set — only which row is read at each of them.
+        /// </summary>
+        private void SortGroup(int[] order, int[] group)
+        {
+            for (var i = 1; i < group.Length; i++)
+            {
+                var candidate = order[group[i]];
+                var j = i - 1;
+
+                while (j >= 0 && CompareRows(order[group[j]], candidate) > 0)
+                {
+                    order[group[j + 1]] = order[group[j]];
+                    j--;
+                }
+
+                order[group[j + 1]] = candidate;
+            }
+        }
+
+        /// <summary>
+        /// A total order over two blocks' dynamic rows: origin, then how many
+        /// colours have been shed, then the four flags. Any total order would
+        /// do — this one only has to be a function of the row's contents, so
+        /// that equal multisets of rows always canonicalise to equal sequences.
+        /// Rows that tie are identical, so their relative order cannot matter.
+        /// </summary>
+        private int CompareRows(int a, int b)
+        {
+            if (Origins[a].X != Origins[b].X)
+            {
+                return Origins[a].X < Origins[b].X ? -1 : 1;
+            }
+
+            if (Origins[a].Y != Origins[b].Y)
+            {
+                return Origins[a].Y < Origins[b].Y ? -1 : 1;
+            }
+
+            if (ClearedColors[a] != ClearedColors[b])
+            {
+                return ClearedColors[a] < ClearedColors[b] ? -1 : 1;
+            }
+
+            if (Alive[a] != Alive[b])
+            {
+                return Alive[a] ? 1 : -1;
+            }
+
+            if (Unfrozen[a] != Unfrozen[b])
+            {
+                return Unfrozen[a] ? 1 : -1;
+            }
+
+            if (Unlocked[a] != Unlocked[b])
+            {
+                return Unlocked[a] ? 1 : -1;
+            }
+
+            if (KeyConsumed[a] != KeyConsumed[b])
+            {
+                return KeyConsumed[a] ? 1 : -1;
+            }
+
+            return 0;
         }
 
         private static uint HashByte(uint hash, byte value)
