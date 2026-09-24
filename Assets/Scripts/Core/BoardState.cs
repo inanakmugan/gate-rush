@@ -312,7 +312,7 @@ namespace GateRush.Core
             var gateOpen = new bool[ctx.Gates.Count];
             for (var i = 0; i < gateOpen.Length; i++)
             {
-                gateOpen[i] = IsOpenAtZeroClears(ctx.Gates[i].OpenAtClearCount);
+                gateOpen[i] = GateDefinition.IsOpenAtZeroClears(ctx.Gates[i].OpenAtClearCount);
             }
 
             var shutterOpen = new bool[ctx.Shutters.Count];
@@ -345,9 +345,6 @@ namespace GateRush.Core
 
         private static bool IsUnfrozenAtZeroClears(int? unfreezeAtClearCount) =>
             !unfreezeAtClearCount.HasValue || unfreezeAtClearCount.Value <= 0;
-
-        private static bool IsOpenAtZeroClears(int? openAtClearCount) =>
-            !openAtClearCount.HasValue || openAtClearCount.Value <= 0;
 
         /// <summary>
         /// The block's outermost remaining colour — the single point of truth

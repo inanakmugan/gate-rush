@@ -754,7 +754,11 @@ namespace GateRush.Editor
 
                 if (spans[i].Owner is GateDraft gate)
                 {
-                    EditorGUI.DrawRect(rect, Palette(gate.Color));
+                    EditorGUI.DrawRect(rect, GateMarker.Fill(Palette(gate.Color), gate.OpenAtClearCount));
+                    if (GateMarker.IsThresholdGated(gate.OpenAtClearCount))
+                    {
+                        DrawMarkerLabel(rect, gate.OpenAtClearCount.Value.ToString());
+                    }
                 }
                 else
                 {
@@ -807,6 +811,50 @@ namespace GateRush.Editor
                 default:
                     return new Rect(r.x + distance, r.y, r.width, r.height);
             }
+        }
+
+        // The label only ever sits on GateMarker.Frost, a fixed near-white, so
+        // plain dark text reads without an outline.
+        private static readonly Color MarkerLabelColor = new Color(0.12f, 0.14f, 0.2f);
+        private const float MarkerLabelSizeRatio = 0.7f;
+        private const int MarkerLabelMinFontSize = 7;
+
+        private static GUIStyle markerLabelStyle;
+
+        /// <summary>
+        /// Draws <paramref name="text"/> centred on a marker rect, sized to the
+        /// rect's short side — a Left/Right gate is only its depth wide. Skipped
+        /// when that size would be unreadable; the fill alone still carries the
+        /// signal at small cell sizes.
+        /// </summary>
+        private static void DrawMarkerLabel(Rect r, string text)
+        {
+            if (Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+
+            var fontSize = Mathf.RoundToInt(Mathf.Min(r.width, r.height) * MarkerLabelSizeRatio);
+            if (fontSize < MarkerLabelMinFontSize)
+            {
+                return;
+            }
+
+            // Built lazily: EditorStyles is only available inside a GUI pass.
+            if (markerLabelStyle == null)
+            {
+                markerLabelStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    clipping = TextClipping.Clip,
+                    padding = new RectOffset(0, 0, 0, 0),
+                    margin = new RectOffset(0, 0, 0, 0),
+                };
+                markerLabelStyle.normal.textColor = MarkerLabelColor;
+            }
+
+            markerLabelStyle.fontSize = fontSize;
+            GUI.Label(r, text, markerLabelStyle);
         }
 
         private static void DrawInwardTriangle(Rect r, BoardEdge edge, Color color)
