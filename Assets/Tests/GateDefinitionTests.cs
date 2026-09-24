@@ -20,5 +20,37 @@ namespace GateRush.Tests
 
             Assert.AreEqual(1, gate.Width);
         }
+
+        [Test]
+        public void IsOpenAtZeroClears_Null_ReturnsTrue()
+        {
+            var open = GateDefinition.IsOpenAtZeroClears(null);
+
+            Assert.IsTrue(open);
+        }
+
+        [Test]
+        public void IsOpenAtZeroClears_Zero_ReturnsTrue()
+        {
+            var open = GateDefinition.IsOpenAtZeroClears(0);
+
+            Assert.IsTrue(open);
+        }
+
+        [Test]
+        public void IsOpenAtZeroClears_Negative_ReturnsTrue()
+        {
+            var open = GateDefinition.IsOpenAtZeroClears(-1);
+
+            Assert.IsTrue(open);
+        }
+
+        [Test]
+        public void IsOpenAtZeroClears_Positive_ReturnsFalse()
+        {
+            var open = GateDefinition.IsOpenAtZeroClears(1);
+
+            Assert.IsFalse(open);
+        }
     }
 }

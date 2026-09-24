@@ -34,5 +34,16 @@ namespace GateRush.Core
             Color = color;
             OpenAtClearCount = openAtClearCount;
         }
+
+        /// <summary>
+        /// Whether a gate with this <see cref="OpenAtClearCount"/> is open before
+        /// any clear has happened. A missing or non-positive threshold means
+        /// open from the start (M2). The single definition of that rule: the
+        /// initial <see cref="BoardState"/> and the Level Editor's gate marker
+        /// both ask here, so what the editor shows as closed is exactly what the
+        /// game starts closed.
+        /// </summary>
+        public static bool IsOpenAtZeroClears(int? openAtClearCount) =>
+            !openAtClearCount.HasValue || openAtClearCount.Value <= 0;
     }
 }
