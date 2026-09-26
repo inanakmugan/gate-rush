@@ -13,7 +13,8 @@ namespace GateRush.Core
     /// <remarks>
     /// <para><b>Index scheme.</b> Per-block arrays (<see cref="Origins"/>,
     /// <see cref="ClearedColors"/>, <see cref="Alive"/>, <see cref="Unfrozen"/>,
-    /// <see cref="Unlocked"/>, <see cref="KeyConsumed"/>) have a <em>fixed</em>
+    /// <see cref="Unlocked"/>, <see cref="KeyConsumed"/>,
+    /// <see cref="WaitingKeyEffect"/>) have a <em>fixed</em>
     /// length, <see cref="LevelContext.TotalBlockCapacity"/> — top-level blocks
     /// plus every block any generator or elevator could ever spawn. Index
     /// <c>i</c> resolves to its <see cref="BlockSpec"/> via
@@ -58,7 +59,8 @@ namespace GateRush.Core
     /// cached. Field order: <see cref="TotalClearCount"/>; then, per block index,
     /// <see cref="Origins"/> (X then Y), <see cref="ClearedColors"/>,
     /// <see cref="Alive"/>, <see cref="Unfrozen"/>, <see cref="Unlocked"/>,
-    /// <see cref="KeyConsumed"/>; then <see cref="GateOpen"/> per gate; then
+    /// <see cref="KeyConsumed"/>, <see cref="WaitingKeyEffect"/>; then
+    /// <see cref="GateOpen"/> per gate; then
     /// <see cref="ShutterOpen"/> per shutter; then <see cref="GeneratorIndex"/>
     /// per generator; then, per elevator, <see cref="ElevatorWaveIndex"/> and
     /// <see cref="ElevatorWaveActive"/>; then <see cref="ClearCountByColor"/> per
@@ -147,6 +149,21 @@ namespace GateRush.Core
         public IReadOnlyList<int> ClearCountByColor { get; }
         public IReadOnlyList<bool> KeyConsumed { get; }
 
+        /// <summary>
+        /// Per block, the key effect a completed lock is holding because its
+        /// block was under a closed shutter when the completing key was
+        /// consumed (<c>DECISIONS.md</c> D41); null when nothing waits. Only
+        /// ever set on a lock-owning block, and cleared — the effect applied —
+        /// in the same resolution that opens the last closed shutter over it.
+        /// Stored rather than derived because it cannot be recovered from
+        /// <see cref="KeyConsumed"/>: when a lock's keys carry different
+        /// effects the completing key decides (M8), and two completion orders
+        /// leave the same keys consumed with different effects waiting. A
+        /// dynamic field like any other, so it is hashed and compared (D1) and
+        /// sorted with its block's row (D35).
+        /// </summary>
+        public IReadOnlyList<KeyEffect?> WaitingKeyEffect { get; }
+
         private readonly int hashCode;
 
         /// <summary>
@@ -231,7 +248,8 @@ namespace GateRush.Core
             IReadOnlyList<bool> elevatorWaveActive,
             int totalClearCount,
             IReadOnlyList<int> clearCountByColor,
-            IReadOnlyList<bool> keyConsumed)
+            IReadOnlyList<bool> keyConsumed,
+            IReadOnlyList<KeyEffect?> waitingKeyEffect)
         {
             Origins = origins;
             ClearedColors = clearedColors;
@@ -246,6 +264,7 @@ namespace GateRush.Core
             TotalClearCount = totalClearCount;
             ClearCountByColor = clearCountByColor;
             KeyConsumed = keyConsumed;
+            WaitingKeyEffect = waitingKeyEffect;
 
             Symmetry = symmetry ?? BlockSymmetry.None;
 
@@ -275,7 +294,58 @@ namespace GateRush.Core
         /// the same shape as <c>BreadthFirstStrategy</c>'s non-stratified
         /// baseline. Production code always wants the public overload.
         /// </remarks>
-        internal static BoardState CreateInitial(LevelContext ctx, BlockSymmetry symmetry)
+        internal static BoardState CreateInitial(LevelContext ctx, BlockSymmetry symmetry) =>
+            CreateInitial(ctx, symmetry, waitingKeyEffect: null);
+
+        /// <summary>
+        /// <see cref="CreateInitial(LevelContext)"/>, except that each block
+        /// starts with the given <see cref="WaitingKeyEffect"/> instead of none.
+        /// </summary>
+        /// <remarks>
+        /// Exists for a board derived from another state rather than authored:
+        /// the solver's next-clear copy (<c>NextClearAbstraction</c>) rebuilds
+        /// the source state as a fresh level and carries the source's waiting
+        /// effects across block for block, so the copy never silently disagrees
+        /// with the state it stands for. The values are carried as identity
+        /// only: an entry on a block that owns no lock is never released and
+        /// changes nothing but the state's hash and equality. The list is
+        /// copied, so the caller keeps ownership of it.
+        /// </remarks>
+        /// <exception cref="ArgumentException">
+        /// <paramref name="waitingKeyEffect"/> does not have exactly
+        /// <see cref="LevelContext.TotalBlockCapacity"/> entries.
+        /// </exception>
+        public static BoardState CreateInitialWithWaitingKeyEffects(
+            LevelContext ctx, IReadOnlyList<KeyEffect?> waitingKeyEffect)
+        {
+            if (ctx == null)
+            {
+                throw new ArgumentNullException(nameof(ctx));
+            }
+
+            if (waitingKeyEffect == null)
+            {
+                throw new ArgumentNullException(nameof(waitingKeyEffect));
+            }
+
+            if (waitingKeyEffect.Count != ctx.TotalBlockCapacity)
+            {
+                throw new ArgumentException(
+                    $"Level {ctx.LevelId} has {ctx.TotalBlockCapacity} block slots but {waitingKeyEffect.Count} " +
+                    "waiting key effects were given.",
+                    nameof(waitingKeyEffect));
+            }
+
+            return CreateInitial(ctx, ctx.BlockSymmetry, waitingKeyEffect);
+        }
+
+        /// <summary>
+        /// The one construction path behind every <c>CreateInitial</c>
+        /// overload. <paramref name="waitingKeyEffect"/> null means nothing
+        /// waits; otherwise it is copied, already checked for length.
+        /// </summary>
+        private static BoardState CreateInitial(
+            LevelContext ctx, BlockSymmetry symmetry, IReadOnlyList<KeyEffect?> waitingKeyEffect)
         {
             if (ctx == null)
             {
@@ -283,6 +353,15 @@ namespace GateRush.Core
             }
 
             var totalBlocks = ctx.TotalBlockCapacity;
+
+            var waiting = new KeyEffect?[totalBlocks];
+            if (waitingKeyEffect != null)
+            {
+                for (var i = 0; i < totalBlocks; i++)
+                {
+                    waiting[i] = waitingKeyEffect[i];
+                }
+            }
 
             var origins = new Coord[totalBlocks];
             var clearedColors = new byte[totalBlocks];
@@ -340,7 +419,8 @@ namespace GateRush.Core
                 elevatorWaveActive,
                 totalClearCount: 0,
                 clearCountByColor: clearCountByColor,
-                keyConsumed: keyConsumed);
+                keyConsumed: keyConsumed,
+                waitingKeyEffect: waiting);
         }
 
         private static bool IsUnfrozenAtZeroClears(int? unfreezeAtClearCount) =>
@@ -492,12 +572,29 @@ namespace GateRush.Core
         public bool CanBeTargeted(LevelContext ctx, int blockIndex) =>
             Alive[blockIndex] && !IsInsideClosedShutter(ctx, blockIndex);
 
-        private bool IsInsideClosedShutter(LevelContext ctx, int blockIndex)
+        private bool IsInsideClosedShutter(LevelContext ctx, int blockIndex) =>
+            Alive[blockIndex] && IsInsideClosedShutter(ctx, blockIndex, Origins[blockIndex], ShutterOpen);
+
+        /// <summary>
+        /// True when any cell of block <paramref name="blockIndex"/>, placed at
+        /// <paramref name="origin"/>, lies in a shutter that
+        /// <paramref name="shutterOpen"/> reports closed. The one "under a
+        /// closed shutter" test in <c>Core</c>: <see cref="CanMove"/> and
+        /// <see cref="CanBeTargeted"/> read it through this state's own fields,
+        /// and <c>MoveResolver</c> reads it mid-resolution through its successor
+        /// builder, where no <see cref="BoardState"/> exists yet — which is why
+        /// it takes the two fields it reads rather than a state. The caller
+        /// must know the block is alive; a dead block's origin names cells it
+        /// no longer occupies.
+        /// </summary>
+        internal static bool IsInsideClosedShutter(
+            LevelContext ctx, int blockIndex, Coord origin, IReadOnlyList<bool> shutterOpen)
         {
-            foreach (var cell in OccupiedCells(ctx, blockIndex))
+            var cells = ctx.SpecAt(blockIndex).Cells;
+            for (var i = 0; i < cells.Count; i++)
             {
-                var shutterPosition = ctx.ShutterPositionAt(cell);
-                if (shutterPosition.HasValue && !ShutterOpen[shutterPosition.Value])
+                var shutterPosition = ctx.ShutterPositionAt(origin + cells[i]);
+                if (shutterPosition.HasValue && !shutterOpen[shutterPosition.Value])
                 {
                     return true;
                 }
@@ -595,7 +692,7 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// Compares the six per-block rows of the two states, each read through
+        /// Compares the seven per-block rows of the two states, each read through
         /// its own <see cref="Slot"/> so interchangeable blocks are compared in
         /// canonical order rather than by literal index (D35). The whole row is
         /// compared at each position, not one field across all positions, which
@@ -603,7 +700,7 @@ namespace GateRush.Core
         /// any genuine difference in a row still fails.
         /// </summary>
         /// <remarks>
-        /// Only <see cref="Origins"/>'s length is checked; the other five are
+        /// Only <see cref="Origins"/>'s length is checked; the other six are
         /// held to the constructor's documented sizing contract, exactly as
         /// <see cref="ComputeHashCode"/> holds them.
         /// </remarks>
@@ -624,7 +721,8 @@ namespace GateRush.Core
                     || Alive[a] != other.Alive[b]
                     || Unfrozen[a] != other.Unfrozen[b]
                     || Unlocked[a] != other.Unlocked[b]
-                    || KeyConsumed[a] != other.KeyConsumed[b])
+                    || KeyConsumed[a] != other.KeyConsumed[b]
+                    || WaitingKeyEffect[a] != other.WaitingKeyEffect[b])
                 {
                     return false;
                 }
@@ -670,6 +768,7 @@ namespace GateRush.Core
                     hash = HashBool(hash, Unfrozen[slot]);
                     hash = HashBool(hash, Unlocked[slot]);
                     hash = HashBool(hash, KeyConsumed[slot]);
+                    hash = HashByte(hash, WaitingKeyEffectCode(WaitingKeyEffect[slot]));
                 }
 
                 for (var i = 0; i < GateOpen.Count; i++)
@@ -772,7 +871,8 @@ namespace GateRush.Core
 
         /// <summary>
         /// A total order over two blocks' dynamic rows: origin, then how many
-        /// colours have been shed, then the four flags. Any total order would
+        /// colours have been shed, then the four flags, then the waiting key
+        /// effect. Any total order would
         /// do — this one only has to be a function of the row's contents, so
         /// that equal multisets of rows always canonicalise to equal sequences.
         /// Rows that tie are identical, so their relative order cannot matter.
@@ -814,8 +914,23 @@ namespace GateRush.Core
                 return KeyConsumed[a] ? 1 : -1;
             }
 
+            var waitingA = WaitingKeyEffectCode(WaitingKeyEffect[a]);
+            var waitingB = WaitingKeyEffectCode(WaitingKeyEffect[b]);
+            if (waitingA != waitingB)
+            {
+                return waitingA < waitingB ? -1 : 1;
+            }
+
             return 0;
         }
+
+        /// <summary>
+        /// <see cref="WaitingKeyEffect"/> as one byte, for hashing and row
+        /// ordering: 0 when nothing waits, otherwise one more than the
+        /// effect's value, so no effect shares a code with "none".
+        /// </summary>
+        private static byte WaitingKeyEffectCode(KeyEffect? waiting) =>
+            waiting.HasValue ? (byte)((int)waiting.Value + 1) : (byte)0;
 
         private static uint HashByte(uint hash, byte value)
         {

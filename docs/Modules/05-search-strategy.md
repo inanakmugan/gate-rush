@@ -175,7 +175,8 @@ A\*'s memory is bounded by the states it actually touches, already a subset
 of what BFS touches on the same board.
 
 **Heuristic:** see D3 for `h = C - F` and why "at least one unconsumed
-`ClearOuterColor` key" replaces the plain colour-remaining count.
+`ClearOuterColor` key" replaces the plain colour-remaining count. Since D41,
+`F` also counts a lock with `ClearOuterColor` waiting for a shutter to open.
 
 **Shared corpus.** `BreadthFirstStrategyTests` and `AStarStrategyTests` run
 against the same `SearchCorpus`, including a board built specifically to

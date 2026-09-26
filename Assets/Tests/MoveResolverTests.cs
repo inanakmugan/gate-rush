@@ -14,7 +14,8 @@ namespace GateRush.Tests
     /// M10 (time-bonus output), the "opening never clears" rule (D25), and the
     /// fixpoint loop's first real chains — and Module 07's Phase 1.8 additions:
     /// M8 (locks and keys), where a key's <see cref="KeyEffect.ClearOuterColor"/>
-    /// makes the fixpoint loop feed itself.
+    /// makes the fixpoint loop feed itself — and D41, where a key effect aimed at
+    /// a block under a closed shutter waits and the opening releases it.
     /// </summary>
     /// <remarks>
     /// Still deferred to phase 1.13 (spawners): a generator or elevator wave
@@ -1717,6 +1718,349 @@ namespace GateRush.Tests
             var state = BoardState.CreateInitial(ctx);
 
             Assert.DoesNotThrow(() => Resolver().TrySweepColor(ctx, state, BlockColor.Red, out _, out _));
+        }
+
+        // ----- D41: a key effect waits for a closed shutter ------------
+
+        // Every board below is one row, so every block is flush against the
+        // bottom edge and each is pushed in place (a zero-distance move) into
+        // the bottom gate under it. Index 0 is the key carrier, index 1 the
+        // green block whose clear opens a green-bound shutter, index 2 the lock
+        // owner under that shutter.
+
+        /// <summary>
+        /// Key (red, <paramref name="keyEffect"/>) | green | owner of lock 1
+        /// under a green-bound shutter. The owner's stack and any extra gates
+        /// are the caller's.
+        /// </summary>
+        private static LevelContext ShutteredLockBoard(
+            KeyEffect keyEffect, IReadOnlyList<BlockColor> ownerColors, params GateDefinition[] extraGates)
+        {
+            var gates = new List<GateDefinition>
+            {
+                Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Green)
+            };
+            gates.AddRange(extraGates);
+
+            return Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: keyEffect),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }),
+                    Block(3, new Coord(2, 0), colors: ownerColors, lockId: 1, requiredKeys: 1)
+                },
+                gates: gates,
+                shutters: new[] { Shutter(1, new Coord(2, 0), new Coord(2, 0), 1, BlockColor.Green) });
+        }
+
+        [Test]
+        public void TryApplyMove_ClearOuterColorKeyCompletesAShutteredLock_ConsumesTheKeyAndTheEffectWaits()
+        {
+            var ctx = ShutteredLockBoard(KeyEffect.ClearOuterColor, new[] { BlockColor.Blue });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.KeyConsumed[0], "the key is spent when its carrier dies");
+            Assert.IsFalse(result.ShutterOpen[0]);
+            Assert.IsFalse(result.Unlocked[2], "nothing reaches a block under a closed shutter");
+            Assert.IsTrue(result.Alive[2]);
+            Assert.AreEqual(0, result.ClearedColors[2], "the owner keeps its colour");
+            Assert.AreEqual(KeyEffect.ClearOuterColor, result.WaitingKeyEffect[2]);
+            Assert.AreEqual(1, result.TotalClearCount, "only the key carrier's own clear happened");
+        }
+
+        [Test]
+        public void TryApplyMove_ShutterOpensOverAWaitingClearOuterColor_UnlocksAndClearsInThatResolution()
+        {
+            // Clears: key (1), green (2), then the released key clear (3). The
+            // yellow gate opens at 3, so it can only be open after the green
+            // push if the release happened and was drained in that resolution.
+            var ctx = ShutteredLockBoard(
+                KeyEffect.ClearOuterColor,
+                new[] { BlockColor.Blue, BlockColor.Yellow },
+                Gate(3, BoardEdge.Bottom, 3, 1, BlockColor.Yellow, openAt: 3));
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            var moved = resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.ShutterOpen[0]);
+            Assert.IsNull(result.WaitingKeyEffect[2], "the effect is released, not left waiting");
+            Assert.IsTrue(result.Unlocked[2]);
+            Assert.AreEqual(1, result.ClearedColors[2]);
+            Assert.AreEqual(BlockColor.Yellow, result.CurrentColorOf(ctx, 2));
+            Assert.AreEqual(3, result.TotalClearCount);
+            Assert.AreEqual(
+                waiting.ClearCountByColor[(int)BlockColor.Blue] + 1,
+                result.ClearCountByColor[(int)BlockColor.Blue],
+                "the counters credit the colour removed from the owner");
+            Assert.IsTrue(result.GateOpen[2], "a threshold the released clear crosses opens in the same resolution");
+        }
+
+        [Test]
+        public void TryApplyMove_ShutterOpensOverAWaitingUnlockMovement_UnlocksWithoutClearing()
+        {
+            // The owner sits against its own open blue gate: the opening
+            // unlocks it and clears nothing (D25); a push then clears it.
+            var ctx = ShutteredLockBoard(
+                KeyEffect.UnlockMovement,
+                new[] { BlockColor.Blue },
+                Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Blue));
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 0)), out var opened, out _);
+
+            Assert.AreEqual(KeyEffect.UnlockMovement, waiting.WaitingKeyEffect[2]);
+            Assert.IsFalse(waiting.Unlocked[2]);
+            Assert.IsTrue(opened.ShutterOpen[0]);
+            Assert.IsNull(opened.WaitingKeyEffect[2]);
+            Assert.IsTrue(opened.Unlocked[2]);
+            Assert.IsTrue(opened.Alive[2]);
+            Assert.AreEqual(0, opened.ClearedColors[2], "unlocking clears nothing");
+            Assert.AreEqual(2, opened.TotalClearCount);
+
+            var pushed = resolver.TryApplyMove(ctx, opened, new Move(2, new Coord(2, 0)), out var afterPush, out _);
+
+            Assert.IsTrue(pushed);
+            Assert.IsFalse(afterPush.Alive[2]);
+        }
+
+        [Test]
+        public void TryApplyMove_ReleasedClearExposesAColourMatchingTheGateItRestsAt_ClearsOnlyOnce()
+        {
+            // D25: the release is one key clear, not an exit. The owner's next
+            // colour, yellow, matches the open gate under it, and it still waits
+            // for a push.
+            var ctx = ShutteredLockBoard(
+                KeyEffect.ClearOuterColor,
+                new[] { BlockColor.Blue, BlockColor.Yellow },
+                Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Yellow));
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 0)), out var opened, out _);
+
+            Assert.IsTrue(opened.Alive[2]);
+            Assert.AreEqual(1, opened.ClearedColors[2], "exactly the one waiting clear");
+            Assert.AreEqual(BlockColor.Yellow, opened.CurrentColorOf(ctx, 2));
+
+            var pushed = resolver.TryApplyMove(ctx, opened, new Move(2, new Coord(2, 0)), out var afterPush, out _);
+
+            Assert.IsTrue(pushed);
+            Assert.IsFalse(afterPush.Alive[2]);
+        }
+
+        [TestCase(0, 1)]
+        [TestCase(1, 0)]
+        public void TryApplyMove_MixedKeysOnAShutteredLock_TheCompletingKeysEffectWaitsAndApplies(
+            int firstKey, int completingKey)
+        {
+            // Lock 1 needs both keys: index 0 carries ClearOuterColor, index 1
+            // UnlockMovement. The owner (index 3) has its own blue gate, so
+            // either effect leaves it clearable.
+            var ctx = Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 2)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
+                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green),
+                    Gate(4, BoardEdge.Bottom, 3, 1, BlockColor.Blue)
+                },
+                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green) });
+            var resolver = Resolver();
+            var expected = ctx.SpecAt(completingKey).KeyEffect;
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(firstKey, new Coord(firstKey, 0)), out var oneKey, out _);
+            resolver.TryApplyMove(
+                ctx, oneKey, new Move(completingKey, new Coord(completingKey, 0)), out var bothKeys, out _);
+
+            resolver.TryApplyMove(ctx, bothKeys, new Move(2, new Coord(2, 0)), out var opened, out _);
+
+            Assert.IsNull(oneKey.WaitingKeyEffect[3], "one key of two completes nothing");
+            Assert.AreEqual(expected, bothKeys.WaitingKeyEffect[3], "the completing key decides what waits");
+            Assert.IsTrue(opened.Unlocked[3]);
+            Assert.AreEqual(expected == KeyEffect.ClearOuterColor, !opened.Alive[3],
+                "the owner is cleared exactly when the completing key was ClearOuterColor");
+        }
+
+        [Test]
+        public void TryApplyMove_KeyConsumedAfterAShutteredLockCompleted_IsSpentAndChangesNothingThatWaits()
+        {
+            // Lock 1 needs one key; two target it. The first decides; the second
+            // is still consumed when its carrier dies (M8) but cannot replace
+            // the waiting effect.
+            var ctx = Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
+                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green)
+                },
+                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green) });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var decided, out _);
+
+            resolver.TryApplyMove(ctx, decided, new Move(1, new Coord(1, 0)), out var extraKey, out _);
+            resolver.TryApplyMove(ctx, extraKey, new Move(2, new Coord(2, 0)), out var opened, out _);
+
+            Assert.AreEqual(KeyEffect.ClearOuterColor, decided.WaitingKeyEffect[3]);
+            Assert.IsTrue(extraKey.KeyConsumed[1], "a later key is still consumed");
+            Assert.AreEqual(KeyEffect.ClearOuterColor, extraKey.WaitingKeyEffect[3], "and replaces nothing");
+            Assert.IsFalse(opened.Alive[3], "the deciding ClearOuterColor is what applies");
+        }
+
+        [Test]
+        public void TryApplyMove_LastKeysClearAlsoOpensTheShutter_TheEffectAppliesInTheSameResolution()
+        {
+            // The shutter is red-bound: the key carrier's own clear both
+            // completes the lock and opens the shutter over its owner.
+            var ctx = Ctx(
+                2, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) },
+                shutters: new[] { Shutter(1, new Coord(1, 0), new Coord(1, 0), 1, BlockColor.Red) });
+
+            var moved = Resolver().TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsTrue(result.ShutterOpen[0]);
+            Assert.IsNull(result.WaitingKeyEffect[1]);
+            Assert.IsFalse(result.Alive[1]);
+            Assert.AreEqual(2, result.TotalClearCount);
+            Assert.IsTrue(result.IsSolved(ctx));
+        }
+
+        [Test]
+        public void TryApplyMove_OneOpeningOverTwoWaitingClears_ReleasesBothInOneResolution()
+        {
+            var ctx = SearchCorpus.TwoWaitingClearsUnderOneShutterBoard();
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var firstKey, out _);
+            resolver.TryApplyMove(ctx, firstKey, new Move(1, new Coord(1, 0)), out var bothWaiting, out _);
+
+            var moved = resolver.TryApplyMove(ctx, bothWaiting, new Move(2, new Coord(2, 0)), out var result, out _);
+
+            Assert.AreEqual(KeyEffect.ClearOuterColor, bothWaiting.WaitingKeyEffect[3]);
+            Assert.AreEqual(KeyEffect.ClearOuterColor, bothWaiting.WaitingKeyEffect[4]);
+            Assert.IsTrue(moved);
+            Assert.AreEqual(bothWaiting.TotalClearCount + 3, result.TotalClearCount,
+                "the green push plus both released clears");
+            Assert.IsNull(result.WaitingKeyEffect[3]);
+            Assert.IsNull(result.WaitingKeyEffect[4]);
+            Assert.IsTrue(result.IsSolved(ctx));
+        }
+
+        [Test]
+        public void TryApplyMove_OwnerStraddlingTwoShutters_WaitsUntilBothHaveOpened()
+        {
+            // A 1x2 owner spans a green-bound and a yellow-bound shutter. Opening
+            // one leaves it under the other, so the effect keeps waiting.
+            var ctx = Ctx(
+                5, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Yellow }),
+                    Block(4, new Coord(3, 0), cells: new[] { new Coord(0, 0), new Coord(1, 0) },
+                        colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                gates: new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Green),
+                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Yellow)
+                },
+                shutters: new[]
+                {
+                    Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green),
+                    Shutter(2, new Coord(4, 0), new Coord(4, 0), 1, BlockColor.Yellow)
+                });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 0)), out var oneOpen, out _);
+            resolver.TryApplyMove(ctx, oneOpen, new Move(2, new Coord(2, 0)), out var bothOpen, out _);
+
+            Assert.IsTrue(oneOpen.ShutterOpen[0]);
+            Assert.IsFalse(oneOpen.ShutterOpen[1]);
+            Assert.AreEqual(KeyEffect.ClearOuterColor, oneOpen.WaitingKeyEffect[3], "still under the second shutter");
+            Assert.IsTrue(oneOpen.Alive[3]);
+            Assert.IsNull(bothOpen.WaitingKeyEffect[3]);
+            Assert.IsFalse(bothOpen.Alive[3]);
+        }
+
+        [Test]
+        public void TryApplyMove_KeyCompletesALockOutsideAnyShutter_AppliesAtOnceAndNothingWaits()
+        {
+            var ctx = Ctx(
+                2, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) });
+
+            Resolver().TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var result, out _);
+
+            Assert.IsFalse(result.Alive[1]);
+            foreach (var waiting in result.WaitingKeyEffect)
+            {
+                Assert.IsNull(waiting);
+            }
+        }
+
+        [Test]
+        public void TryClearBlockAndTrySweepColor_OwnerWaitingUnderAClosedShutter_CannotBeTargeted()
+        {
+            var ctx = ShutteredLockBoard(KeyEffect.ClearOuterColor, new[] { BlockColor.Blue });
+            var resolver = Resolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            var rocketed = resolver.TryClearBlock(ctx, waiting, 2, out var rocketResult, out _);
+            var swept = resolver.TrySweepColor(ctx, waiting, BlockColor.Blue, out var sweepResult, out _);
+
+            Assert.AreEqual(KeyEffect.ClearOuterColor, waiting.WaitingKeyEffect[2]);
+            Assert.IsFalse(rocketed);
+            Assert.IsNull(rocketResult);
+            Assert.IsFalse(swept);
+            Assert.IsNull(sweepResult);
         }
     }
 }

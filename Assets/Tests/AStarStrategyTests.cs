@@ -427,6 +427,94 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void EstimateRemainingMoves_ClearOuterColorWaitingForAShutter_CountsTheFreeClear()
+        {
+            // D41: after the key's push its lock has no unconsumed key left, but
+            // ClearOuterColor waits on the owner. Two colours remain and one
+            // move — the green push — clears both.
+            var ctx = ShutteredClearOuterColorLockBoard();
+            new MoveResolver().TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
+
+            Assert.AreEqual(KeyEffect.ClearOuterColor, waiting.WaitingKeyEffect[2]);
+            Assert.AreEqual(1, estimate);
+        }
+
+        [Test]
+        public void EstimateRemainingMoves_UnlockMovementWaiting_DoesNotCountALaterClearOuterColorKey()
+        {
+            // Lock 1 needs one key. The UnlockMovement key completed it under
+            // the shutter, so the ClearOuterColor key still unconsumed can no
+            // longer fire (M8): all three remaining colours cost a move each.
+            var ctx = Ctx(
+                4, 1,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
+                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green),
+                    Gate(4, BoardEdge.Bottom, 3, 1, BlockColor.Blue)
+                },
+                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green) });
+            new MoveResolver().TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
+            var remaining = new BreadthFirstStrategy().Search(ctx, waiting, Budget(MoveGenMode.Exhaustive));
+
+            Assert.AreEqual(KeyEffect.UnlockMovement, waiting.WaitingKeyEffect[3]);
+            Assert.AreEqual(3, estimate);
+            Assert.AreEqual(remaining.Solution.Count, estimate, "the estimate is exact here, not merely admissible");
+        }
+
+        [Test]
+        public void EstimateRemainingMoves_OpeningThatReleasesTwoWaitingClears_DropsByExactlyOne()
+        {
+            // The move that opens the shutter clears three colours: its own and
+            // both released owners'. Both locks leave F with it, so h drops by
+            // one — without counting waiting clears in F it would drop by three.
+            var ctx = TwoWaitingClearsUnderOneShutterBoard();
+            var resolver = new MoveResolver();
+            resolver.TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var firstKey, out _);
+            resolver.TryApplyMove(ctx, firstKey, new Move(1, new Coord(1, 0)), out var bothWaiting, out _);
+            resolver.TryApplyMove(ctx, bothWaiting, new Move(2, new Coord(2, 0)), out var solved, out _);
+
+            var before = AStarStrategy.EstimateRemainingMoves(ctx, bothWaiting);
+            var after = AStarStrategy.EstimateRemainingMoves(ctx, solved);
+
+            Assert.IsTrue(solved.IsSolved(ctx));
+            Assert.AreEqual(1, before);
+            Assert.AreEqual(0, after);
+        }
+
+        [Test]
+        public void Search_TwoWaitingClearsUnderOneShutter_ReturnsTheBreadthFirstOptimum()
+        {
+            var ctx = TwoWaitingClearsUnderOneShutterBoard();
+            var initial = BoardState.CreateInitial(ctx);
+
+            foreach (var mode in new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive })
+            {
+                var expected = new BreadthFirstStrategy().Search(ctx, initial, Budget(mode));
+                var actual = new AStarStrategy().Search(ctx, initial, Budget(mode));
+
+                Assert.AreEqual(SolveStatus.Solvable, actual.Status, $"[{mode}]");
+                Assert.AreEqual(3, expected.Solution.Count, $"[{mode}] breadth-first optimum");
+                Assert.AreEqual(expected.Solution.Count, actual.Solution.Count, $"[{mode}] A* optimum");
+            }
+        }
+
+        [Test]
         public void EstimateRemainingMoves_PendingGeneratorAndElevatorOutput_CountsEveryColour()
         {
             // No top-level blocks: every colour is still queued. Two in the

@@ -39,8 +39,11 @@ sealed class BoardState
     int TotalClearCount
     IReadOnlyList<int> ClearCountByColor
     IReadOnlyList<bool> KeyConsumed
+    IReadOnlyList<KeyEffect?> WaitingKeyEffect   // per block; added in D41
 
     static BoardState CreateInitial(LevelContext ctx)
+    static BoardState CreateInitialWithWaitingKeyEffects(LevelContext ctx,
+        IReadOnlyList<KeyEffect?> waitingKeyEffect)   // added in D41, for NextClearAbstraction
 
     BlockColor CurrentColorOf(LevelContext ctx, int blockIndex)
     bool IsFullyCleared(LevelContext ctx, int blockIndex)

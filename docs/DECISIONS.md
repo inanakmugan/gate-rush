@@ -80,6 +80,14 @@ solution: nearest-next-clear returns a playable one, and `SolveResult`
 states separately whether its length is proven shortest. BFS and A\* keep
 the guarantee above.
 
+**Later (D41).** One shutter opening can now release several waiting
+`ClearOuterColor` effects in a single move, so "at most one bonus clear per
+move" no longer holds. `F` also counts a still-locked lock with
+`ClearOuterColor` waiting, and does not count one with `UnlockMovement`
+waiting. Each free clear still belongs to a distinct lock that leaves `F` in
+the same move, so `h` still drops by at most one per move;
+`AStarStrategy`'s remarks carry the proof.
+
 ---
 
 ## D4 — Three-valued solve result

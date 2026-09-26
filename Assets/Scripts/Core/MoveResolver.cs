@@ -19,7 +19,8 @@ namespace GateRush.Core
     /// <see cref="ReevaluateConditions"/> and <see cref="ApplyKeyEffects"/> —
     /// the latter is where the loop first closes a cycle, since a key's
     /// <see cref="KeyEffect.ClearOuterColor"/> emits a fresh event the same
-    /// drain then processes. Its spawn-trigger step remains an extension point
+    /// drain then processes. A key effect whose target is under a closed
+    /// shutter waits and is released by the opening (D41). Its spawn-trigger step remains an extension point
     /// that does nothing yet — see <see cref="CheckSpawnTriggers"/> (M6/M9,
     /// phase 1.13).</para>
     ///
@@ -372,6 +373,15 @@ namespace GateRush.Core
         /// fresh event this same drain loop then processes — the one place the
         /// fixpoint loop feeds itself (<c>DECISIONS.md</c> D8).
         /// <para>
+        /// The key that completes the count decides the effect (M8). When the
+        /// lock's block is under a closed shutter at that moment, the effect
+        /// is not applied but recorded in <see cref="BoardState.WaitingKeyEffect"/>
+        /// (<c>DECISIONS.md</c> D41); <see cref="ReevaluateConditions"/> applies it
+        /// when the shutter opens. Every key whose carrier dies is consumed,
+        /// including one arriving after the count is complete — it simply
+        /// changes nothing, whether the effect was applied or is waiting.
+        /// </para>
+        /// <para>
         /// A key consumed against an owner that is already dead (destroyed by a
         /// joker before its key arrived, D11) or already unlocked applies
         /// nothing; the key-carrying block stays on the board as an ordinary
@@ -431,6 +441,15 @@ namespace GateRush.Core
 
             builder.ConsumeKey(keyIndex);
 
+            // The lock already completed while its block was under a closed
+            // shutter, and the completing key decided the effect (M8). A later
+            // key is spent — consumed above, as M8 requires of every key whose
+            // carrier dies — but changes nothing about what waits (D41).
+            if (builder.GetWaitingKeyEffect(ownerIndex).HasValue)
+            {
+                return;
+            }
+
             var requiredKeys = ctx.SpecAt(ownerIndex).RequiredKeyCount;
             var consumedKeys = 0;
             var keyIndices = ctx.KeyIndicesForLock(lockId);
@@ -462,9 +481,33 @@ namespace GateRush.Core
                 return;
             }
 
+            // Nothing reaches a block under a closed shutter, a key's effect
+            // included (D41). Hold the completing key's effect; the opening
+            // that uncovers the block applies it (ReleaseWaitingKeyEffects).
+            if (BoardState.IsInsideClosedShutter(ctx, ownerIndex, builder.GetOrigin(ownerIndex), builder.ShutterOpen))
+            {
+                builder.SetWaitingKeyEffect(ownerIndex, keyEffect);
+                return;
+            }
+
+            ApplyLockEffect(ctx, builder, ownerIndex, keyEffect);
+        }
+
+        /// <summary>
+        /// Applies a completed lock's effect to its living, still-locked block:
+        /// both effects remove the lock, and <see cref="KeyEffect.ClearOuterColor"/>
+        /// also clears the block's outer colour, whose event the drain loop
+        /// processes like any other clear (Module 07). The one path for both
+        /// timings — a lock completing on an uncovered block
+        /// (<see cref="ApplyKeyEffects"/>) and an effect released when a shutter
+        /// opens (<see cref="ReleaseWaitingKeyEffects"/>) — so the two cannot
+        /// drift apart.
+        /// </summary>
+        private void ApplyLockEffect(LevelContext ctx, SuccessorBuilder builder, int ownerIndex, KeyEffect effect)
+        {
             builder.Unlock(ownerIndex);
 
-            if (keyEffect == KeyEffect.ClearOuterColor)
+            if (effect == KeyEffect.ClearOuterColor)
             {
                 ClearOuterColor(ctx, builder, ownerIndex);
             }
@@ -482,6 +525,13 @@ namespace GateRush.Core
         /// move-triggered, and that block waits for the player's next (possibly
         /// zero-distance) move (D25). Clearing here is a plausible-looking
         /// mistake and is wrong.
+        /// </para>
+        /// <para>
+        /// The one exception is D41's: a shutter opening releases any key
+        /// effect waiting on a block it uncovers, and a released
+        /// <see cref="KeyEffect.ClearOuterColor"/> clears — see
+        /// <see cref="ReleaseWaitingKeyEffects"/>. That is a key clear
+        /// arriving late, not an exit, and it reads no gate.
         /// </para>
         /// <para>
         /// The M3 scan visits only blocks that are currently alive. A
@@ -546,6 +596,7 @@ namespace GateRush.Core
                 }
             }
 
+            var openedShutter = false;
             for (var s = 0; s < ctx.Shutters.Count; s++)
             {
                 if (builder.IsShutterOpen(s))
@@ -558,11 +609,66 @@ namespace GateRush.Core
                         totalClearCount, clearCountByColor, shutter.Threshold, shutter.RequiredColor))
                 {
                     builder.OpenShutter(s);
+                    openedShutter = true;
                     changed = true;
                 }
             }
 
+            if (openedShutter)
+            {
+                ReleaseWaitingKeyEffects(ctx, builder);
+            }
+
             return changed;
+        }
+
+        /// <summary>
+        /// D41. After a scan has opened at least one shutter, applies every key
+        /// effect waiting on a lock whose block is no longer under any closed
+        /// shutter — a block straddling two regions waits for both. Runs in the
+        /// resolution that opens the shutter, so the effect lands the moment
+        /// the block is uncovered.
+        /// <para>
+        /// This is the one place an opening can emit a <see cref="ColorClearedEvent"/>:
+        /// a released <see cref="KeyEffect.ClearOuterColor"/> is a key clear
+        /// arriving late, and its event is drained by the fixpoint loop's next
+        /// pass like any other (the scan that called this has already reported
+        /// a change). It is not an exit: nothing here reads gate geometry, so a
+        /// block resting against a gate is still never cleared for being there
+        /// (D25).
+        /// </para>
+        /// <para>
+        /// Walks <see cref="LevelContext.LockOwnerIndices"/>, not every block
+        /// slot, and only on a scan that opened a shutter — at most once per
+        /// shutter along any line of play. Ascending index order fixes the
+        /// order several releases enqueue their clears in.
+        /// </para>
+        /// </summary>
+        private void ReleaseWaitingKeyEffects(LevelContext ctx, SuccessorBuilder builder)
+        {
+            var owners = ctx.LockOwnerIndices;
+            var shutterOpen = builder.ShutterOpen;
+
+            for (var i = 0; i < owners.Count; i++)
+            {
+                var ownerIndex = owners[i];
+                var waiting = builder.GetWaitingKeyEffect(ownerIndex);
+                if (!waiting.HasValue)
+                {
+                    continue;
+                }
+
+                if (BoardState.IsInsideClosedShutter(ctx, ownerIndex, builder.GetOrigin(ownerIndex), shutterOpen))
+                {
+                    continue;
+                }
+
+                // Safe to apply: a waiting block is alive and still locked,
+                // because nothing — no move, joker or key — reaches a block
+                // under a closed shutter (M5), and it was under one until now.
+                builder.SetWaitingKeyEffect(ownerIndex, null);
+                ApplyLockEffect(ctx, builder, ownerIndex, waiting.Value);
+            }
         }
 
         /// <summary>
@@ -602,6 +708,7 @@ namespace GateRush.Core
             private bool[] unfrozen;
             private bool[] unlocked;
             private bool[] keyConsumed;
+            private KeyEffect?[] waitingKeyEffect;
             private bool[] gateOpen;
             private bool[] shutterOpen;
             private int[] clearCountByColor;
@@ -616,6 +723,7 @@ namespace GateRush.Core
                 unfrozen = null;
                 unlocked = null;
                 keyConsumed = null;
+                waitingKeyEffect = null;
                 gateOpen = null;
                 shutterOpen = null;
                 clearCountByColor = null;
@@ -647,6 +755,19 @@ namespace GateRush.Core
 
             public bool IsKeyConsumed(int index) =>
                 keyConsumed != null ? keyConsumed[index] : source.KeyConsumed[index];
+
+            /// <summary>The key effect waiting on block <paramref name="index"/>'s
+            /// lock for a shutter to open (D41), or null when none waits.</summary>
+            public KeyEffect? GetWaitingKeyEffect(int index) =>
+                waitingKeyEffect != null ? waitingKeyEffect[index] : source.WaitingKeyEffect[index];
+
+            /// <summary>The running shutter states, by position in
+            /// <see cref="LevelContext.Shutters"/>. Returns the source array by
+            /// reference until the first <see cref="OpenShutter"/> copies it —
+            /// safe for the read-only use
+            /// <c>BoardState.IsInsideClosedShutter</c>
+            /// makes of it.</summary>
+            public IReadOnlyList<bool> ShutterOpen => shutterOpen ?? source.ShutterOpen;
 
             /// <summary>
             /// The block's origin as this successor currently has it — the
@@ -690,6 +811,15 @@ namespace GateRush.Core
             public void ConsumeKey(int index) =>
                 Materialize(ref keyConsumed, source.KeyConsumed)[index] = true;
 
+            /// <summary>Records <paramref name="value"/> as the key effect
+            /// waiting on block <paramref name="index"/>'s lock (D41), or clears
+            /// it with null once the effect is released. Set only when a lock
+            /// completes under a closed shutter and cleared only when that
+            /// shutter opens — both in a resolution that drained a clear, so the
+            /// field never changes within one clear-count stratum (D6).</summary>
+            public void SetWaitingKeyEffect(int index, KeyEffect? value) =>
+                Materialize(ref waitingKeyEffect, source.WaitingKeyEffect)[index] = value;
+
             /// <summary>Opens gate <paramref name="index"/> (M2). Permanent.</summary>
             public void OpenGate(int index) =>
                 Materialize(ref gateOpen, source.GateOpen)[index] = true;
@@ -726,7 +856,8 @@ namespace GateRush.Core
                     source.ElevatorWaveActive,
                     totalClearCount,
                     clearCountByColor ?? source.ClearCountByColor,
-                    keyConsumed ?? source.KeyConsumed);
+                    keyConsumed ?? source.KeyConsumed,
+                    waitingKeyEffect ?? source.WaitingKeyEffect);
 
             private static T[] Materialize<T>(ref T[] slot, IReadOnlyList<T> original)
             {
