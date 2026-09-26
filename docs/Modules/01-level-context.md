@@ -167,6 +167,7 @@ sealed class LevelContext
     BlockSpec SpecAt(int blockIndex)    // O(1) across top-level blocks and every spawn slot
     int LockOwnerIndex(int lockId)                     // added in Module 07
     IReadOnlyList<int> KeyIndicesForLock(int lockId)   // added in Module 07
+    IReadOnlyList<int> LockOwnerIndices                // ascending; added in D41
 ```
 
 `TotalBlockCapacity`, `ShutterPositionAt`, and `SpecAt` were added in Module 02
