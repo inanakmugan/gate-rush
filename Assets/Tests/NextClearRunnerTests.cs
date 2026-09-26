@@ -87,6 +87,23 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Run_AxisBlockBoxedInAboveACrossAxisGate_BothSearchesAgreeItIsUnsolvable()
+        {
+            // End to end for D39: nearest-next-clear proves it on clear
+            // monotonicity, A* by exhaustion. If only one of them still allowed
+            // the push across the axis they would disagree and this would throw;
+            // if both did, the level would read as solvable.
+            var ctx = AxisBlockBoxedAboveCrossAxisGateBoard();
+            Assert.IsTrue(ctx.IsClearMonotone, "the proof needs a clear-monotone board");
+
+            var result = new NextClearRunner().Run(ctx, NextClear(), Canonical(), Exhaustive());
+
+            Assert.AreEqual(SolveStatus.Unsolvable, result.NextClear.Status);
+            Assert.AreEqual(UnsolvableCrossCheck.Confirmed, result.CrossCheckOutcome);
+            Assert.AreEqual(LevelSolveVerdict.Unsolvable, result.CrossCheck.Verdict);
+        }
+
+        [Test]
         public void Run_UnsolvableAndAStarRunsOutOfBudget_StandsButIsInconclusive()
         {
             var result = new NextClearRunner()

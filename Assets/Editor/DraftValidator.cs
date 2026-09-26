@@ -205,6 +205,15 @@ namespace GateRush.Editor
             }
         }
 
+        /// <summary>
+        /// Reports an axis-restricted block with no gate of some layer's colour
+        /// that it can arrive at (M7). Two kinds of edge count: the two ends of
+        /// its axis, which it can slide or push into; and an edge across its axis
+        /// that its fixed row or column touches, since a block sliding along that
+        /// edge into line with a gate there clears on arrival (D39). The second
+        /// kind needs the block's position, so it is counted only for blocks
+        /// whose position is known — see <see cref="BlockLike.Origin"/>.
+        /// </summary>
         private static void AddAxisRestrictionWarnings(
             LevelDraft draft, IReadOnlyList<BlockLike> blockLikes, List<DraftWarning> warnings)
         {
@@ -215,9 +224,7 @@ namespace GateRush.Editor
                     continue;
                 }
 
-                var reachableEdges = block.Axis == MovementAxis.HorizontalOnly
-                    ? new[] { BoardEdge.Left, BoardEdge.Right }
-                    : new[] { BoardEdge.Top, BoardEdge.Bottom };
+                var reachableEdges = ArrivableEdges(draft, block);
 
                 foreach (var color in block.ColorStack.Distinct())
                 {
@@ -231,13 +238,50 @@ namespace GateRush.Editor
                     if (!gatesOfColor.Any(g => reachableEdges.Contains(g.Edge)))
                     {
                         var ends = block.Axis == MovementAxis.HorizontalOnly ? "left or right" : "top or bottom";
+                        var line = block.Axis == MovementAxis.HorizontalOnly ? "row" : "column";
                         warnings.Add(new DraftWarning(
                             DraftWarningCategory.AxisRestrictedBlockHasNoGate,
-                            $"{block.Label} moves {block.Axis} only, but no {color} gate is on the {ends} edge, " +
-                            $"so its {color} layer can never be cleared by movement."));
+                            $"{block.Label} moves {block.Axis} only, but no {color} gate is one it can arrive at — " +
+                            $"none on the {ends} edge, nor on an edge its {line} touches — so its {color} layer " +
+                            "can never be cleared by movement."));
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// The edges an axis-restricted <paramref name="block"/> can arrive flush
+        /// against: both ends of its axis, plus each edge across its axis that
+        /// its footprint touches at <see cref="BlockLike.Origin"/>, when known.
+        /// </summary>
+        private static List<BoardEdge> ArrivableEdges(LevelDraft draft, BlockLike block)
+        {
+            var isHorizontal = block.Axis == MovementAxis.HorizontalOnly;
+            var edges = isHorizontal
+                ? new List<BoardEdge> { BoardEdge.Left, BoardEdge.Right }
+                : new List<BoardEdge> { BoardEdge.Top, BoardEdge.Bottom };
+
+            if (!block.Origin.HasValue || block.Cells.Count == 0)
+            {
+                return edges;
+            }
+
+            var origin = block.Origin.Value;
+            var min = isHorizontal ? block.Cells.Min(c => c.Y + origin.Y) : block.Cells.Min(c => c.X + origin.X);
+            var max = isHorizontal ? block.Cells.Max(c => c.Y + origin.Y) : block.Cells.Max(c => c.X + origin.X);
+            var last = (isHorizontal ? draft.Height : draft.Width) - 1;
+
+            if (min == 0)
+            {
+                edges.Add(isHorizontal ? BoardEdge.Bottom : BoardEdge.Left);
+            }
+
+            if (max == last)
+            {
+                edges.Add(isHorizontal ? BoardEdge.Top : BoardEdge.Right);
+            }
+
+            return edges;
         }
 
         // -- Thresholds vs available clears --------------------------
@@ -535,8 +579,7 @@ namespace GateRush.Editor
             var hasReadyClear = false;
             for (var i = 0; i < ctx.TotalBlockCapacity; i++)
             {
-                if (initial.Alive[i]
-                    && BlockReachability.IsAtCompatibleExitGate(ctx, initial, i, initial.Origins[i]))
+                if (BlockReachability.CanClearInPlace(ctx, initial, i))
                 {
                     hasReadyClear = true;
                     break;
@@ -564,6 +607,18 @@ namespace GateRush.Editor
             public int RequiredKeyCount { get; }
             public int? KeyTargetLockId { get; }
 
+            /// <summary>
+            /// The absolute grid origin <see cref="Cells"/> are relative to, when
+            /// the draft fixes it: a block's start origin, or a placed elevator
+            /// wave block's region origin offset by the region's minimum corner.
+            /// Null for an unplaced wave block and for every generator queue
+            /// entry — where a generator's block lands is Core's spawn placement,
+            /// which does not exist until phase 1.13, and deriving it here first
+            /// would put one rule in two places (D28, D31). TODO(1.13): once Core
+            /// owns generator spawn placement, fill this in from it.
+            /// </summary>
+            public Coord? Origin { get; }
+
             public BlockLike(
                 string label,
                 IReadOnlyList<Coord> cells,
@@ -572,7 +627,8 @@ namespace GateRush.Editor
                 int? unfreezeAtClearCount,
                 int? lockId,
                 int requiredKeyCount,
-                int? keyTargetLockId)
+                int? keyTargetLockId,
+                Coord? origin)
             {
                 Label = label;
                 Cells = cells;
@@ -582,6 +638,7 @@ namespace GateRush.Editor
                 LockId = lockId;
                 RequiredKeyCount = requiredKeyCount;
                 KeyTargetLockId = keyTargetLockId;
+                Origin = origin;
             }
         }
 
@@ -591,7 +648,7 @@ namespace GateRush.Editor
             {
                 yield return new BlockLike(
                     $"Block {b.Id}", b.Cells, b.ColorStack, b.Axis, b.UnfreezeAtClearCount,
-                    b.LockId, b.RequiredKeyCount, b.KeyTargetLockId);
+                    b.LockId, b.RequiredKeyCount, b.KeyTargetLockId, b.StartOrigin);
             }
 
             foreach (var g in draft.Generators)
@@ -601,7 +658,8 @@ namespace GateRush.Editor
                     var s = g.Queue[i];
                     yield return new BlockLike(
                         $"Generator {g.Id} queue entry {i}", s.Cells, s.ColorStack, s.Axis,
-                        s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
+                        s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId,
+                        origin: null);
                 }
             }
 
@@ -615,7 +673,8 @@ namespace GateRush.Editor
                         var s = wave.Blocks[i];
                         yield return new BlockLike(
                             $"Elevator {e.Id} wave {w} block {i}", s.Cells, s.ColorStack, s.Axis,
-                            s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId);
+                            s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId,
+                            s.RegionOrigin.HasValue ? e.Min + s.RegionOrigin.Value : (Coord?)null);
                     }
                 }
             }

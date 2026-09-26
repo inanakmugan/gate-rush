@@ -15,7 +15,9 @@ namespace GateRush.Tests
     /// Covers <see cref="ValidationPipeline"/>: the quick exhaustive attempt
     /// answers easy levels with a proof, anything it cannot settle falls through
     /// to nearest-next-clear and its cross-check, stages are announced in order,
-    /// a solver disagreement propagates rather than becoming a verdict, and
+    /// a solver disagreement or a rejected generated move propagates rather
+    /// than becoming a verdict, a level with generators or elevators is declined
+    /// before any search with a reason rather than a verdict, and
     /// cancellation — before the run or in the middle of a search — ends it
     /// with <see cref="OperationCanceledException"/>.
     /// </summary>
@@ -59,9 +61,33 @@ namespace GateRush.Tests
         private static LevelContext NoGateForItsColour() =>
             Ctx(3, 3, new[] { Block(1, new Coord(1, 1)) }, new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Blue) });
 
-        private static ValidationResult Run(
+        private static ValidationOutcome Outcome(
             LevelContext ctx, SearchBudget quick, List<ValidationStage> stages = null, ValidationPipeline pipeline = null) =>
             (pipeline ?? new ValidationPipeline()).Run(ctx, quick, Normal(), Canonical(), Normal(), stages == null ? (Action<ValidationStage>)null : stages.Add);
+
+        /// <summary>
+        /// The result of a run on a level every search can judge. Asserts the
+        /// run did not decline the level, so no test here reads a missing verdict.
+        /// </summary>
+        private static ValidationResult Run(
+            LevelContext ctx, SearchBudget quick, List<ValidationStage> stages = null, ValidationPipeline pipeline = null)
+        {
+            var outcome = Outcome(ctx, quick, stages, pipeline);
+            Assert.IsNull(outcome.NotValidatableReason, "a level without generators or elevators must get a verdict");
+            return outcome.Result;
+        }
+
+        /// <summary>A quick-stage factory that records whether any search was ever started.</summary>
+        private sealed class SearchSpy
+        {
+            public bool Searched { get; private set; }
+
+            public ISearchStrategy Create()
+            {
+                Searched = true;
+                return new AStarStrategy();
+            }
+        }
 
         // ----- Which stage answers --------------------------------------------
 
@@ -134,6 +160,55 @@ namespace GateRush.Tests
 
             Assert.Throws<SolverDisagreementException>(
                 () => Run(StepAsideBeforeFirstClearBoard(), Quick(maxExplored: 1), pipeline: pipeline));
+        }
+
+        [Test]
+        public void Run_SearchGeneratesAMoveTheResolverRejects_Propagates()
+        {
+            var pipeline = new ValidationPipeline(quickFactory: () => new AStarStrategy(() => new IllegalMoveGenerator()));
+
+            Assert.Throws<InvalidOperationException>(
+                () => Run(StepAsideBeforeFirstClearBoard(), Quick(), pipeline: pipeline));
+        }
+
+        // ----- Levels no search can judge yet -----------------------------------
+
+        [Test]
+        public void Run_LevelWithAGenerator_IsNotValidatableAndRunsNoSearch()
+        {
+            var spy = new SearchSpy();
+            var stages = new List<ValidationStage>();
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(1, 1)) },
+                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
+                generators: new[] { Spawner(1, BoardEdge.Top, 0, 1, Spawned()) });
+
+            var outcome = Outcome(ctx, Quick(), stages, new ValidationPipeline(quickFactory: spy.Create));
+
+            Assert.IsNull(outcome.Result);
+            Assert.AreEqual(ValidationPipeline.SpawnersNotYetSupportedReason, outcome.NotValidatableReason);
+            Assert.IsFalse(spy.Searched);
+            CollectionAssert.IsEmpty(stages);
+        }
+
+        [Test]
+        public void Run_LevelWithAnElevator_IsNotValidatableAndRunsNoSearch()
+        {
+            var spy = new SearchSpy();
+            var stages = new List<ValidationStage>();
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(1, 1)) },
+                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
+                elevators: new[] { Elevator(1, new Coord(2, 2), new Coord(2, 2), new[] { Spawned(regionOrigin: new Coord(0, 0)) }) });
+
+            var outcome = Outcome(ctx, Quick(), stages, new ValidationPipeline(quickFactory: spy.Create));
+
+            Assert.IsNull(outcome.Result);
+            Assert.AreEqual(ValidationPipeline.SpawnersNotYetSupportedReason, outcome.NotValidatableReason);
+            Assert.IsFalse(spy.Searched);
+            CollectionAssert.IsEmpty(stages);
         }
 
         [Test]

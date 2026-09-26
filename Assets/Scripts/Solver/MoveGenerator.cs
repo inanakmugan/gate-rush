@@ -21,8 +21,8 @@ namespace GateRush.Solver
     /// inside are overwritten per scan.</para>
     ///
     /// <para><b>Enumeration order</b> (both modes): ascending block index; within
-    /// a block, the zero-distance move first (when the block is already flush
-    /// against a compatible open gate), then reachable positions in the
+    /// a block, the zero-distance move first (when the block can be cleared in
+    /// place — <see cref="BlockReachability.CanClearInPlace"/>), then reachable positions in the
     /// breadth-first order <see cref="BlockReachability.ReachableOrigins"/>
     /// produces — ascending path length, ties broken by <see cref="Direction"/>
     /// enum order. Only blocks for which <see cref="BoardState.CanMove"/> is true
@@ -35,8 +35,14 @@ namespace GateRush.Solver
     /// <see cref="BlockReachability"/> instance. A fresh result list per call is
     /// deliberate: the search (Module 05) may hold or partially drain the
     /// returned sequence, and a reused list would change under it.</para>
+    ///
+    /// <para><b>Not sealed.</b> <see cref="Generate"/> is virtual so tests can
+    /// substitute a generator that emits a move the resolver rejects, proving
+    /// every strategy throws rather than skips it (<c>RejectedMove</c>).
+    /// Production code never subclasses this type — the same arrangement as
+    /// <see cref="MoveResolver"/>.</para>
     /// </remarks>
-    public sealed class MoveGenerator
+    public class MoveGenerator
     {
         private readonly BlockReachability reachability = new BlockReachability();
 
@@ -45,7 +51,7 @@ namespace GateRush.Solver
         /// <paramref name="mode"/>. See the type remarks for order and mode
         /// semantics.
         /// </summary>
-        public IEnumerable<Move> Generate(LevelContext ctx, BoardState state, MoveGenMode mode)
+        public virtual IEnumerable<Move> Generate(LevelContext ctx, BoardState state, MoveGenMode mode)
         {
             if (ctx == null)
             {
@@ -78,9 +84,9 @@ namespace GateRush.Solver
             var origin = state.Origins[blockIndex];
 
             // Zero-distance move: the deliberate push that clears a block already
-            // flush against a compatible open gate (D25). Emitted first for the
-            // block, in both modes.
-            if (BlockReachability.IsAtCompatibleExitGate(ctx, state, blockIndex, origin))
+            // flush against a compatible open gate (D25), toward an edge its axis
+            // lets it push (D39). Emitted first for the block, in both modes.
+            if (BlockReachability.CanClearInPlace(ctx, state, blockIndex))
             {
                 result.Add(new Move(blockIndex, origin));
             }

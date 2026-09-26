@@ -32,8 +32,10 @@ namespace GateRush.Editor
     /// <para><b>One run at a time.</b> While a run is in progress the Validate
     /// button becomes Cancel. Editing, loading or starting a new level cancels
     /// the run, because its answer would describe a draft that no longer exists.
-    /// Closing the window, entering Play Mode or recompiling scripts cancels it
-    /// too (<see cref="OnDisable"/>); every search checks the cancellation token
+    /// Closing the window or recompiling scripts cancels it too
+    /// (<see cref="OnDisable"/>), and so does entering Play Mode
+    /// (<see cref="OnPlayModeStateChanged"/> — with domain reload disabled,
+    /// <see cref="OnDisable"/> does not run then); every search checks the cancellation token
     /// before each expansion, so the worker stops within one expansion.</para>
     /// </remarks>
     public sealed class LevelEditorWindow : EditorWindow
@@ -133,7 +135,7 @@ namespace GateRush.Editor
         private ValidationResult solve;
 
         // -- Validate on a worker thread --
-        private Task<ValidationResult> validation;
+        private Task<ValidationOutcome> validation;
         private CancellationTokenSource validationCancellation;
         private double validationStartedAt;
         private double lastValidationRepaint;
@@ -146,6 +148,13 @@ namespace GateRush.Editor
 
         /// <summary>The last run's failure — a solver bug, never a verdict — shown as an error until the next run.</summary>
         private string validationError;
+
+        /// <summary>
+        /// Why the last run gave no verdict at all — the level is not one the
+        /// pipeline can validate yet. Neither a verdict nor a solver bug, so it
+        /// is kept apart from <see cref="validationError"/> and shown as a warning.
+        /// </summary>
+        private string validationNotice;
 
         private Dictionary<Type, Action<object>> inspectors;
         private Vector2 windowScroll;
@@ -184,19 +193,51 @@ namespace GateRush.Editor
                 EditorApplication.update += PollValidation;
             }
 
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+
             Revalidate();
         }
 
         /// <summary>
         /// Stops a running Validate. Called when the window closes and before
-        /// every domain reload — entering Play Mode, recompiling — so no worker
-        /// is left searching a level nobody can see, and the reload is not held
-        /// up by one.
+        /// every domain reload — a script recompile, say — so no worker is left
+        /// searching a level nobody can see, and the reload is not held up by
+        /// one. Entering Play Mode is not among them: the project enters it
+        /// without a domain reload, so this does not run then; see
+        /// <see cref="OnPlayModeStateChanged"/>.
         /// </summary>
         private void OnDisable()
         {
             CancelValidation("the Level Editor was closed or reloaded");
             EditorApplication.update -= PollValidation;
+            EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+        }
+
+        /// <summary>
+        /// Releases a run still in flight when the window closes. <see cref="OnDisable"/>
+        /// has already cancelled it and stopped polling, so nothing will collect
+        /// it; the worker still sees the cancellation after the source is
+        /// disposed, and stops at its next expansion.
+        /// </summary>
+        private void OnDestroy()
+        {
+            CancelValidation("the Level Editor was closed");
+            ReleaseValidation();
+        }
+
+        /// <summary>
+        /// Cancels a running Validate as Play Mode is entered (D38). Enter Play
+        /// Mode Options are on with domain reload disabled
+        /// (<c>ProjectSettings/EditorSettings.asset</c>), so <see cref="OnDisable"/>
+        /// does not run on entering Play Mode and cannot be relied on for this.
+        /// </summary>
+        private void OnPlayModeStateChanged(PlayModeStateChange change)
+        {
+            if (change == PlayModeStateChange.ExitingEditMode)
+            {
+                CancelValidation("Play Mode was entered");
+            }
         }
 
         // -- the frame -----------------------------------------------
@@ -2365,6 +2406,11 @@ namespace GateRush.Editor
                 EditorGUILayout.HelpBox(validationError, MessageType.Error);
             }
 
+            if (validationNotice != null)
+            {
+                EditorGUILayout.HelpBox(validationNotice, MessageType.Warning);
+            }
+
             EditorGUILayout.BeginHorizontal();
             GUILayout.Label(IsValidating ? ValidationProgress() : SolveSummary(), EditorStyles.miniLabel);
             GUILayout.FlexibleSpace();
@@ -2389,9 +2435,12 @@ namespace GateRush.Editor
         {
             if (solve == null)
             {
-                return validationCancelledReason != null
-                    ? $"Solver: cancelled — {validationCancelledReason}"
-                    : "Solver: not run";
+                if (validationCancelledReason != null)
+                {
+                    return $"Solver: cancelled — {validationCancelledReason}";
+                }
+
+                return validationNotice != null ? "Solver: not run — see above" : "Solver: not run";
             }
 
             var answering = solve.Answering;
@@ -2486,6 +2535,7 @@ namespace GateRush.Editor
 
             solve = null;
             validationError = null;
+            validationNotice = null;
             validationCancelledReason = null;
             Revalidate();
 
@@ -2549,13 +2599,24 @@ namespace GateRush.Editor
 
             var finished = validation;
             var wasCancelled = validationCancellation.IsCancellationRequested;
-            validation = null;
-            validationCancellation.Dispose();
-            validationCancellation = null;
+            ReleaseValidation();
             EditorApplication.update -= PollValidation;
 
             FinishValidation(finished, wasCancelled);
             Repaint();
+        }
+
+        /// <summary>
+        /// Forgets the run and disposes its cancellation source — when a run is
+        /// collected, and when the window closes with one still in flight. Only
+        /// call it once the run has been cancelled or has finished: a disposed
+        /// source can no longer be cancelled.
+        /// </summary>
+        private void ReleaseValidation()
+        {
+            validation = null;
+            validationCancellation?.Dispose();
+            validationCancellation = null;
         }
 
         /// <summary>
@@ -2564,7 +2625,7 @@ namespace GateRush.Editor
         /// was asked to stop has its answer discarded even if it finished first:
         /// it describes a draft that has since changed.
         /// </summary>
-        private void FinishValidation(Task<ValidationResult> finished, bool wasCancelled)
+        private void FinishValidation(Task<ValidationOutcome> finished, bool wasCancelled)
         {
             var failure = finished.IsFaulted ? finished.Exception?.GetBaseException() : null;
 
@@ -2591,7 +2652,10 @@ namespace GateRush.Editor
                 return;
             }
 
-            solve = finished.Result;
+            // Exactly one of these is non-null: a verdict, or why there is none.
+            var outcome = finished.Result;
+            solve = outcome.Result;
+            validationNotice = outcome.NotValidatableReason;
             validationCancelledReason = null;
             Revalidate();
         }
@@ -2604,6 +2668,7 @@ namespace GateRush.Editor
         {
             solve = null;
             validationError = null;
+            validationNotice = null;
             validationCancelledReason = null;
             CancelValidation("the level changed while it was running");
         }

@@ -138,8 +138,7 @@ namespace GateRush.Editor
 
                 for (var i = 0; i < ctx.TotalBlockCapacity; i++)
                 {
-                    if (initial.Alive[i]
-                        && BlockReachability.IsAtCompatibleExitGate(ctx, initial, i, initial.Origins[i]))
+                    if (BlockReachability.CanClearInPlace(ctx, initial, i))
                     {
                         metrics.HasReadyOpeningMove = true;
                         break;

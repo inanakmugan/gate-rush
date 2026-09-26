@@ -784,6 +784,8 @@ DTO and the draft, not in `Core`. `formatVersion` goes to 3; version 2 is
 refused. No level has been authored, so no migration path is needed, as with
 1 → 2.
 
+---
+
 ## D35 — Symmetric blocks collapse for search identity
 
 **Decision.** `BoardState`'s hash and equality — used only by a search's
@@ -980,3 +982,62 @@ fewest-moves over fewest-blockers, to shrink the gap to true optimum, at
 some cost in speed. Validate's job is existence, not optimality (D36,
 D37); worth revisiting if shorter answers turn out to matter more in
 practice.
+
+---
+
+## D39 — An axis-restricted block cannot be pushed across its axis
+
+**Decision.** A zero-distance move is a push toward the gate, so it is
+legal only in a direction the block's `MovementAxis` permits: a
+`HorizontalOnly` block can be pushed in place only into a gate on the left
+or right edge, a `VerticalOnly` block only into one on the top or bottom
+edge. A move that *arrives* flush and aligned with a compatible gate still
+clears whatever edge the gate is on (D25).
+
+**Why.** Observation of the reference game. A block that cannot move
+vertically cannot be pushed down into a gate either; the push is a movement
+like any other. Arriving is different: the clear is a property of where the
+move ends, not of the direction it took.
+
+**Consequence.** Of D25's four cases where a block waits flush against a
+usable gate, an axis-restricted block facing a gate across its axis cannot
+be cleared in place: it must slide away and come back, and if it has no
+room to, it is stuck. `BlockReachability` owns the rule, so `MoveResolver`
+and `MoveGenerator` cannot disagree (D31). A push in place also needs the
+block to be movable at all (`BoardState.CanMove`): a frozen, locked or
+shuttered block flush against its gate is not a ready opening move.
+
+**Rejected.** Ignoring the axis for zero-distance moves — the behaviour
+before this decision, never intended. It let the solver clear a block with
+a push the player cannot make.
+
+---
+## D40 — Validate refuses levels it cannot judge; a rejected move is a bug
+
+**Decision.** Two additions to D38's "errors are never verdicts". A level
+with a generator or an elevator gets no verdict until phase 1.13:
+`ValidationPipeline.Run` returns a `ValidationOutcome` carrying a reason
+instead of a `ValidationResult`, before any search runs, and the editor
+shows it as a warning. And every search strategy throws when
+`MoveResolver` rejects a move `MoveGenerator` emitted, instead of
+skipping it.
+
+**Why.** Without spawning, `IsSolved` can never become true on such a
+level, so an exhaustive search reports `Unsolvable` and the pipeline
+presented it as proof. A skipped move shrinks the move set silently and
+can do the same; the A\* cross-check (D37) cannot catch it, because it
+shares the generator and the resolver.
+
+**Mechanism.** `ValidationOutcome` holds exactly one of a
+`ValidationResult` or a reason.
+
+**Rejected.** A "no verdict" flag on `ValidationResult`. It would still
+expose a `Verdict`, and its default, `Solvable`, is the worst value to
+read by mistake. Also rejected: running spawner levels and labelling the
+answer unreliable — a label is easy to miss, and an answer known to mean
+nothing should not be computed.
+
+**Temporary.** The spawner guard goes when phase 1.13 lands; the
+rejected-move throw stays.
+
+---

@@ -378,5 +378,38 @@ namespace GateRush.Tests
                     Gate(3, BoardEdge.Right, 0, 1, BlockColor.Green)
                 });
         }
+
+        /// <summary>
+        /// A 4x2 board: one horizontal-only red block at (1, 0), flush above the
+        /// red bottom gate at offset 1, with a static wall at (3, 0). Optimum 2:
+        /// the block cannot be pushed down into the gate in place (D39), so it
+        /// slides away and back, and arriving clears it. The wall makes (2, 0) a
+        /// resting position, so canonical pruning keeps the slide away and both
+        /// modes agree on the optimum.
+        /// </summary>
+        internal static LevelContext AxisBlockReturnsToCrossAxisGateBoard()
+        {
+            return Ctx(
+                4, 2,
+                new[] { Block(1, new Coord(1, 0), axis: MovementAxis.HorizontalOnly) },
+                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
+                staticWalls: new[] { new Coord(3, 0) });
+        }
+
+        /// <summary>
+        /// A 3x2 board: one horizontal-only red block at (1, 0), flush above its
+        /// only gate — red, on the bottom edge — and boxed in horizontally by
+        /// static walls at (0, 0) and (2, 0). Unsolvable: the push down is across
+        /// its axis (D39), and it has no room to slide away and arrive back.
+        /// Clear-monotone, so nearest-next-clear may prove it.
+        /// </summary>
+        internal static LevelContext AxisBlockBoxedAboveCrossAxisGateBoard()
+        {
+            return Ctx(
+                3, 2,
+                new[] { Block(1, new Coord(1, 0), axis: MovementAxis.HorizontalOnly) },
+                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
+                staticWalls: new[] { new Coord(0, 0), new Coord(2, 0) });
+        }
     }
 }

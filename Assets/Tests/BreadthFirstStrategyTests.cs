@@ -34,6 +34,19 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Search_GeneratedMoveTheResolverRejects_ThrowsNamingTheMove()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)) }, new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => new BreadthFirstStrategy(stratifyVisitedSet: true, generatorFactory: () => new IllegalMoveGenerator())
+                    .Search(ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive)));
+
+            StringAssert.Contains("block 0", error.Message);
+            StringAssert.Contains(IllegalMoveGenerator.Target.ToString(), error.Message);
+        }
+
+        [Test]
         public void Search_FullyPackedBoardWithPreAlignedBlocks_SolvesStartingFromAZeroDistanceMove()
         {
             var ctx = PackedFourColourBoard();

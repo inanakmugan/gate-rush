@@ -106,11 +106,31 @@ namespace GateRush.Solver
     /// </remarks>
     public sealed class AStarStrategy : ISearchStrategy
     {
+        private readonly Func<MoveGenerator> generatorFactory;
+
+        /// <summary>Creates a search that builds its own <see cref="MoveGenerator"/> per call.</summary>
+        public AStarStrategy()
+            : this(() => new MoveGenerator())
+        {
+        }
+
+        /// <summary>
+        /// Test seam: <paramref name="generatorFactory"/> supplies the generator
+        /// each <see cref="Search"/> call uses, so a test can feed the search a
+        /// move the resolver rejects.
+        /// </summary>
+        internal AStarStrategy(Func<MoveGenerator> generatorFactory)
+        {
+            this.generatorFactory = generatorFactory;
+        }
+
         /// <inheritdoc />
         /// <exception cref="InvalidOperationException">
         /// A strictly shorter path reached a state that was already expanded —
         /// the heuristic has stopped being consistent. Indicates a rule change
         /// the heuristic has not caught up with, not a property of the level.
+        /// Also thrown when the resolver rejects a move the generator emitted —
+        /// a solver bug, never a property of the level.
         /// </exception>
         public SolveResult Search(LevelContext ctx, BoardState initial, SearchBudget budget)
         {
@@ -140,7 +160,7 @@ namespace GateRush.Solver
                     peakRetainedStateCount: 0, elapsedMs: stopwatch.ElapsedMilliseconds);
             }
 
-            var generator = new MoveGenerator();
+            var generator = generatorFactory();
             var resolver = new MoveResolver();
 
             var nodesByState = new Dictionary<BoardState, Node>();
@@ -205,9 +225,7 @@ namespace GateRush.Solver
                     // solver discards them.
                     if (!resolver.TryApplyMove(ctx, node.State, move, out var successor, out _))
                     {
-                        // Unreachable while the generator's move sets stay subsets
-                        // of what the resolver accepts; see BreadthFirstStrategy.
-                        continue;
+                        throw RejectedMove.Error(ctx, move);
                     }
 
                     int h;

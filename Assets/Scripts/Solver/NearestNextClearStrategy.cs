@@ -73,12 +73,31 @@ namespace GateRush.Solver
     /// </remarks>
     public sealed class NearestNextClearStrategy : ISearchStrategy
     {
+        private readonly Func<MoveGenerator> generatorFactory;
+
+        /// <summary>Creates a search that builds its own <see cref="MoveGenerator"/> per call.</summary>
+        public NearestNextClearStrategy()
+            : this(() => new MoveGenerator())
+        {
+        }
+
+        /// <summary>
+        /// Test seam: <paramref name="generatorFactory"/> supplies the generator
+        /// each <see cref="Search"/> call uses, so a test can feed the search a
+        /// move the resolver rejects.
+        /// </summary>
+        internal NearestNextClearStrategy(Func<MoveGenerator> generatorFactory)
+        {
+            this.generatorFactory = generatorFactory;
+        }
+
         /// <inheritdoc />
         /// <exception cref="ArgumentException"><paramref name="budget"/> is not exhaustive.</exception>
         /// <exception cref="InvalidOperationException">
         /// A route found on the smaller copy did not replay on the real board —
-        /// a bug in <see cref="NextClearAbstraction"/>, never a property of the
-        /// level.
+        /// a bug in <see cref="NextClearAbstraction"/> — or the resolver rejected
+        /// a move the generator emitted. Either is a solver bug, never a property
+        /// of the level.
         /// </exception>
         public SolveResult Search(LevelContext ctx, BoardState initial, SearchBudget budget)
         {
@@ -105,7 +124,7 @@ namespace GateRush.Solver
                     nameof(budget));
             }
 
-            var run = new Run(ctx, budget);
+            var run = new Run(ctx, budget, generatorFactory());
             var solution = new List<Move>();
             var state = initial;
 
@@ -149,17 +168,18 @@ namespace GateRush.Solver
             private readonly LevelContext ctx;
             private readonly SearchBudget budget;
             private readonly Stopwatch stopwatch = Stopwatch.StartNew();
-            private readonly MoveGenerator generator = new MoveGenerator();
+            private readonly MoveGenerator generator;
             private readonly MoveResolver resolver = new MoveResolver();
 
             private int explored;
             private int peakFrontier;
             private int peakRetained;
 
-            public Run(LevelContext ctx, SearchBudget budget)
+            public Run(LevelContext ctx, SearchBudget budget, MoveGenerator generator)
             {
                 this.ctx = ctx;
                 this.budget = budget;
+                this.generator = generator;
             }
 
             /// <summary>
@@ -214,7 +234,7 @@ namespace GateRush.Solver
                     {
                         if (!resolver.TryApplyMove(searchCtx, entry.State, move, out var next, out _))
                         {
-                            continue;
+                            throw RejectedMove.Error(searchCtx, move);
                         }
 
                         if (next.TotalClearCount > root.TotalClearCount)

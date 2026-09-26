@@ -93,6 +93,41 @@ namespace GateRush.Editor
     }
 
     /// <summary>
+    /// What <see cref="ValidationPipeline.Run"/> returns: either a
+    /// <see cref="ValidationResult"/>, or the reason the level could not be
+    /// validated at all. Exactly one of <see cref="Result"/> and
+    /// <see cref="NotValidatableReason"/> is non-null.
+    /// </summary>
+    /// <remarks>
+    /// A separate wrapper, not a flag on <see cref="ValidationResult"/>, so that
+    /// "no verdict" can never be read as a verdict: a flagged result would
+    /// still expose a <see cref="ValidationResult.Verdict"/>, and its default,
+    /// <see cref="LevelSolveVerdict.Solvable"/>, is the worst possible thing to
+    /// read by mistake. Here the verdict is reachable only through a
+    /// <see cref="Result"/> that is null.
+    /// </remarks>
+    public sealed class ValidationOutcome
+    {
+        private ValidationOutcome(ValidationResult result, string notValidatableReason)
+        {
+            Result = result;
+            NotValidatableReason = notValidatableReason;
+        }
+
+        /// <summary>The pipeline's answer; null when the level could not be validated.</summary>
+        public ValidationResult Result { get; }
+
+        /// <summary>Why no search ran; null when <see cref="Result"/> is present. Not an error — the level may be fine.</summary>
+        public string NotValidatableReason { get; }
+
+        internal static ValidationOutcome Of(ValidationResult result) =>
+            new ValidationOutcome(result ?? throw new ArgumentNullException(nameof(result)), null);
+
+        internal static ValidationOutcome NotValidatable(string reason) =>
+            new ValidationOutcome(null, reason ?? throw new ArgumentNullException(nameof(reason)));
+    }
+
+    /// <summary>
     /// The Level Editor's single Validate: a quick optimal attempt, then
     /// nearest-next-clear with its A\* cross-check. Synchronous and free of Unity
     /// APIs, so the editor can run it on a worker thread; everything it reads is
@@ -110,6 +145,10 @@ namespace GateRush.Editor
     /// <para><b>Errors are not results.</b> A
     /// <see cref="SolverDisagreementException"/>, or any exception a search
     /// throws on a bug, propagates to the caller unchanged.</para>
+    /// <para><b>Not yet every level.</b> A level with a generator or an
+    /// elevator gets <see cref="ValidationOutcome.NotValidatableReason"/>
+    /// before any search runs — neither a verdict nor an error — until spawning
+    /// lands in phase 1.13 (<see cref="SpawnersNotYetSupportedReason"/>).</para>
     /// </remarks>
     public sealed class ValidationPipeline
     {
@@ -122,6 +161,23 @@ namespace GateRush.Editor
             this.nextClearRunner = nextClearRunner ?? new NextClearRunner();
         }
 
+        /// <summary>
+        /// Why no level with a generator or an elevator can be validated yet.
+        /// Spawning does not exist until phase 1.13, so on such a level
+        /// <see cref="BoardState.IsSolved"/> can never become true and every
+        /// search would report <see cref="SolveStatus.Unsolvable"/> as if proven.
+        /// </summary>
+        public const string SpawnersNotYetSupportedReason =
+            "Levels with generators or elevators cannot be validated until spawning is implemented " +
+            "(phase 1.13). Until then every search would report such a level unsolvable, which proves nothing.";
+
+        /// <summary>
+        /// Validates <paramref name="ctx"/>: a verdict in
+        /// <see cref="ValidationOutcome.Result"/>, or — for a level no search
+        /// can judge yet — the reason in
+        /// <see cref="ValidationOutcome.NotValidatableReason"/>, with no search
+        /// run and no stage announced.
+        /// </summary>
         /// <param name="quickBudget">Must be exhaustive: only then is a quick answer a proof.</param>
         /// <param name="nextClearBudget">Nearest-next-clear's own budget; exhaustive.</param>
         /// <param name="canonicalBudget">The cross-check's first stage.</param>
@@ -133,7 +189,7 @@ namespace GateRush.Editor
         /// <exception cref="ArgumentException"><paramref name="quickBudget"/> is not exhaustive.</exception>
         /// <exception cref="OperationCanceledException"><paramref name="cancellation"/> was cancelled.</exception>
         /// <exception cref="SolverDisagreementException">See <see cref="NextClearRunner"/>.</exception>
-        public ValidationResult Run(
+        public ValidationOutcome Run(
             LevelContext ctx,
             SearchBudget quickBudget,
             SearchBudget nextClearBudget,
@@ -174,11 +230,19 @@ namespace GateRush.Editor
             }
 
             cancellation.ThrowIfCancellationRequested();
+
+            // TODO(1.13): remove once MoveResolver.CheckSpawnTriggers spawns
+            // generator output and elevator waves.
+            if (ctx.Generators.Count > 0 || ctx.Elevators.Count > 0)
+            {
+                return ValidationOutcome.NotValidatable(SpawnersNotYetSupportedReason);
+            }
+
             stageStarting?.Invoke(ValidationStage.QuickOptimal);
             var quick = quickFactory().Search(ctx, BoardState.CreateInitial(ctx), quickBudget.WithCancellation(cancellation));
             if (quick.Status != SolveStatus.Indeterminate)
             {
-                return new ValidationResult(ValidationStage.QuickOptimal, quick, nextClear: null);
+                return ValidationOutcome.Of(new ValidationResult(ValidationStage.QuickOptimal, quick, nextClear: null));
             }
 
             cancellation.ThrowIfCancellationRequested();
@@ -194,7 +258,7 @@ namespace GateRush.Editor
                     stageStarting?.Invoke(ValidationStage.CrossCheck);
                 });
 
-            return new ValidationResult(ValidationStage.NearestNextClear, quick, nextClear);
+            return ValidationOutcome.Of(new ValidationResult(ValidationStage.NearestNextClear, quick, nextClear));
         }
     }
 }

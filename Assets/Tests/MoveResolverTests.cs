@@ -325,6 +325,86 @@ namespace GateRush.Tests
             Assert.IsNull(result);
         }
 
+        // ----- Zero-distance pushes respect the axis (D39) -----------------
+
+        [Test]
+        public void TryApplyMove_ZeroDistanceHorizontalBlockIntoABottomGate_Fails()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(1, 0), axis: MovementAxis.HorizontalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result, out _);
+
+            Assert.IsFalse(moved);
+            Assert.IsNull(result);
+        }
+
+        [Test]
+        public void TryApplyMove_HorizontalBlockSlidingAlongTheBottomRowIntoABottomGate_ClearsTheBlock()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(0, 0), axis: MovementAxis.HorizontalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 0)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(result.Alive[0]);
+            Assert.AreEqual(1, result.TotalClearCount);
+        }
+
+        [Test]
+        public void TryApplyMove_ZeroDistanceHorizontalBlockIntoARightGate_ClearsTheBlock()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(2, 1), axis: MovementAxis.HorizontalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Right, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(2, 1)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(result.Alive[0]);
+            Assert.AreEqual(1, result.TotalClearCount);
+        }
+
+        [Test]
+        public void TryApplyMove_ZeroDistanceVerticalBlockIntoALeftGate_Fails()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(0, 1), axis: MovementAxis.VerticalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Left, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(0, 1)), out var result, out _);
+
+            Assert.IsFalse(moved);
+            Assert.IsNull(result);
+        }
+
+        [Test]
+        public void TryApplyMove_ZeroDistanceVerticalBlockIntoATopGate_ClearsTheBlock()
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(1, 2), axis: MovementAxis.VerticalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Top, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moved = Resolver().TryApplyMove(ctx, state, new Move(0, new Coord(1, 2)), out var result, out _);
+
+            Assert.IsTrue(moved);
+            Assert.IsFalse(result.Alive[0]);
+            Assert.AreEqual(1, result.TotalClearCount);
+        }
+
         [Test]
         public void TryApplyMove_SlidingPastACompatibleGateAndStoppingBeyondIt_DoesNotClear()
         {

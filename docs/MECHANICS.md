@@ -208,9 +208,16 @@ An overlap is a level data error, not a warning.
 A block may be restricted to horizontal-only or vertical-only movement, shown by
 an arrow.
 
-Design implication: such a block must have a compatible gate at one end of its
-axis, or it can never be cleared by movement alone. The editor warns when this
-is not the case.
+An axis restriction limits pushes as well as slides. A zero-distance move
+(M1) pushes the block toward its gate, so an axis-restricted block can be
+pushed in place only into a gate at one end of its axis. A block that
+*arrives* flush and aligned with a compatible gate clears on that move
+whatever edge the gate is on: a horizontal-only block sliding along the
+bottom row into line with a bottom gate exits through it.
+
+Design implication: every colour of such a block needs a compatible gate
+it can arrive at — one at an end of its axis, or one on the edge its fixed
+row or column touches. The editor warns when there is none.
 
 ---
 
@@ -352,7 +359,7 @@ Not runtime rules, but properties the Level Editor should measure and report.
 - No legal move at level start.
 - A colour in some block's stack has no compatible gate anywhere in the level.
 - A compatible gate exists but is too narrow for that block's projection.
-- An axis-restricted block has no compatible gate at either end of its axis.
+- An axis-restricted block has no compatible gate it can arrive at.
 - A gate or shutter threshold exceeds the total number of clears available.
 - A lock has fewer matching keys than it requires.
 
