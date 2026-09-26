@@ -16,8 +16,8 @@ namespace GateRush.Tests
     /// answers easy levels with a proof, anything it cannot settle falls through
     /// to nearest-next-clear and its cross-check, stages are announced in order,
     /// a solver disagreement or a rejected generated move propagates rather
-    /// than becoming a verdict, a level with generators or elevators is declined
-    /// before any search with a reason rather than a verdict, and
+    /// than becoming a verdict, a level with generators or elevators gets a
+    /// verdict like any other now that spawning exists (D40's guard removed), and
     /// cancellation — before the run or in the middle of a search — ends it
     /// with <see cref="OperationCanceledException"/>.
     /// </summary>
@@ -73,21 +73,10 @@ namespace GateRush.Tests
             LevelContext ctx, SearchBudget quick, List<ValidationStage> stages = null, ValidationPipeline pipeline = null)
         {
             var outcome = Outcome(ctx, quick, stages, pipeline);
-            Assert.IsNull(outcome.NotValidatableReason, "a level without generators or elevators must get a verdict");
+            Assert.IsNull(outcome.NotValidatableReason, "every level the pipeline accepts must get a verdict");
             return outcome.Result;
         }
 
-        /// <summary>A quick-stage factory that records whether any search was ever started.</summary>
-        private sealed class SearchSpy
-        {
-            public bool Searched { get; private set; }
-
-            public ISearchStrategy Create()
-            {
-                Searched = true;
-                return new AStarStrategy();
-            }
-        }
 
         // ----- Which stage answers --------------------------------------------
 
@@ -171,44 +160,32 @@ namespace GateRush.Tests
                 () => Run(StepAsideBeforeFirstClearBoard(), Quick(), pipeline: pipeline));
         }
 
-        // ----- Levels no search can judge yet -----------------------------------
+        // ----- Spawner levels (D40's guard is gone) -----------------------------
 
         [Test]
-        public void Run_LevelWithAGenerator_IsNotValidatableAndRunsNoSearch()
+        public void Run_LevelWithAGenerator_ReturnsAProvenVerdict()
         {
-            var spy = new SearchSpy();
             var stages = new List<ValidationStage>();
-            var ctx = Ctx(
-                3, 3,
-                new[] { Block(1, new Coord(1, 1)) },
-                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
-                generators: new[] { Spawner(1, BoardEdge.Top, 0, 1, Spawned()) });
 
-            var outcome = Outcome(ctx, Quick(), stages, new ValidationPipeline(quickFactory: spy.Create));
+            var result = Run(GeneratorReleasesAWaitingKeyEffectBoard(), Quick(), stages);
 
-            Assert.IsNull(outcome.Result);
-            Assert.AreEqual(ValidationPipeline.SpawnersNotYetSupportedReason, outcome.NotValidatableReason);
-            Assert.IsFalse(spy.Searched);
-            CollectionAssert.IsEmpty(stages);
+            Assert.AreEqual(ValidationStage.QuickOptimal, result.AnsweredBy);
+            Assert.AreEqual(LevelSolveVerdict.Solvable, result.Verdict);
+            Assert.AreEqual(2, result.ProvenShortestLength);
+            CollectionAssert.AreEqual(new[] { ValidationStage.QuickOptimal }, stages);
         }
 
         [Test]
-        public void Run_LevelWithAnElevator_IsNotValidatableAndRunsNoSearch()
+        public void Run_LevelWithAnElevator_ReturnsAProvenVerdict()
         {
-            var spy = new SearchSpy();
             var stages = new List<ValidationStage>();
-            var ctx = Ctx(
-                3, 3,
-                new[] { Block(1, new Coord(1, 1)) },
-                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) },
-                elevators: new[] { Elevator(1, new Coord(2, 2), new Coord(2, 2), new[] { Spawned(regionOrigin: new Coord(0, 0)) }) });
 
-            var outcome = Outcome(ctx, Quick(), stages, new ValidationPipeline(quickFactory: spy.Create));
+            var result = Run(ElevatorHeldByATopLevelBlockBoard(), Quick(), stages);
 
-            Assert.IsNull(outcome.Result);
-            Assert.AreEqual(ValidationPipeline.SpawnersNotYetSupportedReason, outcome.NotValidatableReason);
-            Assert.IsFalse(spy.Searched);
-            CollectionAssert.IsEmpty(stages);
+            Assert.AreEqual(ValidationStage.QuickOptimal, result.AnsweredBy);
+            Assert.AreEqual(LevelSolveVerdict.Solvable, result.Verdict);
+            Assert.AreEqual(2, result.ProvenShortestLength);
+            CollectionAssert.AreEqual(new[] { ValidationStage.QuickOptimal }, stages);
         }
 
         [Test]

@@ -30,10 +30,11 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// Every non-empty wave must tile the region <c>[Min, Max]</c> exactly —
-        /// every cell covered once, no gaps, no overlaps, nothing outside (M9).
-        /// The tiling is authored, so a wave that does not tile is a level-data
-        /// error, reported here with the elevator id, the wave index, and what is
+        /// Every wave must tile the region <c>[Min, Max]</c> exactly — every
+        /// cell covered once, no gaps, no overlaps, nothing outside (M9). An
+        /// empty wave covers nothing, so it does not tile either. The tiling is
+        /// authored, so a wave that does not tile is a level-data error,
+        /// reported here with the elevator id, the wave index, and what is
         /// wrong. See <see cref="ElevatorTiling"/>, which the Level Editor shares
         /// to warn about the same fault before a draft becomes a level.
         /// </summary>
@@ -44,7 +45,9 @@ namespace GateRush.Core
                 var wave = Waves[w];
                 if (wave.Count == 0)
                 {
-                    continue;
+                    throw new ArgumentException(
+                        $"Elevator {Id} wave {w} is empty; every wave must tile the region [{Min}, {Max}] " +
+                        "exactly (M9).");
                 }
 
                 var tiling = ElevatorTiling.Check(Min, Max, wave);

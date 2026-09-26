@@ -109,8 +109,9 @@ namespace GateRush.Solver
 
         /// <summary>
         /// True when <paramref name="target"/> is worth branching on: it lands the
-        /// block flush and aligned with a compatible gate, or it changes an
-        /// elevator region's occupancy by this block, or it leaves the block
+        /// block flush and aligned with a compatible gate, or it changes whether
+        /// this block covers a generator's next spawn cells or an elevator
+        /// region, or it leaves the block
         /// resting against an obstacle. The zero-distance clear — the fifth
         /// canonical criterion — is handled by the caller before this runs.
         /// </summary>
@@ -124,18 +125,8 @@ namespace GateRush.Solver
                 return true;
             }
 
-            // 2. EXTENSION POINT — phase 1.13 (M6 generators). A generator's spawn
-            //    footprint is the projection of its edge and offset through the
-            //    incoming block's shape; that placement algorithm is Module 03's
-            //    and does not exist yet, so a position that vacates or occupies a
-            //    generator's spawn cells cannot be recognised here.
-            //
-            //    Consequence, per D5's safety argument: until 1.13, canonical
-            //    mode produces MORE false negatives on levels with generators
-            //    than it eventually will, so the editor falls through to
-            //    Exhaustive on those levels more often. That is expected — a
-            //    smaller canonical set is always safe (it is a subset of the
-            //    player's moves) — not a defect.
+            // 2. Vacates or occupies the cells a generator's next queued block
+            //    needs: the move can trigger that spawn, or hold it back.
             if (FlipsGeneratorRegionOccupancy(ctx, state, blockIndex, fromOrigin, target))
             {
                 return true;
@@ -161,11 +152,58 @@ namespace GateRush.Solver
         }
 
         /// <summary>
-        /// EXTENSION POINT — phase 1.13. Always false while generators do not
-        /// exist in level data; see the call site for why that is safe.
+        /// True when the block overlaps the footprint of some generator's next
+        /// queued block at <paramref name="target"/> but not at
+        /// <paramref name="fromOrigin"/>, or the other way round. Only
+        /// generators with output left count. The footprint is where Core
+        /// places that block (<see cref="LevelContext.GeneratorSpawnOrigin"/>),
+        /// read rather than derived here (D31).
         /// </summary>
         private static bool FlipsGeneratorRegionOccupancy(
-            LevelContext ctx, BoardState state, int blockIndex, Coord fromOrigin, Coord target) => false;
+            LevelContext ctx, BoardState state, int blockIndex, Coord fromOrigin, Coord target)
+        {
+            var cells = ctx.SpecAt(blockIndex).Cells;
+
+            for (var g = 0; g < ctx.Generators.Count; g++)
+            {
+                var queue = ctx.Generators[g].Queue;
+                var next = state.GeneratorIndex[g];
+                if (next >= queue.Count)
+                {
+                    continue;
+                }
+
+                var spawnCells = queue[next].Cells;
+                var spawnOrigin = ctx.GeneratorSpawnOrigin(g, next);
+                var atTarget = FootprintsOverlap(cells, target, spawnCells, spawnOrigin);
+                var atFrom = FootprintsOverlap(cells, fromOrigin, spawnCells, spawnOrigin);
+
+                if (atTarget != atFrom)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool FootprintsOverlap(
+            IReadOnlyList<Coord> cells, Coord origin, IReadOnlyList<Coord> otherCells, Coord otherOrigin)
+        {
+            for (var i = 0; i < cells.Count; i++)
+            {
+                var cell = origin + cells[i];
+                for (var j = 0; j < otherCells.Count; j++)
+                {
+                    if (cell == otherOrigin + otherCells[j])
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
 
         private static bool FlipsElevatorRegionOccupancy(
             LevelContext ctx, BoardState state, int blockIndex, Coord fromOrigin, Coord target)

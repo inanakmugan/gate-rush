@@ -515,12 +515,38 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void EstimateRemainingMoves_WaitingClearAppliedWhenItsBlockSpawns_NeverDropsByMoreThanOne()
+        {
+            // D42 on the corpus board built for it. The red push leaves
+            // ClearOuterColor waiting in the unspawned slot: the lock is now
+            // counted through what waits instead of through its key. Moving
+            // green aside spawns the lock's block and the effect clears it at
+            // once: one colour and one free clear go together, so h holds.
+            var ctx = GeneratorReleasesAWaitingKeyEffectBoard();
+            var resolver = new MoveResolver();
+            var initial = BoardState.CreateInitial(ctx);
+            resolver.TryApplyMove(ctx, initial, new Move(0, new Coord(0, 0)), out var waiting, out _);
+            resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 1)), out var spawned, out _);
+
+            var before = AStarStrategy.EstimateRemainingMoves(ctx, initial);
+            var afterKey = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
+            var afterSpawn = AStarStrategy.EstimateRemainingMoves(ctx, spawned);
+
+            Assert.AreEqual(KeyEffect.ClearOuterColor, waiting.WaitingKeyEffect[2]);
+            Assert.IsFalse(spawned.Alive[2], "the released clear destroyed the spawned block");
+            Assert.AreEqual(new[] { 2, 1, 1 }, new[] { before, afterKey, afterSpawn });
+        }
+
+        [Test]
         public void EstimateRemainingMoves_PendingGeneratorAndElevatorOutput_CountsEveryColour()
         {
-            // No top-level blocks: every colour is still queued. Two in the
-            // generator's layered block, three in the elevator wave's.
+            // Two top-level red blocks stand on the generator's spawn cell and in
+            // the elevator's region, so neither spawns at level start (D42) and
+            // both slots are still unspawned. One colour each for the blockers,
+            // two in the generator's layered block, three in the wave's.
             var ctx = Ctx(
                 3, 3,
+                blocks: new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 2)) },
                 generators: new[]
                 {
                     Spawner(1, BoardEdge.Left, 0, 1, Spawned(colors: new[] { BlockColor.Red, BlockColor.Blue }))
@@ -536,9 +562,11 @@ namespace GateRush.Tests
                         })
                 });
 
-            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, BoardState.CreateInitial(ctx));
+            var initial = BoardState.CreateInitial(ctx);
+            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, initial);
 
-            Assert.AreEqual(5, estimate);
+            Assert.IsFalse(initial.Alive[2] || initial.Alive[3], "the fixture's spawner output must still be pending");
+            Assert.AreEqual(7, estimate);
         }
 
         // ----- Reproducibility --------------------------------------

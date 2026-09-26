@@ -97,6 +97,24 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Constructor_WaveWithNoBlocks_ThrowsNamingElevatorAndWave()
+        {
+            // An empty wave covers none of the region, so it does not tile it
+            // (M9) — the same fault as a gap, not a wave to skip.
+            var ex = Assert.Throws<System.ArgumentException>(() => new ElevatorDefinition(
+                5, new Coord(0, 0), new Coord(0, 0),
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[] { Cell(0, 0) },
+                    System.Array.Empty<SpawnedBlock>()
+                }));
+
+            StringAssert.Contains("Elevator 5", ex.Message);
+            StringAssert.Contains("wave 1", ex.Message);
+            StringAssert.Contains("empty", ex.Message);
+        }
+
+        [Test]
         public void Constructor_EmptyWaveList_Succeeds()
         {
             Assert.DoesNotThrow(() => new ElevatorDefinition(

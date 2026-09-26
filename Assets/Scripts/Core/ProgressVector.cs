@@ -25,9 +25,8 @@ namespace GateRush.Core
     /// a stratification key. States that differ only by it remain distinct under
     /// <see cref="BoardState"/> hashing.</para>
     /// <para><b>Keep in sync with <see cref="BoardState"/>.</b> When a later phase
-    /// adds a monotonic counter to <see cref="BoardState"/> — generator and
-    /// elevator progress land in phase 1.13 — <see cref="Of"/> and this summary
-    /// must gain the matching component. That obligation is the reason this type
+    /// adds a monotonic counter to <see cref="BoardState"/>, <see cref="Of"/>
+    /// and this summary must gain the matching component. That obligation is the reason this type
     /// lives in <c>GateRush.Core</c> next to the fields rather than in the solver
     /// (D32).</para>
     /// </remarks>

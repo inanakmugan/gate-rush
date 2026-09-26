@@ -13,7 +13,8 @@ namespace GateRush.Core
     /// <remarks>
     /// Every O(1) lookup this class exposes (<see cref="IsStaticWall"/>,
     /// <see cref="ShutterAt"/>, <see cref="ShutterPositionAt"/>,
-    /// <see cref="SpecAt"/>, <see cref="BlockSymmetry"/>) is precomputed once in
+    /// <see cref="SpecAt"/>, <see cref="GeneratorSpawnOrigin"/>,
+    /// <see cref="BlockSymmetry"/>) is precomputed once in
     /// the constructor. That is
     /// safe because level data never changes after construction, and cheap
     /// because it is bounded by authored content, not by how many states the
@@ -114,6 +115,25 @@ namespace GateRush.Core
         private readonly Dictionary<int, int> lockOwnerByLockId;
         private readonly Dictionary<int, int[]> keyIndicesByLockId;
 
+        /// <summary>
+        /// Per flat block index, where that block's minimum corner lands when it
+        /// spawns — the generator placement rule (M6, D34) for a generator queue
+        /// slot, <c>Min + RegionOrigin</c> for an elevator wave slot, and
+        /// <see cref="BoardState.UnspawnedOrigin"/> for a top-level block, which
+        /// never spawns. Laid out by flat index so the resolver can place any
+        /// slot with one lookup (D28).
+        /// </summary>
+        private readonly Coord[] spawnOriginBySlot;
+
+        /// <summary>Per generator, the flat index of its queue entry 0.</summary>
+        private readonly int[] generatorFirstSlot;
+
+        /// <summary>Per elevator, per wave, the flat index of that wave's block 0.</summary>
+        private readonly int[][] elevatorWaveFirstSlot;
+
+        /// <summary>Per elevator, every cell of its region relative to <see cref="ElevatorDefinition.Min"/>.</summary>
+        private readonly Coord[][] elevatorRegionCells;
+
         public LevelContext(
             int levelId,
             int width,
@@ -156,6 +176,7 @@ namespace GateRush.Core
             ValidateBlockPlacement();
             ValidateEdgeFeatures();
             ValidateShutterBounds();
+            ValidateElevatorRegions();
             ValidateLocksAndKeys();
 
             // Built only after bounds are validated: a shutter whose Max lies
@@ -165,6 +186,11 @@ namespace GateRush.Core
             shutterPositionByCell = BuildShutterPositionLookup(Shutters);
             specByIndex = BuildSpecByIndex(Blocks, Generators, Elevators);
             TotalBlockCapacity = specByIndex.Length;
+            generatorFirstSlot = new int[Generators.Count];
+            elevatorWaveFirstSlot = new int[Elevators.Count][];
+            spawnOriginBySlot = BuildSpawnLayout();
+            elevatorRegionCells = BuildElevatorRegionCells(Elevators);
+            ValidateGeneratorSpawnFootprints();
             MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
             lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
             keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
@@ -248,6 +274,69 @@ namespace GateRush.Core
 
             return specByIndex[blockIndex];
         }
+
+        /// <summary>
+        /// Where entry <paramref name="queueIndex"/> of generator
+        /// <paramref name="generatorIndex"/> (a position in
+        /// <see cref="Generators"/>) lands when it spawns: the origin its
+        /// normalised minimum corner occupies, flush against the generator's
+        /// edge and aligned to its offset (M6, D34). With <c>maxX</c>/<c>maxY</c>
+        /// the block's largest cell coordinates: bottom <c>(Offset, 0)</c>, top
+        /// <c>(Offset, Height − 1 − maxY)</c>, left <c>(0, Offset)</c>, right
+        /// <c>(Width − 1 − maxX, Offset)</c>. Precomputed (D28); the one
+        /// placement rule, which <c>MoveResolver</c>, <c>MoveGenerator</c> and
+        /// the Level Editor all read rather than derive (D31).
+        /// </summary>
+        public Coord GeneratorSpawnOrigin(int generatorIndex, int queueIndex)
+        {
+            if (generatorIndex < 0 || generatorIndex >= Generators.Count)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(generatorIndex), generatorIndex,
+                    $"Level {LevelId} has {Generators.Count} generator(s).");
+            }
+
+            if (queueIndex < 0 || queueIndex >= Generators[generatorIndex].Queue.Count)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(queueIndex), queueIndex,
+                    $"Generator {Generators[generatorIndex].Id} has {Generators[generatorIndex].Queue.Count} " +
+                    "queue entr(ies).");
+            }
+
+            return spawnOriginBySlot[GeneratorSlot(generatorIndex, queueIndex)];
+        }
+
+        /// <summary>
+        /// The flat block index of entry <paramref name="queueIndex"/> of
+        /// generator <paramref name="generatorIndex"/>. Unchecked: the resolver
+        /// only asks for an entry it knows exists.
+        /// </summary>
+        internal int GeneratorSlot(int generatorIndex, int queueIndex) =>
+            generatorFirstSlot[generatorIndex] + queueIndex;
+
+        /// <summary>
+        /// The flat block index of block 0 of wave <paramref name="waveIndex"/>
+        /// of elevator <paramref name="elevatorIndex"/>; the wave's blocks
+        /// occupy the next <c>Waves[waveIndex].Count</c> indices. Unchecked.
+        /// </summary>
+        internal int ElevatorWaveFirstSlot(int elevatorIndex, int waveIndex) =>
+            elevatorWaveFirstSlot[elevatorIndex][waveIndex];
+
+        /// <summary>
+        /// Where the spawner slot <paramref name="blockIndex"/> lands when it
+        /// spawns. <see cref="BoardState.UnspawnedOrigin"/> for a top-level
+        /// block, which never spawns. Unchecked.
+        /// </summary>
+        internal Coord SpawnOriginAt(int blockIndex) => spawnOriginBySlot[blockIndex];
+
+        /// <summary>
+        /// Every cell of elevator <paramref name="elevatorIndex"/>'s region,
+        /// relative to its <see cref="ElevatorDefinition.Min"/> — the region as
+        /// a footprint, so the resolver's one occupancy test serves both a
+        /// generator's incoming block and an elevator's region.
+        /// </summary>
+        internal IReadOnlyList<Coord> ElevatorRegionCells(int elevatorIndex) => elevatorRegionCells[elevatorIndex];
 
         /// <summary>
         /// The flat block index that owns lock <paramref name="lockId"/>. Lock
@@ -467,6 +556,186 @@ namespace GateRush.Core
             }
 
             return specs.ToArray();
+        }
+
+        /// <summary>
+        /// Walks the flat index space in <see cref="BuildSpecByIndex"/>'s order,
+        /// records where each generator's queue and each elevator wave starts,
+        /// and returns every slot's spawn origin. Must stay in step with
+        /// <see cref="BuildSpecByIndex"/>: top-level blocks, then generator
+        /// queues, then elevator waves.
+        /// </summary>
+        private Coord[] BuildSpawnLayout()
+        {
+            var origins = new Coord[TotalBlockCapacity];
+            var slot = 0;
+
+            for (; slot < Blocks.Count; slot++)
+            {
+                origins[slot] = BoardState.UnspawnedOrigin;
+            }
+
+            for (var g = 0; g < Generators.Count; g++)
+            {
+                var generator = Generators[g];
+                generatorFirstSlot[g] = slot;
+                foreach (var spawned in generator.Queue)
+                {
+                    origins[slot++] = GeneratorPlacement(generator, spawned.Cells);
+                }
+            }
+
+            for (var e = 0; e < Elevators.Count; e++)
+            {
+                var elevator = Elevators[e];
+                var firstSlots = new int[elevator.Waves.Count];
+                for (var w = 0; w < elevator.Waves.Count; w++)
+                {
+                    firstSlots[w] = slot;
+                    foreach (var spawned in elevator.Waves[w])
+                    {
+                        // ElevatorDefinition has already required a RegionOrigin
+                        // on every wave block (its tiling check).
+                        origins[slot++] = elevator.Min + spawned.RegionOrigin.Value;
+                    }
+                }
+
+                elevatorWaveFirstSlot[e] = firstSlots;
+            }
+
+            return origins;
+        }
+
+        /// <summary>
+        /// The generator placement rule — see <see cref="GeneratorSpawnOrigin"/>.
+        /// <paramref name="cells"/> are normalised so their minimum is
+        /// <c>(0, 0)</c> (D30).
+        /// </summary>
+        private Coord GeneratorPlacement(GeneratorDefinition generator, IReadOnlyList<Coord> cells)
+        {
+            var maxX = 0;
+            var maxY = 0;
+            foreach (var cell in cells)
+            {
+                maxX = Math.Max(maxX, cell.X);
+                maxY = Math.Max(maxY, cell.Y);
+            }
+
+            switch (generator.Edge)
+            {
+                case BoardEdge.Bottom:
+                    return new Coord(generator.Offset, 0);
+                case BoardEdge.Top:
+                    return new Coord(generator.Offset, Height - 1 - maxY);
+                case BoardEdge.Left:
+                    return new Coord(0, generator.Offset);
+                case BoardEdge.Right:
+                    return new Coord(Width - 1 - maxX, generator.Offset);
+                default:
+                    throw new ArgumentException($"Generator {generator.Id} sits on unknown edge {generator.Edge}.");
+            }
+        }
+
+        private static Coord[][] BuildElevatorRegionCells(IReadOnlyList<ElevatorDefinition> elevators)
+        {
+            var regions = new Coord[elevators.Count][];
+            for (var e = 0; e < elevators.Count; e++)
+            {
+                var elevator = elevators[e];
+                var cells = new List<Coord>();
+                for (var y = 0; y <= elevator.Max.Y - elevator.Min.Y; y++)
+                {
+                    for (var x = 0; x <= elevator.Max.X - elevator.Min.X; x++)
+                    {
+                        cells.Add(new Coord(x, y));
+                    }
+                }
+
+                regions[e] = cells.ToArray();
+            }
+
+            return regions;
+        }
+
+        /// <summary>
+        /// Every queued block of every generator must land entirely inside the
+        /// grid and clear of static walls, or it could never spawn — a level
+        /// data error naming the generator and the entry. Blocks, shutters and
+        /// elevator regions under the footprint are legal: they only make the
+        /// generator wait, or hide what it delivers (D42).
+        /// </summary>
+        private void ValidateGeneratorSpawnFootprints()
+        {
+            for (var g = 0; g < Generators.Count; g++)
+            {
+                var generator = Generators[g];
+                for (var q = 0; q < generator.Queue.Count; q++)
+                {
+                    var origin = spawnOriginBySlot[GeneratorSlot(g, q)];
+                    foreach (var cell in generator.Queue[q].Cells)
+                    {
+                        var absolute = origin + cell;
+                        if (!IsInsideGrid(absolute))
+                        {
+                            throw new ArgumentException(
+                                $"Generator {generator.Id} queue entry {q} would spawn at {origin} with a cell at " +
+                                $"{absolute}, outside the {Width}x{Height} grid.");
+                        }
+
+                        if (IsStaticWall(absolute))
+                        {
+                            throw new ArgumentException(
+                                $"Generator {generator.Id} queue entry {q} would spawn at {origin} with a cell on " +
+                                $"the static wall at {absolute}.");
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Every elevator region lies inside the grid and covers no static wall,
+        /// and no two regions share a cell. Each is a level data error naming
+        /// the elevator: a wave that tiles a region with a wall in it, or one
+        /// half off the grid, could never be placed, and two overlapping regions
+        /// would make "the region reads empty" (M9) ambiguous.
+        /// </summary>
+        private void ValidateElevatorRegions()
+        {
+            var elevatorIdByCell = new Dictionary<Coord, int>();
+
+            foreach (var elevator in Elevators)
+            {
+                if (!IsInsideGrid(elevator.Min) || !IsInsideGrid(elevator.Max))
+                {
+                    throw new ArgumentException(
+                        $"Elevator {elevator.Id} region [{elevator.Min}, {elevator.Max}] falls outside the " +
+                        $"{Width}x{Height} grid.");
+                }
+
+                for (var y = elevator.Min.Y; y <= elevator.Max.Y; y++)
+                {
+                    for (var x = elevator.Min.X; x <= elevator.Max.X; x++)
+                    {
+                        var cell = new Coord(x, y);
+                        if (IsStaticWall(cell))
+                        {
+                            throw new ArgumentException(
+                                $"Elevator {elevator.Id} region [{elevator.Min}, {elevator.Max}] covers the static " +
+                                $"wall at {cell}.");
+                        }
+
+                        if (elevatorIdByCell.TryGetValue(cell, out var otherId))
+                        {
+                            throw new ArgumentException(
+                                $"Elevators {otherId} and {elevator.Id} both cover cell {cell}; elevator regions " +
+                                "may not overlap.");
+                        }
+
+                        elevatorIdByCell[cell] = elevator.Id;
+                    }
+                }
+            }
         }
 
         private void ValidateStaticWalls()

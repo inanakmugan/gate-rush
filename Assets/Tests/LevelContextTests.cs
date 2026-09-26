@@ -578,5 +578,166 @@ namespace GateRush.Tests
 
             Assert.IsFalse(context.IsClearMonotone);
         }
+
+        // ----- Generator spawn placement (M6, D34) ----------------------------
+
+        private static readonly Coord[] Spawn1x1 = { new Coord(0, 0) };
+        private static readonly Coord[] SpawnHorizontal1x2 = { new Coord(0, 0), new Coord(1, 0) };
+        private static readonly Coord[] SpawnVertical1x2 = { new Coord(0, 0), new Coord(0, 1) };
+        private static readonly Coord[] SpawnL = { new Coord(0, 0), new Coord(0, 1), new Coord(1, 1) };
+
+        /// <summary>
+        /// "1x1", "along" — a 1x2 lying along the generator's edge, horizontal
+        /// on the top and bottom edges and vertical on the left and right — or
+        /// "L", whose largest cell is (1, 1).
+        /// </summary>
+        private static Coord[] SpawnShape(string shape, BoardEdge edge)
+        {
+            switch (shape)
+            {
+                case "1x1":
+                    return Spawn1x1;
+                case "along":
+                    return edge == BoardEdge.Top || edge == BoardEdge.Bottom ? SpawnHorizontal1x2 : SpawnVertical1x2;
+                default:
+                    return SpawnL;
+            }
+        }
+
+        // A 5x4 grid, every generator at offset 1 and two cells wide. The table
+        // in Module 10: bottom (Offset, 0), top (Offset, Height - 1 - maxY),
+        // left (0, Offset), right (Width - 1 - maxX, Offset).
+        [TestCase(BoardEdge.Bottom, "1x1", 1, 0)]
+        [TestCase(BoardEdge.Bottom, "along", 1, 0)]
+        [TestCase(BoardEdge.Bottom, "L", 1, 0)]
+        [TestCase(BoardEdge.Top, "1x1", 1, 3)]
+        [TestCase(BoardEdge.Top, "along", 1, 3)]
+        [TestCase(BoardEdge.Top, "L", 1, 2)]
+        [TestCase(BoardEdge.Left, "1x1", 0, 1)]
+        [TestCase(BoardEdge.Left, "along", 0, 1)]
+        [TestCase(BoardEdge.Left, "L", 0, 1)]
+        [TestCase(BoardEdge.Right, "1x1", 4, 1)]
+        [TestCase(BoardEdge.Right, "along", 4, 1)]
+        [TestCase(BoardEdge.Right, "L", 3, 1)]
+        public void GeneratorSpawnOrigin_QueuedBlock_LandsFlushAgainstTheEdgeAlignedToTheOffset(
+            BoardEdge edge, string shape, int expectedX, int expectedY)
+        {
+            var ctx = Fixture.Ctx(
+                5, 4,
+                generators: new[] { Fixture.Spawner(1, edge, 1, 2, Fixture.Spawned(cells: SpawnShape(shape, edge))) });
+
+            var origin = ctx.GeneratorSpawnOrigin(0, 0);
+
+            Assert.AreEqual(new Coord(expectedX, expectedY), origin);
+        }
+
+        [Test]
+        public void GeneratorSpawnOrigin_EachQueueEntry_IsPlacedByItsOwnShape()
+        {
+            var ctx = Fixture.Ctx(
+                5, 4,
+                generators: new[]
+                {
+                    Fixture.Spawner(1, BoardEdge.Top, 1, 2,
+                        Fixture.Spawned(cells: Spawn1x1), Fixture.Spawned(cells: SpawnVertical1x2))
+                });
+
+            Assert.AreEqual(new Coord(1, 3), ctx.GeneratorSpawnOrigin(0, 0));
+            Assert.AreEqual(new Coord(1, 2), ctx.GeneratorSpawnOrigin(0, 1));
+        }
+
+        [Test]
+        public void GeneratorSpawnOrigin_IndexOutOfRange_Throws()
+        {
+            var ctx = Fixture.Ctx(3, 3, generators: new[] { Fixture.Spawner(1, BoardEdge.Top, 0, 1, Fixture.Spawned()) });
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => ctx.GeneratorSpawnOrigin(1, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => ctx.GeneratorSpawnOrigin(0, 1));
+        }
+
+        [Test]
+        public void Constructor_QueuedBlockWouldSpawnPartlyOutsideTheGrid_ThrowsNamingGeneratorAndEntry()
+        {
+            // Bottom edge, offset 2 of a 3-wide grid: the 1x1 fits, the
+            // horizontal 1x2 behind it would reach x = 3.
+            var generator = Fixture.Spawner(
+                7, BoardEdge.Bottom, 2, 1, Fixture.Spawned(cells: Spawn1x1), Fixture.Spawned(cells: SpawnHorizontal1x2));
+
+            var ex = Assert.Throws<ArgumentException>(() => Fixture.Ctx(3, 3, generators: new[] { generator }));
+
+            StringAssert.Contains("Generator 7", ex.Message);
+            StringAssert.Contains("queue entry 1", ex.Message);
+            StringAssert.Contains("outside", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_QueuedBlockWouldSpawnOnAStaticWall_ThrowsNamingGeneratorAndEntry()
+        {
+            var generator = Fixture.Spawner(7, BoardEdge.Top, 0, 1, Fixture.Spawned(cells: Spawn1x1));
+
+            var ex = Assert.Throws<ArgumentException>(() =>
+                Fixture.Ctx(3, 3, generators: new[] { generator }, staticWalls: new[] { new Coord(0, 2) }));
+
+            StringAssert.Contains("Generator 7", ex.Message);
+            StringAssert.Contains("queue entry 0", ex.Message);
+            StringAssert.Contains("static wall", ex.Message);
+        }
+
+        // ----- Elevator regions --------------------------------------------------
+
+        [Test]
+        public void Constructor_ElevatorRegionOutsideTheGrid_ThrowsNamingTheElevator()
+        {
+            var elevator = Fixture.Elevator(
+                4, new Coord(2, 2), new Coord(3, 2),
+                new[] { Fixture.Spawned(cells: SpawnHorizontal1x2, regionOrigin: new Coord(0, 0)) });
+
+            var ex = Assert.Throws<ArgumentException>(() => Fixture.Ctx(3, 3, elevators: new[] { elevator }));
+
+            StringAssert.Contains("Elevator 4", ex.Message);
+            StringAssert.Contains("outside", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_ElevatorRegionCoversAStaticWall_ThrowsNamingTheElevator()
+        {
+            var elevator = Fixture.Elevator(
+                4, new Coord(1, 1), new Coord(1, 1), new[] { Fixture.Spawned(regionOrigin: new Coord(0, 0)) });
+
+            var ex = Assert.Throws<ArgumentException>(() =>
+                Fixture.Ctx(3, 3, elevators: new[] { elevator }, staticWalls: new[] { new Coord(1, 1) }));
+
+            StringAssert.Contains("Elevator 4", ex.Message);
+            StringAssert.Contains("static wall", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_TwoElevatorRegionsOverlap_ThrowsNamingBoth()
+        {
+            var first = Fixture.Elevator(
+                1, new Coord(0, 0), new Coord(1, 0),
+                new[] { Fixture.Spawned(cells: SpawnHorizontal1x2, regionOrigin: new Coord(0, 0)) });
+            var second = Fixture.Elevator(
+                2, new Coord(1, 0), new Coord(1, 1),
+                new[] { Fixture.Spawned(cells: SpawnVertical1x2, regionOrigin: new Coord(0, 0)) });
+
+            var ex = Assert.Throws<ArgumentException>(() => Fixture.Ctx(3, 3, elevators: new[] { first, second }));
+
+            StringAssert.Contains("Elevators 1 and 2", ex.Message);
+            StringAssert.Contains("may not overlap", ex.Message);
+        }
+
+        [Test]
+        public void Constructor_GeneratorSpawningIntoAnElevatorRegion_IsAllowed()
+        {
+            // The two contend for the cells at run time (the resolver's tests pin
+            // how); nothing about the pair is a data error.
+            var generator = Fixture.Spawner(1, BoardEdge.Left, 0, 1, Fixture.Spawned());
+            var elevator = Fixture.Elevator(
+                1, new Coord(0, 0), new Coord(0, 0), new[] { Fixture.Spawned(regionOrigin: new Coord(0, 0)) });
+
+            Assert.DoesNotThrow(() =>
+                Fixture.Ctx(2, 1, generators: new[] { generator }, elevators: new[] { elevator }));
+        }
     }
 }

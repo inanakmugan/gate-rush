@@ -18,13 +18,12 @@ namespace GateRush.Tests
     /// a block under a closed shutter waits and the opening releases it.
     /// </summary>
     /// <remarks>
-    /// Still deferred to phase 1.13 (spawners): a generator or elevator wave
-    /// arriving mid-resolution, and the named "owner not yet spawned" branch in
-    /// <c>ApplyKeyEffects</c> that holds a key rather than consuming it. The
-    /// "resolution cycle throws" case is exercised through
-    /// <see cref="ScriptedLoopResolver"/> here and does not need real level data.
+    /// Module 10's spawning (M6, M9, D42) lives in the other part of this
+    /// class, <c>MoveResolverSpawningTests.cs</c>. The "resolution cycle
+    /// throws" case is exercised through <see cref="ScriptedLoopResolver"/>
+    /// here and does not need real level data.
     /// </remarks>
-    public class MoveResolverTests
+    public partial class MoveResolverTests
     {
         private static readonly Coord[] CellsVertical1x2 = { new Coord(0, 0), new Coord(0, 1) };
         private static readonly Coord[] CellsHorizontal1x3 =
@@ -62,7 +61,8 @@ namespace GateRush.Tests
         /// its first <c>changingPasses</c> calls, then settles; the other hook
         /// always reports no change. Pass <see cref="int.MaxValue"/> for a loop
         /// that never settles. Lets the loop's own mechanism be exercised
-        /// through either extension point while both are still no-ops.
+        /// through either extension point, independently of what either does
+        /// for real.
         /// </summary>
         private sealed class ScriptedLoopResolver : MoveResolver
         {

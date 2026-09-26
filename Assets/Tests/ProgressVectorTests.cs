@@ -13,9 +13,8 @@ namespace GateRush.Tests
     /// </summary>
     /// <remarks>
     /// The spawn-index components of the vector are exercised directly here
-    /// through the internal <see cref="BoardState"/> constructor; generators and
-    /// elevators cannot appear in a real level until phase 1.13, so the
-    /// resolver-driven monotonicity test only moves <c>TotalClearCount</c>.
+    /// through the internal <see cref="BoardState"/> constructor, and through
+    /// the resolver by a move that spawns without clearing.
     /// </remarks>
     public class ProgressVectorTests
     {
@@ -134,6 +133,24 @@ namespace GateRush.Tests
 
             new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after, out _);
 
+            Assert.Greater(after.ProgressVector.CompareTo(before.ProgressVector), 0);
+        }
+
+        [Test]
+        public void ProgressVector_IncreasesAcrossAMoveThatOnlySpawns()
+        {
+            // No gate anywhere: moving the block off the generator's cell clears
+            // nothing, but the spawn it lets through advances the vector (D6).
+            var ctx = Ctx(
+                4, 1,
+                new[] { Block(1, new Coord(0, 0)) },
+                Array.Empty<GateDefinition>(),
+                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned()) });
+            var before = BoardState.CreateInitial(ctx);
+
+            new MoveResolver().TryApplyMove(ctx, before, new Move(0, new Coord(2, 0)), out var after, out _);
+
+            Assert.AreEqual(before.TotalClearCount, after.TotalClearCount);
             Assert.Greater(after.ProgressVector.CompareTo(before.ProgressVector), 0);
         }
     }

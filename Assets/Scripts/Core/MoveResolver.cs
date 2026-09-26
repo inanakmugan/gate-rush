@@ -13,16 +13,19 @@ namespace GateRush.Core
     /// <remarks>
     /// <para><b>Scope.</b> This class implements M1 (movement and gate exit),
     /// M7 (axis restriction), the count-based unlocks M2 (gates), M3 (frozen
-    /// blocks) and M5's threshold evaluation (shutters), M8 (locks and keys),
-    /// and M10 (time-bonus blocks report their seconds when they die). The
-    /// fixpoint loop (<c>DECISIONS.md</c> D8) drives real work through
-    /// <see cref="ReevaluateConditions"/> and <see cref="ApplyKeyEffects"/> —
-    /// the latter is where the loop first closes a cycle, since a key's
+    /// blocks) and M5's threshold evaluation (shutters), M6 and M9 (generators
+    /// and elevators spawning), M8 (locks and keys), and M10 (time-bonus
+    /// blocks report their seconds when they die). The fixpoint loop
+    /// (<c>DECISIONS.md</c> D8) drives real work through
+    /// <see cref="ReevaluateConditions"/>, <see cref="ApplyKeyEffects"/> and
+    /// <see cref="CheckSpawnTriggers"/> — <see cref="ApplyKeyEffects"/> is
+    /// where the loop first closes a cycle, since a key's
     /// <see cref="KeyEffect.ClearOuterColor"/> emits a fresh event the same
     /// drain then processes. A key effect whose target is under a closed
-    /// shutter waits and is released by the opening (D41). Its spawn-trigger step remains an extension point
-    /// that does nothing yet — see <see cref="CheckSpawnTriggers"/> (M6/M9,
-    /// phase 1.13).</para>
+    /// shutter waits and is released by the opening (D41); one whose target
+    /// has not spawned yet waits and is applied when it spawns (D42). The
+    /// level's starting state is itself settled by one action-free
+    /// resolution (<see cref="ResolveInitial"/>, D42).</para>
     ///
     /// <para><b>Exit is a property of the move, not the position</b>
     /// (<c>DECISIONS.md</c> D25). A move — zero-distance or not — that leaves a
@@ -266,6 +269,33 @@ namespace GateRush.Core
         }
 
         /// <summary>
+        /// Settles a level's starting state: one resolution with no action, so
+        /// spawn triggers and condition re-evaluation run to a fixpoint exactly
+        /// as after a move (D42). <see cref="BoardState"/>'s <c>CreateInitial</c>
+        /// overloads are the only callers; this entry point is what lets them
+        /// settle through the one resolution loop rather than a second copy of
+        /// it (D9).
+        /// <para>Nothing drives the first pass but the spawn triggers: the
+        /// event queue is empty, and every threshold in
+        /// <paramref name="unresolved"/> was already evaluated at its own
+        /// counters, so <see cref="conditionsDirty"/> starts lowered. On a level
+        /// with no generator or elevator the first pass therefore changes
+        /// nothing and the result holds <paramref name="unresolved"/>'s arrays,
+        /// field for field. Any time bonus is discarded: nothing is cleared
+        /// before the first move except by a key effect carried in through
+        /// <c>CreateInitialWithWaitingKeyEffects</c>, whose callers build
+        /// levels without spawners.</para>
+        /// </summary>
+        internal BoardState ResolveInitial(LevelContext ctx, BoardState unresolved)
+        {
+            successor.Reset(unresolved);
+            events.Clear();
+            BeginResolution();
+
+            return ResolveToFixpoint(ctx, successor);
+        }
+
+        /// <summary>
         /// Resets the per-resolution accumulators the three entry points share:
         /// the M10 time-bonus sum and <see cref="ReevaluateConditions"/>'s
         /// last-scanned marker. Call once per action, after
@@ -314,6 +344,33 @@ namespace GateRush.Core
         /// then re-evaluates unlock conditions and spawn triggers; if either
         /// changed anything, it drains and re-evaluates again. Terminates when a
         /// full pass changes nothing.
+        /// <para><b>Why <see cref="LevelContext.MaxResolutionPasses"/> bounds a
+        /// cycle-free resolution.</b> The bound counts every colour, every
+        /// generator entry and every elevator wave in the level. Charge each
+        /// pass that changes something to one such unit, never charging a unit
+        /// twice:</para>
+        /// <list type="bullet">
+        /// <item>A pass that drains a clear is charged to that clear.</item>
+        /// <item>Otherwise, a pass that spawns a generator block or places a
+        /// wave is charged to it.</item>
+        /// <item>No other pass can change a threshold. Counters rise only in the
+        /// drain, and a block that spawns gets its frozen flag from the running
+        /// count at once (<see cref="SpawnBlock"/>), so a scan that no drain
+        /// preceded finds nothing new.</item>
+        /// <item>What remains is a pass whose only change is clearing an
+        /// elevator's <c>ElevatorWaveActive</c> after its last wave, with no
+        /// clear drained and no spawn. The region read occupied at the previous
+        /// check and empty now, so a block left it in between with no clear: no
+        /// death — a death is a clear drained in this pass — and no spawn. Only
+        /// the action moves a block, so this is pass 0 of a move that slid the
+        /// region's last block out, and it happens at most once per resolution.
+        /// That elevator's waves were all placed in earlier resolutions, since
+        /// no wave can be placed before pass 0; so this resolution has at least
+        /// one wave unit it can never spend, and pass 0 is charged to it.</item>
+        /// </list>
+        /// <para>Every unit is charged at most once, so a resolution changes
+        /// something in at most <see cref="LevelContext.MaxResolutionPasses"/>
+        /// passes. More means a cycle in the level data.</para>
         /// </summary>
         private BoardState ResolveToFixpoint(LevelContext ctx, SuccessorBuilder builder)
         {
@@ -377,7 +434,9 @@ namespace GateRush.Core
         /// lock's block is under a closed shutter at that moment, the effect
         /// is not applied but recorded in <see cref="BoardState.WaitingKeyEffect"/>
         /// (<c>DECISIONS.md</c> D41); <see cref="ReevaluateConditions"/> applies it
-        /// when the shutter opens. Every key whose carrier dies is consumed,
+        /// when the shutter opens. When the lock's block has not spawned yet,
+        /// the effect waits the same way and <see cref="SpawnBlock"/> applies
+        /// it when the block lands (D42). Every key whose carrier dies is consumed,
         /// including one arriving after the count is complete — it simply
         /// changes nothing, whether the effect was applied or is waiting.
         /// </para>
@@ -420,31 +479,13 @@ namespace GateRush.Core
             var keyEffect = ctx.SpecAt(keyIndex).KeyEffect;
             var ownerIndex = ctx.LockOwnerIndex(lockId);
 
-            // EXTENSION POINT — phase 1.13 (M6/M9). The lock's owner is a
-            // generator/elevator slot that has not spawned yet: Alive is false
-            // but for a different reason than "destroyed", and BoardState's index
-            // scheme says so explicitly (an unspawned slot keeps
-            // UnspawnedOrigin; a destroyed block keeps the grid cell it died on).
-            // Such a key must be HELD, not consumed — consuming it now would
-            // leave the block permanently locked once it lands, with no visible
-            // cause and no way for a designer to see why the solver calls the
-            // level unsolvable. The pass that spawns the owner
-            // (CheckSpawnTriggers) will raise conditionsDirty; phase 1.13 must
-            // re-evaluate held keys there. Behaviour today is unchanged — no
-            // level has spawners yet — but this branch is named, not folded into
-            // the dead-owner case below.
-            if (!builder.IsAlive(ownerIndex) &&
-                builder.GetOrigin(ownerIndex) == BoardState.UnspawnedOrigin)
-            {
-                return;
-            }
-
             builder.ConsumeKey(keyIndex);
 
             // The lock already completed while its block was under a closed
-            // shutter, and the completing key decided the effect (M8). A later
-            // key is spent — consumed above, as M8 requires of every key whose
-            // carrier dies — but changes nothing about what waits (D41).
+            // shutter or not yet spawned, and the completing key decided the
+            // effect (M8). A later key is spent — consumed above, as M8 requires
+            // of every key whose carrier dies — but changes nothing about what
+            // waits (D41, D42).
             if (builder.GetWaitingKeyEffect(ownerIndex).HasValue)
             {
                 return;
@@ -463,6 +504,20 @@ namespace GateRush.Core
 
             if (consumedKeys < requiredKeys)
             {
+                return;
+            }
+
+            // The lock's block has not spawned yet: still in a generator's queue
+            // or a later elevator wave (D42). Not alive, but not destroyed either
+            // — BoardState's index scheme tells the two apart by the sentinel
+            // origin — so it is named here rather than folded into the
+            // destroyed-owner case below. Its slot exists at a fixed index before
+            // it spawns, so the completing key's effect waits there, and
+            // SpawnBlock applies it when the block lands (or leaves it for the
+            // shutter's opening, if it lands under a closed one).
+            if (builder.IsUnspawned(ownerIndex))
+            {
+                builder.SetWaitingKeyEffect(ownerIndex, keyEffect);
                 return;
             }
 
@@ -658,32 +713,184 @@ namespace GateRush.Core
                     continue;
                 }
 
+                // An effect waiting on a block that has not spawned yet (D42) is
+                // SpawnBlock's to apply, never an opening's. Its origin is the
+                // sentinel, which no shutter covers, so without this check the
+                // shutter test below would read "uncovered" and apply the effect
+                // to a block that is not on the board.
+                if (!builder.IsAlive(ownerIndex))
+                {
+                    continue;
+                }
+
                 if (BoardState.IsInsideClosedShutter(ctx, ownerIndex, builder.GetOrigin(ownerIndex), shutterOpen))
                 {
                     continue;
                 }
 
-                // Safe to apply: a waiting block is alive and still locked,
-                // because nothing — no move, joker or key — reaches a block
-                // under a closed shutter (M5), and it was under one until now.
+                // Safe to apply: a living block with an effect waiting is still
+                // locked, because nothing — no move, joker or key — reaches a
+                // block under a closed shutter (M5), and it was under one from
+                // the moment its effect began waiting — completed under one
+                // (D41) or spawned under one (D42) — until now.
                 builder.SetWaitingKeyEffect(ownerIndex, null);
                 ApplyLockEffect(ctx, builder, ownerIndex, waiting.Value);
             }
         }
 
         /// <summary>
-        /// EXTENSION POINT — phase 1.13 (M6 generators, M9 elevators). Spawns the
-        /// next generator block when every cell it would occupy is empty, and
-        /// places the next elevator wave when its region holds no blocks. Both
-        /// advance a monotonic progress index, which is why
-        /// <see cref="LevelContext.MaxResolutionPasses"/> counts them. Returns
-        /// true iff it spawned anything, and must raise
-        /// <see cref="conditionsDirty"/> when it does so a spawned block's
-        /// unlock threshold is re-evaluated on the next pass. No-op — returns
-        /// false — while only M1 and M7 are implemented. <c>internal virtual</c>
-        /// so tests can drive the fixpoint loop; see the class remarks.
+        /// M6 and M9. Spawns the next generator block when no living block
+        /// covers any cell it would occupy, and places the next elevator wave
+        /// when no living block — the previous wave's, or any other — covers
+        /// any cell of the region. Returns true iff it changed anything.
+        /// <para><b>Order.</b> Generators in <see cref="LevelContext.Generators"/>
+        /// order, then elevators in <see cref="LevelContext.Elevators"/> order.
+        /// Every check reads the successor's live fields, so it sees the cells
+        /// every earlier spawn in the same pass has filled. A generator spawns
+        /// at most once per pass: its placed block now covers its cells — and
+        /// if a released key effect clears it at once, the next pass sees
+        /// that.</para>
+        /// <para><b><c>ElevatorWaveActive</c></b> keeps Module 02's meaning. The
+        /// pass that finds a region empty clears the flag and, when waves
+        /// remain, places the next wave and sets it again. A region that never
+        /// reads empty keeps it set.</para>
+        /// <para><b>What it does not read.</b> Closed shutters: a spawn is not a
+        /// move, a joker or a key, so an empty region under a closed shutter
+        /// still receives its wave (D42). Gates: a block spawning flush
+        /// against a compatible gate is not cleared — it did not arrive by a
+        /// move, and waits for a push (D25).</para>
+        /// <para>A generator with no output left, or an elevator with no wave
+        /// left and no flag to clear, is skipped before any occupancy test, so
+        /// a level without spawners pays only for two empty loops. Otherwise
+        /// each check is one sweep of the living blocks
+        /// (<see cref="BoardState.OverlapsLivingBlock"/>). Raises <see cref="conditionsDirty"/> when it
+        /// spawns, since the set of living blocks the M3 scan covers has
+        /// changed. <c>internal virtual</c> so tests can drive the fixpoint
+        /// loop; see the class remarks.</para>
         /// </summary>
-        internal virtual bool CheckSpawnTriggers(LevelContext ctx, SuccessorBuilder builder) => false;
+        internal virtual bool CheckSpawnTriggers(LevelContext ctx, SuccessorBuilder builder)
+        {
+            var changed = false;
+            var spawned = false;
+
+            for (var g = 0; g < ctx.Generators.Count; g++)
+            {
+                var generator = ctx.Generators[g];
+                var next = builder.GetGeneratorIndex(g);
+                if (next >= generator.Queue.Count)
+                {
+                    continue;
+                }
+
+                var slot = ctx.GeneratorSlot(g, next);
+                var origin = ctx.SpawnOriginAt(slot);
+                if (BoardState.OverlapsLivingBlock(ctx, ctx.SpecAt(slot).Cells, origin, builder.Alive, builder.Origins))
+                {
+                    continue;
+                }
+
+                builder.SetGeneratorIndex(g, next + 1);
+                SpawnBlock(ctx, builder, slot);
+                changed = true;
+                spawned = true;
+            }
+
+            for (var e = 0; e < ctx.Elevators.Count; e++)
+            {
+                var elevator = ctx.Elevators[e];
+                var waveIndex = builder.GetElevatorWaveIndex(e);
+                var isActive = builder.IsElevatorWaveActive(e);
+                if (!isActive && waveIndex >= elevator.Waves.Count)
+                {
+                    continue;
+                }
+
+                if (BoardState.OverlapsLivingBlock(
+                        ctx, ctx.ElevatorRegionCells(e), elevator.Min, builder.Alive, builder.Origins))
+                {
+                    continue;
+                }
+
+                if (isActive)
+                {
+                    builder.SetElevatorWaveActive(e, false);
+                    changed = true;
+                }
+
+                if (waveIndex >= elevator.Waves.Count)
+                {
+                    continue;
+                }
+
+                builder.SetElevatorWaveIndex(e, waveIndex + 1);
+                builder.SetElevatorWaveActive(e, true);
+
+                var firstSlot = ctx.ElevatorWaveFirstSlot(e, waveIndex);
+                var count = elevator.Waves[waveIndex].Count;
+                for (var slot = firstSlot; slot < firstSlot + count; slot++)
+                {
+                    SpawnBlock(ctx, builder, slot);
+                }
+
+                changed = true;
+                spawned = true;
+            }
+
+            if (spawned)
+            {
+                conditionsDirty = true;
+            }
+
+            return changed;
+        }
+
+        /// <summary>
+        /// Brings the unspawned slot <paramref name="slot"/> onto the board at
+        /// its precomputed spawn origin, with the starting row Module 10 gives
+        /// it: alive, no colours cleared, key not consumed (both already true of
+        /// an unspawned slot), unlocked only if it carries no lock (already
+        /// true), and unfrozen if it carries no threshold or the running clear
+        /// count already meets it.
+        /// <para>The frozen flag is decided here, against the successor's
+        /// running counters, through <see cref="UnlockConditions.IsThresholdMet"/>
+        /// — the one predicate every unlock goes through (Module 06). Deciding
+        /// it here rather than leaving it to the next scan is also what keeps a
+        /// spawn from costing an extra pass (see <see cref="ResolveToFixpoint"/>).</para>
+        /// <para>A key effect waiting on the slot (its lock completed before it
+        /// spawned, D42) applies now, in the same resolution, through
+        /// <see cref="ApplyLockEffect"/> — unless the block lands under a closed
+        /// shutter, where nothing reaches it; the effect then keeps waiting and
+        /// <see cref="ReleaseWaitingKeyEffects"/> applies it at the opening.</para>
+        /// </summary>
+        private void SpawnBlock(LevelContext ctx, SuccessorBuilder builder, int slot)
+        {
+            var origin = ctx.SpawnOriginAt(slot);
+            builder.SetOrigin(slot, origin);
+            builder.SetAlive(slot, true);
+
+            var unfreezeAt = ctx.SpecAt(slot).UnfreezeAtClearCount;
+            if (!builder.IsUnfrozen(slot)
+                && unfreezeAt.HasValue
+                && UnlockConditions.IsThresholdMet(
+                    builder.TotalClearCount, builder.ClearCountByColor, unfreezeAt.Value, null))
+            {
+                builder.Unfreeze(slot);
+            }
+
+            var waiting = builder.GetWaitingKeyEffect(slot);
+            if (!waiting.HasValue)
+            {
+                return;
+            }
+
+            if (BoardState.IsInsideClosedShutter(ctx, slot, origin, builder.ShutterOpen))
+            {
+                return;
+            }
+
+            builder.SetWaitingKeyEffect(slot, null);
+            ApplyLockEffect(ctx, builder, slot, waiting.Value);
+        }
 
         /// <summary>
         /// Accumulates the changes one resolution makes to a
@@ -711,6 +918,9 @@ namespace GateRush.Core
             private KeyEffect?[] waitingKeyEffect;
             private bool[] gateOpen;
             private bool[] shutterOpen;
+            private int[] generatorIndex;
+            private int[] elevatorWaveIndex;
+            private bool[] elevatorWaveActive;
             private int[] clearCountByColor;
             private int totalClearCount;
 
@@ -726,6 +936,9 @@ namespace GateRush.Core
                 waitingKeyEffect = null;
                 gateOpen = null;
                 shutterOpen = null;
+                generatorIndex = null;
+                elevatorWaveIndex = null;
+                elevatorWaveActive = null;
                 clearCountByColor = null;
                 totalClearCount = newSource.TotalClearCount;
             }
@@ -772,12 +985,44 @@ namespace GateRush.Core
             /// <summary>
             /// The block's origin as this successor currently has it — the
             /// pending value if <see cref="SetOrigin"/> has touched this index,
-            /// otherwise the source's. Lets <c>ApplyKeyEffects</c> tell a
-            /// destroyed lock owner (a real grid origin) from a not-yet-spawned
-            /// one (<see cref="BoardState.UnspawnedOrigin"/>).
+            /// otherwise the source's. Lets <see cref="IsUnspawned"/> tell a
+            /// destroyed block (a real grid origin) from a not-yet-spawned one
+            /// (<see cref="BoardState.UnspawnedOrigin"/>).
             /// </summary>
             public Coord GetOrigin(int index) =>
                 origins != null ? origins[index] : source.Origins[index];
+
+            /// <summary>
+            /// The running liveness of every block slot. Returns the source
+            /// array by reference until the first <see cref="SetAlive"/> copies
+            /// it — safe for the read-only use
+            /// <c>BoardState.OverlapsLivingBlock</c> makes of it.
+            /// </summary>
+            public IReadOnlyList<bool> Alive => alive ?? source.Alive;
+
+            /// <summary>
+            /// The running origin of every block slot, by reference until the
+            /// first <see cref="SetOrigin"/> copies it, like <see cref="Alive"/>.
+            /// </summary>
+            public IReadOnlyList<Coord> Origins => origins ?? source.Origins;
+
+            /// <summary>
+            /// True for a generator or elevator slot that has not spawned yet:
+            /// not alive, and still at <see cref="BoardState.UnspawnedOrigin"/>.
+            /// A destroyed block is not alive either, but keeps the grid cell it
+            /// died on, which is how the two are told apart.
+            /// </summary>
+            public bool IsUnspawned(int index) =>
+                !IsAlive(index) && GetOrigin(index) == BoardState.UnspawnedOrigin;
+
+            public int GetGeneratorIndex(int index) =>
+                generatorIndex != null ? generatorIndex[index] : source.GeneratorIndex[index];
+
+            public int GetElevatorWaveIndex(int index) =>
+                elevatorWaveIndex != null ? elevatorWaveIndex[index] : source.ElevatorWaveIndex[index];
+
+            public bool IsElevatorWaveActive(int index) =>
+                elevatorWaveActive != null ? elevatorWaveActive[index] : source.ElevatorWaveActive[index];
 
             public bool IsGateOpen(int index) =>
                 gateOpen != null ? gateOpen[index] : source.GateOpen[index];
@@ -814,9 +1059,11 @@ namespace GateRush.Core
             /// <summary>Records <paramref name="value"/> as the key effect
             /// waiting on block <paramref name="index"/>'s lock (D41), or clears
             /// it with null once the effect is released. Set only when a lock
-            /// completes under a closed shutter and cleared only when that
-            /// shutter opens — both in a resolution that drained a clear, so the
-            /// field never changes within one clear-count stratum (D6).</summary>
+            /// completes under a closed shutter or before its block spawns (D42)
+            /// — always in a resolution that drained a clear. Cleared when that
+            /// shutter opens, which also takes a clear, or when the block
+            /// spawns, which advances a spawn index; so the field never changes
+            /// within one progress stratum (D6).</summary>
             public void SetWaitingKeyEffect(int index, KeyEffect? value) =>
                 Materialize(ref waitingKeyEffect, source.WaitingKeyEffect)[index] = value;
 
@@ -827,6 +1074,22 @@ namespace GateRush.Core
             /// <summary>Opens shutter <paramref name="index"/> (M5). Permanent.</summary>
             public void OpenShutter(int index) =>
                 Materialize(ref shutterOpen, source.ShutterOpen)[index] = true;
+
+            /// <summary>Advances generator <paramref name="index"/>'s spawn
+            /// count (M6). Monotonic (D6): the resolver only ever raises it.</summary>
+            public void SetGeneratorIndex(int index, int value) =>
+                Materialize(ref generatorIndex, source.GeneratorIndex)[index] = value;
+
+            /// <summary>Advances elevator <paramref name="index"/>'s wave count
+            /// (M9). Monotonic (D6): the resolver only ever raises it.</summary>
+            public void SetElevatorWaveIndex(int index, int value) =>
+                Materialize(ref elevatorWaveIndex, source.ElevatorWaveIndex)[index] = value;
+
+            /// <summary>Sets elevator <paramref name="index"/>'s
+            /// <see cref="BoardState.ElevatorWaveActive"/> flag: true when a wave
+            /// is placed, false when its region reads empty.</summary>
+            public void SetElevatorWaveActive(int index, bool value) =>
+                Materialize(ref elevatorWaveActive, source.ElevatorWaveActive)[index] = value;
 
             public void IncrementTotalClearCount() => totalClearCount++;
 
@@ -851,9 +1114,9 @@ namespace GateRush.Core
                     unlocked ?? source.Unlocked,
                     gateOpen ?? source.GateOpen,
                     shutterOpen ?? source.ShutterOpen,
-                    source.GeneratorIndex,
-                    source.ElevatorWaveIndex,
-                    source.ElevatorWaveActive,
+                    generatorIndex ?? source.GeneratorIndex,
+                    elevatorWaveIndex ?? source.ElevatorWaveIndex,
+                    elevatorWaveActive ?? source.ElevatorWaveActive,
                     totalClearCount,
                     clearCountByColor ?? source.ClearCountByColor,
                     keyConsumed ?? source.KeyConsumed,

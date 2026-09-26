@@ -269,6 +269,11 @@ namespace GateRush.Tests
                     }
 
                     Count("nonMonotone");
+                    if (ctx.Generators.Count > 0 || ctx.Elevators.Count > 0)
+                    {
+                        Count("spawner");
+                    }
+
                     continue;
                 }
 
@@ -298,6 +303,13 @@ namespace GateRush.Tests
             Assert.GreaterOrEqual(
                 coverage.TryGetValue("nonMonotone", out var nonMonotone) ? nonMonotone : 0, nonMonotoneMinimum,
                 "boards compared that are not clear-monotone");
+
+            // Generators and elevators (D42) make a board non-monotone too; this
+            // floor shows the random corpus actually puts some in front of both
+            // searches, rather than drawing them only to see them redrawn.
+            Assert.GreaterOrEqual(
+                coverage.TryGetValue("spawner", out var spawner) ? spawner : 0, nonMonotoneMinimum,
+                "boards compared with a generator or an elevator");
         }
 
         [TestCase(3, 300, 20260927)]
