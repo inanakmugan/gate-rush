@@ -15,6 +15,18 @@ namespace GateRush.Tests
     public class LevelEditorSettingsTests
     {
         [Test]
+        public void Defaults_QuickBudget_IsASmallExhaustiveAttempt()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(MoveGenMode.Exhaustive, settings.QuickBudget.Mode);
+            Assert.AreEqual(100_000, settings.QuickBudget.MaxExploredStates);
+            Assert.AreEqual(2_000, settings.QuickBudget.MaxWallClockMs);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
         public void Defaults_SolveBudgets_AreD5sNumbers()
         {
             var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();

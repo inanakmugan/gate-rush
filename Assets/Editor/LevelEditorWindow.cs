@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using GateRush.Core;
 using GateRush.Serialization;
 using GateRush.Solver;
@@ -16,9 +18,24 @@ namespace GateRush.Editor
     /// solvable, whether a wave tiles, what a resize removes — is answered by
     /// <see cref="LevelDraft"/>, <see cref="DraftValidator"/>,
     /// <see cref="DraftMetrics"/>, <see cref="DraftTiling"/> and
-    /// <see cref="LevelSolveRunner"/>. If a rule ever needs to live here, it
+    /// <see cref="ValidationPipeline"/>. If a rule ever needs to live here, it
     /// belongs in one of those instead.
     /// </summary>
+    /// <remarks>
+    /// <para><b>Validate runs off the main thread.</b> Everything the pipeline
+    /// needs — the <see cref="LevelContext"/> and the budgets — is built on the
+    /// main thread before it starts, and the pipeline itself touches no Unity
+    /// API, so it runs on a thread-pool task. The window polls the task from
+    /// <see cref="EditorApplication.update"/> and applies the result on the main
+    /// thread. The only thing the worker writes that the window reads while it
+    /// runs is the current stage, through <see cref="Interlocked"/>.</para>
+    /// <para><b>One run at a time.</b> While a run is in progress the Validate
+    /// button becomes Cancel. Editing, loading or starting a new level cancels
+    /// the run, because its answer would describe a draft that no longer exists.
+    /// Closing the window, entering Play Mode or recompiling scripts cancels it
+    /// too (<see cref="OnDisable"/>); every search checks the cancellation token
+    /// before each expansion, so the worker stops within one expansion.</para>
+    /// </remarks>
     public sealed class LevelEditorWindow : EditorWindow
     {
         private const string LevelsFolder = "Assets/Resources/Levels";
@@ -113,7 +130,22 @@ namespace GateRush.Editor
         // -- cached results of Step 3's logic (recomputed on edit) --
         private IReadOnlyList<DraftWarning> warnings = Array.Empty<DraftWarning>();
         private DraftMetrics metrics;
-        private LevelSolveResult solve;
+        private ValidationResult solve;
+
+        // -- Validate on a worker thread --
+        private Task<ValidationResult> validation;
+        private CancellationTokenSource validationCancellation;
+        private double validationStartedAt;
+        private double lastValidationRepaint;
+
+        /// <summary>The running stage, written by the worker through <see cref="Interlocked"/>.</summary>
+        private int validationStage;
+
+        /// <summary>Why the last run was cancelled, shown until the next run; null when it was not.</summary>
+        private string validationCancelledReason;
+
+        /// <summary>The last run's failure — a solver bug, never a verdict — shown as an error until the next run.</summary>
+        private string validationError;
 
         private Dictionary<Type, Action<object>> inspectors;
         private Vector2 windowScroll;
@@ -143,7 +175,28 @@ namespace GateRush.Editor
                 { typeof(SpawnedBlockDraft), o => DrawWaveBlockProperties((SpawnedBlockDraft)o) },
             };
 
+            // A window disabled and re-enabled without a domain reload keeps its
+            // fields, including a run that was cancelled on the way out: resume
+            // polling so it is collected rather than left looking busy forever.
+            if (validation != null)
+            {
+                EditorApplication.update -= PollValidation;
+                EditorApplication.update += PollValidation;
+            }
+
             Revalidate();
+        }
+
+        /// <summary>
+        /// Stops a running Validate. Called when the window closes and before
+        /// every domain reload — entering Play Mode, recompiling — so no worker
+        /// is left searching a level nobody can see, and the reload is not held
+        /// up by one.
+        /// </summary>
+        private void OnDisable()
+        {
+            CancelValidation("the Level Editor was closed or reloaded");
+            EditorApplication.update -= PollValidation;
         }
 
         // -- the frame -----------------------------------------------
@@ -210,7 +263,7 @@ namespace GateRush.Editor
         private void Mutated()
         {
             dirty = true;
-            solve = null;
+            DiscardSolve();
             history.Record(draft.ToDto(), GUIUtility.keyboardControl);
             Revalidate();
         }
@@ -219,23 +272,25 @@ namespace GateRush.Editor
         {
             warnings = new DraftValidator().Validate(draft);
 
-            // solve is null on every path except immediately after RunSolve —
-            // Mutated() clears it first — so an out-of-date solution length can
+            // solve is null on every path except immediately after a Validate
+            // run finishes — DiscardSolve() clears it on every edit, and cancels
+            // a run still in flight — so an out-of-date solution length can
             // never feed the suggested time budget. Only a fresh solve supplies
-            // a move count.
-            int? moves = solve != null && solve.Verdict == LevelSolveVerdict.Solvable ? solve.Solution.Count : (int?)null;
+            // a move count, and a length not proven shortest travels separately
+            // so the budget built from it is flagged rather than passed off as
+            // the designed one.
+            var solved = solve != null && solve.Verdict == LevelSolveVerdict.Solvable;
+            var provenLength = solved ? solve.ProvenShortestLength : null;
+            int? unprovenLength = solved && provenLength == null ? solve.Solution.Count : (int?)null;
             int? explored = null;
             int? stratum = null;
             if (solve != null)
             {
-                var raw = solve.SolvedBy == MoveGenMode.Exhaustive && solve.Exhaustive != null
-                    ? solve.Exhaustive
-                    : solve.Canonical;
-                explored = raw.ExploredStateCount;
-                stratum = raw.PeakRetainedStateCount;
+                explored = solve.Answering.ExploredStateCount;
+                stratum = solve.Answering.PeakRetainedStateCount;
             }
 
-            metrics = DraftMetrics.Compute(draft, settings.TimeBudget, moves, explored, stratum);
+            metrics = DraftMetrics.Compute(draft, settings.TimeBudget, provenLength, unprovenLength, explored, stratum);
         }
 
         // -- toolbar (new / open / save + breadcrumb) --------------
@@ -1367,7 +1422,7 @@ namespace GateRush.Editor
             freeCells.Clear();
             queueEntriesInFreeMode.Clear();
             dirty = true;
-            solve = null;
+            DiscardSolve();
             SyncGridFields();
             Revalidate();
             Repaint();
@@ -2305,12 +2360,24 @@ namespace GateRush.Editor
                     EditorStyles.miniLabel);
             }
 
-            EditorGUILayout.BeginHorizontal();
-            GUILayout.Label(SolveSummary(), EditorStyles.miniLabel);
-            GUILayout.FlexibleSpace();
-            if (GUILayout.Button("Validate", GUILayout.Width(80f)))
+            if (validationError != null)
             {
-                RunSolve();
+                EditorGUILayout.HelpBox(validationError, MessageType.Error);
+            }
+
+            EditorGUILayout.BeginHorizontal();
+            GUILayout.Label(IsValidating ? ValidationProgress() : SolveSummary(), EditorStyles.miniLabel);
+            GUILayout.FlexibleSpace();
+            if (IsValidating)
+            {
+                if (GUILayout.Button("Cancel", GUILayout.Width(80f)))
+                {
+                    CancelValidation("you cancelled it");
+                }
+            }
+            else if (GUILayout.Button("Validate", GUILayout.Width(80f)))
+            {
+                StartValidation();
             }
 
             EditorGUILayout.EndHorizontal();
@@ -2322,28 +2389,90 @@ namespace GateRush.Editor
         {
             if (solve == null)
             {
-                return "Solver: not run";
+                return validationCancelledReason != null
+                    ? $"Solver: cancelled — {validationCancelledReason}"
+                    : "Solver: not run";
             }
+
+            var answering = solve.Answering;
+            var stage = $"{StageName(solve.AnsweredBy)}, {answering.ExploredStateCount} states, {answering.ElapsedMs}ms";
 
             switch (solve.Verdict)
             {
                 case LevelSolveVerdict.Solvable:
-                    var raw = solve.SolvedBy == MoveGenMode.Exhaustive && solve.Exhaustive != null
-                        ? solve.Exhaustive
-                        : solve.Canonical;
                     var suggested = metrics?.SuggestedTimeBudgetSeconds;
-                    return $"Solver: solvable in {solve.Solution.Count} ({solve.SolvedBy}, " +
-                           $"{raw.ExploredStateCount} states, {raw.ElapsedMs}ms)" +
-                           (suggested.HasValue ? $"  ·  Suggested budget {suggested.Value}s" : string.Empty);
+                    var quality = solve.ProvenShortestLength.HasValue
+                        ? "shortest"
+                        : $"shortest ≥ {solve.LengthLowerBound}, not proven";
+                    var budgetNote = metrics != null && metrics.IsTimeBudgetFromUnprovenLength
+                        ? " (from unproven length)"
+                        : string.Empty;
+                    return $"Solver: solvable in {solve.Solution.Count}, {quality} ({stage})" +
+                           (suggested.HasValue ? $"  ·  Suggested budget {suggested.Value}s{budgetNote}" : string.Empty);
                 case LevelSolveVerdict.Unsolvable:
-                    return "Solver: unsolvable";
+                    return $"Solver: unsolvable ({stage}) — {UnsolvableBasis()}";
                 default:
-                    return "Solver: indeterminate (budget reached)";
+                    return "Solver: indeterminate (budget reached) — " +
+                           $"quick exhaustive A* {solve.Quick.ExploredStateCount} states/{solve.Quick.ElapsedMs}ms, " +
+                           $"nearest-next-clear {answering.ExploredStateCount} states/{answering.ElapsedMs}ms";
             }
         }
 
-        private void RunSolve()
+        /// <summary>Why the pipeline believes an Unsolvable verdict.</summary>
+        private string UnsolvableBasis()
         {
+            switch (solve.CrossCheckOutcome)
+            {
+                case UnsolvableCrossCheck.Confirmed:
+                    return "A* cross-check confirmed";
+                case UnsolvableCrossCheck.Inconclusive:
+                    return "A* cross-check inconclusive (ran out of budget without finding a solution)";
+                default:
+                    return "proven by exhaustive search";
+            }
+        }
+
+        private static string StageName(ValidationStage stage)
+        {
+            switch (stage)
+            {
+                case ValidationStage.QuickOptimal:
+                    return "quick exhaustive A*";
+                case ValidationStage.NearestNextClear:
+                    return "nearest-next-clear";
+                default:
+                    return "A* cross-check";
+            }
+        }
+
+        private bool IsValidating => validation != null;
+
+        private string ValidationProgress()
+        {
+            var stage = (ValidationStage)Interlocked.CompareExchange(ref validationStage, 0, 0);
+            var elapsed = EditorApplication.timeSinceStartup - validationStartedAt;
+            return $"Validating — {StageName(stage)}… {elapsed:F0}s";
+        }
+
+        /// <summary>
+        /// How often, in seconds, the window repaints to advance the progress
+        /// line while a run is in flight — often enough to read as live, rarely
+        /// enough not to spend the main thread on redrawing.
+        /// </summary>
+        private const double ValidationRepaintIntervalSeconds = 0.25;
+
+        /// <summary>
+        /// Starts a Validate run on a worker thread. The context and budgets are
+        /// built here, on the main thread, because <see cref="LevelEditorSettings"/>
+        /// is a Unity object; the worker only ever touches plain C#.
+        /// </summary>
+        private void StartValidation()
+        {
+            if (IsValidating)
+            {
+                return;
+            }
+
             LevelContext ctx;
             try
             {
@@ -2355,42 +2484,128 @@ namespace GateRush.Editor
                 return;
             }
 
-            // The search is synchronous and blocks the editor. The bar cannot
-            // show real progress — the search is opaque — but it is the
-            // difference between a frozen editor and a working one. Cleared in a
-            // finally so a throw does not leave it stuck.
-            try
+            solve = null;
+            validationError = null;
+            validationCancelledReason = null;
+            Revalidate();
+
+            var quickBudget = settings.QuickBudget;
+            var normalBudget = settings.ExhaustiveBudget;
+            var canonicalBudget = settings.CanonicalBudget;
+            var pipeline = new ValidationPipeline();
+
+            validationCancellation = new CancellationTokenSource();
+            var token = validationCancellation.Token;
+            Interlocked.Exchange(ref validationStage, (int)ValidationStage.QuickOptimal);
+            validationStartedAt = EditorApplication.timeSinceStartup;
+
+            validation = Task.Run(
+                () => pipeline.Run(
+                    ctx, quickBudget, normalBudget, canonicalBudget, normalBudget,
+                    stage => Interlocked.Exchange(ref validationStage, (int)stage),
+                    token),
+                token);
+
+            EditorApplication.update -= PollValidation;
+            EditorApplication.update += PollValidation;
+        }
+
+        /// <summary>
+        /// Asks a running Validate to stop, recording why for the summary line.
+        /// The worker notices at its next expansion; <see cref="PollValidation"/>
+        /// then finishes the run on the main thread.
+        /// </summary>
+        private void CancelValidation(string reason)
+        {
+            if (validationCancellation == null || validationCancellation.IsCancellationRequested)
             {
-                // A* rather than the runner's breadth-first default: it returns
-                // the same optimum while expanding fewer states (D3), which is
-                // the whole reason it was built, and both stages want it.
-                solve = new LevelSolveRunner(() => new AStarStrategy()).Run(
-                    ctx, settings.CanonicalBudget, settings.ExhaustiveBudget,
-                    stage => EditorUtility.DisplayProgressBar(
-                        "Solving…",
-                        stage == MoveGenMode.Canonical ? "Canonical search…" : "Exhaustive search…",
-                        stage == MoveGenMode.Canonical ? 0.1f : 0.55f));
-            }
-            catch (InvalidOperationException e)
-            {
-                // A* abandons a search whose heuristic has stopped being
-                // consistent rather than return an optimum it cannot vouch for.
-                // Breadth-first search has no such failure, so this catch arrived
-                // with the strategy above: without it the throw would escape
-                // through OnGUI. It reports a bug in the solver, not a problem
-                // with the level, so it says so and leaves the previous verdict
-                // untouched.
-                EditorUtility.DisplayDialog(
-                    "Solver error",
-                    $"The search could not complete:\n\n{e.Message}", "OK");
                 return;
             }
-            finally
+
+            validationCancelledReason = reason;
+            validationCancellation.Cancel();
+        }
+
+        /// <summary>Main-thread poll of the worker, from <see cref="EditorApplication.update"/>.</summary>
+        private void PollValidation()
+        {
+            if (validation == null)
             {
-                EditorUtility.ClearProgressBar();
+                EditorApplication.update -= PollValidation;
+                return;
             }
 
+            if (!validation.IsCompleted)
+            {
+                var now = EditorApplication.timeSinceStartup;
+                if (now - lastValidationRepaint >= ValidationRepaintIntervalSeconds)
+                {
+                    lastValidationRepaint = now;
+                    Repaint();
+                }
+
+                return;
+            }
+
+            var finished = validation;
+            var wasCancelled = validationCancellation.IsCancellationRequested;
+            validation = null;
+            validationCancellation.Dispose();
+            validationCancellation = null;
+            EditorApplication.update -= PollValidation;
+
+            FinishValidation(finished, wasCancelled);
+            Repaint();
+        }
+
+        /// <summary>
+        /// Applies a finished run. A solver failure is always shown, loudly — it
+        /// is a bug, never a verdict, and must not be mistaken for one. A run that
+        /// was asked to stop has its answer discarded even if it finished first:
+        /// it describes a draft that has since changed.
+        /// </summary>
+        private void FinishValidation(Task<ValidationResult> finished, bool wasCancelled)
+        {
+            var failure = finished.IsFaulted ? finished.Exception?.GetBaseException() : null;
+
+            if (failure is SolverDisagreementException disagreement)
+            {
+                validationError =
+                    "Solver disagreement — neither verdict can be trusted, and this is a solver bug, not a " +
+                    $"property of the level:\n{disagreement.Message}";
+                Debug.LogError(disagreement);
+                EditorUtility.DisplayDialog("Solver disagreement", validationError, "OK");
+                return;
+            }
+
+            if (failure != null && !(failure is OperationCanceledException))
+            {
+                validationError = $"Solver error — the search could not complete, and this is a solver bug:\n{failure.Message}";
+                Debug.LogException(failure);
+                EditorUtility.DisplayDialog("Solver error", validationError, "OK");
+                return;
+            }
+
+            if (wasCancelled || finished.IsCanceled || failure != null)
+            {
+                return;
+            }
+
+            solve = finished.Result;
+            validationCancelledReason = null;
             Revalidate();
+        }
+
+        /// <summary>
+        /// Forgets the last Validate answer because the draft changed, and
+        /// cancels a run still in flight for the same reason.
+        /// </summary>
+        private void DiscardSolve()
+        {
+            solve = null;
+            validationError = null;
+            validationCancelledReason = null;
+            CancelValidation("the level changed while it was running");
         }
 
         // -- files -------------------------------------------
@@ -2401,7 +2616,7 @@ namespace GateRush.Editor
             history.Reset(draft.ToDto());
             assetPath = null;
             dirty = false;
-            solve = null;
+            DiscardSolve();
             selection = null;
             dragKind = DragKind.None;
             queueEntriesInFreeMode.Clear();
@@ -2451,7 +2666,7 @@ namespace GateRush.Editor
                 history.Reset(draft.ToDto());
                 assetPath = path;
                 dirty = false;
-                solve = null;
+                DiscardSolve();
                 selection = null;
                 dragKind = DragKind.None;
                 queueEntriesInFreeMode.Clear();

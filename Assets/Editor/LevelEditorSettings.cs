@@ -5,8 +5,9 @@ using GateRush.Solver;
 namespace GateRush.Editor
 {
     /// <summary>
-    /// The editor-only, project-local tunables the Level Editor reads: the two
-    /// solve budgets (D5), the suggested-time-budget formula (D12), and the
+    /// The editor-only, project-local tunables the Level Editor reads: the
+    /// Validate budgets (the quick optimal attempt, and the canonical and
+    /// exhaustive budgets, D5), the suggested-time-budget formula (D12), and the
     /// window-layout proportions the docs/Modules/09a follow-up replaced fixed
     /// pixel constants with. Kept in an asset so no number is fixed at a call
     /// site and every one of them can be edited in the window and persist.
@@ -21,6 +22,11 @@ namespace GateRush.Editor
     /// </remarks>
     public sealed class LevelEditorSettings : ScriptableObject
     {
+        [Header("Quick optimal attempt (Validate's first step): exhaustive A*, small, to prove easy levels shortest fast")]
+        [SerializeField] private int quickMaxDepth = 400;
+        [SerializeField] private int quickMaxExploredStates = 100_000;
+        [SerializeField] private long quickMaxWallClockMs = 2_000;
+
         [Header("Canonical solve budget (stage 1)")]
         [SerializeField] private int canonicalMaxDepth = 200;
         [SerializeField] private int canonicalMaxExploredStates = 200_000;
@@ -49,9 +55,25 @@ namespace GateRush.Editor
         [Header("Undo (docs/Modules/09a, Session C): depth of the level editor's undo stack. A level's DTO is a few kilobytes, so memory is not a consideration.")]
         [SerializeField] private int undoStackDepth = 50;
 
+        /// <summary>
+        /// The quick optimal attempt Validate makes first: exhaustive A* at a
+        /// small budget. Easy levels finish inside it with a proven answer; the
+        /// rest fall through to nearest-next-clear. Default 100,000 states / 2 s.
+        /// </summary>
+        public SearchBudget QuickBudget => new SearchBudget(
+            quickMaxDepth, quickMaxExploredStates, quickMaxWallClockMs, MoveGenMode.Exhaustive);
+
+        /// <summary>
+        /// Canonical A*: the first stage of the cross-check that corroborates a
+        /// nearest-next-clear Unsolvable.
+        /// </summary>
         public SearchBudget CanonicalBudget => new SearchBudget(
             canonicalMaxDepth, canonicalMaxExploredStates, canonicalMaxWallClockMs, MoveGenMode.Canonical);
 
+        /// <summary>
+        /// The normal exhaustive budget: nearest-next-clear's own, and the second
+        /// stage of its A* cross-check.
+        /// </summary>
         public SearchBudget ExhaustiveBudget => new SearchBudget(
             exhaustiveMaxDepth, exhaustiveMaxExploredStates, exhaustiveMaxWallClockMs, MoveGenMode.Exhaustive);
 
