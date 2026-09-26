@@ -58,6 +58,38 @@ namespace GateRush.Core
         public int MaxResolutionPasses { get; }
 
         /// <summary>
+        /// True when, on this level, a clear can never turn a solvable board into
+        /// an unsolvable one. A solver may then commit to any reachable clear
+        /// without backtracking, and may conclude a level is unsolvable once it
+        /// finds no clear reachable from a state it reached — the authority the
+        /// nearest-next-clear strategy relies on.
+        /// </summary>
+        /// <remarks>
+        /// <para>The argument, in brief: between clears, moves are reversible,
+        /// so every arrangement within a stratum is as solvable as any other; a
+        /// clear moves no block; and everything a clear changes only ever opens
+        /// things up — counters rise, gates, shutters, frozen blocks and locks
+        /// only open, destroyed blocks free their cells. So a solution from
+        /// before any clear still works after it.</para>
+        /// <para>Three things break it, and make this false:</para>
+        /// <list type="bullet">
+        /// <item>A generator or an elevator. A spawn places blocks between
+        /// clears and cannot be undone, and a clear can trigger one.</item>
+        /// <item>A lock whose keys carry different effects. The key consumed
+        /// last decides whether the lock only unlocks or also clears its owner
+        /// (M8), so clearing one key's carrier early can change which effect the
+        /// lock gets — and an owner that can only leave by being cleared is then
+        /// stranded. A lock whose keys all share one effect is safe: an early
+        /// clear only makes that same effect arrive sooner.</item>
+        /// </list>
+        /// <para><b>Every new mechanic must decide this flag consciously.</b> One
+        /// that changes the board between clears, closes anything on a clear,
+        /// makes a move irreversible, or lets the order of clears change what a
+        /// clear does must set it false here — not inherit true.</para>
+        /// </remarks>
+        public bool IsClearMonotone { get; }
+
+        /// <summary>
         /// Which of this level's block indices are interchangeable — blocks
         /// sharing an identical spec, whose dynamic rows <c>BoardState</c>
         /// canonicalises before hashing so that permuting them is not mistaken
@@ -127,6 +159,7 @@ namespace GateRush.Core
             MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
             lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
             keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
+            IsClearMonotone = Generators.Count == 0 && Elevators.Count == 0 && !HasLockWithMixedKeyEffects();
             // Fully qualified because the property name shadows the type name
             // inside this class — the same shape as BoardState.ProgressVector.
             BlockSymmetry = GateRush.Core.BlockSymmetry.Of(specByIndex);
@@ -263,6 +296,27 @@ namespace GateRush.Core
         /// that each lock has enough of them is already enforced by
         /// <see cref="ValidateLocksAndKeys"/>.
         /// </summary>
+        /// <summary>
+        /// True when some lock is targeted by keys — top-level or spawned — that
+        /// do not all carry the same <see cref="KeyEffect"/>. See
+        /// <see cref="IsClearMonotone"/> for why that matters.
+        /// </summary>
+        private bool HasLockWithMixedKeyEffects()
+        {
+            foreach (var keyIndices in keyIndicesByLockId.Values)
+            {
+                for (var k = 1; k < keyIndices.Length; k++)
+                {
+                    if (specByIndex[keyIndices[k]].KeyEffect != specByIndex[keyIndices[0]].KeyEffect)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         private static Dictionary<int, int[]> BuildKeyIndexLookup(IReadOnlyList<BlockSpec> specs)
         {
             var keyLists = new Dictionary<int, List<int>>();
