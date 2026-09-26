@@ -821,3 +821,162 @@ agreement — exactly what D2's single full-field `Equals` was written to
 avoid.
 
 ---
+
+## D36 — Existence and quality are separate on a solve result
+
+**Decision.** `SolveStatus` stays three-valued (D4): `Solvable | Unsolvable |
+Indeterminate`. `SolveResult` (and `LevelSolveResult` / `ValidationResult`)
+additionally carry a `LengthLowerBound` and a computed `ProvenShortestLength`
+— `Solution.Count` when `LengthLowerBound` reaches it, else null. `Solvable`
+states a solution exists; it no longer by itself states that the solution is
+shortest.
+
+**Why.** D3 assumed the solver would only ever run BFS or A\*, both
+exhaustive and mode-optimal, so every `Solvable` result was automatically
+the shortest one. That stopped holding once nearest-next-clear (D37) could
+return a playable but not-shortest solution. Existence and quality had to
+become independent fields.
+
+**The bound.** An exhaustive-mode `Solvable` result's own length is a
+trivial, tight bound. A canonical-mode or `Indeterminate` result falls back
+to A\*'s own admissible heuristic (`h = C - F`, D3) evaluated at the initial
+state, valid regardless of which strategy produced the result.
+
+**Consequence.** The Level Editor's suggested time budget (D12) prefers a
+proven-shortest length and falls back to an unproven one only when flagged
+as such (`IsTimeBudgetFromUnprovenLength`).
+
+**Rejected.** A fourth `SolveStatus` value for "solvable but unproven
+shortest." Existence and quality are orthogonal axes — `Unsolvable` and
+`Indeterminate` carry no meaningful length either way — so folding quality
+into the existence enum would only have to be undone later.
+
+---
+
+## D37 — Nearest-next-clear: enforced hill-climbing under clear monotonicity
+
+**Decision.** A third search strategy, `NearestNextClearStrategy`: enforced
+hill-climbing. From the current state, search only the current stratum —
+the states reachable before any clear — for a route to any reachable
+clear; commit to the first one found; repeat; never backtrack. Requires
+`MoveGenMode.Exhaustive`, since canonical pruning (D5) could hide the only
+route to a clear and manufacture a false dead end.
+
+**Why.** Some of the simplest levels in the game were exhausting both
+BFS's and A\*'s budgets without a verdict — A\*'s heuristic is blind
+before the first clear, and colour-distinct blocks are correctly not
+collapsed by D35's symmetry reduction, so the branching factor is real,
+not a bug. A solver that cannot clear the simplest levels could not be
+trusted on harder ones.
+
+**Completeness: clear monotonicity.** Enforced hill-climbing is incomplete
+in general — a commitment can walk into a dead end. It is complete
+whenever `LevelContext.IsClearMonotone` holds: a clear never turns a
+solvable board unsolvable, because moves within a stratum are reversible;
+a clear only ever parks or destroys a block, freeing cells; and
+everything else a clear can change — counters, gates, shutters, frozen
+blocks, locks — only ever opens further possibility. Under this argument,
+exhausting a stratum with no clear reachable anywhere in it proves
+unsolvability, not merely a budget limit, so `NearestNextClearStrategy`
+may report `SolveStatus.Unsolvable` when `IsClearMonotone` is true.
+
+**`IsClearMonotone`.** True only when the level has no generators, no
+elevators, and no lock whose required keys carry different `KeyEffect`
+values.
+
+**The flaw the corpus found.** The monotonicity argument's claim that
+"keys only unlock or clear" was incomplete: M8's rule is that the last
+key consumed decides a lock's effect, so when a lock's keys carry
+different effects, clear order decides which effect the lock gets.
+Expanding the random-board property corpus to cover locks and keys — one
+of the two safety measures below — surfaced a board where A\* proved it
+solvable and nearest-next-clear reported it unsolvable.
+`IsClearMonotone`'s scope was narrowed to also exclude any lock with
+mixed-effect keys; the narrowing only ever takes authority away, never
+changes an answer nearest-next-clear would otherwise give.
+
+**Two safety measures precede trusting `Unsolvable`:**
+
+- An automatic A\* cross-check (`NextClearRunner`). Whenever
+  nearest-next-clear would report `Unsolvable`, the two-stage A\* search
+  (canonical then exhaustive, `LevelSolveRunner`, D5) also runs at the
+  editor's ordinary budgets before the verdict is surfaced. A\*
+  `Unsolvable` confirms it; A\* `Indeterminate` leaves it standing,
+  labelled `Inconclusive`, on the monotonicity argument alone —
+  expected, since this is exactly the situation nearest-next-clear
+  exists for. A\* `Solvable` means the two disagree, and
+  `SolverDisagreementException` is thrown rather than either verdict
+  surfacing.
+- A permanent, expanded property-test corpus. `RandomBoards` was
+  expanded to also generate locks and keys (both `KeyEffect` values) and
+  shutters, and the scratch-harness checks this argument was validated
+  against became permanent Edit Mode tests
+  (`NearestNextClearStrategyTests`, `ClearMonotonicityTests`).
+
+**Mechanism.** Each stratum is searched on `NextClearAbstraction`, a
+colour-merged copy of the board exact up to the next clear, whenever no
+generator or elevator spawn is pending — every block that cannot clear
+next shares one merged colour, which is where D35's `BlockSymmetry` gets
+its reduction. Every route the abstraction returns is replayed on the
+real board through `MoveResolver` before being trusted; a mismatch
+throws.
+
+**Consequence.** A `Solvable` result from nearest-next-clear is usually,
+but not always, the shortest solution — it commits to the first
+reachable clear a best-first search finds within a stratum, not to the
+fewest moves overall. This is why D36 separates existence from quality.
+
+**Rejected.** Granting `Unsolvable` authority on the proof alone,
+without the A\* cross-check — the corpus expansion had already found one
+real gap in the argument itself once, and a cross-check catches an
+implementation bug even after the mathematics is believed sound, at no
+cost on the common case.
+
+**Deferred.** A second, opt-in mode that proves the shortest solution
+rather than just existence. Existence is the priority for the Level
+Editor's Validate button; may be added later if a real need surfaces.
+
+---
+
+## D38 — Validate pipeline: quick proof, then nearest-next-clear, cancellable
+
+**Decision.** The Level Editor's single `[ Validate ]` button runs one
+pipeline (`ValidationPipeline`): exhaustive A\* at a small "quick"
+budget first; if that settles the level, its answer is already a proof
+and the run ends there. Anything the quick budget leaves `Indeterminate`
+falls through to nearest-next-clear (D37) with its A\* cross-check, at
+the editor's normal budgets.
+
+**Why the quick stage is exhaustive-only.** Canonical pruning (D5) is a
+subset of the real move set, so a canonical solution is playable but
+never provably shortest. Running canonical first bought nothing here: on
+the levels where it matters, canonical finds an answer quickly but
+unproven, and exhaustive is needed anyway to prove it.
+
+**Threading.** The pipeline touches no Unity API, so it runs on a worker
+thread (`Task.Run`); the window polls it from `EditorApplication.update`
+and applies the result on the main thread.
+
+**Cancellation.** `.NET` cannot safely stop a thread from outside, so
+cancellation is cooperative: `SearchBudget` carries a
+`CancellationToken`, and every strategy (BFS, A\*, nearest-next-clear)
+checks it once per state expansion — finer-grained than `SearchBudget`'s
+existing 1,024-expansion wall-clock poll. Closing the window, entering
+Play Mode, or a script recompile all cancel a run in progress the same
+way.
+
+**One run at a time.** While a run is in flight, the Validate button
+becomes Cancel rather than starting a second run. Editing, loading or
+creating a level cancels a run in progress, since its answer would
+describe a draft that no longer exists by the time it arrives.
+
+**Errors are never verdicts.** `SolverDisagreementException` (D37), or
+any other exception a search throws on a bug, is surfaced as a dialog, a
+logged error, and a persistent error box in the footer — never mistaken
+for `Indeterminate`.
+
+**Rejected.** Reordering nearest-next-clear's own search to prefer
+fewest-moves over fewest-blockers, to shrink the gap to true optimum, at
+some cost in speed. Validate's job is existence, not optimality (D36,
+D37); worth revisiting if shorter answers turn out to matter more in
+practice.
