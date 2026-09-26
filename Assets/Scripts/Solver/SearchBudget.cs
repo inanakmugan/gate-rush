@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace GateRush.Solver
 {
@@ -61,12 +62,27 @@ namespace GateRush.Solver
         /// </summary>
         public MoveGenMode Mode { get; }
 
+        /// <summary>
+        /// Lets the caller stop a running search from another thread. Unlike the
+        /// limits above it does not yield <see cref="SolveStatus.Indeterminate"/>:
+        /// a cancelled search has no answer to report, so every strategy checks
+        /// this once per expansion — a single flag read, far finer than the
+        /// wall-clock poll — and throws <see cref="OperationCanceledException"/>.
+        /// <see cref="CancellationToken.None"/> by default, which never cancels.
+        /// </summary>
+        public CancellationToken Cancellation { get; }
+
         /// <exception cref="ArgumentOutOfRangeException">
         /// Any numeric limit is below 1, or <paramref name="mode"/> is not a
         /// defined <see cref="MoveGenMode"/>. A zero or negative budget is a
         /// caller bug, not a tiny-but-valid budget.
         /// </exception>
-        public SearchBudget(int maxDepth, int maxExploredStates, long maxWallClockMs, MoveGenMode mode)
+        public SearchBudget(
+            int maxDepth,
+            int maxExploredStates,
+            long maxWallClockMs,
+            MoveGenMode mode,
+            CancellationToken cancellation = default)
         {
             if (maxDepth < 1)
             {
@@ -94,6 +110,11 @@ namespace GateRush.Solver
             MaxExploredStates = maxExploredStates;
             MaxWallClockMs = maxWallClockMs;
             Mode = mode;
+            Cancellation = cancellation;
         }
+
+        /// <summary>This budget with every limit unchanged, cancellable through <paramref name="cancellation"/>.</summary>
+        public SearchBudget WithCancellation(CancellationToken cancellation) =>
+            new SearchBudget(MaxDepth, MaxExploredStates, MaxWallClockMs, Mode, cancellation);
     }
 }
