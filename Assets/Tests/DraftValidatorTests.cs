@@ -784,6 +784,171 @@ namespace GateRush.Tests
             Assert.IsTrue(Warns(draft, DraftWarningCategory.ShutterRegionNotFullyCovered));
         }
 
+        // -- TimeBudgetNotPositive -------------------------------
+
+        [Test]
+        public void TimeBudgetNotPositive_ZeroBudget_Fires()
+        {
+            var draft = Draft(3, 3, d => d.SuggestedTimeBudgetSeconds = 0);
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.TimeBudgetNotPositive));
+        }
+
+        [Test]
+        public void TimeBudgetNotPositive_NegativeBudget_Fires()
+        {
+            var draft = Draft(3, 3, d => d.SuggestedTimeBudgetSeconds = -5);
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.TimeBudgetNotPositive));
+        }
+
+        [Test]
+        public void TimeBudgetNotPositive_PositiveBudget_Silent()
+        {
+            var draft = Draft(3, 3, d => d.SuggestedTimeBudgetSeconds = 30);
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.TimeBudgetNotPositive));
+        }
+
+        // -- GoldRewardNotPositive -------------------------------
+
+        [Test]
+        public void GoldRewardNotPositive_ZeroReward_Fires()
+        {
+            var draft = Draft(3, 3, d => d.GoldReward = 0);
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.GoldRewardNotPositive));
+        }
+
+        [Test]
+        public void GoldRewardNotPositive_NegativeReward_Fires()
+        {
+            var draft = Draft(3, 3, d => d.GoldReward = -1);
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.GoldRewardNotPositive));
+        }
+
+        [Test]
+        public void GoldRewardNotPositive_PositiveReward_Silent()
+        {
+            var draft = Draft(3, 3, d => d.GoldReward = 10);
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.GoldRewardNotPositive));
+        }
+
+        // -- LevelIdAlreadyUsed ----------------------------------
+
+        [Test]
+        public void LevelIdAlreadyUsed_AnotherFileDeclaresTheId_FiresNamingTheFile()
+        {
+            var draft = Draft(3, 3, d => d.LevelId = 3);
+            var others = new[] { new LevelFileId("level-1.json", 1), new LevelFileId("level-3.json", 3) };
+
+            var clashes = new DraftValidator().Validate(draft, others)
+                .Where(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed).ToList();
+
+            Assert.AreEqual(1, clashes.Count);
+            StringAssert.Contains("level-3.json", clashes[0].Message);
+        }
+
+        [Test]
+        public void LevelIdAlreadyUsed_TwoFilesDeclareTheId_FiresOncePerFile()
+        {
+            var draft = Draft(3, 3, d => d.LevelId = 3);
+            var others = new[] { new LevelFileId("a.json", 3), new LevelFileId("b.json", 3) };
+
+            var clashes = new DraftValidator().Validate(draft, others)
+                .Where(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed).ToList();
+
+            Assert.AreEqual(2, clashes.Count);
+            StringAssert.Contains("a.json", clashes[0].Message);
+            StringAssert.Contains("b.json", clashes[1].Message);
+        }
+
+        [Test]
+        public void LevelIdAlreadyUsed_OtherFilesDeclareDifferentIds_Silent()
+        {
+            var draft = Draft(3, 3, d => d.LevelId = 3);
+            var others = new[] { new LevelFileId("level-1.json", 1), new LevelFileId("level-4.json", 4) };
+
+            var warnings = new DraftValidator().Validate(draft, others);
+
+            Assert.IsFalse(warnings.Any(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
+        }
+
+        [Test]
+        public void LevelIdAlreadyUsed_NoOtherFiles_Silent()
+        {
+            var draft = Draft(3, 3, d => d.LevelId = 0);
+
+            var withNull = new DraftValidator().Validate(draft, null);
+            var withEmpty = new DraftValidator().Validate(draft, Array.Empty<LevelFileId>());
+
+            Assert.IsFalse(withNull.Any(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
+            Assert.IsFalse(withEmpty.Any(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
+        }
+
+        // -- TimeBudgetBelowSuggested ----------------------------
+
+        private static bool WarnsBelowSuggested(int budget, int? suggested, bool isUnproven = false) =>
+            BelowSuggestedWarning(budget, suggested, isUnproven) != null;
+
+        private static DraftWarning BelowSuggestedWarning(int budget, int? suggested, bool isUnproven) =>
+            new DraftValidator()
+                .Validate(Draft(3, 3, d => d.SuggestedTimeBudgetSeconds = budget), null, suggested, isUnproven)
+                .FirstOrDefault(w => w.Category == DraftWarningCategory.TimeBudgetBelowSuggested);
+
+        [Test]
+        public void TimeBudgetBelowSuggested_BudgetShorterThanSuggestion_Fires()
+        {
+            Assert.IsTrue(WarnsBelowSuggested(30, 40));
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_BudgetEqualToSuggestion_Silent()
+        {
+            Assert.IsFalse(WarnsBelowSuggested(40, 40));
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_BudgetLongerThanSuggestion_Silent()
+        {
+            Assert.IsFalse(WarnsBelowSuggested(50, 40));
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_NoSuggestion_Silent()
+        {
+            Assert.IsFalse(WarnsBelowSuggested(30, null));
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_ZeroBudget_SilentBecauseNotPositiveCoversIt()
+        {
+            var draft = Draft(3, 3, d => d.SuggestedTimeBudgetSeconds = 0);
+
+            var warnings = new DraftValidator().Validate(draft, null, 40);
+
+            Assert.IsFalse(warnings.Any(w => w.Category == DraftWarningCategory.TimeBudgetBelowSuggested));
+            Assert.IsTrue(warnings.Any(w => w.Category == DraftWarningCategory.TimeBudgetNotPositive));
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_SuggestionFromUnprovenLength_MessageSaysSo()
+        {
+            var warning = BelowSuggestedWarning(30, 40, isUnproven: true);
+
+            StringAssert.Contains("(from unproven length)", warning.Message);
+        }
+
+        [Test]
+        public void TimeBudgetBelowSuggested_SuggestionFromProvenLength_MessageHasNoUnprovenNote()
+        {
+            var warning = BelowSuggestedWarning(30, 40, isUnproven: false);
+
+            StringAssert.DoesNotContain("unproven", warning.Message);
+        }
+
         private static string Message(LevelDraft draft, DraftWarningCategory category) =>
             new DraftValidator().Validate(draft).First(w => w.Category == category).Message;
 
