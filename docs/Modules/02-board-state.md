@@ -52,6 +52,9 @@ sealed class BoardState
 
     bool IsSolved(LevelContext ctx)
 
+    ProgressVector ProgressVector       // added in Module 05 (D32)
+    static readonly Coord UnspawnedOrigin   // (-1, -1); see the index scheme below
+
     int GetHashCode()
     bool Equals(object obj)
 ```
@@ -79,6 +82,12 @@ repeatedly.
 
 **`Equals` performs a full field comparison after the hash matches.** Hash
 collisions are rare, not impossible, and a collision here corrupts the search.
+
+**Symmetric blocks collapse (added later, D35).** Hash and `Equals` compare the
+per-block rows of interchangeable blocks — those `LevelContext.BlockSymmetry`
+groups by identical spec — in a canonical sorted order rather than by index.
+Every dynamic field still participates; only the order within a group is
+normalised. `Origins`, and the moves a solve returns, keep literal indices.
 
 **`CanMove` and `CanBeTargeted` are separate predicates**, per `DECISIONS.md`
 D11:

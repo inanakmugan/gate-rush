@@ -24,32 +24,38 @@ means cleaning up every leak that accumulated in the meantime.
 Grid, blocks, gates, resolution, search, tests, editor. No Unity scene involved
 except the editor window.
 
-| # | Module | Spec                            |
-|---|---|---------------------------------|
-| 1.1 | `Coord`, `LevelContext`, definitions | `Modules/01-level-context.md`   |
-| 1.2 | `BoardState` | `Modules/02-board-state.md`     |
-| 1.3 | `MoveResolver` (fixpoint skeleton, M1 + M7 only) | `Modules/03-move-resolver.md`   |
-| 1.4 | `MoveGenerator` | `Modules/04-move-generator.md`  |
-| 1.5 | `ISearchStrategy` + BFS | `Modules/05-search-strategy.md` |
-| 1.6 | Test corpus — hand-built 3×3 to 5×5 boards | —                               |
-| 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `Modules/06-conditions.md`      |
-| 1.8 | M8 locks and keys | `Modules/07-locks-and-keys.md`  |
-| 1.9 | Serialization (JSON DTOs) | `Modules/08-serialization.md`   |
-| 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `Modules/09-level-editor.md`    |
-| 1.11 | A\* + equivalence tests against BFS | spec written when reached       |
-| 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | —                               |
-| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached       |
-        
+| # | Module | Spec | Status |
+|---|---|---|---|
+| 1.1 | `Coord`, `LevelContext`, definitions | `Modules/01-level-context.md` | Done |
+| 1.2 | `BoardState` | `Modules/02-board-state.md` | Done |
+| 1.3 | `MoveResolver` (fixpoint skeleton, M1 + M7 only) | `Modules/03-move-resolver.md` | Done |
+| 1.4 | `MoveGenerator` | `Modules/04-move-generator.md` | Done |
+| 1.5 | `ISearchStrategy` + BFS | `Modules/05-search-strategy.md` | Done |
+| 1.6 | Test corpus — hand-built 3×3 to 5×5 boards | — | Done |
+| 1.7 | Condition system + M2, M3, M10 (and M5's threshold half) | `Modules/06-conditions.md` | Done |
+| 1.8 | M8 locks and keys | `Modules/07-locks-and-keys.md` | Done |
+| 1.9 | Serialization (JSON DTOs) | `Modules/08-serialization.md` | Done |
+| 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `Modules/09-level-editor.md` | Done |
+| 1.11 | A\* + equivalence tests against BFS | `Modules/05-search-strategy.md` | Done |
+| 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | — | Done |
+| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached | Not started |
 
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
 1.1–1.3 and carry the heaviest test load. Subtle bugs concentrate there.
 
-**Next after 1.10.** A generator gains a `Width`, mirroring the gate it is the
-inverse of (M6): the marker draws at that width, and a queue block whose
-projection exceeds it is a warning, the mirror of "a compatible gate exists but
-is too narrow". `SpawnedBlockDraft` gains a stable `Id` in the same change —
+**Next after 1.10 — done (D34).** A generator gains a `Width`, mirroring the
+gate it is the inverse of (M6): the marker draws at that width, and a queue
+block whose projection exceeds it is a warning, the mirror of "a compatible gate
+exists but is too narrow". `SpawnedBlockDraft` gains a stable `Id` in the same change —
 both touch the level DTO, and no level has been authored yet, so the format can
 still change for free. Spec written when reached.
+
+**Added along the way — solver robustness (D35–D41).** Authoring the first real
+levels showed the solver could not settle some simple boards. That produced
+symmetry reduction (D35), solve results that separate existence from proven
+length (D36), the nearest-next-clear strategy (D37), the cancellable Validate
+pipeline (D38), and the fixes and rules in D39–D41. D41 is specified but not
+yet implemented.
 
 ---
 
@@ -69,6 +75,10 @@ synthetic corpus; this is the first time the editor, the solver, and
 serialization run against a real, non-trivial level. Cheaper to find an
 editor or data-model gap here than after 2.1 depends on the level format.
 
+*Status: in progress.* level-0, level-1 and level-3 are authored and validate,
+but none starts with a ready opening move (D16), and all carry `levelId`,
+`goldReward` and a suggested time budget of 0, which the editor cannot yet set.
+
 **2.1 — Static skeleton.** Render the board, wire pointer input straight to
 `MoveResolver`, apply moves instantly — no animation, no countdown, no
 win/lose UI. Proves the simulation and input are wired correctly before any
@@ -81,6 +91,7 @@ of 2.1 once the core loop is confirmed correct.
 Watch the zero-distance move here: a drag with a determined direction but no
 displacement must still clear a block at a gate. This is the first move of
 most levels and is easy to lose in input handling.
+
 ---
 
 ## Phase 3 — First WebGL build

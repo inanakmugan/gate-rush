@@ -163,3 +163,23 @@ missed.
   grid, say — is rejected by `Core`'s constructor with `Core`'s message. Assert
   the message, so that a later "helpful" duplicate check in this layer changes
   which error surfaces and fails the test.
+
+---
+
+## Later additions
+
+- **`formatVersion` 3** (D34; it went to 2 in Module 09). Older versions are
+  refused. Levels now exist, so the next change needs a migration path rather
+  than a refusal.
+- **`GeneratorDto.width`** — the generator's width along its edge (D34).
+- **`SpawnedBlockDto.id`** — a stable per-list authoring identity for queue
+  entries and wave blocks, so a selection survives undo (D33, D34). It lives in
+  the DTO and the editor's draft only; `Core` addresses spawned blocks by flat
+  index.
+- **Spawned-block region origin** (Module 09) — an elevator wave block's
+  position relative to the region's `Min`, stored as a `hasRegionOrigin` flag
+  plus a `regionOrigin` coordinate, because `JsonUtility` cannot serialise a
+  nullable.
+- **`ParseDto` / `ToJson(LevelDto)`** (Module 09) — the stage that stops at the
+  DTO, so the editor can open a level that is structurally sound but
+  semantically broken, and repair it.

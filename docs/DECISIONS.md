@@ -37,6 +37,11 @@ reimplement identically in tests.
 principle, but a single missed undo produces corruption that is nearly
 impossible to diagnose.
 
+**Later (D35).** Hash and equality are no longer plain full-field: blocks
+with an identical static spec are sorted into a canonical order first, so
+states that differ only by which interchangeable block sits where collapse
+into one. Every dynamic field still participates.
+
 ---
 
 ## D3 — BFS first, A\* second, behind an interface
@@ -69,6 +74,11 @@ a 2-move optimum — "every" gives `h = 3` there.
 `F` only when *every* unconsumed key targeting it is `ClearOuterColor` —
 still admissible, but weaker, and shown to overestimate on the
 mixed-key-effect corpus board (Module 05).
+
+**Later (D36, D37).** The solver no longer always returns a shortest
+solution: nearest-next-clear returns a playable one, and `SolveResult`
+states separately whether its length is proven shortest. BFS and A\* keep
+the guarantee above.
 
 ---
 
@@ -107,6 +117,11 @@ move set is a subset of the player's, so any solution it finds is genuinely
 playable, and it can never call an unsolvable board solvable. When the solver was
 planned as a generation filter, false negatives were free. As an authoring tool
 they are expensive, hence the exhaustive fallback.
+
+**Later (D38).** The editor no longer tries canonical first. Validate starts
+with exhaustive A\* at a small budget, since only an exhaustive answer is a
+proof; canonical-then-exhaustive survives as nearest-next-clear's A\*
+cross-check (D37).
 
 ---
 
@@ -289,6 +304,11 @@ so a later schema change can be migrated rather than silently misread.
 **Rejected.** `ScriptableObject`. It would bind level data to `UnityEngine`, take
 the `Core` and `Solver` layers with it, and make bulk operations over hundreds of
 levels awkward.
+
+**Later (Module 08).** Enums are written and read as their names, not as
+integers: a name diffs readably and cannot be silently reassigned when an
+enum gains a member. The DTO layer bypasses `JsonUtility`'s integer default,
+so the "accept integer enums" consequence above no longer applies.
 
 ---
 
@@ -784,6 +804,9 @@ DTO and the draft, not in `Core`. `formatVersion` goes to 3; version 2 is
 refused. No level has been authored, so no migration path is needed, as with
 1 → 2.
 
+**Later.** Levels now exist (Phase 2.0), so the next `formatVersion` change
+needs a migration path, not a refusal.
+
 ---
 
 ## D35 — Symmetric blocks collapse for search identity
@@ -839,10 +862,12 @@ the shortest one. That stopped holding once nearest-next-clear (D37) could
 return a playable but not-shortest solution. Existence and quality had to
 become independent fields.
 
-**The bound.** An exhaustive-mode `Solvable` result's own length is a
-trivial, tight bound. A canonical-mode or `Indeterminate` result falls back
-to A\*'s own admissible heuristic (`h = C - F`, D3) evaluated at the initial
-state, valid regardless of which strategy produced the result.
+**The bound.** A `Solvable` result from BFS or A\* in exhaustive mode is
+mode-optimal, so its own length is a tight bound. Any other result —
+canonical mode, `Indeterminate`, or nearest-next-clear, which runs
+exhaustive but is not optimal — falls back to A\*'s admissible heuristic
+(`h = C - F`, D3) evaluated at the initial state, valid whichever strategy
+produced the result.
 
 **Consequence.** The Level Editor's suggested time budget (D12) prefers a
 proven-shortest length and falls back to an unproven one only when flagged
@@ -874,21 +899,23 @@ trusted on harder ones.
 **Completeness: clear monotonicity.** Enforced hill-climbing is incomplete
 in general — a commitment can walk into a dead end. It is complete
 whenever `LevelContext.IsClearMonotone` holds: a clear never turns a
-solvable board unsolvable, because moves within a stratum are reversible;
-a clear only ever parks or destroys a block, freeing cells; and
-everything else a clear can change — counters, gates, shutters, frozen
-blocks, locks — only ever opens further possibility. Under this argument,
-exhausting a stratum with no clear reachable anywhere in it proves
-unsolvability, not merely a budget limit, so `NearestNextClearStrategy`
-may report `SolveStatus.Unsolvable` when `IsClearMonotone` is true.
+solvable board unsolvable. A move within a stratum can always be undone by
+moving back, except that moving back onto a compatible gate clears the
+block — itself a clear, and so covered by the same argument. A clear only
+ever parks or destroys a block, freeing cells; and everything else a clear
+can change — counters, gates, shutters, frozen blocks, locks — only ever
+opens further possibility. Under this argument, exhausting a stratum with
+no clear reachable anywhere in it proves unsolvability, not merely a
+budget limit, so `NearestNextClearStrategy` may report
+`SolveStatus.Unsolvable` when `IsClearMonotone` is true.
 
 **`IsClearMonotone`.** True only when the level has no generators, no
 elevators, and no lock whose required keys carry different `KeyEffect`
 values.
 
 **The flaw the corpus found.** The monotonicity argument's claim that
-"keys only unlock or clear" was incomplete: M8's rule is that the last
-key consumed decides a lock's effect, so when a lock's keys carry
+"keys only unlock or clear" was incomplete: under M8 the key that
+completes a lock decides its effect, so when a lock's keys carry
 different effects, clear order decides which effect the lock gets.
 Expanding the random-board property corpus to cover locks and keys — one
 of the two safety measures below — surfaced a board where A\* proved it
@@ -1012,6 +1039,7 @@ before this decision, never intended. It let the solver clear a block with
 a push the player cannot make.
 
 ---
+
 ## D40 — Validate refuses levels it cannot judge; a rejected move is a bug
 
 **Decision.** Two additions to D38's "errors are never verdicts". A level
@@ -1039,5 +1067,38 @@ nothing should not be computed.
 
 **Temporary.** The spawner guard goes when phase 1.13 lands; the
 rejected-move throw stays.
+
+---
+
+## D41 — A key effect waits for a closed shutter
+
+**Decision.** Nothing reaches a block under a closed shutter, a key's
+effect included. When a lock's keys complete while its block is under a
+closed shutter, the effect waits and applies the moment the shutter
+opens, within the same resolution: the lock is removed and, for
+`ClearOuterColor`, the outer colour is cleared. The completing key decides
+which effect waits (M8).
+
+**Why.** Observation of the reference game: a block under a closed shutter
+cannot be dragged or targeted until the shutter opens. The key is still
+spent when its carrier dies, so waiting keeps the player from losing it to
+an order they could not see — the locked block was hidden.
+
+**The exception this makes.** Module 06's rule is that opening never
+clears: opening a gate, unfreezing a block or opening a shutter changes
+state and stops. A waiting `ClearOuterColor` is the one clear an opening
+can release. It is a key clear arriving late, not a gate exit, so D25 is
+untouched: no block is cleared for resting at a gate.
+
+**Consequence.** The state must be able to tell a completed lock whose
+effect is still waiting, and which effect it is — with mixed-effect keys
+the completing key decides. If that is stored rather than derived, it is
+a dynamic field and is hashed like every other (D1). Clear monotonicity
+(D37) is unaffected: waiting delays an effect, never removes one.
+
+**Rejected.** Spending the key with no effect: the lock could stay shut
+for good because of an order the player could not see. Also rejected:
+unlocking at once and dropping only the clear — it splits one effect into
+two halves with different timing, for no gain.
 
 ---

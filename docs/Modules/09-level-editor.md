@@ -27,8 +27,8 @@ so the field is optional and meaningful only for elevator waves.
 gaps, no overlaps (M9). Validated in `ElevatorDefinition`'s constructor, which
 already knows the region.
 
-`formatVersion` goes to **2**. No migration path is needed: no levels have been
-authored yet, so version 1 is simply refused.
+`formatVersion` goes to **2** (later 3, D34). No migration path is needed: no
+levels have been authored yet, so version 1 is simply refused.
 
 ### Not in scope
 
@@ -86,8 +86,15 @@ GateRush.Editor
     LevelDraft                            mutable level under edit
     DraftValidator                        the live warnings
     DraftMetrics                          the numbers the panel shows
-    LevelSolveRunner                      the two-stage solver invocation
+    LevelSolveRunner                      the two-stage A* search (now the cross-check, D37)
+    NextClearRunner                       nearest-next-clear plus its A* cross-check (D37)
+    ValidationPipeline                    what [ Validate ] runs, off the main thread (D38)
 ```
+
+The footer has since changed (D36, D38): the solver line names the stage that
+answered, says whether the length is proven shortest, and carries the suggested
+budget; a run in progress shows its stage and elapsed time, and Validate becomes
+Cancel.
 
 Everything except `LevelEditorWindow` is plain logic with no `UnityEditor`
 dependency in its signatures, so it can be tested. The window draws and routes
@@ -185,11 +192,13 @@ and stops. Explaining *why* a board is geometrically deadlocked is a research
 problem, not a feature; the honest answer is that the designer has to look at the
 board.
 
-**Two-stage solving.** Canonical first with a 5s / 200k budget; if that finds
-nothing, exhaustive with 15s / 1M. Only if both come back empty is the verdict
-`Indeterminate`. This is the fallback D5 describes, and it belongs here rather
-than in the strategy — the strategy honours a budget, the caller decides the
-policy. Both budgets are editable in the window.
+**The solving pipeline (revised, D38).** Originally canonical first (5s / 200k),
+then exhaustive (15s / 1M). Validate now runs exhaustive A\* at a small quick
+budget; anything that leaves `Indeterminate` falls through to nearest-next-clear
+with its A\* cross-check (D37). The policy still belongs here rather than in the
+strategy — the strategy honours a budget, the caller decides the policy. All
+budgets live in `LevelEditorSettings`. A level with a generator or an elevator
+gets no verdict until phase 1.13 (D40).
 
 **Undo.** The editor has undo and redo over level snapshots — D33 records why
 the original "no undo" here was reversed. Destructive edits still confirm first:
@@ -229,6 +238,9 @@ Everything `MECHANICS.md` lists, plus what the board shape adds:
 - **An elevator wave does not tile its region exactly** — n cells uncovered, or
   blocks overlapping.
 - No block starts flush against a matching open gate (D16's ready opening move).
+- A generator is too narrow for a queued block's projection (D34).
+- A shutter region has a cell no block covers (M5).
+- A frozen block's threshold exceeds the total number of clears available.
 
 Warnings never block saving. They are what a designer reads while building.
 
@@ -259,14 +271,9 @@ it is exactly the question the solver answers.
 - Whether the `Resources/Levels` dropdown watches the folder or refreshes on
   demand.
 - How a wave's tiling status is computed cheaply enough to show live.
-- **The solve runs synchronously on the UI thread.** A level that hits both
-  budgets freezes the editor for up to their sum (default 5s + 15s). A progress
-  bar is raised for each stage so it reads as working rather than hung, but it
-  cannot show real progress — the search is opaque. Acceptable because most
-  levels finish in milliseconds and both budgets are editable in
-  `LevelEditorSettings`. Making the search step-able (so the window can drive it
-  from `EditorApplication.update` and stay responsive) is real work and should
-  be a deliberate decision, not a surprise six months from now.
+- ~~The solve runs synchronously on the UI thread.~~ Resolved by D38: the
+  pipeline touches no Unity API, so it runs on a worker thread, is polled from
+  `EditorApplication.update`, and is cancellable.
 
 ---
 
@@ -317,3 +324,9 @@ that warns about everything is as useless as one that warns about nothing.
 - A level neither mode solves within budget reports `Indeterminate`, not
   `Unsolvable`.
 - A genuinely unsolvable level reports `Unsolvable` from the first stage.
+
+**`ValidationPipeline`** (added in D38, D40)
+- A level the quick exhaustive A\* stage settles runs nothing further.
+- A level it leaves `Indeterminate` falls through to nearest-next-clear.
+- A search error propagates as an exception, never a verdict.
+- A level with a generator or an elevator gets a reason and no search.

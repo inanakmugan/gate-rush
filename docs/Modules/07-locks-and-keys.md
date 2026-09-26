@@ -100,6 +100,17 @@ blocks answer yes to it. The rocket clears a locked block's outer colour; the
 broom includes locked blocks showing its colour. Neither joker gets a special
 case, or `CanBeTargeted` would stop meaning one thing.
 
+**The completing key decides the effect (added later).** A lock's keys may
+carry different effects. The key whose consumption reaches `RequiredKeyCount`
+decides which effect fires; keys consumed after that do nothing (M8). When one
+action consumes several keys at once, they count in the level's block order.
+
+**A shuttered owner waits (added later, D41).** Nothing reaches a block under a
+closed shutter, a key's effect included. The keys are still consumed; the
+effect is held and applies the moment the shutter opens, in the same
+resolution. This is the one clear an opening can release — see D41 for why it
+does not contradict "opening never clears" (Module 06).
+
 ---
 
 ## Where it happens
@@ -122,6 +133,8 @@ case, or `CanBeTargeted` would stop meaning one thing.
    Owner already dead      -> return. The key is spent; nothing to apply.
    Owner already unlocked  -> return. Cannot happen with a once-only trigger,
                               but guard rather than assume.
+   Owner under a closed    -> hold the effect; it applies when the shutter
+   shutter                    opens (D41, added later).
 
 6. Unlock the owner.             builder.Unlock(ownerIndex)
 

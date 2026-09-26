@@ -99,12 +99,16 @@ sealed class GeneratorDefinition
     int Id
     BoardEdge Edge
     int Offset
+    int Width                           // 1..MaxWidth (2) along the edge (D34)
     IReadOnlyList<SpawnedBlock> Queue   // ordered, explicit, never randomised
 ```
 
 `SpawnedBlock` carries the same shape, colour stack, axis and modifier fields as
-`BlockDefinition` but no `StartOrigin` — placement derives from the generator's
-edge and offset.
+`BlockDefinition` but no `StartOrigin` — a generator's output takes its position
+from the generator's edge, offset and width. It does carry `Coord? RegionOrigin`
+(added in Module 09): an elevator wave block's position relative to the region's
+`Min`, since a region usually admits several tilings. It is null for generator
+output.
 
 ### `ElevatorDefinition`
 
@@ -125,6 +129,10 @@ readonly struct BlockSpec
     MovementAxis Axis                   // added in Module 03 (D29)
     int? UnfreezeAtClearCount
     int? LockId
+    int RequiredKeyCount                // added in Module 07
+    int? KeyTargetLockId                // added in Module 07
+    KeyEffect KeyEffect                 // added in Module 07
+    int TimeBonusSeconds
 ```
 
 The fields `BlockDefinition` and `SpawnedBlock` share, unified so a caller that
@@ -149,12 +157,16 @@ sealed class LevelContext
     int GoldReward
     int TotalBlockCapacity              // size of the flat index SpecAt resolves
     int MaxResolutionPasses            // fixpoint-loop bound for MoveResolver; added in Module 03 (D28)
+    bool IsClearMonotone                // added for nearest-next-clear (D37)
+    BlockSymmetry BlockSymmetry         // interchangeable-block groups (D35)
 
     bool IsInsideGrid(Coord c)
     bool IsStaticWall(Coord c)
     int? ShutterAt(Coord c)             // shutter id covering this cell, if any
     int? ShutterPositionAt(Coord c)     // shutter's 0-based position in Shutters, if any
     BlockSpec SpecAt(int blockIndex)    // O(1) across top-level blocks and every spawn slot
+    int LockOwnerIndex(int lockId)                     // added in Module 07
+    IReadOnlyList<int> KeyIndicesForLock(int lockId)   // added in Module 07
 ```
 
 `TotalBlockCapacity`, `ShutterPositionAt`, and `SpecAt` were added in Module 02
@@ -244,6 +256,10 @@ the solver's guarantee.
     the second one placed.
   - Every entry in `StaticWalls` is inside the grid, and `StaticWalls` contains
     no duplicates.
+  - A block carries a lock or a key, never both (added in Module 07).
+  - Generator `Width` is between 1 and `GeneratorDefinition.MaxWidth`, and
+    gate and generator spans on one edge never overlap (D34, M6).
+  - Every elevator wave tiles its region exactly (added in Module 09).
 - Efficient lookup structures for `IsStaticWall`, `ShutterAt`/`ShutterPositionAt`,
   and `SpecAt` — precomputed, not linear scans or per-call walks. These are
   called inside the search loop.

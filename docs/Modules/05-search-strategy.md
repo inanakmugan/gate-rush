@@ -8,7 +8,8 @@
 
 ## Responsibility
 
-Decide whether a level is solvable and, if so, return a shortest solution.
+Decide whether a level is solvable and, if so, return a solution — and say
+whether its length is proven shortest (D36).
 
 ---
 
@@ -16,7 +17,7 @@ Decide whether a level is solvable and, if so, return a shortest solution.
 
 ```
 enum SolveStatus
-    Solvable
+    Solvable           // a solution exists; not necessarily the shortest (D36)
     Unsolvable
     Indeterminate      // budget exhausted; NOT a proof of unsolvability
 
@@ -25,12 +26,17 @@ sealed class SearchBudget
     int MaxExploredStates
     long MaxWallClockMs
     MoveGenMode Mode
+    CancellationToken Cancellation     // added in D38; None by default
+    SearchBudget WithCancellation(CancellationToken cancellation)
 
 sealed class SolveResult
     SolveStatus Status
     IReadOnlyList<Move> Solution       // empty unless Solvable
+    int LengthLowerBound               // added in D36
+    int? ProvenShortestLength          // Solution.Count when the bound meets it
     int ExploredStateCount
     int PeakFrontierSize
+    int PeakRetainedStateCount
     long ElapsedMs
 
 interface ISearchStrategy
@@ -38,6 +44,8 @@ interface ISearchStrategy
                        SearchBudget budget)
 
 sealed class BreadthFirstStrategy : ISearchStrategy
+sealed class AStarStrategy : ISearchStrategy              // phase 1.11
+sealed class NearestNextClearStrategy : ISearchStrategy   // D37
 ```
 
 ---
@@ -50,7 +58,9 @@ renders the three outcomes in three colours.
 
 **Breadth-first, not depth-first.** Difficulty is measured in moves, so the
 solver must return the shortest solution. Depth-first would return *a* solution
-and corrupt both the difficulty score and the derived time budget.
+and corrupt both the difficulty score and the derived time budget. (Later,
+D36/D37: nearest-next-clear gives up this guarantee for existence, and
+`SolveResult` states separately whether a length is proven shortest.)
 
 **Exploit progress monotonicity** (D6). The vector
 
@@ -77,9 +87,10 @@ Storing a full path per state multiplies memory by solution length.
 **Check the budget on every expansion,** not once per level of the search. A
 single stratum can exceed the wall-clock budget on its own.
 
-**Two-stage use is the caller's responsibility.** The editor runs `Canonical`
-first and falls back to `Exhaustive` with a larger budget only when the first
-pass finds nothing. The strategy itself does not decide this.
+**Policy is the caller's responsibility.** A strategy honours a budget; the
+caller decides which strategies run, in what order. Today the editor's Validate
+runs exhaustive A\* at a quick budget, then nearest-next-clear with a
+canonical-then-exhaustive A\* cross-check (D37, D38).
 
 ---
 
@@ -122,8 +133,8 @@ pass finds nothing. The strategy itself does not decide this.
   and the final state satisfies `IsSolved`.
 - The returned solution length equals the shortest length for a corpus of boards
   with hand-verified optima.
-- Canonical and exhaustive modes return the same move count on boards where both
-  succeed.
+- On boards where both modes succeed, canonical's move count is never below
+  exhaustive's optimum. It may be longer: canonical is a pruned subset (D5).
 - Stratified and non-stratified variants return identical move counts across the
   corpus. **This is the regression test that protects the memory optimisation.**
 - Results are reproducible: two runs on the same input produce the same solution.
@@ -185,3 +196,20 @@ tests mirrored from `BreadthFirstStrategyTests`)
   (consistency — checked over the full state graph, not just the start).
 - The mixed-key-effect lock board's heuristic is exactly 2, not 3 — the
   regression case for the `F` formula.
+
+---
+
+## Implemented: `NearestNextClearStrategy` (D37)
+
+Enforced hill-climbing: search the current stratum for a route to any clear,
+commit to the first found, repeat, never backtrack. Requires
+`MoveGenMode.Exhaustive`. Each stratum is searched on `NextClearAbstraction`
+and ordered by `ExitCandidates`; every route is replayed on the real board
+before it is trusted. It reports `Unsolvable` only when
+`LevelContext.IsClearMonotone` holds, and the editor cross-checks that verdict
+with A\* (`NextClearRunner`). See D37 for the completeness argument and D38 for
+how Validate sequences it.
+
+**Every strategy throws on a rejected move** (D40). A move the generator emits
+and the resolver rejects is a solver bug, never skipped: skipping could shrink
+the move set into a false `Unsolvable` that the A\* cross-check shares.

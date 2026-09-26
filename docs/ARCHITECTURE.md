@@ -31,13 +31,11 @@ This is not stylistic. It buys three concrete things:
           ┌─────────────▼─┐   ┌─▼──────────────┐
           │     Core      │   │      Meta      │
           │ board rules   │   │ economy, lives │
-          └───────┬───────┘   └────────┬───────┘
-                  │                    │
-                  └────────┬───────────┘
-                           │
-                  ┌────────▼─────────┐
-                  │    Platform      │  interfaces only
-                  └──────────────────┘
+          └───────────────┘   └────────┬───────┘
+                                       │
+                              ┌────────▼─────────┐
+                              │    Platform      │  interfaces only
+                              └──────────────────┘
 
   ┌──────────┐                    ┌──────────────────┐
   │  Solver  │ ──► Core           │  Serialization   │ ──► Core
@@ -56,8 +54,9 @@ govern how a board changes. Contains no rendering, no timing, no input.
 
 ### Solver — design-time search
 
-Pure C#, depends on `Core`. Answers one question: *is this board solvable, and
-in how few moves?* Used by the Level Editor during authoring and by tests.
+Pure C#, depends on `Core`. Answers one question: *is this board solvable?* —
+and, where it can prove it, in how few moves (D36). Used by the Level Editor
+during authoring and by tests.
 
 **Excluded from player builds by assembly definition.** The shipped game never
 searches; it only plays back hand-authored levels the solver has approved.
@@ -77,8 +76,8 @@ DTO layer converts between them.
 
 ### Platform — engine and OS boundaries
 
-Interfaces that `Core` and `Meta` depend on, with per-platform implementations
-supplied at startup:
+Interfaces that `Meta` depends on — `Core` needs none — with per-platform
+implementations supplied at startup:
 
 | Interface | Purpose | Test double |
 |---|---|---|
@@ -189,16 +188,18 @@ positions vary; transitions between strata are one-way. Unlike Rush Hour, whose
 state graph is cyclic, this game's graph is a directed acyclic layering of
 cyclic sub-graphs.
 
-The solver exploits this: it explores one stratum fully, collects the actions
-that advance progress, then moves to the next stratum and **discards the previous
-stratum's visited set entirely**. Peak memory drops from "whole state space" to
-"largest single stratum."
+Breadth-first search exploits this: it explores one stratum fully, collects the
+actions that advance progress, then moves to the next stratum and **discards the
+previous stratum's visited set entirely**. Peak memory drops from "whole state
+space" to "largest single stratum." Nearest-next-clear (D37) uses the same
+layering differently: it searches only the current stratum, for a route to the
+next clear, and commits to it.
 
 ## Core concept 5 — time is not part of the search
 
 Moves are unlimited; the only pressure is the countdown. The solver therefore
-answers "is there a solution and how short is it," and the time budget is
-*derived* from that answer at design time.
+answers "is there a solution" and, where it can prove it, "how short is it"
+(D36); the time budget is *derived* from that answer at design time.
 
 Time-bonus blocks (M10) never enter `BoardState`. They contribute to the level's
 effective time budget, which the editor reports as a suggested value.
@@ -253,7 +254,7 @@ small project than a finished one.
 | `GateRush.Solver` | `GateRush.Core` | **Editor only** |
 | `GateRush.Runtime` | Core, Meta, Serialization, Platform, DOTween | All |
 | `GateRush.Editor` | All of the above incl. Solver | Editor only |
-| `GateRush.Tests` | All of the above incl. Solver | Editor only |
+| `GateRush.Tests` | Core, Meta, Platform, Serialization, Solver, Editor | Editor only |
 
 `GateRush.Core`, `GateRush.Meta`, `GateRush.Platform`, and `GateRush.Solver`
 have `noEngineReferences` enabled. This turns the "no `UnityEngine`" rule from a

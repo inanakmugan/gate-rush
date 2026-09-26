@@ -4,10 +4,14 @@ A Unity reimplementation of the sliding-block puzzle *Block Out!* by Grand Games
 built as a portfolio project with an emphasis on engine-independent game logic,
 solver-verified level design, and a documented architecture.
 
-**▶ Play in browser:** *(itch.io link)*
+**▶ Play in browser:** *(coming with the first web build — Phase 3)*
 
 Unity 6000.3.22f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL and
 Android
+
+**Status:** work in progress. The puzzle core, the solver and the level editor
+are built (Phase 1, apart from generator and elevator spawning); the first
+playable level is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -21,29 +25,36 @@ restrictions, and lock-and-key pairs.
 
 ## What is interesting about it
 
-**The rules do not know Unity exists.** Board logic, search, and the economy are
-plain C# in assemblies compiled with engine references disabled — the layer
-boundary is a compile error, not a convention. The entire rule set runs in an
-Edit Mode test suite in milliseconds, without loading a scene.
+**The rules do not know Unity exists.** Board logic and search — and, once it
+is built, the economy — are plain C# in assemblies compiled with engine
+references disabled, so the layer boundary is a compile error, not a
+convention. The entire rule set runs in an Edit Mode test suite in
+milliseconds, without loading a scene.
 
-**Levels are proved solvable before they ship.** A breadth-first solver runs
-inside a custom editor window and answers three ways — solvable in *n* moves,
-unsolvable, or indeterminate within budget. The move count also produces the
-level's suggested time budget, so difficulty pacing is measured rather than
+**Levels are proved solvable before they ship.** A custom editor window
+validates every level on demand: an exhaustive A\* search first, then — for
+levels too large for it — a nearest-next-clear search that commits to one clear
+at a time — complete wherever a monotonicity argument holds, and cross-checked
+by A\*.
+It answers three ways — solvable, unsolvable, or indeterminate within budget —
+and says whether a solution's length is proven shortest. That length produces
+the level's suggested time budget, so difficulty pacing is measured rather than
 guessed.
 
 **Ten mechanics compose without knowing about each other.** Every removal in the
 game emits one event; every unlock condition listens to that event; the resolver
-loops to a fixpoint. A shutter opening can reveal an elevator whose incoming wave
-carries a key that unlocks a block — all within a single move, with no mechanic
+loops to a fixpoint. Clearing a key-carrying block can fire its key, whose
+effect clears a colour on a locked block, whose clear crosses a shutter's
+threshold and opens it — all within a single move, with no mechanic
 referencing another.
 
 **The search space is stratified, not cyclic.** Because blocks leave the board
 permanently, progress counters increase monotonically, so the state graph is a
-one-way layering of strata. The solver discards each stratum's visited set on
-advance, bounding memory to the largest single stratum rather than the whole
-space. This is the structural difference from Rush Hour–style puzzles, where
-nothing is ever removed.
+one-way layering of strata. Breadth-first search discards each stratum's
+visited set on advance, bounding memory to the largest single stratum rather
+than the whole space; nearest-next-clear searches one stratum at a time. This
+is the structural difference from Rush Hour–style puzzles, where nothing is ever
+removed.
 
 ## Architecture
 
@@ -82,7 +93,8 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-The `Core`, `Solver`, `Meta`, and `Serialization` suites require no scene.
+None of the suites needs a scene: `Core`, `Solver`, `Serialization` and the
+editor's logic are all tested headless.
 
 ## Note on the web build
 
