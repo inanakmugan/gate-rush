@@ -92,6 +92,49 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void WaitingKeyEffectBoards_EveryReachableClear_LeavesThemSolvable()
+        {
+            // D41: a key effect waiting for a shutter delays the effect and never
+            // removes it, so the clear-monotone boards built around it keep the
+            // claim over their whole reachable state space, not just a sample.
+            var boards = new[]
+            {
+                SearchCorpus.ShutteredClearOuterColorLockBoard(),
+                SearchCorpus.ShutteredUnlockMovementLockBoard(),
+                SearchCorpus.TwoWaitingClearsUnderOneShutterBoard()
+            };
+            var generator = new MoveGenerator();
+            var resolver = new MoveResolver();
+
+            for (var b = 0; b < boards.Length; b++)
+            {
+                var ctx = boards[b];
+                Assert.IsTrue(ctx.IsClearMonotone, $"board {b}");
+                var initial = BoardState.CreateInitial(ctx);
+                var visited = new HashSet<BoardState> { initial };
+                var frontier = new Queue<BoardState>();
+                frontier.Enqueue(initial);
+
+                while (frontier.Count > 0)
+                {
+                    var state = frontier.Dequeue();
+                    Assert.AreEqual(
+                        SolveStatus.Solvable, new AStarStrategy().Search(ctx, state, GroundTruth()).Status,
+                        $"board {b}: a state reachable from a solvable start is not solvable");
+
+                    foreach (var move in generator.Generate(ctx, state, MoveGenMode.Exhaustive))
+                    {
+                        Assert.IsTrue(resolver.TryApplyMove(ctx, state, move, out var successor, out _));
+                        if (visited.Add(successor))
+                        {
+                            frontier.Enqueue(successor);
+                        }
+                    }
+                }
+            }
+        }
+
+        [Test]
         public void MixedEffectLock_AClearCanTurnASolvableBoardUnsolvable_SoTheLevelIsNotClearMonotone()
         {
             // Why IsClearMonotone must be false for a lock whose keys carry

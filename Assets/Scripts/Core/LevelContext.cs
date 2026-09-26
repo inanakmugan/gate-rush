@@ -82,6 +82,15 @@ namespace GateRush.Core
         /// stranded. A lock whose keys all share one effect is safe: an early
         /// clear only makes that same effect arrive sooner.</item>
         /// </list>
+        /// <para><b>A key effect waiting for a shutter (D41) leaves it true.</b>
+        /// With every key of a lock sharing one effect, which effect the lock
+        /// gets never depends on clear order; waiting only decides when it
+        /// lands. It lands the moment the shutter opens — the earliest moment
+        /// anything can interact with a block under it, since until then the
+        /// block can be neither moved nor targeted and its region is closed
+        /// either way. An early clear therefore never makes the effect arrive
+        /// later than it otherwise would, and the effect only unlocks or
+        /// clears, which only opens things up.</para>
         /// <para><b>Every new mechanic must decide this flag consciously.</b> One
         /// that changes the board between clears, closes anything on a clear,
         /// makes a move irreversible, or lets the order of clears change what a
@@ -159,6 +168,7 @@ namespace GateRush.Core
             MaxResolutionPasses = ComputeMaxResolutionPasses(specByIndex, Generators, Elevators);
             lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
             keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
+            LockOwnerIndices = BuildLockOwnerIndices(specByIndex);
             IsClearMonotone = Generators.Count == 0 && Elevators.Count == 0 && !HasLockWithMixedKeyEffects();
             // Fully qualified because the property name shadows the type name
             // inside this class — the same shape as BoardState.ProgressVector.
@@ -267,6 +277,38 @@ namespace GateRush.Core
         /// </summary>
         public IReadOnlyList<int> KeyIndicesForLock(int lockId) =>
             keyIndicesByLockId.TryGetValue(lockId, out var indices) ? indices : Array.Empty<int>();
+
+        /// <summary>
+        /// Every flat block index that owns a lock — top-level or spawned — in
+        /// ascending index order. Empty on a level with no locks. Precomputed
+        /// for the same reason as <see cref="LockOwnerIndex"/> (D28):
+        /// <c>MoveResolver</c> walks it when a shutter opens, to release every
+        /// key effect waiting on a block the opening uncovered (D41), and
+        /// scanning every block slot there would repeat a walk over data that
+        /// never changes. The ascending order is what makes several releases in
+        /// one opening enqueue their clears in a fixed, reproducible order.
+        /// </summary>
+        public IReadOnlyList<int> LockOwnerIndices { get; }
+
+        /// <summary>
+        /// The lock-owning flat block indices for <see cref="LockOwnerIndices"/>,
+        /// ascending, over the index space <see cref="BuildSpecByIndex"/>
+        /// produced.
+        /// </summary>
+        private static int[] BuildLockOwnerIndices(IReadOnlyList<BlockSpec> specs)
+        {
+            var owners = new List<int>();
+
+            for (var i = 0; i < specs.Count; i++)
+            {
+                if (specs[i].LockId.HasValue)
+                {
+                    owners.Add(i);
+                }
+            }
+
+            return owners.ToArray();
+        }
 
         /// <summary>
         /// Maps each lock id to the flat block index that owns it, over the index

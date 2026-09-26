@@ -499,6 +499,34 @@ namespace GateRush.Tests
             CollectionAssert.IsEmpty(context.KeyIndicesForLock(999));
         }
 
+        [Test]
+        public void LockOwnerIndices_ListsEveryLockOwnerIncludingSpawnSlots_InAscendingIndexOrder()
+        {
+            var lockedLate = CreateBlock(1, new Coord(0, 0), lockId: 7, requiredKeyCount: 1);
+            var plain = CreateBlock(2, new Coord(1, 0));
+            var lockedEarly = CreateBlock(3, new Coord(2, 0), lockId: 3, requiredKeyCount: 1);
+            var keyFor7 = CreateBlock(4, new Coord(0, 1), keyTargetLockId: 7);
+            var keyFor3 = CreateBlock(5, new Coord(1, 1), keyTargetLockId: 3);
+            var keyFor9 = CreateBlock(6, new Coord(2, 1), keyTargetLockId: 9);
+            var generator = new GeneratorDefinition(
+                id: 1, edge: BoardEdge.Bottom, offset: 0, width: 1,
+                queue: new[] { CreateSpawnedBlock(lockId: 9, requiredKeyCount: 1) });
+
+            var context = CreateContext(
+                3, 3, new[] { lockedLate, plain, lockedEarly, keyFor7, keyFor3, keyFor9 },
+                generators: new[] { generator });
+
+            CollectionAssert.AreEqual(new[] { 0, 2, 6 }, context.LockOwnerIndices);
+        }
+
+        [Test]
+        public void LockOwnerIndices_LevelWithNoLocks_IsEmpty()
+        {
+            var context = CreateContext(3, 3, new[] { CreateBlock(1, new Coord(0, 0)) });
+
+            CollectionAssert.IsEmpty(context.LockOwnerIndices);
+        }
+
         // ----- IsClearMonotone ----------------------------------------------
 
         [Test]

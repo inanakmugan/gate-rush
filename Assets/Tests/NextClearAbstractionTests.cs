@@ -103,6 +103,26 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Of_OwnerWithAKeyEffectWaiting_StaysHeldUnderItsKeptShutterAndCarriesTheEffect()
+        {
+            // D41: the key has died and its ClearOuterColor waits on the owner.
+            // The copy needs no lock to stay exact — the owner is held and its
+            // shutter kept — but its state carries the waiting value across.
+            var ctx = SearchCorpus.ShutteredClearOuterColorLockBoard();
+            new MoveResolver().TryApplyMove(
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+
+            var abstraction = NextClearAbstraction.Of(ctx, waiting);
+
+            // The key is dead, so the copy holds green at 0 and the owner at 1.
+            Assert.AreEqual(2, abstraction.ToSourceMove(new Move(1, new Coord(2, 0))).BlockIndex);
+            Assert.AreEqual(1, abstraction.Context.Shutters.Count);
+            Assert.IsFalse(abstraction.Initial.CanMove(abstraction.Context, 1));
+            Assert.AreEqual(KeyEffect.ClearOuterColor, abstraction.Initial.WaitingKeyEffect[1]);
+            Assert.IsNull(abstraction.Initial.WaitingKeyEffect[0]);
+        }
+
+        [Test]
         public void Of_ClosedShutter_IsKeptClosedAndHoldsItsBlock_OpenShutterIsDropped()
         {
             var ctx = Ctx(
