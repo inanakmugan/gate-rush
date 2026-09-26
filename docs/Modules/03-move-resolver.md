@@ -26,13 +26,15 @@ readonly struct Move
 class MoveResolver    // not sealed: two resolution hooks are internal virtual
                       // so tests can drive the fixpoint loop
     bool TryApplyMove(LevelContext ctx, BoardState state, Move move,
-                      out BoardState result)
+                      out BoardState result, out int timeBonusSeconds)
 
     // Joker and key entry points — same pipeline, different trigger
     bool TryClearBlock(LevelContext ctx, BoardState state, int blockIndex,
-                       out BoardState result)
+                       out BoardState result, out int timeBonusSeconds)
     bool TrySweepColor(LevelContext ctx, BoardState state, BlockColor color,
-                       out BoardState result)
+                       out BoardState result, out int timeBonusSeconds)
+
+    // timeBonusSeconds added in Module 06
 ```
 
 All three return `false` when the action is not legal, leaving `result`
@@ -56,8 +58,10 @@ untouched. They never throw for player error.
       unreachable.
 
       ZERO-DISTANCE MOVE: TargetOrigin == current origin. Skip the path check.
-      The move is legal only if the block is flush against a compatible open
-      gate — otherwise it is a no-op and must be rejected.
+      The move is a push: legal only if the block is flush against a
+      compatible open gate on an edge its MovementAxis can push toward (D39)
+      — otherwise it is a no-op and must be rejected. A move that ARRIVES at
+      a compatible gate clears on any edge.
 
  2. Move the block to TargetOrigin
 
@@ -83,11 +87,14 @@ untouched. They never throw for player error.
                 UnlockMovement   -> set Unlocked once enough keys are consumed
                 ClearOuterColor  -> clear the target's colour, which enqueues
                                     a NEW ColorCleared event
+              the key that completes the count decides the effect (M8); if
+              the target is under a closed shutter, the effect waits (D41)
 
  5. Re-evaluate unlock conditions
       gates    : TotalClearCount >= OpenAtClearCount      -> open
       blocks   : TotalClearCount >= UnfreezeAtClearCount  -> unfreeze
-      shutters : global or per-colour count >= Threshold  -> open
+      shutters : global or per-colour count >= Threshold  -> open, then
+                 apply any key effect waiting on a block inside (D41)
 
  6. Check spawn triggers
       generators : every target cell empty and queue non-empty -> spawn next

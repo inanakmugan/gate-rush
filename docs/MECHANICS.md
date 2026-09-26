@@ -176,6 +176,9 @@ A rectangular region may be covered by a shutter with a threshold N.
   exists to hide and later reveal blocks, and an empty cell underneath hides
   nothing. The editor warns, but does not refuse to save, when a region has an
   uncovered cell.
+- Nothing reaches a block under a closed shutter — not a move, not a joker,
+  not a key's effect. A key effect aimed at such a block waits and applies
+  when the shutter opens (M8).
 
 Shutters are the only thing that makes a block untargetable by jokers.
 
@@ -235,6 +238,16 @@ own colours.
 - **Jokers can still target a locked block.**
 - A lock may require more than one key; the required count is shown on the lock.
 - When a key-carrying block is destroyed, its key is consumed and applied.
+- The effect fires once, when the last required key is consumed, and the
+  key that completes the count decides which effect it is. A lock's keys
+  may carry different effects, so the order they are consumed in matters.
+  When one action consumes several at once — a broom — they count in the
+  level's block order.
+- A lock whose block is under a closed shutter receives nothing while the
+  shutter stays closed (M5). If its keys complete in the meantime, the
+  effect waits and applies the moment the shutter opens.
+- A lock needs at least as many keys in the level as it requires. Fewer is
+  a level data error: the lock could never open.
 
 A key has one of two effects, chosen by the designer:
 
@@ -357,14 +370,21 @@ Not runtime rules, but properties the Level Editor should measure and report.
 ### Editor warnings
 
 - No legal move at level start.
+- No block starts flush against a matching open gate it can be pushed into
+  (D16).
 - A colour in some block's stack has no compatible gate anywhere in the level.
 - A compatible gate exists but is too narrow for that block's projection.
 - An axis-restricted block has no compatible gate it can arrive at.
-- A gate or shutter threshold exceeds the total number of clears available.
-- A lock has fewer matching keys than it requires.
+- A generator is too narrow for a queued block's projection (D34).
+- A gate, shutter or frozen-block threshold exceeds the total number of clears
+  available.
+- A shutter region has a cell no block covers (M5).
 
 ### Level data errors (not warnings)
 
 - Two adjacent layers of the same colour.
 - Overlapping blocks at start, footprints outside the grid, gates outside their
   edge, keys pointing at non-existent locks.
+- A lock with fewer keys in the level than it requires, a block carrying both
+  a lock and a key, or two locks sharing an id.
+- Overlapping edge features (M6).

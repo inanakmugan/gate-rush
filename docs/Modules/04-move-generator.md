@@ -19,9 +19,9 @@ enum MoveGenMode
     Canonical      // pruned; fast
     Exhaustive     // every reachable position
 
-sealed class MoveGenerator
-    IEnumerable<Move> Generate(LevelContext ctx, BoardState state,
-                               MoveGenMode mode)
+class MoveGenerator                    // not sealed: Generate is virtual, a test seam (D40)
+    virtual IEnumerable<Move> Generate(LevelContext ctx, BoardState state,
+                                       MoveGenMode mode)
 ```
 
 ---
@@ -33,8 +33,8 @@ sealed class MoveGenerator
 For every movable block, run a flood fill from its current position over
 single-cell orthogonal steps in the directions its axis permits, accepting only
 positions where the whole footprint is legal. Emit every position found — plus
-the **zero-distance move** whenever the block is already flush against a
-compatible open gate.
+the **zero-distance move** whenever the block can be pushed in place into a
+compatible open gate (`BlockReachability.CanClearInPlace`, D39).
 
 One traversal per block yields the complete set. Do not scan direction by
 direction.
@@ -45,12 +45,16 @@ The same flood fill, filtered to positions that can plausibly matter:
 
 1. Positions where the block becomes **flush and aligned with a compatible
    gate** (right colour, sufficient width, full containment).
-2. Positions that **vacate or occupy a generator's spawn cells**.
+2. Positions that **vacate or occupy a generator's spawn cells**. Not yet
+   implemented: it waits for spawn placement in phase 1.13, which D5 makes
+   safe — a missing canonical criterion can only cause false negatives.
 3. Positions that **vacate or occupy an elevator region**.
-4. Positions where the block **rests against an obstacle** — a wall or another
-   block — in at least one direction. This replaces the old "maximum slide"
-   criterion, which is meaningless once a block can turn corners.
-5. The **zero-distance move** when the block is already at a compatible gate.
+4. Positions where the block **rests against an obstacle** — a static wall, a
+   closed shutter or another block — in at least one direction its axis
+   permits. The board edge does not count. This replaces the old "maximum
+   slide" criterion, which is meaningless once a block can turn corners.
+5. The **zero-distance move** when the block can be pushed in place into a
+   compatible gate (D39).
 
 ---
 
@@ -75,9 +79,12 @@ one move, so branching far exceeds Rush Hour's 30–40 and grows as the board
 empties. Unpruned breadth-first search does not survive that. Canonical mode is a
 prerequisite for termination on realistic boards, not an optimisation.
 
-**Enumeration order must be deterministic** in both modes: ascending block index,
-then direction in `Direction` enum order, then ascending distance, with the
-zero-distance move emitted first for its block. Reproducible tests depend on it.
+**Enumeration order must be deterministic** in both modes: ascending block index;
+within a block, the zero-distance move first, then the flood fill's
+breadth-first order — ascending path length, ties in discovery order.
+Reproducible tests depend on it. (An earlier draft specified direction, then
+distance; a position reached by turning a corner has no single direction, so a
+flood fill cannot produce that order.)
 
 **Only `CanMove` blocks are enumerated.** Jokers are not moves and never appear
 in search output (D10).
@@ -88,7 +95,7 @@ in search output (D10).
 
 - Path scanning for multi-cell and non-rectangular footprints.
 - Computing the set of gate-aligned positions per block per direction.
-- Deriving generator spawn cells and elevator regions for criteria 3 and 4.
+- Deriving generator spawn cells and elevator regions for criteria 2 and 3.
 - Avoiding duplicate emissions when one position satisfies several criteria.
 - Allocation strategy — this runs once per expanded node.
 
