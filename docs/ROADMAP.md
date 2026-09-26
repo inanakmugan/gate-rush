@@ -54,8 +54,7 @@ still change for free. Spec written when reached.
 levels showed the solver could not settle some simple boards. That produced
 symmetry reduction (D35), solve results that separate existence from proven
 length (D36), the nearest-next-clear strategy (D37), the cancellable Validate
-pipeline (D38), and the fixes and rules in D39–D41. D41 is specified but not
-yet implemented.
+pipeline (D38), and the fixes and rules in D39–D41.
 
 ---
 
