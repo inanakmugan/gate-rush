@@ -222,6 +222,42 @@ namespace GateRush.Tests
             Assert.IsFalse(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
         }
 
+        [Test]
+        public void AxisRestrictedBlockHasNoGate_HorizontalBlockOnTheBottomRowWithABottomGate_Silent()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0), MovementAxis.HorizontalOnly));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 2, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
+        }
+
+        [Test]
+        public void AxisRestrictedBlockHasNoGate_VerticalBlockOnTheRightColumnWithARightGate_Silent()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(RedBlock(1, new Coord(2, 0), MovementAxis.VerticalOnly));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Right, Offset = 2, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
+        }
+
+        [Test]
+        public void AxisRestrictedBlockHasNoGate_HorizontalBlockOnTheBottomRowWithOnlyATopGate_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0), MovementAxis.HorizontalOnly));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Top, Offset = 0, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
+        }
+
         // -- ThresholdExceedsAvailableClears -------------------
 
         [Test]
@@ -402,6 +438,59 @@ namespace GateRush.Tests
             });
 
             Assert.IsFalse(Warns(draft, DraftWarningCategory.NoReadyOpeningMove));
+        }
+
+        [Test]
+        public void NoReadyOpeningMove_HorizontalBlockFlushAboveABottomGate_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(RedBlock(1, new Coord(1, 0), MovementAxis.HorizontalOnly));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.DraftDoesNotFormValidLevel));
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.NoReadyOpeningMove));
+        }
+
+        [Test]
+        public void NoReadyOpeningMove_FrozenBlockFlushAtItsGate_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(new BlockDraft
+                {
+                    Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(1, 0),
+                    UnfreezeAtClearCount = 1,
+                });
+                d.Blocks.Add(RedBlock(2, new Coord(0, 2)));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.DraftDoesNotFormValidLevel));
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.NoReadyOpeningMove));
+        }
+
+        [Test]
+        public void NoReadyOpeningMove_LockedBlockFlushAtItsGate_Fires()
+        {
+            var draft = Draft(3, 3, d =>
+            {
+                d.Blocks.Add(new BlockDraft
+                {
+                    Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(1, 0),
+                    LockId = 1, RequiredKeyCount = 1,
+                });
+                d.Blocks.Add(new BlockDraft
+                {
+                    Id = 2, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(0, 2),
+                    KeyTargetLockId = 1,
+                });
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red });
+            });
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.DraftDoesNotFormValidLevel));
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.NoReadyOpeningMove));
         }
 
         // -- DraftDoesNotFormValidLevel ---------------------

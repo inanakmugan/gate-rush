@@ -15,6 +15,64 @@ namespace GateRush.Tests
     /// </summary>
     public class ExitCandidatesTests
     {
+        // ----- The start origin under an axis restriction (D39) ---------------
+
+        [Test]
+        public void IsEmpty_AxisBlockBoxedInAboveACrossAxisGate_IsTrue()
+        {
+            var ctx = AxisBlockBoxedAboveCrossAxisGateBoard();
+
+            Assert.IsTrue(ExitCandidates.Of(ctx, BoardState.CreateInitial(ctx)).IsEmpty);
+        }
+
+        [Test]
+        public void IsEmpty_AxisBlockThatCanStepOffItsCrossAxisGate_IsFalse()
+        {
+            var ctx = AxisBlockReturnsToCrossAxisGateBoard();
+
+            Assert.IsFalse(ExitCandidates.Of(ctx, BoardState.CreateInitial(ctx)).IsEmpty);
+        }
+
+        [Test]
+        public void FewestBlockers_AxisBlockMustStepOffPastABlockerToArriveBack_CountsTheBlocker()
+        {
+            // The red block cannot be pushed down in place; stepping off either
+            // way runs into a blue block, and arriving back meets nobody.
+            var ctx = Ctx(
+                3, 2,
+                new[]
+                {
+                    Block(1, new Coord(1, 0), axis: MovementAxis.HorizontalOnly),
+                    Block(2, new Coord(0, 0), colors: new[] { BlockColor.Blue }),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Blue })
+                },
+                new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var fewest = ExitCandidates.Of(ctx, state).FewestBlockers(ctx, state);
+
+            Assert.AreEqual(1, fewest);
+        }
+
+        [Test]
+        public void FewestBlockers_AxisBlockBoxedInAgainstAnAxisEndGate_IsZero()
+        {
+            // Pushing right, along its axis, is allowed in place.
+            var ctx = Ctx(
+                3, 1,
+                new[] { Block(1, new Coord(2, 0), axis: MovementAxis.HorizontalOnly) },
+                new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) },
+                staticWalls: new[] { new Coord(1, 0) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var candidates = ExitCandidates.Of(ctx, state);
+
+            Assert.IsFalse(candidates.IsEmpty);
+            Assert.AreEqual(0, candidates.FewestBlockers(ctx, state));
+        }
+
+        // ----- Exits in general ------------------------------------------------
+
         [Test]
         public void IsEmpty_ColourHasNoOpenGate_IsTrue()
         {

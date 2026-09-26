@@ -81,8 +81,10 @@ namespace GateRush.Core
         /// zero — when the move is not legal: the block cannot move (dead,
         /// frozen, locked, shuttered, or axis-forbidden), the target is not
         /// reachable by a corner-turning flood fill of fully-legal intermediate
-        /// positions, or the move is zero-distance and the block is not flush
-        /// against a compatible open gate. Never throws for player error.
+        /// positions, or the move is zero-distance and the block cannot be pushed
+        /// in place into a compatible open gate — none is flush against it, or
+        /// the only one is on an edge across its axis (D39). Never throws for
+        /// player error.
         /// <para><paramref name="timeBonusSeconds"/> is the sum of every
         /// time-bonus block (M10) destroyed anywhere in this resolution — a
         /// single clear, or a chain — for the caller to add to its countdown
@@ -125,8 +127,12 @@ namespace GateRush.Core
                 return false;
             }
 
-            var clearsAtGate =
-                BlockReachability.IsAtCompatibleExitGate(ctx, state, blockIndex, move.TargetOrigin);
+            // A zero-distance move is a push, legal only into a gate on an edge
+            // the block's axis can push toward (D39); a move that arrives clears
+            // at a compatible gate on any edge.
+            var clearsAtGate = isZeroDistance
+                ? BlockReachability.CanClearInPlace(ctx, state, blockIndex)
+                : BlockReachability.IsAtCompatibleExitGate(ctx, state, blockIndex, move.TargetOrigin);
 
             // A zero-distance move is only ever legal as the push that clears a
             // block already sitting at a compatible open gate. Anything else is a

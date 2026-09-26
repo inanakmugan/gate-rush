@@ -28,6 +28,14 @@ namespace GateRush.Solver
     /// positions that route reaches. If no candidate survives,
     /// <see cref="IsEmpty"/> is true and no clear is reachable from any state
     /// in the stratum.</para>
+    /// <para><b>The start origin.</b> The origin a block stands on when the
+    /// stratum begins is the one place it can be without having arrived by a
+    /// move, so reaching an exit there takes a push in place, which its axis
+    /// may forbid (<c>DECISIONS.md</c> D39). It is an exit when
+    /// <see cref="BlockReachability.CanClearInPlace"/> holds, and also when the
+    /// block can step off it at all — then it can come back, and arriving
+    /// clears on any edge. See <see cref="Of"/> for why that second case must
+    /// count.</para>
     /// <para><b>The score.</b> For each candidate block, a cheapest-route
     /// search over its positions, where stepping to a position costs the number
     /// of other blocks its footprint newly runs into there. The score is the
@@ -117,23 +125,50 @@ namespace GateRush.Solver
                 }
 
                 var spec = ctx.SpecAt(i);
-                var reachable = ReachableOrigins(spec.Cells, BlockReachability.PermittedSteps(spec.Axis), state.Origins[i], fixedObstacle, width, height);
+                var start = state.Origins[i];
+                var startIndex = start.Y * width + start.X;
+                var reachable = ReachableOrigins(spec.Cells, BlockReachability.PermittedSteps(spec.Axis), start, fixedObstacle, width, height);
+
+                var canLeaveStart = false;
+                for (var origin = 0; origin < reachable.Length && !canLeaveStart; origin++)
+                {
+                    canLeaveStart = reachable[origin] && origin != startIndex;
+                }
+
+                var clearsInPlace = BlockReachability.CanClearInPlace(ctx, state, i);
 
                 var isExit = new bool[width * height];
                 var hasExit = false;
                 for (var origin = 0; origin < isExit.Length; origin++)
                 {
-                    if (reachable[origin]
-                        && BlockReachability.IsAtCompatibleExitGate(ctx, state, i, new Coord(origin % width, origin / width)))
+                    if (!reachable[origin]
+                        || !BlockReachability.IsAtCompatibleExitGate(ctx, state, i, new Coord(origin % width, origin / width)))
                     {
-                        isExit[origin] = true;
-                        hasExit = true;
+                        continue;
                     }
+
+                    // The start origin is reached by a push in place or by
+                    // arriving back after stepping off. It must stay an exit
+                    // whenever the block can step off at all, even if the push
+                    // is forbidden: IsEmpty has to over-approximate the clears
+                    // reachable in this stratum, because an empty list becomes a
+                    // DeadEnd, and on a clear-monotone level a DeadEnd becomes a
+                    // proven Unsolvable. Stepping off in the relaxed flood only
+                    // needs movable blocks to make way, which they can.
+                    if (origin == startIndex && !clearsInPlace && !canLeaveStart)
+                    {
+                        continue;
+                    }
+
+                    isExit[origin] = true;
+                    hasExit = true;
                 }
 
                 if (hasExit)
                 {
-                    candidates.Add(new Candidate(i, spec.Cells, BlockReachability.PermittedSteps(spec.Axis), isExit));
+                    candidates.Add(new Candidate(
+                        i, spec.Cells, BlockReachability.PermittedSteps(spec.Axis), isExit,
+                        inPlaceExit: clearsInPlace ? startIndex : -1));
                     maxFootprint = Math.Max(maxFootprint, spec.Cells.Count);
                 }
             }
@@ -170,12 +205,23 @@ namespace GateRush.Solver
 
         /// <summary>
         /// Dijkstra over the candidate's origins. Stops at the first exit
-        /// settled, or once nothing cheaper than <paramref name="toBeat"/> is
-        /// left. Positions number at most a few dozen, so the unvisited minimum
-        /// is found by a plain scan.
+        /// settled, or once nothing cheaper than the best route found so far —
+        /// initially <paramref name="toBeat"/> — is left. Positions number at
+        /// most a few dozen, so the unvisited minimum is found by a plain scan.
+        /// <para>The block's current origin is special: standing there is not
+        /// arriving there. It counts as an exit at cost zero only when it is the
+        /// candidate's <see cref="Candidate.InPlaceExit"/>; otherwise the route
+        /// has to step off and come back, which is recorded when an edge leads
+        /// back into it — it is settled by then, so it can never be settled as an
+        /// exit.</para>
         /// </summary>
         private int CheapestRouteToAnExit(Candidate candidate, int start, int toBeat)
         {
+            if (start == candidate.InPlaceExit)
+            {
+                return 0;
+            }
+
             for (var i = 0; i < cost.Length; i++)
             {
                 cost[i] = int.MaxValue;
@@ -183,6 +229,7 @@ namespace GateRush.Solver
             }
 
             cost[start] = 0;
+            var best = toBeat;
 
             while (true)
             {
@@ -195,12 +242,12 @@ namespace GateRush.Solver
                     }
                 }
 
-                if (current < 0 || cost[current] >= toBeat)
+                if (current < 0 || cost[current] >= best)
                 {
-                    return toBeat;
+                    return best;
                 }
 
-                if (candidate.IsExit[current])
+                if (candidate.IsExit[current] && current != start)
                 {
                     return cost[current];
                 }
@@ -218,7 +265,8 @@ namespace GateRush.Solver
                     }
 
                     var index = next.Y * width + next.X;
-                    if (settled[index])
+                    var arrivesBackAtStart = index == start && candidate.IsExit[start];
+                    if (settled[index] && !arrivesBackAtStart)
                     {
                         continue;
                     }
@@ -234,6 +282,12 @@ namespace GateRush.Solver
                     }
 
                     var total = cost[current] + newlyMet;
+                    if (arrivesBackAtStart)
+                    {
+                        best = Math.Min(best, total);
+                        continue;
+                    }
+
                     if (total < cost[index])
                     {
                         cost[index] = total;
@@ -345,12 +399,13 @@ namespace GateRush.Solver
         /// <summary>One movable block with at least one reachable exit, and which of its origins are exits.</summary>
         private sealed class Candidate
         {
-            public Candidate(int blockIndex, IReadOnlyList<Coord> cells, IReadOnlyList<Coord> steps, bool[] isExit)
+            public Candidate(int blockIndex, IReadOnlyList<Coord> cells, IReadOnlyList<Coord> steps, bool[] isExit, int inPlaceExit)
             {
                 BlockIndex = blockIndex;
                 Cells = cells;
                 Steps = steps;
                 IsExit = isExit;
+                InPlaceExit = inPlaceExit;
             }
 
             public int BlockIndex { get; }
@@ -361,6 +416,13 @@ namespace GateRush.Solver
 
             /// <summary>Indexed by origin cell (<c>y * width + x</c>).</summary>
             public bool[] IsExit { get; }
+
+            /// <summary>
+            /// The stratum's start origin (<c>y * width + x</c>) when the block
+            /// can be pushed in place into a gate there
+            /// (<see cref="BlockReachability.CanClearInPlace"/>); -1 otherwise.
+            /// </summary>
+            public int InPlaceExit { get; }
         }
     }
 }

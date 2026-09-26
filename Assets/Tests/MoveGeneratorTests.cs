@@ -241,6 +241,36 @@ namespace GateRush.Tests
 
         [TestCase(MoveGenMode.Canonical)]
         [TestCase(MoveGenMode.Exhaustive)]
+        public void Generate_EmitsNoZeroDistanceMove_ForAHorizontalBlockFlushAboveABottomGate(MoveGenMode mode)
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(1, 0), axis: MovementAxis.HorizontalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moves = Generate(ctx, state, mode);
+
+            CollectionAssert.DoesNotContain(moves, new Move(0, new Coord(1, 0)));
+        }
+
+        [TestCase(MoveGenMode.Canonical)]
+        [TestCase(MoveGenMode.Exhaustive)]
+        public void Generate_EmitsTheZeroDistanceMove_ForAHorizontalBlockFlushAgainstARightGate(MoveGenMode mode)
+        {
+            var ctx = Ctx(
+                3, 3,
+                new[] { Block(1, new Coord(2, 1), axis: MovementAxis.HorizontalOnly) },
+                gates: new[] { Gate(1, BoardEdge.Right, 1, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var moves = Generate(ctx, state, mode);
+
+            Assert.AreEqual(new Move(0, new Coord(2, 1)), moves[0], "zero-distance move must be emitted first");
+        }
+
+        [TestCase(MoveGenMode.Canonical)]
+        [TestCase(MoveGenMode.Exhaustive)]
         public void Generate_OnAFullyPackedBoardWithOnePreAlignedBlock_EmitsExactlyOneMove(MoveGenMode mode)
         {
             var ctx = Ctx(

@@ -52,6 +52,7 @@ namespace GateRush.Solver
     public sealed class BreadthFirstStrategy : ISearchStrategy
     {
         private readonly bool stratifyVisitedSet;
+        private readonly Func<MoveGenerator> generatorFactory;
 
         /// <param name="stratifyVisitedSet">
         /// When true (the default), retire a progress stratum's visited entries
@@ -60,11 +61,26 @@ namespace GateRush.Solver
         /// the plain global visited set, used as the equivalence baseline.
         /// </param>
         public BreadthFirstStrategy(bool stratifyVisitedSet = true)
+            : this(stratifyVisitedSet, () => new MoveGenerator())
+        {
+        }
+
+        /// <summary>
+        /// Test seam: <paramref name="generatorFactory"/> supplies the generator
+        /// each <see cref="Search"/> call uses, so a test can feed the search a
+        /// move the resolver rejects.
+        /// </summary>
+        internal BreadthFirstStrategy(bool stratifyVisitedSet, Func<MoveGenerator> generatorFactory)
         {
             this.stratifyVisitedSet = stratifyVisitedSet;
+            this.generatorFactory = generatorFactory;
         }
 
         /// <inheritdoc />
+        /// <exception cref="InvalidOperationException">
+        /// The resolver rejected a move the generator emitted — a solver bug,
+        /// never a property of the level.
+        /// </exception>
         public SolveResult Search(LevelContext ctx, BoardState initial, SearchBudget budget)
         {
             if (ctx == null)
@@ -93,7 +109,7 @@ namespace GateRush.Solver
                     peakRetainedStateCount: 0, elapsedMs: stopwatch.ElapsedMilliseconds);
             }
 
-            var generator = new MoveGenerator();
+            var generator = generatorFactory();
             var resolver = new MoveResolver();
 
             var visited = new SortedDictionary<ProgressVector, Dictionary<BoardState, Node>>();
@@ -155,12 +171,7 @@ namespace GateRush.Solver
                     // solver discards them.
                     if (!resolver.TryApplyMove(ctx, node.State, move, out var successor, out _))
                     {
-                        // The canonical and exhaustive move sets are both
-                        // subsets of what the resolver accepts (Module 04's
-                        // tests pin this), so this branch should not be taken;
-                        // skipping rather than throwing keeps a generator bug
-                        // from crashing an editor session.
-                        continue;
+                        throw RejectedMove.Error(ctx, move);
                     }
 
                     var vector = successor.ProgressVector;

@@ -82,6 +82,45 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Search_AxisBlockFlushAboveACrossAxisGate_SlidesAwayAndArrivesBack()
+        {
+            var ctx = AxisBlockReturnsToCrossAxisGateBoard();
+            var initial = BoardState.CreateInitial(ctx);
+
+            var result = new NearestNextClearStrategy().Search(ctx, initial, Generous());
+
+            Assert.AreEqual(SolveStatus.Solvable, result.Status);
+            Assert.AreEqual(2, result.Solution.Count);
+            Assert.AreNotEqual(initial.Origins[0], result.Solution[0].TargetOrigin, "the first move must slide away");
+            Assert.AreEqual(initial.Origins[0], result.Solution[1].TargetOrigin, "the second must arrive back at the gate");
+            Assert.IsTrue(Replay(ctx, initial, result.Solution).IsSolved(ctx));
+        }
+
+        [Test]
+        public void Search_AxisBlockBoxedInAboveACrossAxisGate_IsUnsolvable()
+        {
+            var ctx = AxisBlockBoxedAboveCrossAxisGateBoard();
+            Assert.IsTrue(ctx.IsClearMonotone, "the proof needs a clear-monotone board");
+
+            var result = Search(ctx);
+
+            Assert.AreEqual(SolveStatus.Unsolvable, result.Status);
+        }
+
+        [Test]
+        public void Search_GeneratedMoveTheResolverRejects_ThrowsNamingTheMove()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)) }, new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => new NearestNextClearStrategy(() => new IllegalMoveGenerator())
+                    .Search(ctx, BoardState.CreateInitial(ctx), Generous()));
+
+            StringAssert.Contains("block 0", error.Message);
+            StringAssert.Contains(IllegalMoveGenerator.Target.ToString(), error.Message);
+        }
+
+        [Test]
         public void Search_InitialStateAlreadySolved_ReturnsAnEmptyProvenSolution()
         {
             var result = Search(Ctx(2, 2));

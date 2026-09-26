@@ -95,6 +95,72 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Compute_HasReadyOpeningMove_FalseForHorizontalBlockFlushAboveABottomGate()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(new BlockDraft
+            {
+                Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(1, 0),
+                Axis = MovementAxis.HorizontalOnly,
+            });
+            draft.Gates.Add(new GateDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red,
+            });
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.GreaterOrEqual(metrics.OpeningBranchingFactor, 0, "The draft must form a valid level, or this proves nothing.");
+            Assert.IsFalse(metrics.HasReadyOpeningMove);
+        }
+
+        [Test]
+        public void Compute_HasReadyOpeningMove_FalseForFrozenBlockFlushAtItsGate()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(new BlockDraft
+            {
+                Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(1, 0),
+                UnfreezeAtClearCount = 1,
+            });
+            draft.Blocks.Add(RedBlock(2, new Coord(0, 2)));
+            draft.Gates.Add(new GateDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red,
+            });
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.GreaterOrEqual(metrics.OpeningBranchingFactor, 0, "The draft must form a valid level, or this proves nothing.");
+            Assert.IsFalse(metrics.HasReadyOpeningMove);
+        }
+
+        [Test]
+        public void Compute_HasReadyOpeningMove_FalseForLockedBlockFlushAtItsGate()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(new BlockDraft
+            {
+                Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(1, 0),
+                LockId = 1, RequiredKeyCount = 1,
+            });
+            draft.Blocks.Add(new BlockDraft
+            {
+                Id = 2, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, StartOrigin = new Coord(0, 2),
+                KeyTargetLockId = 1,
+            });
+            draft.Gates.Add(new GateDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 1, Width = 1, Color = BlockColor.Red,
+            });
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.GreaterOrEqual(metrics.OpeningBranchingFactor, 0, "The draft must form a valid level, or this proves nothing.");
+            Assert.IsFalse(metrics.HasReadyOpeningMove);
+        }
+
+        [Test]
         public void Compute_SuggestedTimeBudget_RisesWithSolutionLengthAndWithBonuses()
         {
             var plain = LevelDraft.NewEmpty(3, 3);

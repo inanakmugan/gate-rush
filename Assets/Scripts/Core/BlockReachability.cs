@@ -127,16 +127,50 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// True when block <paramref name="blockIndex"/> would exit through some
-        /// open gate if its origin were <paramref name="origin"/>: the footprint
-        /// flush against that gate's edge, the gate's colour equal to the block's
-        /// current colour, the gate at least as wide as the footprint's
-        /// projection span onto that edge, and that projection entirely within
-        /// the opening. Non-rectangular footprints project their whole bounding
-        /// extent, not just the cells touching the wall (M1).
+        /// True when a move that <em>arrives</em> with block
+        /// <paramref name="blockIndex"/>'s origin at <paramref name="origin"/>
+        /// would exit it through some open gate: the footprint flush against that
+        /// gate's edge, the gate's colour equal to the block's current colour, the
+        /// gate at least as wide as the footprint's projection span onto that
+        /// edge, and that projection entirely within the opening. Non-rectangular
+        /// footprints project their whole bounding extent, not just the cells
+        /// touching the wall (M1). The gate may be on any edge, whatever the
+        /// block's <see cref="MovementAxis"/>: the clear is a property of where
+        /// the move ends, not of the direction it took (<c>DECISIONS.md</c> D39).
+        /// A zero-distance move is a push, not an arrival — use
+        /// <see cref="CanClearInPlace"/> for it.
         /// </summary>
         public static bool IsAtCompatibleExitGate(
-            LevelContext ctx, BoardState state, int blockIndex, Coord origin)
+            LevelContext ctx, BoardState state, int blockIndex, Coord origin) =>
+            HasCompatibleGate(ctx, state, blockIndex, origin, pushAxis: MovementAxis.Free);
+
+        /// <summary>
+        /// True when the player can clear block <paramref name="blockIndex"/>
+        /// right now with a zero-distance move — a push into a gate from where it
+        /// already stands (<c>DECISIONS.md</c> D25). That needs everything
+        /// <see cref="IsAtCompatibleExitGate"/> needs at the block's current
+        /// origin, and two things more: the block can move at all
+        /// (<see cref="BoardState.CanMove"/> — a frozen, locked or shuttered
+        /// block cannot be pushed), and the gate is on an edge its
+        /// <see cref="MovementAxis"/> lets it push toward — left or right for
+        /// <see cref="MovementAxis.HorizontalOnly"/>, top or bottom for
+        /// <see cref="MovementAxis.VerticalOnly"/>, any for
+        /// <see cref="MovementAxis.Free"/> (D39). Takes no origin: a push in place
+        /// only ever happens where the block is.
+        /// </summary>
+        public static bool CanClearInPlace(LevelContext ctx, BoardState state, int blockIndex) =>
+            state.CanMove(ctx, blockIndex)
+            && HasCompatibleGate(ctx, state, blockIndex, state.Origins[blockIndex], ctx.SpecAt(blockIndex).Axis);
+
+        /// <summary>
+        /// The one gate scan behind <see cref="IsAtCompatibleExitGate"/> and
+        /// <see cref="CanClearInPlace"/>: a compatible open gate at
+        /// <paramref name="origin"/> on an edge a push along
+        /// <paramref name="pushAxis"/> can reach. An arrival passes
+        /// <see cref="MovementAxis.Free"/>, so every edge counts.
+        /// </summary>
+        private static bool HasCompatibleGate(
+            LevelContext ctx, BoardState state, int blockIndex, Coord origin, MovementAxis pushAxis)
         {
             var cells = ctx.SpecAt(blockIndex).Cells;
 
@@ -180,6 +214,11 @@ namespace GateRush.Core
 
                 var gate = ctx.Gates[g];
                 if (gate.Color != currentColor)
+                {
+                    continue;
+                }
+
+                if (!CanPushToward(pushAxis, gate.Edge))
                 {
                     continue;
                 }
@@ -233,6 +272,24 @@ namespace GateRush.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// True when a block restricted to <paramref name="axis"/> can push toward
+        /// <paramref name="edge"/>: a horizontal push reaches the left and right
+        /// edges, a vertical one the top and bottom.
+        /// </summary>
+        private static bool CanPushToward(MovementAxis axis, BoardEdge edge)
+        {
+            switch (axis)
+            {
+                case MovementAxis.HorizontalOnly:
+                    return edge == BoardEdge.Left || edge == BoardEdge.Right;
+                case MovementAxis.VerticalOnly:
+                    return edge == BoardEdge.Top || edge == BoardEdge.Bottom;
+                default:
+                    return true;
+            }
         }
 
         /// <summary>

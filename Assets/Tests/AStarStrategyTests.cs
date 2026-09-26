@@ -50,6 +50,45 @@ namespace GateRush.Tests
             Assert.IsTrue(Replay(ctx, initial, result.Solution).IsSolved(ctx));
         }
 
+        [TestCase(MoveGenMode.Canonical)]
+        [TestCase(MoveGenMode.Exhaustive)]
+        public void Search_AxisBlockFlushAboveACrossAxisGate_SlidesAwayAndArrivesBack(MoveGenMode mode)
+        {
+            var ctx = AxisBlockReturnsToCrossAxisGateBoard();
+            var initial = BoardState.CreateInitial(ctx);
+
+            var result = new AStarStrategy().Search(ctx, initial, Budget(mode));
+
+            Assert.AreEqual(SolveStatus.Solvable, result.Status);
+            Assert.AreEqual(2, result.Solution.Count);
+            Assert.AreNotEqual(initial.Origins[0], result.Solution[0].TargetOrigin, "the first move must slide away");
+            Assert.AreEqual(initial.Origins[0], result.Solution[1].TargetOrigin, "the second must arrive back at the gate");
+            Assert.IsTrue(Replay(ctx, initial, result.Solution).IsSolved(ctx));
+        }
+
+        [Test]
+        public void Search_AxisBlockBoxedInAboveACrossAxisGate_ReturnsUnsolvable()
+        {
+            var ctx = AxisBlockBoxedAboveCrossAxisGateBoard();
+
+            var result = new AStarStrategy().Search(ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive));
+
+            Assert.AreEqual(SolveStatus.Unsolvable, result.Status);
+        }
+
+        [Test]
+        public void Search_GeneratedMoveTheResolverRejects_ThrowsNamingTheMove()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)) }, new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => new AStarStrategy(() => new IllegalMoveGenerator())
+                    .Search(ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive)));
+
+            StringAssert.Contains("block 0", error.Message);
+            StringAssert.Contains(IllegalMoveGenerator.Target.ToString(), error.Message);
+        }
+
         [Test]
         public void Search_BlockWhoseColourHasNoGate_ReturnsUnsolvable()
         {
