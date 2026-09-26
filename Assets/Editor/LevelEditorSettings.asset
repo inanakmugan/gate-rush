@@ -21,3 +21,10 @@ MonoBehaviour:
   timeBudgetBaseSeconds: 10
   timeBudgetSecondsPerMove: 3
   timeBudgetRoundingSeconds: 5
+  propertiesColumnWidthRatio: 0.2
+  propertiesColumnMinWidth: 300
+  warningsListHeightRatio: 0.08
+  warningsListMinHeight: 70
+  canvasMinHeight: 220
+  queueEntryFreeDrawMaxDepth: 4
+  undoStackDepth: 50
