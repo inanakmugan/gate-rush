@@ -10,7 +10,8 @@ namespace GateRush.Tests
     /// Covers <see cref="DraftMetrics"/>: the packing numbers on a known board,
     /// the opening branching factor against <see cref="MoveGenerator"/>'s own
     /// output, ready-opening-move detection, and that the suggested time budget
-    /// rises with solution length and with available M10 bonuses (D12).
+    /// rises with solution length and with available M10 bonuses (D12), prefers
+    /// a proven shortest length, and flags a budget built from an unproven one.
     /// </summary>
     public class DraftMetricsTests
     {
@@ -102,12 +103,48 @@ namespace GateRush.Tests
             var withBonus = LevelDraft.NewEmpty(3, 3);
             withBonus.Blocks.Add(RedBlock(1, new Coord(0, 0), timeBonusSeconds: 12));
 
-            var shortSolve = DraftMetrics.Compute(plain, Formula, solutionMoveCount: 2).SuggestedTimeBudgetSeconds;
-            var longSolve = DraftMetrics.Compute(plain, Formula, solutionMoveCount: 8).SuggestedTimeBudgetSeconds;
-            var withBonusSolve = DraftMetrics.Compute(withBonus, Formula, solutionMoveCount: 2).SuggestedTimeBudgetSeconds;
+            var shortSolve = DraftMetrics.Compute(plain, Formula, provenShortestLength: 2).SuggestedTimeBudgetSeconds;
+            var longSolve = DraftMetrics.Compute(plain, Formula, provenShortestLength: 8).SuggestedTimeBudgetSeconds;
+            var withBonusSolve = DraftMetrics.Compute(withBonus, Formula, provenShortestLength: 2).SuggestedTimeBudgetSeconds;
 
             Assert.Greater(longSolve.Value, shortSolve.Value);
             Assert.Greater(withBonusSolve.Value, shortSolve.Value);
+        }
+
+        [Test]
+        public void Compute_ProvenShortestLength_BudgetIsNotFlaggedUnproven()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+
+            var metrics = DraftMetrics.Compute(draft, Formula, provenShortestLength: 4);
+
+            Assert.AreEqual(Formula.Suggest(4, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.IsFalse(metrics.IsTimeBudgetFromUnprovenLength);
+        }
+
+        [Test]
+        public void Compute_OnlyAnUnprovenLength_BudgetIsBuiltFromItAndFlagged()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+
+            var metrics = DraftMetrics.Compute(draft, Formula, unprovenSolutionLength: 6);
+
+            Assert.AreEqual(Formula.Suggest(6, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.IsTrue(metrics.IsTimeBudgetFromUnprovenLength);
+        }
+
+        [Test]
+        public void Compute_BothLengthsSupplied_TheProvenOneWins()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+
+            var metrics = DraftMetrics.Compute(draft, Formula, provenShortestLength: 4, unprovenSolutionLength: 9);
+
+            Assert.AreEqual(Formula.Suggest(4, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.IsFalse(metrics.IsTimeBudgetFromUnprovenLength);
         }
 
         [Test]

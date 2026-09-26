@@ -280,6 +280,73 @@ namespace GateRush.Tests
         }
 
         /// <summary>
+        /// A 3x2 board with a static wall at (2, 1). Red at (0, 0) must reach the
+        /// red gate on the right edge of row 0; blue at (1, 0) stands in its way,
+        /// and blue's own gate — the top edge above column 1 — opens only after
+        /// the first clear. Optimum 3: blue steps up to (1, 1), red slides out,
+        /// and blue then clears in place. Two colours make the heuristic's lower
+        /// bound 2, one short of the optimum.
+        /// </summary>
+        /// <remarks>
+        /// The board that separates "found" from "proven shortest": a solution
+        /// longer than the admissible bound, reachable in both move modes (the
+        /// wall makes (1, 1) a canonical resting spot). Not in
+        /// <see cref="SolvableCorpus"/>, whose boards are chosen to meet their
+        /// bound.
+        /// </remarks>
+        internal static LevelContext StepAsideBeforeFirstClearBoard()
+        {
+            return Ctx(
+                3, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0)),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue })
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Top, 1, 1, BlockColor.Blue, openAt: 1)
+                },
+                staticWalls: new[] { new Coord(2, 1) });
+        }
+
+        /// <summary>
+        /// A 3x2 board where the nearest clear is a trap. A red vertical block at
+        /// column 2 carries a lock needing two keys, and there is no red gate: it
+        /// can only leave by being cleared, which happens only if the last key
+        /// consumed is <see cref="KeyEffect.ClearOuterColor"/>. That key's green
+        /// carrier starts flush against the green gate at (0, 0); the
+        /// <see cref="KeyEffect.UnlockMovement"/> key's green carrier waits at
+        /// (1, 1). Optimum 3: step the first carrier aside to (1, 0), clear the
+        /// second, then clear the first — its key completes the lock and clears
+        /// the red block for free. Clearing the pre-aligned carrier first
+        /// instead spends its effect on a lock that is not yet complete, and the
+        /// board can no longer be solved.
+        /// </summary>
+        /// <remarks>
+        /// The counterexample to clear monotonicity for mixed-effect locks: a
+        /// clear that turns a solvable board unsolvable. Its
+        /// <see cref="LevelContext.IsClearMonotone"/> is false. Found by the
+        /// random-board comparison against A\*, then reduced to this.
+        /// </remarks>
+        internal static LevelContext WastedClearKeyTrapBoard()
+        {
+            return Ctx(
+                3, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green },
+                        keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(1, 1), colors: new[] { BlockColor.Green },
+                        keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(3, new Coord(2, 0), cells: new[] { new Coord(0, 0), new Coord(0, 1) },
+                        lockId: 1, requiredKeys: 2)
+                },
+                new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Green) });
+        }
+
+        /// <summary>
         /// One blue lock needing two keys: a red <see cref="KeyEffect.ClearOuterColor"/>
         /// key and a green <see cref="KeyEffect.UnlockMovement"/> key. Every block
         /// is flush against its own gate on a packed 3x1 row. The key consumed

@@ -57,6 +57,10 @@ namespace GateRush.Core
             new Coord(0, 1), new Coord(0, -1)
         };
 
+        private static readonly IReadOnlyList<Coord> FreeStepsView = Array.AsReadOnly(FreeSteps);
+        private static readonly IReadOnlyList<Coord> HorizontalStepsView = Array.AsReadOnly(HorizontalSteps);
+        private static readonly IReadOnlyList<Coord> VerticalStepsView = Array.AsReadOnly(VerticalSteps);
+
         private readonly Queue<Coord> frontier = new Queue<Coord>();
         private readonly List<Coord> reached = new List<Coord>();
 
@@ -375,6 +379,25 @@ namespace GateRush.Core
             }
 
             scanGeneration++;
+        }
+
+        /// <summary>
+        /// The single-cell steps a block with <paramref name="axis"/> may take,
+        /// in <see cref="Direction"/> enum order — the same steps the flood fill
+        /// here uses, exposed so other code that walks a block's positions
+        /// cannot disagree with it about which directions are allowed.
+        /// </summary>
+        public static IReadOnlyList<Coord> PermittedSteps(MovementAxis axis)
+        {
+            switch (axis)
+            {
+                case MovementAxis.HorizontalOnly:
+                    return HorizontalStepsView;
+                case MovementAxis.VerticalOnly:
+                    return VerticalStepsView;
+                default:
+                    return FreeStepsView;
+            }
         }
 
         private static int CellIndex(Coord c, int width) => (c.Y * width) + c.X;

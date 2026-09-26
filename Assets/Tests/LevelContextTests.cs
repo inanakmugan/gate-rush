@@ -498,5 +498,57 @@ namespace GateRush.Tests
 
             CollectionAssert.IsEmpty(context.KeyIndicesForLock(999));
         }
+
+        // ----- IsClearMonotone ----------------------------------------------
+
+        [Test]
+        public void IsClearMonotone_NoGeneratorOrElevator_IsTrue()
+        {
+            var context = CreateContext(3, 3, new[] { CreateBlock(1, new Coord(0, 0)) });
+
+            Assert.IsTrue(context.IsClearMonotone);
+        }
+
+        [Test]
+        public void IsClearMonotone_LockWhoseKeysShareOneEffect_IsTrue()
+        {
+            var locked = CreateBlock(1, new Coord(0, 0), lockId: 1, requiredKeyCount: 2);
+            var keyA = CreateBlock(2, new Coord(1, 0), keyTargetLockId: 1);
+            var keyB = CreateBlock(3, new Coord(2, 0), keyTargetLockId: 1);
+
+            var context = CreateContext(3, 3, new[] { locked, keyA, keyB });
+
+            Assert.IsTrue(context.IsClearMonotone);
+        }
+
+        [Test]
+        public void IsClearMonotone_LockWhoseKeysCarryDifferentEffects_IsFalse()
+        {
+            var context = SearchCorpus.WastedClearKeyTrapBoard();
+
+            Assert.IsFalse(context.IsClearMonotone);
+        }
+
+        [Test]
+        public void IsClearMonotone_WithAGenerator_IsFalse()
+        {
+            var generator = new GeneratorDefinition(1, BoardEdge.Top, 0, 1, new[] { CreateSpawnedBlock() });
+
+            var context = CreateContext(3, 3, generators: new[] { generator });
+
+            Assert.IsFalse(context.IsClearMonotone);
+        }
+
+        [Test]
+        public void IsClearMonotone_WithAnElevator_IsFalse()
+        {
+            var elevator = new ElevatorDefinition(
+                1, new Coord(0, 0), new Coord(0, 0),
+                new IReadOnlyList<SpawnedBlock>[] { new[] { CreateSpawnedBlock(regionOrigin: new Coord(0, 0)) } });
+
+            var context = CreateContext(3, 3, elevators: new[] { elevator });
+
+            Assert.IsFalse(context.IsClearMonotone);
+        }
     }
 }

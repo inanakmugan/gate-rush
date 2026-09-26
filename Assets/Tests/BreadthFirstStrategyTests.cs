@@ -105,6 +105,50 @@ namespace GateRush.Tests
             CollectionAssert.IsEmpty(result.Solution);
         }
 
+        // ----- Found versus proven shortest ------------------------------
+
+        [Test]
+        public void Search_ExhaustiveSolution_IsProvenShortest()
+        {
+            var ctx = StepAsideBeforeFirstClearBoard();
+
+            var result = new BreadthFirstStrategy().Search(ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive));
+
+            Assert.AreEqual(SolveStatus.Solvable, result.Status);
+            Assert.AreEqual(3, result.ProvenShortestLength);
+            Assert.AreEqual(3, result.LengthLowerBound);
+        }
+
+        [Test]
+        public void Search_CanonicalSolutionLongerThanTheHeuristicBound_IsNotProvenShortest()
+        {
+            var ctx = StepAsideBeforeFirstClearBoard();
+            var initial = BoardState.CreateInitial(ctx);
+
+            var result = new BreadthFirstStrategy().Search(ctx, initial, Budget(MoveGenMode.Canonical));
+
+            Assert.AreEqual(SolveStatus.Solvable, result.Status);
+            Assert.AreEqual(3, result.Solution.Count);
+            Assert.AreEqual(2, result.LengthLowerBound);
+            Assert.IsNull(result.ProvenShortestLength);
+            Assert.IsTrue(Replay(ctx, initial, result.Solution).IsSolved(ctx));
+        }
+
+        // ----- Cancellation ------------------------------------------------
+
+        [Test]
+        public void Search_CancelledToken_ThrowsOperationCanceled()
+        {
+            var ctx = StepAsideBeforeFirstClearBoard();
+            using (var source = new System.Threading.CancellationTokenSource())
+            {
+                source.Cancel();
+
+                Assert.Throws<OperationCanceledException>(() => new BreadthFirstStrategy().Search(
+                    ctx, BoardState.CreateInitial(ctx), Budget(MoveGenMode.Exhaustive).WithCancellation(source.Token)));
+            }
+        }
+
         // ----- Budget: Indeterminate is not Unsolvable -------------------
 
         [Test]
