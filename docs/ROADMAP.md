@@ -21,6 +21,8 @@ means cleaning up every leak that accumulated in the meantime.
 
 ## Phase 1 — Puzzle core
 
+*Status: done.*
+
 Grid, blocks, gates, resolution, search, tests, editor. No Unity scene involved
 except the editor window.
 
@@ -38,7 +40,7 @@ except the editor window.
 | 1.10 | Level Editor — plus SpawnedBlock.RegionOrigin and exact-tiling validation | `Modules/09-level-editor.md` | Done |
 | 1.11 | A\* + equivalence tests against BFS | `Modules/05-search-strategy.md` | Done |
 | 1.12 | M4 layered blocks — landed with Module 03; editing colour stacks is part of 1.10 | — | Done |
-| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | spec written when reached | Not started |
+| 1.13 | M6, M9 at runtime — CheckSpawnTriggers. Authoring lands in 1.10 | `Modules/10-spawning.md` | Done |
 
 Gate-compatibility rules (projection span, alignment, orientation) are settled in
 1.1–1.3 and carry the heaviest test load. Subtle bugs concentrate there.

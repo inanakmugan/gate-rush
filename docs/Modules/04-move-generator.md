@@ -45,9 +45,9 @@ The same flood fill, filtered to positions that can plausibly matter:
 
 1. Positions where the block becomes **flush and aligned with a compatible
    gate** (right colour, sufficient width, full containment).
-2. Positions that **vacate or occupy a generator's spawn cells**. Not yet
-   implemented: it waits for spawn placement in phase 1.13, which D5 makes
-   safe — a missing canonical criterion can only cause false negatives.
+2. Positions that **vacate or occupy the cells a generator's next queued
+   block needs** (added in Module 10): such a move can trigger that spawn,
+   or hold it back.
 3. Positions that **vacate or occupy an elevator region**.
 4. Positions where the block **rests against an obstacle** — a static wall, a
    closed shutter or another block — in at least one direction its axis

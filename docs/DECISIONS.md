@@ -1076,6 +1076,10 @@ nothing should not be computed.
 **Temporary.** The spawner guard goes when phase 1.13 lands; the
 rejected-move throw stays.
 
+**Later (D42).** Phase 1.13 landed and the spawner guard is gone: levels
+with generators or elevators get a verdict. `ValidationOutcome` stays, for
+the next case no search can judge.
+
 ---
 
 ## D41 — A key effect waits for a closed shutter
@@ -1108,5 +1112,42 @@ a dynamic field and is hashed like every other (D1). Clear monotonicity
 for good because of an order the player could not see. Also rejected:
 unlocking at once and dropping only the clear — it splits one effect into
 two halves with different timing, for no gain.
+
+---
+
+## D42 — Spawning runs at level start, ignores shutters, and holds keys
+
+**Decision.** Phase 1.13's spawn triggers follow three rules the mechanics
+left open. A generator or elevator whose target is empty when the level
+starts spawns before the first move, so the initial state is itself
+resolved. A closed shutter does not stop a spawn: an empty region under one
+receives its wave hidden. A key that completes a lock whose block has not
+spawned yet is consumed and its effect waits, using D41's mechanism; it
+applies when the block spawns, or, if the block spawns under a closed
+shutter, when that shutter opens.
+
+**Why.** Observation of the reference game: a spawner fills its space
+whenever the space is empty, whether a move, a clear or the level's
+authoring emptied it. A shutter hides what is under it; it does not pause
+the level's machinery — D41 stops moves, jokers and keys from reaching a
+shuttered block, and a spawn is none of those. Holding a key for an
+unspawned lock is D41's rule for a hidden lock applied to a lock that is
+not there yet: no key is lost to an order the player could not see.
+
+**Consequence.** `BoardState.CreateInitial` returns the state after one
+action-free resolution, so the solver, the editor and the runtime all start
+from the same settled board, and there is still one resolution path (D9).
+A block that spawns flush against a compatible gate is not cleared: it did
+not arrive by a move, so it joins D25's four cases as a fifth. The branch in
+`ApplyKeyEffects` that returned without consuming a key for an unspawned
+lock is replaced, and D40's spawner guard in Validate is removed.
+
+**Rejected.** Waiting for the first move before any spawn: an empty spawner
+would sit visibly unfilled until some unrelated move, which reads as a bug.
+Letting a closed shutter block spawns: an empty region under one would be
+dead until the opening, and nothing about a shutter says it pauses an
+elevator. Spending a key on an unspawned lock with no effect: the lock
+could stay shut for good because of an order the player could not see —
+the outcome D41 already rejected.
 
 ---

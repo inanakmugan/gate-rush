@@ -171,9 +171,10 @@ owns the edge-and-offset projection. Until both land, an unspawned slot has no
 meaningful position and the sentinel is the honest representation.
 
 **`ElevatorWaveActive`.** `ElevatorWaveIndex[e]` is the count of waves already
-placed for elevator `e`. `ElevatorWaveActive[e]` is true while the most
-recently placed wave still occupies its region, false once that region has
-read empty again. This is technically re-derivable from `Alive` plus cell
+placed for elevator `e`. `ElevatorWaveActive[e]` is set when a wave is placed
+and cleared by the first pass that finds the region holding no living block at
+all. A block that entered the region from outside keeps it set even after the
+wave's own blocks have left (Module 10). This is technically re-derivable from `Alive` plus cell
 geometry rather than history that must be stored — unlike the counters this
 module deliberately keeps un-derived — but it is kept as an explicit field
 anyway, since a `bool` costs nothing to hash and it may simplify the module
