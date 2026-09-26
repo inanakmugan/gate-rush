@@ -44,21 +44,41 @@ namespace GateRush.Editor
         public bool HasReadyOpeningMove { get; private set; }
 
         public int? SuggestedTimeBudgetSeconds { get; private set; }
+
+        /// <summary>
+        /// True when <see cref="SuggestedTimeBudgetSeconds"/> was computed from a
+        /// solution not proven shortest. Such a length can only overstate the
+        /// optimum, so the budget errs generous; the editor labels it so it is
+        /// never mistaken for the designed budget.
+        /// </summary>
+        public bool IsTimeBudgetFromUnprovenLength { get; private set; }
+
         public int? ExploredStateCount { get; private set; }
         public int? LargestStratum { get; private set; }
 
         /// <summary>
-        /// Computes the metrics. <paramref name="solutionMoveCount"/>,
+        /// Computes the metrics. The solution lengths,
         /// <paramref name="exploredStateCount"/> and
         /// <paramref name="largestStratum"/> come from the last solve — the
-        /// window pulls them out of its <see cref="LevelSolveResult"/> and the
-        /// winning stage's <see cref="SolveResult"/>; a suggested time budget is
-        /// produced only when a solution length is supplied.
+        /// window pulls them out of its <see cref="ValidationResult"/> and the
+        /// winning stage's <see cref="SolveResult"/>.
         /// </summary>
+        /// <param name="provenShortestLength">
+        /// The last solve's <see cref="ValidationResult.ProvenShortestLength"/>.
+        /// Preferred for the suggested time budget whenever present.
+        /// </param>
+        /// <param name="unprovenSolutionLength">
+        /// The length of a solution the last solve found but did not prove
+        /// shortest. Used for the budget only when no proven length is supplied,
+        /// and then flagged through <see cref="IsTimeBudgetFromUnprovenLength"/>.
+        /// A suggested time budget is produced only when one of the two lengths
+        /// is supplied.
+        /// </param>
         public static DraftMetrics Compute(
             LevelDraft draft,
             TimeBudgetFormula timeBudget,
-            int? solutionMoveCount = null,
+            int? provenShortestLength = null,
+            int? unprovenSolutionLength = null,
             int? exploredStateCount = null,
             int? largestStratum = null)
         {
@@ -130,10 +150,16 @@ namespace GateRush.Editor
             metrics.ExploredStateCount = exploredStateCount;
             metrics.LargestStratum = largestStratum;
 
-            if (solutionMoveCount.HasValue)
+            if (provenShortestLength.HasValue)
             {
                 metrics.SuggestedTimeBudgetSeconds =
-                    timeBudget.Suggest(solutionMoveCount.Value, TotalTimeBonusSeconds(draft));
+                    timeBudget.Suggest(provenShortestLength.Value, TotalTimeBonusSeconds(draft));
+            }
+            else if (unprovenSolutionLength.HasValue)
+            {
+                metrics.SuggestedTimeBudgetSeconds =
+                    timeBudget.Suggest(unprovenSolutionLength.Value, TotalTimeBonusSeconds(draft));
+                metrics.IsTimeBudgetFromUnprovenLength = true;
             }
 
             return metrics;

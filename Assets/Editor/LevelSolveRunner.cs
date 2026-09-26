@@ -24,14 +24,39 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// The outcome of <see cref="LevelSolveRunner.Run"/>: the verdict, the
-    /// shortest solution when there is one, which stage found it, and both raw
-    /// <see cref="SolveResult"/>s for the metrics panel.
+    /// The outcome of <see cref="LevelSolveRunner.Run"/>: the verdict, a verified
+    /// solution when there is one and what is known about its length, which
+    /// stage found it, and both raw <see cref="SolveResult"/>s for the metrics
+    /// panel.
     /// </summary>
+    /// <remarks>
+    /// Existence (<see cref="Verdict"/>) and quality
+    /// (<see cref="LengthLowerBound"/>, <see cref="ProvenShortestLength"/>) are
+    /// separate, as on <see cref="SolveResult"/>: a canonical-stage solution is
+    /// playable, but proven shortest only when its length meets the lower
+    /// bound — a shorter one can use moves canonical pruning left out. Time-budget and difficulty
+    /// code must read <see cref="ProvenShortestLength"/> and handle its null
+    /// case explicitly rather than take <see cref="Solution"/>'s length.
+    /// </remarks>
     public sealed class LevelSolveResult
     {
         public LevelSolveVerdict Verdict { get; }
+
+        /// <summary>A verified solution; not necessarily the shortest. Empty unless <see cref="Verdict"/> is Solvable.</summary>
         public IReadOnlyList<Move> Solution { get; }
+
+        /// <summary>
+        /// No solution is shorter than this. From the solving stage when
+        /// Solvable; the larger of the two stages' bounds when Indeterminate —
+        /// both are valid, so the tighter one wins; zero when Unsolvable.
+        /// </summary>
+        public int LengthLowerBound { get; }
+
+        /// <summary>
+        /// The shortest solution's length when the solving stage proved it, else
+        /// null. Always null unless <see cref="Verdict"/> is Solvable.
+        /// </summary>
+        public int? ProvenShortestLength { get; }
 
         /// <summary>Which move set produced the solution. Meaningful only when <see cref="Verdict"/> is Solvable.</summary>
         public MoveGenMode SolvedBy { get; }
@@ -54,6 +79,23 @@ namespace GateRush.Editor
             SolvedBy = solvedBy;
             Canonical = canonical;
             Exhaustive = exhaustive;
+
+            switch (verdict)
+            {
+                case LevelSolveVerdict.Solvable:
+                    var solving = solvedBy == MoveGenMode.Exhaustive ? exhaustive : canonical;
+                    LengthLowerBound = solving.LengthLowerBound;
+                    ProvenShortestLength = solving.ProvenShortestLength;
+                    break;
+                case LevelSolveVerdict.Indeterminate:
+                    LengthLowerBound = Math.Max(canonical.LengthLowerBound, exhaustive?.LengthLowerBound ?? 0);
+                    ProvenShortestLength = null;
+                    break;
+                default:
+                    LengthLowerBound = 0;
+                    ProvenShortestLength = null;
+                    break;
+            }
         }
     }
 

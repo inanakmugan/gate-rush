@@ -12,8 +12,9 @@ namespace GateRush.Solver
     /// </remarks>
     public enum SolveStatus
     {
-        /// <summary>A solution was found; <see cref="SolveResult.Solution"/> is
-        /// the shortest one.</summary>
+        /// <summary>A solution was found; <see cref="SolveResult.Solution"/> is a
+        /// verified one. Says nothing about whether it is the shortest — that is
+        /// <see cref="SolveResult.ProvenShortestLength"/>'s job.</summary>
         Solvable,
 
         /// <summary>The search exhausted the reachable state space (within the

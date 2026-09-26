@@ -4,6 +4,7 @@ using GateRush.Editor;
 using GateRush.Solver;
 using NUnit.Framework;
 using static GateRush.Tests.Fixture;
+using static GateRush.Tests.SearchCorpus;
 
 namespace GateRush.Tests
 {
@@ -121,6 +122,61 @@ namespace GateRush.Tests
 
             Assert.AreEqual(LevelSolveVerdict.Unsolvable, result.Verdict);
             CollectionAssert.AreEqual(new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive }, spy.Searches);
+        }
+
+        // ----- Existence versus quality --------------------------------------
+
+        [Test]
+        public void Run_CanonicalSolutionLongerThanTheBound_IsSolvableButNotProvenShortest()
+        {
+            var result = new LevelSolveRunner().Run(StepAsideBeforeFirstClearBoard(), Canonical(), Exhaustive());
+
+            Assert.AreEqual(LevelSolveVerdict.Solvable, result.Verdict);
+            Assert.AreEqual(MoveGenMode.Canonical, result.SolvedBy);
+            Assert.AreEqual(3, result.Solution.Count);
+            Assert.AreEqual(2, result.LengthLowerBound);
+            Assert.IsNull(result.ProvenShortestLength);
+        }
+
+        [Test]
+        public void Run_CanonicalSolutionMeetingTheBound_IsProvenShortest()
+        {
+            var result = new LevelSolveRunner().Run(OneZeroDistanceClear(), Canonical(), Exhaustive());
+
+            Assert.AreEqual(MoveGenMode.Canonical, result.SolvedBy);
+            Assert.AreEqual(1, result.ProvenShortestLength);
+        }
+
+        [Test]
+        public void Run_ExhaustiveStageSolves_IsProvenShortest()
+        {
+            var result = new LevelSolveRunner()
+                .Run(TwoZeroDistanceClears(), Canonical(maxExplored: 1), Exhaustive());
+
+            Assert.AreEqual(MoveGenMode.Exhaustive, result.SolvedBy);
+            Assert.AreEqual(2, result.ProvenShortestLength);
+            Assert.AreEqual(2, result.LengthLowerBound);
+        }
+
+        [Test]
+        public void Run_Indeterminate_CarriesALowerBoundButNoProvenLength()
+        {
+            var result = new LevelSolveRunner()
+                .Run(TwoZeroDistanceClears(), Canonical(maxExplored: 1), Exhaustive(maxExplored: 1));
+
+            Assert.AreEqual(LevelSolveVerdict.Indeterminate, result.Verdict);
+            Assert.AreEqual(2, result.LengthLowerBound);
+            Assert.IsNull(result.ProvenShortestLength);
+        }
+
+        [Test]
+        public void Run_Unsolvable_HasNoLowerBoundAndNoProvenLength()
+        {
+            var result = new LevelSolveRunner().Run(Unsolvable(), Canonical(), Exhaustive());
+
+            Assert.AreEqual(LevelSolveVerdict.Unsolvable, result.Verdict);
+            Assert.AreEqual(0, result.LengthLowerBound);
+            Assert.IsNull(result.ProvenShortestLength);
         }
 
         // ----- The combination the Level Editor ships -----------------------

@@ -69,6 +69,10 @@ namespace GateRush.Solver
     /// single-colour lock whose <see cref="KeyEffect.ClearOuterColor"/> key is
     /// already held (phase 1.13) contributes one to each.</para>
     ///
+    /// <para><b>Cancellation.</b> <see cref="SearchBudget.Cancellation"/> is
+    /// checked before every expansion and throws
+    /// <see cref="OperationCanceledException"/>.</para>
+    ///
     /// <para><b>Budget.</b> Same cadence as <see cref="BreadthFirstStrategy"/>:
     /// <see cref="SearchBudget.MaxExploredStates"/> before every expansion, the
     /// wall clock every <see cref="SearchBudget.WallClockPollInterval"/>
@@ -130,8 +134,8 @@ namespace GateRush.Solver
             if (initial.IsSolved(ctx))
             {
                 stopwatch.Stop();
-                return new SolveResult(
-                    SolveStatus.Solvable, Array.Empty<Move>(),
+                return SolveResult.FromModeOptimalSearch(
+                    SolveStatus.Solvable, Array.Empty<Move>(), budget.Mode, ctx, initial,
                     exploredStateCount: 0, peakFrontierSize: 0,
                     peakRetainedStateCount: 0, elapsedMs: stopwatch.ElapsedMilliseconds);
             }
@@ -168,8 +172,8 @@ namespace GateRush.Solver
                 if (node.State.IsSolved(ctx))
                 {
                     stopwatch.Stop();
-                    return new SolveResult(
-                        SolveStatus.Solvable, Reconstruct(node),
+                    return SolveResult.FromModeOptimalSearch(
+                        SolveStatus.Solvable, Reconstruct(node), budget.Mode, ctx, initial,
                         explored, peakFrontier, nodesByState.Count, stopwatch.ElapsedMilliseconds);
                 }
 
@@ -183,6 +187,7 @@ namespace GateRush.Solver
                     break;
                 }
 
+                budget.Cancellation.ThrowIfCancellationRequested();
                 node.IsClosed = true;
                 explored++;
 
@@ -253,9 +258,9 @@ namespace GateRush.Solver
             }
 
             stopwatch.Stop();
-            return new SolveResult(
+            return SolveResult.FromModeOptimalSearch(
                 truncated ? SolveStatus.Indeterminate : SolveStatus.Unsolvable,
-                Array.Empty<Move>(),
+                Array.Empty<Move>(), budget.Mode, ctx, initial,
                 explored, peakFrontier, nodesByState.Count, stopwatch.ElapsedMilliseconds);
         }
 

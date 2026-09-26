@@ -8,7 +8,8 @@ namespace GateRush.Solver
     /// <summary>
     /// Breadth-first search over board states — the reference
     /// <see cref="ISearchStrategy"/>. A plain FIFO frontier makes the first
-    /// solution the search reaches a shortest one; progress-vector stratification
+    /// solution the search reaches a shortest one within the requested
+    /// <see cref="MoveGenMode"/>; progress-vector stratification
     /// (<c>DECISIONS.md</c> D6) is layered on top without touching that queue,
     /// scoping and releasing the visited set only.
     /// </summary>
@@ -42,6 +43,11 @@ namespace GateRush.Solver
     /// live scan buffer, and no <c>BlockReachability</c> is ever shared or nested.
     /// Not thread-safe; the solver is single-threaded and WebGL has no threads
     /// anyway.</para>
+    ///
+    /// <para><b>Cancellation.</b> <see cref="SearchBudget.Cancellation"/> is
+    /// checked before every expansion and throws
+    /// <see cref="OperationCanceledException"/> — how the editor stops a search
+    /// it is running on a background thread.</para>
     /// </remarks>
     public sealed class BreadthFirstStrategy : ISearchStrategy
     {
@@ -81,8 +87,8 @@ namespace GateRush.Solver
             if (initial.IsSolved(ctx))
             {
                 stopwatch.Stop();
-                return new SolveResult(
-                    SolveStatus.Solvable, Array.Empty<Move>(),
+                return SolveResult.FromModeOptimalSearch(
+                    SolveStatus.Solvable, Array.Empty<Move>(), budget.Mode, ctx, initial,
                     exploredStateCount: 0, peakFrontierSize: 0,
                     peakRetainedStateCount: 0, elapsedMs: stopwatch.ElapsedMilliseconds);
             }
@@ -124,6 +130,7 @@ namespace GateRush.Solver
                     break;
                 }
 
+                budget.Cancellation.ThrowIfCancellationRequested();
                 var node = queue.Dequeue();
                 Decrement(queuedByVector, node.Vector);
                 explored++;
@@ -172,8 +179,8 @@ namespace GateRush.Solver
                     if (successor.IsSolved(ctx))
                     {
                         stopwatch.Stop();
-                        return new SolveResult(
-                            SolveStatus.Solvable, Reconstruct(child),
+                        return SolveResult.FromModeOptimalSearch(
+                            SolveStatus.Solvable, Reconstruct(child), budget.Mode, ctx, initial,
                             explored, peakFrontier, peakRetained, stopwatch.ElapsedMilliseconds);
                     }
 
@@ -193,9 +200,9 @@ namespace GateRush.Solver
             }
 
             stopwatch.Stop();
-            return new SolveResult(
+            return SolveResult.FromModeOptimalSearch(
                 truncated ? SolveStatus.Indeterminate : SolveStatus.Unsolvable,
-                Array.Empty<Move>(),
+                Array.Empty<Move>(), budget.Mode, ctx, initial,
                 explored, peakFrontier, peakRetained, stopwatch.ElapsedMilliseconds);
         }
 
