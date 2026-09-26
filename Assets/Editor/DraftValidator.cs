@@ -100,8 +100,22 @@ namespace GateRush.Editor
                 throw new ArgumentNullException(nameof(draft));
             }
 
+            // Built once, up front: the generator entries below read their spawn
+            // origin from it, and the opening-move checks at the end need it.
+            // Its failure is reported last, where it always was.
+            LevelContext ctx = null;
+            string contextError = null;
+            try
+            {
+                ctx = draft.ToContext();
+            }
+            catch (Exception e)
+            {
+                contextError = e.Message;
+            }
+
             var warnings = new List<DraftWarning>();
-            var blockLikes = EnumerateBlockLikes(draft).ToList();
+            var blockLikes = EnumerateBlockLikes(draft, ctx).ToList();
 
             foreach (var issue in draft.LoadIssues)
             {
@@ -117,16 +131,11 @@ namespace GateRush.Editor
             AddElevatorTilingWarnings(draft, warnings);
             AddShutterCoverageWarnings(draft, warnings);
 
-            LevelContext ctx = null;
-            try
-            {
-                ctx = draft.ToContext();
-            }
-            catch (Exception e)
+            if (contextError != null)
             {
                 warnings.Add(new DraftWarning(
                     DraftWarningCategory.DraftDoesNotFormValidLevel,
-                    $"The draft does not form a valid level: {e.Message}"));
+                    $"The draft does not form a valid level: {contextError}"));
             }
 
             if (ctx != null)
@@ -610,12 +619,12 @@ namespace GateRush.Editor
             /// <summary>
             /// The absolute grid origin <see cref="Cells"/> are relative to, when
             /// the draft fixes it: a block's start origin, or a placed elevator
-            /// wave block's region origin offset by the region's minimum corner.
-            /// Null for an unplaced wave block and for every generator queue
-            /// entry — where a generator's block lands is Core's spawn placement,
-            /// which does not exist until phase 1.13, and deriving it here first
-            /// would put one rule in two places (D28, D31). TODO(1.13): once Core
-            /// owns generator spawn placement, fill this in from it.
+            /// wave block's region origin offset by the region's minimum corner,
+            /// or a generator queue entry's spawn origin, read from
+            /// <see cref="LevelContext.GeneratorSpawnOrigin"/> — Core's one
+            /// placement rule, never derived here (D28, D31). Null for an
+            /// unplaced wave block, and for a generator entry when the draft does
+            /// not form a level, since there is then no context to read it from.
             /// </summary>
             public Coord? Origin { get; }
 
@@ -642,7 +651,14 @@ namespace GateRush.Editor
             }
         }
 
-        private static IEnumerable<BlockLike> EnumerateBlockLikes(LevelDraft draft)
+        /// <summary>
+        /// Every block the draft can put on the board. <paramref name="ctx"/>
+        /// is the draft's level, or null when it does not form one; a
+        /// <see cref="LevelDraft.ToContext"/> keeps the draft's generator and
+        /// queue order, so draft generator <c>g</c> entry <c>i</c> is the
+        /// context's too.
+        /// </summary>
+        private static IEnumerable<BlockLike> EnumerateBlockLikes(LevelDraft draft, LevelContext ctx)
         {
             foreach (var b in draft.Blocks)
             {
@@ -651,15 +667,16 @@ namespace GateRush.Editor
                     b.LockId, b.RequiredKeyCount, b.KeyTargetLockId, b.StartOrigin);
             }
 
-            foreach (var g in draft.Generators)
+            for (var gi = 0; gi < draft.Generators.Count; gi++)
             {
+                var g = draft.Generators[gi];
                 for (var i = 0; i < g.Queue.Count; i++)
                 {
                     var s = g.Queue[i];
                     yield return new BlockLike(
                         $"Generator {g.Id} queue entry {i}", s.Cells, s.ColorStack, s.Axis,
                         s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId,
-                        origin: null);
+                        ctx != null ? ctx.GeneratorSpawnOrigin(gi, i) : (Coord?)null);
                 }
             }
 

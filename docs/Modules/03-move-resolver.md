@@ -99,6 +99,7 @@ untouched. They never throw for player error.
  6. Check spawn triggers
       generators : every target cell empty and queue non-empty -> spawn next
       elevators  : region contains no blocks and waves remain  -> place wave
+      (placement, level-start spawning and keys for unspawned locks: Module 10)
 
  7. If anything changed in steps 4-6, return to step 4
 
@@ -154,8 +155,9 @@ of a countdown; it reports seconds earned and the caller applies them.
 - Projection-span and alignment computation for arbitrary footprints, including
   L shapes where the projection exceeds the number of cells touching the wall.
 - Event queue structure.
-- Generator target-cell derivation from edge and offset.
-- Elevator wave placement.
+- ~~Generator target-cell derivation from edge and offset.~~ Specified in
+  Module 10.
+- ~~Elevator wave placement.~~ Specified in Module 10.
 - The copy strategy for producing the successor `BoardState`.
 - Whether the resolver is stateless with static methods or an instance with
   reusable buffers. Prefer whichever keeps allocation low — it runs inside the

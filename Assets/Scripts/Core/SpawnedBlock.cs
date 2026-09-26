@@ -14,9 +14,10 @@ namespace GateRush.Core
     /// <remarks>
     /// <para><b>Cell normalisation.</b> <see cref="Cells"/> is stored shifted so
     /// its component-wise minimum is <c>(0, 0)</c>, matching
-    /// <see cref="BlockDefinition"/> (see <c>DECISIONS.md</c> D30). The spawn
-    /// placement computed when this block is delivered (Module 03 / phase 1.13)
-    /// treats that normalised minimum corner as the block's origin.</para>
+    /// <see cref="BlockDefinition"/> (see <c>DECISIONS.md</c> D30). Spawn
+    /// placement (<see cref="LevelContext.GeneratorSpawnOrigin"/>, or
+    /// <see cref="RegionOrigin"/> for a wave block) treats that normalised
+    /// minimum corner as the block's origin.</para>
     /// <para><b><see cref="RegionOrigin"/>.</b> Meaningful only for elevator
     /// waves, where it is the grid cell — relative to the elevator region's
     /// <see cref="ElevatorDefinition.Min"/> corner — that the normalised

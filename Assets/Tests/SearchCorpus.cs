@@ -165,6 +165,16 @@ namespace GateRush.Tests
             var twoWaiting = TwoWaitingClearsUnderOneShutterBoard();
             yield return ("one opening releases two waiting clears", twoWaiting,
                 BoardState.CreateInitial(twoWaiting), 3);
+
+            // D42: spawners. Both boards reach their optimum in any clear order,
+            // so nearest-next-clear solves them as well.
+            var generatorRelease = GeneratorReleasesAWaitingKeyEffectBoard();
+            yield return ("generator's block lands and a waiting key clear applies", generatorRelease,
+                BoardState.CreateInitial(generatorRelease), 2);
+
+            var elevatorHeld = ElevatorHeldByATopLevelBlockBoard();
+            yield return ("elevator wave waits for a top-level block to leave", elevatorHeld,
+                BoardState.CreateInitial(elevatorHeld), 2);
         }
 
         internal static IEnumerable<(string name, LevelContext ctx, BoardState initial)> UnsolvableCorpus()
@@ -516,6 +526,68 @@ namespace GateRush.Tests
         /// resting position, so canonical pruning keeps the slide away and both
         /// modes agree on the optimum.
         /// </summary>
+        /// <summary>
+        /// 3x2. A red key block (index 0, a <see cref="KeyEffect.ClearOuterColor"/>
+        /// key for lock 1) sits flush against a red gate on the left, row 0; a
+        /// green block (index 1) sits flush against a green gate on the right,
+        /// row 1, on the cell a top-edge generator spawns into. The generator's
+        /// one queued block (index 2) is blue and owns lock 1; no blue gate
+        /// exists, so only its key can clear it. Optimum 2 in either order:
+        /// green first spawns the locked block and the red push then clears it;
+        /// red first leaves the effect waiting in the unspawned slot (D42), and
+        /// the green push — or merely moving green aside — spawns it and the
+        /// effect applies in that resolution. The heuristic is 2 at the start
+        /// (three colours, one free clear), and the release-at-spawn edge is
+        /// the one A\*'s consistency argument has to cover.
+        /// </summary>
+        internal static LevelContext GeneratorReleasesAWaitingKeyEffectBoard()
+        {
+            return Ctx(
+                3, 2,
+                new[]
+                {
+                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(2, new Coord(2, 1), colors: new[] { BlockColor.Green })
+                },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 1, 1, BlockColor.Green)
+                },
+                generators: new[]
+                {
+                    Spawner(1, BoardEdge.Top, 2, 1,
+                        Spawned(colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1))
+                });
+        }
+
+        /// <summary>
+        /// 3x1. A red block (index 0) stands in a one-cell elevator region in
+        /// the middle, holding back the one-block blue wave (index 1); a red
+        /// gate is on the left, a blue one on the right. Optimum 2: red slides
+        /// left and clears, the region empties and the wave arrives, blue slides
+        /// right and clears — and the region reading empty again clears
+        /// <c>ElevatorWaveActive</c> so the level is solved. Sliding red right
+        /// instead also vacates the region, but leaves blue on the wrong side
+        /// of it: a dead end the searches must explore and reject.
+        /// </summary>
+        internal static LevelContext ElevatorHeldByATopLevelBlockBoard()
+        {
+            return Ctx(
+                3, 1,
+                new[] { Block(1, new Coord(1, 0)) },
+                new[]
+                {
+                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
+                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
+                },
+                elevators: new[]
+                {
+                    Elevator(1, new Coord(1, 0), new Coord(1, 0),
+                        new[] { Spawned(colors: new[] { BlockColor.Blue }, regionOrigin: new Coord(0, 0)) })
+                });
+        }
+
         internal static LevelContext AxisBlockReturnsToCrossAxisGateBoard()
         {
             return Ctx(

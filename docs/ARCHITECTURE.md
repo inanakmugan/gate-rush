@@ -146,9 +146,9 @@ event. It does not mean touching existing mechanics.
 
 Applying a move is not a single step. One move can start a chain:
 
-> A colour is cleared → the counter hits 4 → a shutter opens → an elevator
-> underneath is revealed → its region is already empty → a wave arrives → one of
-> those blocks carries a key → a locked block unlocks.
+> The last block of an elevator wave is cleared → it carried a key → a locked
+> block's outer colour is cleared → the counter hits 4 → a shutter opens → the
+> elevator's region reads empty → the next wave arrives.
 
 `MoveResolver` therefore loops until nothing changes:
 

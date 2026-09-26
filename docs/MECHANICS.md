@@ -197,13 +197,20 @@ A generator sits on a board edge and pushes blocks inward — the inverse of a g
   incoming block's colour. This is presentation only.
 - After its sequence is exhausted, the generator is destroyed.
 - A level is not complete while any generator still has output pending.
-- A generator spans one or two cells of its edge — the reference game never shows
-a wider one. A queued block's projection onto that edge (the same projection a
-gate measures) may not exceed the generator's width; its extent into the board
-is unconstrained. A block spawns aligned to the generator's offset.
+- A generator spans one or two cells of its edge — the reference game never
+  shows a wider one. A queued block's projection onto that edge (the same
+  projection a gate measures) may not exceed the generator's width; its extent
+  into the board is unconstrained. A block spawns flush against the
+  generator's edge, aligned to its offset.
 - Edge features never overlap. Two gates, two generators, or a gate and a
-generator on the same edge may sit side by side, but their spans are disjoint.
-An overlap is a level data error, not a warning.
+  generator on the same edge may sit side by side, but their spans are
+  disjoint. An overlap is a level data error, not a warning.
+- A generator whose cells are empty when the level starts spawns before the
+  first move. A closed shutter over its cells does not stop it: spawning is
+  not a move (D42).
+- A block that spawns flush against a compatible gate is not cleared; like a
+  block authored there, it waits for a push (D25).
+
 ---
 
 ## M7 — Axis-restricted blocks
@@ -246,6 +253,9 @@ own colours.
 - A lock whose block is under a closed shutter receives nothing while the
   shutter stays closed (M5). If its keys complete in the meantime, the
   effect waits and applies the moment the shutter opens.
+- A lock whose block has not spawned yet — still in a generator's queue or a
+  later elevator wave — works the same way: its keys are consumed, and a
+  completed effect waits and applies when the block spawns (D42).
 - A lock needs at least as many keys in the level as it requires. Fewer is
   a level data error: the lock could never open.
 
@@ -273,7 +283,7 @@ An elevator occupies a rectangular region of arbitrary size.
 - The next wave arrives when the region contains **no blocks at all**.
 - After its final wave is cleared, the elevator is destroyed.
 - A level is not complete while any elevator still has waves pending.
-- Waves arrive fully packed.** The blocks in a wave tile the region exactly:
+- **Waves arrive fully packed.** The blocks in a wave tile the region exactly:
 every cell covered once, no gaps, no overlaps. Shapes are unrestricted — L
 shapes are common — so the tiling can be intricate, and the interlocking is
 itself part of the puzzle. Placement is authored, since a region usually admits several tilings.
@@ -285,6 +295,13 @@ region.
 
 Elevators may sit beneath shutters, and their waves may contain frozen or locked
 blocks. No special handling is required: the fixpoint loop composes these.
+
+An elevator whose region is empty when the level starts places its first wave
+before the first move. A closed shutter does not hold a wave back: an empty
+region under one receives its wave hidden, and the blocks stay unreachable
+until the shutter opens (D42). "No blocks at all" means any living block — one
+the player moved into the region holds the next wave back as surely as the
+wave's own.
 
 
 ---
@@ -388,3 +405,4 @@ Not runtime rules, but properties the Level Editor should measure and report.
 - A lock with fewer keys in the level than it requires, a block carrying both
   a lock and a key, or two locks sharing an id.
 - Overlapping edge features (M6).
+- An elevator wave with no blocks: every wave must tile its region (M9).

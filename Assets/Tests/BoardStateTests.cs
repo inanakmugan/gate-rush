@@ -44,7 +44,9 @@ namespace GateRush.Tests
         /// two-layer, one locked, one carrying its key), 1 gate, 1 shutter, 1
         /// generator with one queued block, 1 elevator with one wave of one
         /// block. Index 0/1/2 are the top-level blocks, 3 is the generator's
-        /// spawn slot, 4 is the elevator's.
+        /// spawn slot, 4 is the elevator's. Both targets are empty, so both have
+        /// spawned in the state <c>CreateInitial</c> returns (D42): 3 at (3, 0),
+        /// 4 at (0, 3).
         /// </summary>
         private static LevelContext CreateFullContext()
         {
@@ -301,7 +303,7 @@ namespace GateRush.Tests
         public void GetHashCode_ChangingGeneratorIndex_ChangesHash()
         {
             var baseline = BoardState.CreateInitial(CreateFullContext());
-            var mutated = With(baseline, generatorIndex: ReplaceAt(baseline.GeneratorIndex, 0, 1));
+            var mutated = With(baseline, generatorIndex: ReplaceAt(baseline.GeneratorIndex, 0, baseline.GeneratorIndex[0] + 1));
 
             Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
         }
@@ -310,7 +312,7 @@ namespace GateRush.Tests
         public void GetHashCode_ChangingElevatorWaveIndex_ChangesHash()
         {
             var baseline = BoardState.CreateInitial(CreateFullContext());
-            var mutated = With(baseline, elevatorWaveIndex: ReplaceAt(baseline.ElevatorWaveIndex, 0, 1));
+            var mutated = With(baseline, elevatorWaveIndex: ReplaceAt(baseline.ElevatorWaveIndex, 0, baseline.ElevatorWaveIndex[0] + 1));
 
             Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
         }
@@ -319,7 +321,7 @@ namespace GateRush.Tests
         public void GetHashCode_ChangingElevatorWaveActive_ChangesHash()
         {
             var baseline = BoardState.CreateInitial(CreateFullContext());
-            var mutated = With(baseline, elevatorWaveActive: ReplaceAt(baseline.ElevatorWaveActive, 0, true));
+            var mutated = With(baseline, elevatorWaveActive: ReplaceAt(baseline.ElevatorWaveActive, 0, !baseline.ElevatorWaveActive[0]));
 
             Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
         }
@@ -556,7 +558,9 @@ namespace GateRush.Tests
             var generator = new GeneratorDefinition(1, BoardEdge.Top, 0, 1, new[] { CreateSpawnedBlock() });
             var ctx = CreateContext(generators: new[] { generator });
 
-            var state = BoardState.CreateInitial(ctx);
+            // The unresolved state: settled, the generator would already have
+            // spawned (D42) and a living block would decide this on its own.
+            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
 
             // No blocks were ever placed, so every "Alive" entry is false from
             // the start — indistinguishable from a finished level unless the
@@ -575,7 +579,8 @@ namespace GateRush.Tests
                 });
             var ctx = CreateContext(elevators: new[] { elevator });
 
-            var state = BoardState.CreateInitial(ctx);
+            // Unresolved, for the same reason as the generator case above.
+            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
 
             Assert.IsFalse(state.IsSolved(ctx));
         }
@@ -618,14 +623,99 @@ namespace GateRush.Tests
             Assert.AreEqual(BlockColor.Cyan, state.CurrentColorOf(ctx, 4));
         }
 
+        // ----- Level start is settled (D42) ---------------------------------
+
         [Test]
-        public void CreateInitial_GeneratorSpawnSlot_StartsInactiveWithUnspawnedOrigin()
+        public void CreateInitial_GeneratorWhoseCellIsOccupied_LeavesItsSlotUnspawned()
         {
-            var ctx = CreateFullContext();
+            var generator = new GeneratorDefinition(1, BoardEdge.Bottom, 3, 1, new[] { CreateSpawnedBlock() });
+            var ctx = CreateContext(blocks: new[] { CreateBlock(1, new Coord(3, 0)) }, generators: new[] { generator });
+
             var state = BoardState.CreateInitial(ctx);
 
-            Assert.IsFalse(state.Alive[3]);
-            Assert.AreEqual(BoardState.UnspawnedOrigin, state.Origins[3]);
+            Assert.IsFalse(state.Alive[1]);
+            Assert.AreEqual(BoardState.UnspawnedOrigin, state.Origins[1]);
+            Assert.AreEqual(0, state.GeneratorIndex[0]);
+        }
+
+        [Test]
+        public void CreateInitial_GeneratorWhoseCellIsEmpty_HasSpawnedBeforeTheFirstMove()
+        {
+            var ctx = CreateFullContext();
+
+            var state = BoardState.CreateInitial(ctx);
+
+            Assert.IsTrue(state.Alive[3]);
+            Assert.AreEqual(new Coord(3, 0), state.Origins[3]);
+            Assert.AreEqual(ctx.GeneratorSpawnOrigin(0, 0), state.Origins[3]);
+            Assert.AreEqual(1, state.GeneratorIndex[0]);
+            Assert.AreEqual(0, state.TotalClearCount, "spawning is not a clear");
+        }
+
+        [Test]
+        public void CreateInitial_ElevatorWhoseRegionIsEmpty_HasPlacedItsFirstWave()
+        {
+            var ctx = CreateFullContext();
+
+            var state = BoardState.CreateInitial(ctx);
+
+            Assert.IsTrue(state.Alive[4]);
+            Assert.AreEqual(new Coord(0, 3), state.Origins[4]);
+            Assert.AreEqual(1, state.ElevatorWaveIndex[0]);
+            Assert.IsTrue(state.ElevatorWaveActive[0]);
+        }
+
+        [Test]
+        public void CreateInitial_LevelWithoutSpawners_IsTheUnresolvedStateFieldForField()
+        {
+            var ctx = CreateTargetingContext();
+            var unresolved = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
+
+            var settled = BoardState.CreateInitial(ctx);
+
+            Assert.AreEqual(unresolved, settled);
+            Assert.AreEqual(unresolved.GetHashCode(), settled.GetHashCode());
+            AssertEveryArrayEqual(unresolved, settled);
+        }
+
+        [Test]
+        public void CreateInitial_EveryOverload_SettlesTheSameWay()
+        {
+            // The public overload, the internal symmetry one BFS's plain-identity
+            // baseline uses, and the waiting-effects one all settle through the
+            // same resolution, so all three start with both spawners fired.
+            var ctx = CreateFullContext();
+            var viaPublic = BoardState.CreateInitial(ctx);
+
+            var viaSymmetry = BoardState.CreateInitial(ctx, BlockSymmetry.None);
+            var viaWaiting = BoardState.CreateInitialWithWaitingKeyEffects(ctx, new KeyEffect?[ctx.TotalBlockCapacity]);
+
+            Assert.IsTrue(viaPublic.Alive[3] && viaPublic.Alive[4]);
+            AssertEveryArrayEqual(viaPublic, viaSymmetry);
+            AssertEveryArrayEqual(viaPublic, viaWaiting);
+        }
+
+        /// <summary>
+        /// Compares every public array literally, index by index — stricter
+        /// than <see cref="BoardState.Equals(BoardState)"/>, which reads
+        /// interchangeable blocks in canonical order (D35).
+        /// </summary>
+        private static void AssertEveryArrayEqual(BoardState expected, BoardState actual)
+        {
+            CollectionAssert.AreEqual(expected.Origins, actual.Origins, "Origins");
+            CollectionAssert.AreEqual(expected.ClearedColors, actual.ClearedColors, "ClearedColors");
+            CollectionAssert.AreEqual(expected.Alive, actual.Alive, "Alive");
+            CollectionAssert.AreEqual(expected.Unfrozen, actual.Unfrozen, "Unfrozen");
+            CollectionAssert.AreEqual(expected.Unlocked, actual.Unlocked, "Unlocked");
+            CollectionAssert.AreEqual(expected.KeyConsumed, actual.KeyConsumed, "KeyConsumed");
+            CollectionAssert.AreEqual(expected.WaitingKeyEffect, actual.WaitingKeyEffect, "WaitingKeyEffect");
+            CollectionAssert.AreEqual(expected.GateOpen, actual.GateOpen, "GateOpen");
+            CollectionAssert.AreEqual(expected.ShutterOpen, actual.ShutterOpen, "ShutterOpen");
+            CollectionAssert.AreEqual(expected.GeneratorIndex, actual.GeneratorIndex, "GeneratorIndex");
+            CollectionAssert.AreEqual(expected.ElevatorWaveIndex, actual.ElevatorWaveIndex, "ElevatorWaveIndex");
+            CollectionAssert.AreEqual(expected.ElevatorWaveActive, actual.ElevatorWaveActive, "ElevatorWaveActive");
+            CollectionAssert.AreEqual(expected.ClearCountByColor, actual.ClearCountByColor, "ClearCountByColor");
+            Assert.AreEqual(expected.TotalClearCount, actual.TotalClearCount, "TotalClearCount");
         }
 
         [Test]
@@ -699,9 +789,12 @@ namespace GateRush.Tests
 
             // Every wave placed, nothing alive anywhere, but Active still true
             // — an internally contradictory state a correct resolver would
-            // never produce.
+            // never produce. The settled baseline has the wave's block alive
+            // (D42), so it is killed here: otherwise that living block alone
+            // would make the level unsolved.
             var contradictory = With(
                 baseline,
+                alive: ReplaceAt(baseline.Alive, 0, false),
                 elevatorWaveIndex: ReplaceAt(baseline.ElevatorWaveIndex, 0, 1),
                 elevatorWaveActive: ReplaceAt(baseline.ElevatorWaveActive, 0, true));
 

@@ -29,19 +29,18 @@ namespace GateRush.Core
     /// set of <em>active</em> (<c>Alive == true</c>) indices grows, not that
     /// array length changes.
     /// </para>
-    /// <para><b><see cref="Origins"/> for a not-yet-spawned slot.</b> Its real
-    /// spawn position is not derivable here: a generator's placement depends on
-    /// projecting its edge and offset through the spawned block's own shape (an
-    /// algorithm Module 03 owns and has not been written yet), and an elevator's
-    /// per-block placement within its region has no representation at all in
-    /// today's <see cref="LevelContext"/> (<see cref="SpawnedBlock"/> carries no
-    /// position). Rather than store a placeholder that looks like real data,
+    /// <para><b><see cref="Origins"/> for a not-yet-spawned slot.</b> Where it
+    /// will land is static level data (<c>LevelContext.GeneratorSpawnOrigin</c>
+    /// and the wave's <see cref="SpawnedBlock.RegionOrigin"/>), but storing it
+    /// before the spawn would make the slot look placed. Instead,
     /// not-yet-spawned slots get <see cref="UnspawnedOrigin"/>, a coordinate
     /// that is never inside any grid, so an accidental read (bypassing the
     /// <see cref="Alive"/> check every other query in this class honours) fails
     /// loudly — it will not satisfy <see cref="LevelContext.IsInsideGrid"/> and
     /// will read as permanently occupied by <see cref="IsCellFree"/> rather than
-    /// silently as free.
+    /// silently as free. The sentinel is also how the resolver tells an
+    /// unspawned slot from a destroyed one, which keeps the grid cell it died
+    /// on.
     /// </para>
     /// <para><b><see cref="ElevatorWaveActive"/>.</b> <see cref="ElevatorWaveIndex"/>
     /// is the count of waves already placed for that elevator.
@@ -51,9 +50,11 @@ namespace GateRush.Core
     /// class deliberately keeps un-derived because they carry history that
     /// cannot be reconstructed after the fact, this one is a snapshot of
     /// something re-computable from <see cref="Alive"/> plus cell geometry — it
-    /// is stored anyway because a <c>bool</c> costs nothing to hash and it may
-    /// simplify the module that maintains it (Module 03), which must conform to
-    /// this exact meaning.
+    /// is stored anyway because a <c>bool</c> costs nothing to hash.
+    /// <c>MoveResolver.CheckSpawnTriggers</c> maintains it: it clears the flag
+    /// in the pass that finds the region empty, so a region that never reads
+    /// empty — a foreign block moved in before the wave's last block left —
+    /// keeps it set.
     /// </para>
     /// <para><b>Hashing.</b> FNV-1a, 32-bit, computed once in the constructor and
     /// cached. Field order: <see cref="TotalClearCount"/>; then, per block index,
@@ -274,9 +275,16 @@ namespace GateRush.Core
         }
 
         /// <summary>
-        /// Builds the state a level starts in: every top-level block alive at
-        /// its <see cref="BlockDefinition.StartOrigin"/>, every spawner slot
-        /// inert, every threshold evaluated against zero clears.
+        /// Builds the state a level starts in, <em>settled</em>: every top-level
+        /// block alive at its <see cref="BlockDefinition.StartOrigin"/>, every
+        /// threshold evaluated against zero clears, and then one action-free
+        /// resolution, so a generator or elevator whose target is empty at
+        /// level start has already spawned (<c>DECISIONS.md</c> D42). Every
+        /// caller — solver, editor, runtime — starts from this same board, and
+        /// the settling goes through <c>MoveResolver</c>'s one resolution loop
+        /// (D9). On a level with no generator or elevator the resolution
+        /// changes nothing and the state equals the unresolved one field for
+        /// field.
         /// </summary>
         public static BoardState CreateInitial(LevelContext ctx) =>
             CreateInitial(ctx, ctx?.BlockSymmetry);
@@ -341,10 +349,27 @@ namespace GateRush.Core
 
         /// <summary>
         /// The one construction path behind every <c>CreateInitial</c>
-        /// overload. <paramref name="waitingKeyEffect"/> null means nothing
-        /// waits; otherwise it is copied, already checked for length.
+        /// overload: the unresolved state, settled by
+        /// <c>MoveResolver.ResolveInitial</c> (D42). The internal entry point
+        /// on the resolver is what keeps this from being a second resolution
+        /// path. <paramref name="waitingKeyEffect"/> null means nothing waits;
+        /// otherwise it is copied, already checked for length.
         /// </summary>
         private static BoardState CreateInitial(
+            LevelContext ctx, BlockSymmetry symmetry, IReadOnlyList<KeyEffect?> waitingKeyEffect)
+        {
+            var unresolved = CreateUnresolved(ctx, symmetry, waitingKeyEffect);
+            return new MoveResolver().ResolveInitial(ctx, unresolved);
+        }
+
+        /// <summary>
+        /// The level's authored starting values before any resolution: every
+        /// top-level block alive at its start origin, every spawner slot inert
+        /// at <see cref="UnspawnedOrigin"/>, every threshold evaluated against
+        /// zero clears. <c>internal</c> only so this assembly's tests can show
+        /// that settling changes nothing on a level without spawners.
+        /// </summary>
+        internal static BoardState CreateUnresolved(
             LevelContext ctx, BlockSymmetry symmetry, IReadOnlyList<KeyEffect?> waitingKeyEffect)
         {
             if (ctx == null)
@@ -597,6 +622,66 @@ namespace GateRush.Core
                 if (shutterPosition.HasValue && !shutterOpen[shutterPosition.Value])
                 {
                     return true;
+                }
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// True when any living block covers any cell of the footprint
+        /// <paramref name="cells"/> placed at <paramref name="origin"/>. The
+        /// spawn triggers' occupancy test (M6, M9): a generator passes its next
+        /// block's cells at its spawn origin, an elevator its region's cells at
+        /// its <c>Min</c>. Like <see cref="IsInsideClosedShutter(LevelContext, int, Coord, IReadOnlyList{bool})"/>
+        /// it takes the two fields it reads rather than a state, because
+        /// <c>MoveResolver</c> asks mid-resolution through its successor
+        /// builder, where no <see cref="BoardState"/> — and so no occupancy map
+        /// — exists yet. Reading the live fields is also what lets a later
+        /// spawn in the same pass see the cells an earlier one filled.
+        /// <para>Only occupancy counts: walls are excluded from a spawn
+        /// footprint by <see cref="LevelContext"/>'s validation, and a closed
+        /// shutter does not stop a spawn (D42). One sweep over the block slots,
+        /// skipping every slot that is not alive; <paramref name="cells"/> are
+        /// normalised (minimum <c>(0, 0)</c>, D30), which gives a cheap bounding
+        /// box to reject most cells against before the exact check.</para>
+        /// </summary>
+        internal static bool OverlapsLivingBlock(
+            LevelContext ctx, IReadOnlyList<Coord> cells, Coord origin,
+            IReadOnlyList<bool> alive, IReadOnlyList<Coord> origins)
+        {
+            var maxX = 0;
+            var maxY = 0;
+            for (var i = 0; i < cells.Count; i++)
+            {
+                maxX = Math.Max(maxX, cells[i].X);
+                maxY = Math.Max(maxY, cells[i].Y);
+            }
+
+            for (var blockIndex = 0; blockIndex < alive.Count; blockIndex++)
+            {
+                if (!alive[blockIndex])
+                {
+                    continue;
+                }
+
+                var blockOrigin = origins[blockIndex];
+                var blockCells = ctx.SpecAt(blockIndex).Cells;
+                for (var c = 0; c < blockCells.Count; c++)
+                {
+                    var relative = blockOrigin + blockCells[c] - origin;
+                    if (relative.X < 0 || relative.Y < 0 || relative.X > maxX || relative.Y > maxY)
+                    {
+                        continue;
+                    }
+
+                    for (var t = 0; t < cells.Count; t++)
+                    {
+                        if (cells[t] == relative)
+                        {
+                            return true;
+                        }
+                    }
                 }
             }
 

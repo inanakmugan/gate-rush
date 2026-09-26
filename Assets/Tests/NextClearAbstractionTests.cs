@@ -22,6 +22,13 @@ namespace GateRush.Tests
         private const int MaxWalkMoves = 6;
         private const int CorpusSeed = 20260925;
 
+        /// <summary>
+        /// The fewest sampled states that may survive <see cref="SampleStates"/>'
+        /// skip of unmodelable states, per run — the same half of the boards the
+        /// distance comparison already requires to be compared.
+        /// </summary>
+        private const int MinModelableSamples = RandomBoardCount / 2;
+
         private static BlockColor ColorOf(NextClearAbstraction abstraction, int abstractIndex) =>
             abstraction.Initial.CurrentColorOf(abstraction.Context, abstractIndex);
 
@@ -186,11 +193,13 @@ namespace GateRush.Tests
         [Test]
         public void Of_GeneratorOutputPending_Throws()
         {
+            // Two queued blocks: the first spawns before the first move (D42),
+            // so only the second is still pending in the initial state.
             var ctx = Ctx(
                 3, 3,
                 new[] { Block(1, new Coord(2, 2)) },
                 new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) },
-                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned()) });
+                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned(), Spawned()) });
 
             Assert.Throws<InvalidOperationException>(() => NextClearAbstraction.Of(ctx, BoardState.CreateInitial(ctx)));
         }
@@ -198,11 +207,12 @@ namespace GateRush.Tests
         [Test]
         public void CanModel_FalseExactlyWhenGeneratorOutputIsPending()
         {
+            // As above: the second queued block is still pending after level start.
             var withGenerator = Ctx(
                 3, 3,
                 new[] { Block(1, new Coord(2, 2)) },
                 new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) },
-                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned()) });
+                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned(), Spawned()) });
             var plain = Ctx(3, 3, new[] { Block(1, new Coord(2, 2)) }, new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
 
             Assert.IsFalse(NextClearAbstraction.CanModel(withGenerator, BoardState.CreateInitial(withGenerator)));
@@ -286,13 +296,19 @@ namespace GateRush.Tests
         /// One state per random board: the initial state, or where a short
         /// seeded random walk of legal moves (clears included) leaves it, so
         /// states with open gates, thawed blocks, open shutters and partly
-        /// cleared stacks are sampled too. Solved states are skipped.
+        /// cleared stacks are sampled too. Solved states are skipped, and so are
+        /// states the copy refuses by design — a generator or elevator with
+        /// output still pending (see <see cref="NextClearAbstraction.CanModel"/>).
+        /// A board whose spawners have run out is still sampled. So that the
+        /// skip can never quietly empty the corpus, at least
+        /// <see cref="MinModelableSamples"/> states must survive it.
         /// </summary>
-        private static IEnumerable<(LevelContext ctx, BoardState state)> SampleStates()
+        private static List<(LevelContext ctx, BoardState state)> SampleStates()
         {
             var rng = new Random(CorpusSeed);
             var generator = new MoveGenerator();
             var resolver = new MoveResolver();
+            var samples = new List<(LevelContext ctx, BoardState state)>();
 
             for (var b = 0; b < RandomBoardCount; b++)
             {
@@ -310,11 +326,16 @@ namespace GateRush.Tests
                     resolver.TryApplyMove(ctx, state, moves[rng.Next(moves.Count)], out state, out _);
                 }
 
-                if (!state.IsSolved(ctx))
+                if (!state.IsSolved(ctx) && NextClearAbstraction.CanModel(ctx, state))
                 {
-                    yield return (ctx, state);
+                    samples.Add((ctx, state));
                 }
             }
+
+            Assert.GreaterOrEqual(
+                samples.Count, MinModelableSamples,
+                $"sampled states the copy can model (seed {CorpusSeed}, {RandomBoardCount} boards)");
+            return samples;
         }
 
         private readonly struct Route

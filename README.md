@@ -10,8 +10,7 @@ Unity 6000.3.22f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL a
 Android
 
 **Status:** work in progress. The puzzle core, the solver and the level editor
-are built (Phase 1, apart from generator and elevator spawning); the first
-playable level is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+are built (Phase 1); the first playable level is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 

@@ -105,6 +105,10 @@ namespace GateRush.Editor
     /// <see cref="LevelSolveVerdict.Solvable"/>, is the worst possible thing to
     /// read by mistake. Here the verdict is reachable only through a
     /// <see cref="Result"/> that is null.
+    /// <para>Every level the pipeline accepts today gets a result: the one
+    /// reason it had for refusing — generators and elevators before spawning
+    /// existed (D40) — is gone. The wrapper stays for the next case a search
+    /// cannot judge.</para>
     /// </remarks>
     public sealed class ValidationOutcome
     {
@@ -145,10 +149,6 @@ namespace GateRush.Editor
     /// <para><b>Errors are not results.</b> A
     /// <see cref="SolverDisagreementException"/>, or any exception a search
     /// throws on a bug, propagates to the caller unchanged.</para>
-    /// <para><b>Not yet every level.</b> A level with a generator or an
-    /// elevator gets <see cref="ValidationOutcome.NotValidatableReason"/>
-    /// before any search runs — neither a verdict nor an error — until spawning
-    /// lands in phase 1.13 (<see cref="SpawnersNotYetSupportedReason"/>).</para>
     /// </remarks>
     public sealed class ValidationPipeline
     {
@@ -160,16 +160,6 @@ namespace GateRush.Editor
             this.quickFactory = quickFactory ?? (() => new AStarStrategy());
             this.nextClearRunner = nextClearRunner ?? new NextClearRunner();
         }
-
-        /// <summary>
-        /// Why no level with a generator or an elevator can be validated yet.
-        /// Spawning does not exist until phase 1.13, so on such a level
-        /// <see cref="BoardState.IsSolved"/> can never become true and every
-        /// search would report <see cref="SolveStatus.Unsolvable"/> as if proven.
-        /// </summary>
-        public const string SpawnersNotYetSupportedReason =
-            "Levels with generators or elevators cannot be validated until spawning is implemented " +
-            "(phase 1.13). Until then every search would report such a level unsolvable, which proves nothing.";
 
         /// <summary>
         /// Validates <paramref name="ctx"/>: a verdict in
@@ -230,13 +220,6 @@ namespace GateRush.Editor
             }
 
             cancellation.ThrowIfCancellationRequested();
-
-            // TODO(1.13): remove once MoveResolver.CheckSpawnTriggers spawns
-            // generator output and elevator waves.
-            if (ctx.Generators.Count > 0 || ctx.Elevators.Count > 0)
-            {
-                return ValidationOutcome.NotValidatable(SpawnersNotYetSupportedReason);
-            }
 
             stageStarting?.Invoke(ValidationStage.QuickOptimal);
             var quick = quickFactory().Search(ctx, BoardState.CreateInitial(ctx), quickBudget.WithCancellation(cancellation));

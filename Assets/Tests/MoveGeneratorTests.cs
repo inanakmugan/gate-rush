@@ -10,13 +10,9 @@ namespace GateRush.Tests
     /// <summary>
     /// Covers Module 04: exhaustive enumeration as the flood fill's full output,
     /// canonical pruning as a strict subset of it, zero-distance gate clears in
-    /// both modes, the elevator-region criterion, and deterministic order.
+    /// both modes, the generator-spawn-cell and elevator-region criteria, and
+    /// deterministic order.
     /// </summary>
-    /// <remarks>
-    /// The generator-spawn-cell canonical criterion is an extension point until
-    /// phase 1.13 (no spawn-placement algorithm exists yet), so it has no test
-    /// here — generators cannot appear in a level.
-    /// </remarks>
     public class MoveGeneratorTests
     {
         private static MoveGenerator Generator() => new MoveGenerator();
@@ -187,6 +183,25 @@ namespace GateRush.Tests
             // open-space positions (1,0) and (2,0) match no criterion.
             CollectionAssert.AreEquivalent(
                 new[] { new Coord(3, 0) }, TargetsFor(canonical, 0).ToList());
+        }
+
+        [Test]
+        public void Generate_Canonical_IncludesAPositionThatVacatesAGeneratorsNextSpawnCells()
+        {
+            // The block stands on the one cell the left-edge generator's next
+            // block needs, so the generator is waiting. Every move off (0,0)
+            // lets it spawn, so (2,0) — which rests against nothing — is kept
+            // where it would otherwise be pruned.
+            var ctx = Ctx(
+                5, 1,
+                new[] { Block(1, new Coord(0, 0)) },
+                generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned(colors: new[] { BlockColor.Blue })) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var canonical = Generate(ctx, state, MoveGenMode.Canonical);
+
+            Assert.AreEqual(0, state.GeneratorIndex[0], "the generator must still be waiting");
+            CollectionAssert.Contains(TargetsFor(canonical, 0).ToList(), new Coord(2, 0));
         }
 
         [Test]

@@ -258,6 +258,50 @@ namespace GateRush.Tests
             Assert.IsTrue(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
         }
 
+        /// <summary>
+        /// A 3x3 draft whose left-edge generator, at <paramref name="offset"/>,
+        /// queues one horizontal-only red 1x1, with a single red gate at the
+        /// bottom edge's far end. Where the block lands is read from Core
+        /// (<c>LevelContext.GeneratorSpawnOrigin</c>): row <paramref name="offset"/>.
+        /// </summary>
+        private static LevelDraft HorizontalQueuedBlockWithABottomGateDraft(int offset) =>
+            Draft(3, 3, d =>
+            {
+                d.Generators.Add(new GeneratorDraft
+                {
+                    Id = 1, Edge = BoardEdge.Left, Offset = offset, Width = 1,
+                    Queue =
+                    {
+                        new SpawnedBlockDraft
+                        {
+                            Id = 1,
+                            Cells = { new Coord(0, 0) },
+                            ColorStack = { BlockColor.Red },
+                            Axis = MovementAxis.HorizontalOnly,
+                        },
+                    },
+                });
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 2, Width = 1, Color = BlockColor.Red });
+            });
+
+        [Test]
+        public void AxisRestrictedBlockHasNoGate_QueuedBlockSpawningOnTheBottomRowWithABottomGate_Silent()
+        {
+            // It spawns on row 0, so it can slide along the bottom edge into the
+            // gate — the same cross-axis arrival a placed block gets (D39).
+            var draft = HorizontalQueuedBlockWithABottomGateDraft(offset: 0);
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
+        }
+
+        [Test]
+        public void AxisRestrictedBlockHasNoGate_QueuedBlockSpawningOnAMiddleRowWithOnlyABottomGate_Fires()
+        {
+            var draft = HorizontalQueuedBlockWithABottomGateDraft(offset: 1);
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.AxisRestrictedBlockHasNoGate));
+        }
+
         // -- ThresholdExceedsAvailableClears -------------------
 
         [Test]

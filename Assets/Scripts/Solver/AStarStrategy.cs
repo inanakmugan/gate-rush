@@ -54,9 +54,21 @@ namespace GateRush.Solver
     /// <c>L ≥ 0</c> counts locks leaving <c>F</c> without firing (a lock's last
     /// <see cref="KeyEffect.ClearOuterColor"/> key consumed without completing
     /// it, an <see cref="KeyEffect.UnlockMovement"/> key completing it, whether
-    /// applied or waiting). So <c>Δh = −p + L ≥ −1</c>. A spawned locked block
-    /// (phase 1.13) is counted in <c>C</c> and <c>F</c> before it spawns, so
-    /// spawning changes neither.</para>
+    /// applied or waiting). So <c>Δh = −p + L ≥ −1</c>.</para>
+    ///
+    /// <para><b>Spawning.</b> A not-yet-spawned block is counted in <c>C</c>,
+    /// and in <c>F</c> if it owns a qualifying lock, before it spawns, so a
+    /// spawn by itself changes neither. A lock whose keys complete before its
+    /// block spawns (<c>DECISIONS.md</c> D42) behaves as under a closed
+    /// shutter: its effect waits and it switches from being counted through
+    /// its completing key to being counted through the waiting
+    /// <see cref="KeyEffect.ClearOuterColor"/>. When the block spawns uncovered
+    /// the effect applies — one more way a counted lock fires, so it is one
+    /// more <c>b</c>: fact (2) holds because the lock was counted before the
+    /// move, whether it began waiting in an earlier move or completed in this
+    /// one through a key that was then unconsumed. Several spawns in one move
+    /// each release a distinct lock. A block spawning under a closed shutter
+    /// keeps waiting, and its opening is the D41 case above.</para>
     ///
     /// <para><b>Why it is admissible.</b> On a solved state <c>C = 0</c> and
     /// every lock's owner is dead, so <c>F = 0</c> and <c>h = 0</c>. A
@@ -90,8 +102,8 @@ namespace GateRush.Solver
     /// set. <c>h == 0</c> is not used as the goal test:
     /// <see cref="BoardState.IsSolved"/> is the one definition of solved, and
     /// <c>C − F</c> can reach zero on an unsolved state — a not-yet-spawned
-    /// single-colour lock whose <see cref="KeyEffect.ClearOuterColor"/> key is
-    /// already held (phase 1.13) contributes one to each.</para>
+    /// single-colour lock with <see cref="KeyEffect.ClearOuterColor"/> already
+    /// waiting (D42) contributes one to each.</para>
     ///
     /// <para><b>Cancellation.</b> <see cref="SearchBudget.Cancellation"/> is
     /// checked before every expansion and throws
