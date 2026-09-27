@@ -87,6 +87,8 @@ win/lose UI. Proves the simulation and input are wired correctly before any
 presentation exists. This is the first point the game is actually
 playable by hand.
 
+*Spec: `Modules/11-static-skeleton.md`. Status: in progress.*
+
 **2.2 — Polish.** DOTween movement, countdown, win/lose UI, layered on top
 of 2.1 once the core loop is confirmed correct.
 
