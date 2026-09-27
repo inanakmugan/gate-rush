@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using GateRush.Core;
 using GateRush.Editor;
@@ -838,11 +839,19 @@ namespace GateRush.Tests
 
         // -- LevelIdAlreadyUsed ----------------------------------
 
+        /// <summary>
+        /// A file entry with no board signature, for tests about ids alone: a
+        /// null signature never equals a draft's, so it cannot add an
+        /// identical-board warning.
+        /// </summary>
+        private static LevelFileEntry IdOnly(string fileName, int levelId) =>
+            new LevelFileEntry(fileName, levelId, null);
+
         [Test]
         public void LevelIdAlreadyUsed_AnotherFileDeclaresTheId_FiresNamingTheFile()
         {
             var draft = Draft(3, 3, d => d.LevelId = 3);
-            var others = new[] { new LevelFileId("level-1.json", 1), new LevelFileId("level-3.json", 3) };
+            var others = new[] { IdOnly("level-1.json", 1), IdOnly("level-3.json", 3) };
 
             var clashes = new DraftValidator().Validate(draft, others)
                 .Where(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed).ToList();
@@ -855,7 +864,7 @@ namespace GateRush.Tests
         public void LevelIdAlreadyUsed_TwoFilesDeclareTheId_FiresOncePerFile()
         {
             var draft = Draft(3, 3, d => d.LevelId = 3);
-            var others = new[] { new LevelFileId("a.json", 3), new LevelFileId("b.json", 3) };
+            var others = new[] { IdOnly("a.json", 3), IdOnly("b.json", 3) };
 
             var clashes = new DraftValidator().Validate(draft, others)
                 .Where(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed).ToList();
@@ -869,7 +878,7 @@ namespace GateRush.Tests
         public void LevelIdAlreadyUsed_OtherFilesDeclareDifferentIds_Silent()
         {
             var draft = Draft(3, 3, d => d.LevelId = 3);
-            var others = new[] { new LevelFileId("level-1.json", 1), new LevelFileId("level-4.json", 4) };
+            var others = new[] { IdOnly("level-1.json", 1), IdOnly("level-4.json", 4) };
 
             var warnings = new DraftValidator().Validate(draft, others);
 
@@ -882,10 +891,97 @@ namespace GateRush.Tests
             var draft = Draft(3, 3, d => d.LevelId = 0);
 
             var withNull = new DraftValidator().Validate(draft, null);
-            var withEmpty = new DraftValidator().Validate(draft, Array.Empty<LevelFileId>());
+            var withEmpty = new DraftValidator().Validate(draft, Array.Empty<LevelFileEntry>());
 
             Assert.IsFalse(withNull.Any(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
             Assert.IsFalse(withEmpty.Any(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
+        }
+
+        // -- BoardIdenticalToOtherLevel --------------------------
+
+        /// <summary>
+        /// A one-block board with its gate, the block at <paramref name="blockOrigin"/>,
+        /// carrying the given metadata.
+        /// </summary>
+        private static LevelDraft Board(Coord blockOrigin, int levelId, int goldReward, int timeBudget) =>
+            Draft(3, 3, d =>
+            {
+                d.LevelId = levelId;
+                d.GoldReward = goldReward;
+                d.SuggestedTimeBudgetSeconds = timeBudget;
+                d.Blocks.Add(RedBlock(1, blockOrigin));
+                d.Gates.Add(new GateDraft { Id = 1, Edge = BoardEdge.Bottom, Offset = 0, Width = 1, Color = BlockColor.Red });
+            });
+
+        /// <summary>A file entry holding <paramref name="board"/>, as <see cref="LevelIdIndex"/> would record it.</summary>
+        private static LevelFileEntry FileHolding(string fileName, LevelDraft board) =>
+            new LevelFileEntry(fileName, board.LevelId, LevelIdIndex.BoardSignature(board.ToDto()));
+
+        private static List<DraftWarning> IdenticalBoards(
+            LevelDraft draft, params LevelFileEntry[] others) =>
+            new DraftValidator().Validate(draft, others)
+                .Where(w => w.Category == DraftWarningCategory.BoardIdenticalToOtherLevel).ToList();
+
+        [Test]
+        public void BoardIdenticalToOtherLevel_SameBoardDifferentMetadata_FiresNamingTheFile()
+        {
+            var draft = Board(new Coord(0, 0), levelId: 3, goldReward: 10, timeBudget: 30);
+            var other = FileHolding("level-2.json", Board(new Coord(0, 0), levelId: 2, goldReward: 25, timeBudget: 60));
+
+            var identical = IdenticalBoards(draft, other);
+
+            Assert.AreEqual(1, identical.Count);
+            StringAssert.Contains("level-2.json", identical[0].Message);
+        }
+
+        [Test]
+        public void BoardIdenticalToOtherLevel_DifferentBoard_Silent()
+        {
+            var draft = Board(new Coord(0, 0), levelId: 3, goldReward: 10, timeBudget: 30);
+            var other = FileHolding("level-2.json", Board(new Coord(1, 1), levelId: 2, goldReward: 10, timeBudget: 30));
+
+            var identical = IdenticalBoards(draft, other);
+
+            Assert.AreEqual(0, identical.Count);
+        }
+
+        [Test]
+        public void BoardIdenticalToOtherLevel_NoOtherFiles_Silent()
+        {
+            var draft = Board(new Coord(0, 0), levelId: 3, goldReward: 10, timeBudget: 30);
+
+            var withNull = new DraftValidator().Validate(draft, null);
+            var withEmpty = new DraftValidator().Validate(draft, Array.Empty<LevelFileEntry>());
+
+            Assert.IsFalse(withNull.Any(w => w.Category == DraftWarningCategory.BoardIdenticalToOtherLevel));
+            Assert.IsFalse(withEmpty.Any(w => w.Category == DraftWarningCategory.BoardIdenticalToOtherLevel));
+        }
+
+        [Test]
+        public void BoardIdenticalToOtherLevel_TwoMatchingFiles_FiresOncePerFile()
+        {
+            var draft = Board(new Coord(0, 0), levelId: 3, goldReward: 10, timeBudget: 30);
+            var first = FileHolding("a.json", Board(new Coord(0, 0), levelId: 1, goldReward: 10, timeBudget: 30));
+            var different = FileHolding("b.json", Board(new Coord(1, 1), levelId: 2, goldReward: 10, timeBudget: 30));
+            var second = FileHolding("c.json", Board(new Coord(0, 0), levelId: 4, goldReward: 10, timeBudget: 30));
+
+            var identical = IdenticalBoards(draft, first, different, second);
+
+            Assert.AreEqual(2, identical.Count);
+            StringAssert.Contains("a.json", identical[0].Message);
+            StringAssert.Contains("c.json", identical[1].Message);
+        }
+
+        [Test]
+        public void BoardIdenticalToOtherLevel_FileSharesIdAndBoard_BothWarningsFire()
+        {
+            var draft = Board(new Coord(0, 0), levelId: 3, goldReward: 10, timeBudget: 30);
+            var other = FileHolding("level-3.json", Board(new Coord(0, 0), levelId: 3, goldReward: 25, timeBudget: 60));
+
+            var warnings = new DraftValidator().Validate(draft, new[] { other });
+
+            Assert.AreEqual(1, warnings.Count(w => w.Category == DraftWarningCategory.LevelIdAlreadyUsed));
+            Assert.AreEqual(1, warnings.Count(w => w.Category == DraftWarningCategory.BoardIdenticalToOtherLevel));
         }
 
         // -- TimeBudgetBelowSuggested ----------------------------
