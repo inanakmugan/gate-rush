@@ -95,6 +95,15 @@ follows the finger cell by cell, a push into the facing gate clears in place
 **2.2 — Polish.** DOTween movement, countdown, win/lose UI, layered on top
 of 2.1 once the core loop is confirmed correct.
 
+*Spec: `Modules/12-polish.md`. Status: in progress.*
+
+**Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
+unlock movement: a lock stops a block from moving and nothing else, and no
+key ever clears a colour. Nothing in this game clears a block in place
+except jokers (Phase 5). `ClearOuterColor` is therefore removed from
+`KeyEffect`, `MoveResolver`, the A\* heuristic, serialization, the editor and
+their tests, and from M8, D41 and D42. No authored level uses it.
+
 Watch the zero-distance move here: a drag with a determined direction but no
 displacement must still clear a block at a gate. This is the first move of
 most levels and is easy to lose in input handling.
