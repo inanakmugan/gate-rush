@@ -138,11 +138,11 @@ namespace GateRush.Core
         /// block's <see cref="MovementAxis"/>: the clear is a property of where
         /// the move ends, not of the direction it took (<c>DECISIONS.md</c> D39).
         /// A zero-distance move is a push, not an arrival — use
-        /// <see cref="CanClearInPlace"/> for it.
+        /// <see cref="CanClearInPlace(LevelContext, BoardState, int)"/> for it.
         /// </summary>
         public static bool IsAtCompatibleExitGate(
             LevelContext ctx, BoardState state, int blockIndex, Coord origin) =>
-            HasCompatibleGate(ctx, state, blockIndex, origin, pushAxis: MovementAxis.Free);
+            HasCompatibleGate(ctx, state, blockIndex, origin, pushAxis: MovementAxis.Free, onlyEdge: null);
 
         /// <summary>
         /// True when the player can clear block <paramref name="blockIndex"/>
@@ -160,17 +160,45 @@ namespace GateRush.Core
         /// </summary>
         public static bool CanClearInPlace(LevelContext ctx, BoardState state, int blockIndex) =>
             state.CanMove(ctx, blockIndex)
-            && HasCompatibleGate(ctx, state, blockIndex, state.Origins[blockIndex], ctx.SpecAt(blockIndex).Axis);
+            && HasCompatibleGate(
+                ctx, state, blockIndex, state.Origins[blockIndex], ctx.SpecAt(blockIndex).Axis, onlyEdge: null);
 
         /// <summary>
-        /// The one gate scan behind <see cref="IsAtCompatibleExitGate"/> and
-        /// <see cref="CanClearInPlace"/>: a compatible open gate at
+        /// <see cref="CanClearInPlace(LevelContext, BoardState, int)"/> for a push
+        /// in one direction: true only when the compatible open gate is on the
+        /// edge <paramref name="push"/> faces (<see cref="Direction.Up"/> faces
+        /// <see cref="BoardEdge.Top"/>, and so on), and false for a direction the
+        /// block's <see cref="MovementAxis"/> does not permit (D39). Exists
+        /// because <see cref="Move"/> carries no direction, yet the input layer
+        /// must emit a push only when it clears through the gate the player is
+        /// pushing toward: a block in a corner, flush against two edges, never
+        /// clears through the other one. <c>MoveResolver</c> still judges a
+        /// zero-distance move with the directionless overload; this one is true
+        /// for some direction exactly when that one is true.
+        /// </summary>
+        public static bool CanClearInPlace(
+            LevelContext ctx, BoardState state, int blockIndex, Direction push) =>
+            state.CanMove(ctx, blockIndex)
+            && HasCompatibleGate(
+                ctx, state, blockIndex, state.Origins[blockIndex], ctx.SpecAt(blockIndex).Axis, EdgeFacing(push));
+
+        /// <summary>
+        /// The one gate scan behind <see cref="IsAtCompatibleExitGate"/> and both
+        /// <c>CanClearInPlace</c> overloads: a compatible open gate at
         /// <paramref name="origin"/> on an edge a push along
-        /// <paramref name="pushAxis"/> can reach. An arrival passes
-        /// <see cref="MovementAxis.Free"/>, so every edge counts.
+        /// <paramref name="pushAxis"/> can reach, and on
+        /// <paramref name="onlyEdge"/> when one is given. An arrival passes
+        /// <see cref="MovementAxis.Free"/> and no edge, so every edge counts.
+        /// <para>A directional push needs no axis test of its own: it passes the
+        /// edge its direction faces, and <see cref="CanPushToward"/> rejects that
+        /// edge whenever the axis forbids the direction. That holds because
+        /// <see cref="EdgeFacing"/> is one-to-one, so "the axis permits pushing
+        /// toward this edge" and "the axis permits this direction" are the same
+        /// test.</para>
         /// </summary>
         private static bool HasCompatibleGate(
-            LevelContext ctx, BoardState state, int blockIndex, Coord origin, MovementAxis pushAxis)
+            LevelContext ctx, BoardState state, int blockIndex, Coord origin,
+            MovementAxis pushAxis, BoardEdge? onlyEdge)
         {
             var cells = ctx.SpecAt(blockIndex).Cells;
 
@@ -214,6 +242,11 @@ namespace GateRush.Core
 
                 var gate = ctx.Gates[g];
                 if (gate.Color != currentColor)
+                {
+                    continue;
+                }
+
+                if (onlyEdge.HasValue && gate.Edge != onlyEdge.Value)
                 {
                     continue;
                 }
@@ -272,6 +305,28 @@ namespace GateRush.Core
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// The board edge a push in <paramref name="push"/> runs into. Grid y
+        /// grows upward, so <see cref="Direction.Up"/> faces
+        /// <see cref="BoardEdge.Top"/>, the row at <c>Height - 1</c>.
+        /// </summary>
+        private static BoardEdge EdgeFacing(Direction push)
+        {
+            switch (push)
+            {
+                case Direction.Up:
+                    return BoardEdge.Top;
+                case Direction.Down:
+                    return BoardEdge.Bottom;
+                case Direction.Left:
+                    return BoardEdge.Left;
+                case Direction.Right:
+                    return BoardEdge.Right;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(push), push, "Not a cardinal direction.");
+            }
         }
 
         /// <summary>

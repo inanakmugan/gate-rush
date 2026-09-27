@@ -22,7 +22,7 @@ namespace GateRush.Solver
     ///
     /// <para><b>Enumeration order</b> (both modes): ascending block index; within
     /// a block, the zero-distance move first (when the block can be cleared in
-    /// place — <see cref="BlockReachability.CanClearInPlace"/>), then reachable positions in the
+    /// place — <see cref="BlockReachability.CanClearInPlace(LevelContext, BoardState, int)"/>), then reachable positions in the
     /// breadth-first order <see cref="BlockReachability.ReachableOrigins"/>
     /// produces — ascending path length, ties broken by <see cref="Direction"/>
     /// enum order. Only blocks for which <see cref="BoardState.CanMove"/> is true
