@@ -228,6 +228,18 @@ the original "no undo" here was reversed. Destructive edits still confirm first:
 undo makes a shrunken grid recoverable, but saying what will be lost beforehand
 is clearer than offering to reverse it afterwards.
 
+**The draft survives a script reload.** A recompile reloads the editor's
+domain: Unity restores the window's serializable fields — the file path and
+the unsaved flag among them — but not the draft, which is a plain class.
+Left alone, the window would show a new empty board while still naming the
+old file, and Save would overwrite that level with it. So the draft is written
+to a serialized JSON field just before the reload and restored when the
+window comes back, unsaved edits included; only undo history is lost. If the
+snapshot cannot be read, the named file is reopened, and failing that a new
+level starts; a console warning says which, and what was lost. A new level, an
+opened file and a restored snapshot all reset the window through one path, so
+no stale selection, wave scope or solve survives any of them.
+
 **Destructive edits confirm.** Shrinking a grid can push blocks, gates and
 shutters outside it. Rather than silently dropping them or refusing the resize,
 say what will be lost:
