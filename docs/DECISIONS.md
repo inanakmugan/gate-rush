@@ -288,6 +288,12 @@ immediate feedback on the first tap.
 is the natural output of reverse generation, and is visible throughout the
 reference game.
 
+**Later (phase 2.0).** D16 is a design guideline, not a rule the tools
+enforce. Most levels will be built this way, but a level without a ready
+opening move is legal: the editor reports it as a warning and Validate
+accepts it. The development levels 0–4 do not follow it and are kept as they
+are.
+
 ---
 
 ## D17 — JSON via `JsonUtility`, with a DTO layer
