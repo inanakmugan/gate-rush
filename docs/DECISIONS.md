@@ -1157,3 +1157,34 @@ could stay shut for good because of an order the player could not see —
 the outcome D41 already rejected.
 
 ---
+
+## D43 — A push clears only through the gate it is pushed toward
+
+**Decision.** A zero-distance move is emitted by the input layer only when
+the block is pushed toward the edge that holds its compatible open gate. A
+block in a corner, flush against two edges, clears only when pushed toward
+the one with the usable gate; pushing it into the other edge, a wall or
+another block does nothing. `BlockReachability.CanClearInPlace` gains an
+overload taking the push `Direction`, true only for the gate on the edge
+that direction faces and only when the block's `MovementAxis` permits the
+direction (D39).
+
+**Why.** A push is a movement the player makes in a direction; clearing
+through a gate on a different edge would read as the block exiting through
+a wall. Tightly packed levels (D16) put blocks in corners often, so the case
+is common, not exotic.
+
+**Consequence.** `Move` still carries no direction and `MoveResolver` still
+judges a zero-distance move with the directionless rule; the directional
+check lives before it, in the input layer, and both share one gate scan in
+`BlockReachability` (D31). The directional overload is true for some
+direction exactly when the directionless one is true, so the solver's
+view of which blocks can clear in place is unchanged. Every move the input
+layer emits is therefore legal, and a rejected one is a bug (Module 11).
+
+**Rejected.** Letting the resolver accept any push and clear through
+whichever gate matches: simpler, but a corner block would clear through the
+wrong edge. Adding a direction to `Move`: it would change the solver's move
+identity and every search for a distinction only the input layer needs.
+
+---

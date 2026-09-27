@@ -32,7 +32,7 @@ namespace GateRush.Solver
     /// stratum begins is the one place it can be without having arrived by a
     /// move, so reaching an exit there takes a push in place, which its axis
     /// may forbid (<c>DECISIONS.md</c> D39). It is an exit when
-    /// <see cref="BlockReachability.CanClearInPlace"/> holds, and also when the
+    /// <see cref="BlockReachability.CanClearInPlace(LevelContext, BoardState, int)"/> holds, and also when the
     /// block can step off it at all — then it can come back, and arriving
     /// clears on any edge. See <see cref="Of"/> for why that second case must
     /// count.</para>
@@ -420,7 +420,7 @@ namespace GateRush.Solver
             /// <summary>
             /// The stratum's start origin (<c>y * width + x</c>) when the block
             /// can be pushed in place into a gate there
-            /// (<see cref="BlockReachability.CanClearInPlace"/>); -1 otherwise.
+            /// (<see cref="BlockReachability.CanClearInPlace(LevelContext, BoardState, int)"/>); -1 otherwise.
             /// </summary>
             public int InPlaceExit { get; }
         }
