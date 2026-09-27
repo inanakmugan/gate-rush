@@ -59,6 +59,25 @@ namespace GateRush.Editor
         /// substitution is not silent (see <see cref="DraftLoadIssue"/>).
         /// </summary>
         UnreadableValueDefaultedOnLoad,
+
+        /// <summary>The level's time budget is zero or negative, so the countdown would end at once.</summary>
+        TimeBudgetNotPositive,
+
+        /// <summary>The level's gold reward is zero or negative, so finishing it pays nothing.</summary>
+        GoldRewardNotPositive,
+
+        /// <summary>
+        /// Another level file already uses this level's id. Ids identify levels
+        /// to progression, so two files sharing one would be indistinguishable.
+        /// </summary>
+        LevelIdAlreadyUsed,
+
+        /// <summary>
+        /// The time budget is shorter than the last solve's suggested budget
+        /// (D12). Depends on the last solve, not the draft alone, so it is only
+        /// reported while a current suggestion exists.
+        /// </summary>
+        TimeBudgetBelowSuggested,
     }
 
     /// <summary>One thing wrong with a draft, cheap to compute and shown live.</summary>
@@ -90,10 +109,35 @@ namespace GateRush.Editor
     /// <see cref="DraftWarningCategory.DraftDoesNotFormValidLevel"/> carries
     /// <c>Core</c>'s message and those two are skipped; the rest still run off
     /// the draft.
+    /// <para>
+    /// Two checks read inputs from outside the draft, passed in by the caller
+    /// so this class stays pure and reads no files: the ids other level files
+    /// declare, and the last solve's suggested time budget. Neither needs a
+    /// search; each is only as current as what the caller passes.
+    /// </para>
     /// </remarks>
     public sealed class DraftValidator
     {
-        public IReadOnlyList<DraftWarning> Validate(LevelDraft draft)
+        /// <param name="draft">The level under edit.</param>
+        /// <param name="otherLevels">
+        /// The ids declared by every other level file, excluding the one the
+        /// draft was loaded from. <c>null</c> means there are none.
+        /// </param>
+        /// <param name="suggestedTimeBudgetSeconds">
+        /// The last solve's suggested time budget, or <c>null</c> when there is
+        /// no current one — then <see cref="DraftWarningCategory.TimeBudgetBelowSuggested"/>
+        /// is not reported.
+        /// </param>
+        /// <param name="isSuggestionFromUnprovenLength">
+        /// Whether that suggestion was built from a solution not proven
+        /// shortest. Such a suggestion can be larger than the level needs, so
+        /// the warning says so.
+        /// </param>
+        public IReadOnlyList<DraftWarning> Validate(
+            LevelDraft draft,
+            IReadOnlyList<LevelFileId> otherLevels = null,
+            int? suggestedTimeBudgetSeconds = null,
+            bool isSuggestionFromUnprovenLength = false)
         {
             if (draft == null)
             {
@@ -130,6 +174,10 @@ namespace GateRush.Editor
             AddGateOntoWallWarnings(draft, warnings);
             AddElevatorTilingWarnings(draft, warnings);
             AddShutterCoverageWarnings(draft, warnings);
+            AddNonPositiveMetadataWarnings(draft, warnings);
+            AddLevelIdClashWarnings(draft, otherLevels, warnings);
+            AddTimeBudgetBelowSuggestedWarning(
+                draft, suggestedTimeBudgetSeconds, isSuggestionFromUnprovenLength, warnings);
 
             if (contextError != null)
             {
@@ -543,6 +591,71 @@ namespace GateRush.Editor
                     $"Shutter {shutter.Id}'s region is not fully covered: {uncovered} cell(s) uncovered, " +
                     $"first at {first.Value}. A shutter hides nothing over an empty cell (M5)."));
             }
+        }
+
+        // -- Level metadata ---------------------------------------
+
+        /// <summary>
+        /// Reports a time budget or gold reward that is zero or negative. Both
+        /// default to zero in a new draft, so an unset field is caught here.
+        /// </summary>
+        private static void AddNonPositiveMetadataWarnings(LevelDraft draft, List<DraftWarning> warnings)
+        {
+            if (draft.SuggestedTimeBudgetSeconds <= 0)
+            {
+                warnings.Add(new DraftWarning(
+                    DraftWarningCategory.TimeBudgetNotPositive,
+                    $"The time budget is {draft.SuggestedTimeBudgetSeconds}s; the countdown would end at once."));
+            }
+
+            if (draft.GoldReward <= 0)
+            {
+                warnings.Add(new DraftWarning(
+                    DraftWarningCategory.GoldRewardNotPositive,
+                    $"The gold reward is {draft.GoldReward}; finishing this level would pay nothing."));
+            }
+        }
+
+        /// <summary>Reports one warning per other level file declaring this draft's id.</summary>
+        private static void AddLevelIdClashWarnings(
+            LevelDraft draft, IReadOnlyList<LevelFileId> otherLevels, List<DraftWarning> warnings)
+        {
+            if (otherLevels == null)
+            {
+                return;
+            }
+
+            foreach (var other in otherLevels)
+            {
+                if (other.LevelId == draft.LevelId)
+                {
+                    warnings.Add(new DraftWarning(
+                        DraftWarningCategory.LevelIdAlreadyUsed,
+                        $"Level id {draft.LevelId} is also used by {other.FileName}."));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reports a time budget shorter than the current suggestion (D12). A
+        /// budget that is not positive is skipped: <see cref="DraftWarningCategory.TimeBudgetNotPositive"/>
+        /// already reports it, and the fix for both is the same.
+        /// </summary>
+        private static void AddTimeBudgetBelowSuggestedWarning(
+            LevelDraft draft, int? suggested, bool isFromUnprovenLength, List<DraftWarning> warnings)
+        {
+            if (!suggested.HasValue
+                || draft.SuggestedTimeBudgetSeconds <= 0
+                || draft.SuggestedTimeBudgetSeconds >= suggested.Value)
+            {
+                return;
+            }
+
+            var note = isFromUnprovenLength ? " (from unproven length)" : string.Empty;
+            warnings.Add(new DraftWarning(
+                DraftWarningCategory.TimeBudgetBelowSuggested,
+                $"The time budget is {draft.SuggestedTimeBudgetSeconds}s, shorter than the suggested " +
+                $"{suggested.Value}s{note}."));
         }
 
         private static string DescribeTiling(ElevatorTiling.Result tiling)

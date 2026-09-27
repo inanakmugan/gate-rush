@@ -134,6 +134,14 @@ namespace GateRush.Editor
         private DraftMetrics metrics;
         private ValidationResult solve;
 
+        /// <summary>
+        /// The ids every other level file declares, for the duplicate-id
+        /// warning. Reading the folder is file IO, so this is rebuilt only by
+        /// <see cref="RefreshOtherLevelIds"/> — on enable, focus, open, save and
+        /// new level — never per frame.
+        /// </summary>
+        private IReadOnlyList<LevelFileId> otherLevelIds = Array.Empty<LevelFileId>();
+
         // -- Validate on a worker thread --
         private Task<ValidationOutcome> validation;
         private CancellationTokenSource validationCancellation;
@@ -196,7 +204,19 @@ namespace GateRush.Editor
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
 
-            Revalidate();
+            RefreshOtherLevelIds();
+        }
+
+        /// <summary>
+        /// Level files may have been added, removed or edited outside the
+        /// window, so the duplicate-id set is re-read whenever it regains focus.
+        /// </summary>
+        private void OnFocus()
+        {
+            if (draft != null)
+            {
+                RefreshOtherLevelIds();
+            }
         }
 
         /// <summary>
@@ -297,21 +317,58 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Every draft mutation funnels through here: the level is dirty, any
-        /// earlier solve result is stale, and the live warnings and metrics
+        /// Every draft mutation funnels through here: the level is dirty, the
+        /// edit is recorded for undo, and the live warnings and metrics
         /// recompute (they are cheap — Module 09).
         /// </summary>
-        private void Mutated()
+        /// <param name="discardSolve">
+        /// Whether the edit makes the last solve stale — true for anything on
+        /// the board. Only the Level section passes false: level id, gold
+        /// reward and time budget never reach the solver, and keeping the solve
+        /// keeps its suggested budget alive for "Use suggested" and the
+        /// below-suggested warning while the budget is being typed.
+        /// </param>
+        private void Mutated(bool discardSolve = true)
         {
             dirty = true;
-            DiscardSolve();
+            if (discardSolve)
+            {
+                DiscardSolve();
+            }
+
             history.Record(draft.ToDto(), GUIUtility.keyboardControl);
+            Revalidate();
+        }
+
+        /// <summary>
+        /// Re-reads the level ids of every file in <see cref="LevelsFolder"/>
+        /// except the one open, then revalidates so the duplicate-id warning
+        /// reflects them.
+        /// </summary>
+        private void RefreshOtherLevelIds()
+        {
+            var files = new List<KeyValuePair<string, string>>();
+            if (Directory.Exists(LevelsFolder))
+            {
+                foreach (var path in Directory.GetFiles(LevelsFolder, "*.json"))
+                {
+                    try
+                    {
+                        files.Add(new KeyValuePair<string, string>(path, File.ReadAllText(path)));
+                    }
+                    catch (IOException)
+                    {
+                        // Unreadable right now; it claims no id until the next refresh.
+                    }
+                }
+            }
+
+            otherLevelIds = LevelIdIndex.Build(files, assetPath);
             Revalidate();
         }
 
         private void Revalidate()
         {
-            warnings = new DraftValidator().Validate(draft);
 
             // solve is null on every path except immediately after a Validate
             // run finishes — DiscardSolve() clears it on every edit, and cancels
@@ -332,6 +389,11 @@ namespace GateRush.Editor
             }
 
             metrics = DraftMetrics.Compute(draft, settings.TimeBudget, provenLength, unprovenLength, explored, stratum);
+
+            // After the metrics: the below-suggested warning reads the budget
+            // they just derived from the current solve.
+            warnings = new DraftValidator().Validate(
+                draft, otherLevelIds, metrics.SuggestedTimeBudgetSeconds, metrics.IsTimeBudgetFromUnprovenLength);
         }
 
         // -- toolbar (new / open / save + breadcrumb) --------------
@@ -1885,25 +1947,92 @@ namespace GateRush.Editor
             // Field edits inside an inspector are caught here; button-driven list
             // edits (add/remove a layer, a queue entry, a wave) call Mutated()
             // themselves. Either way the window only routes the edit — the draft
-            // and DraftValidator decide what it means.
-            EditorGUI.BeginChangeCheck();
-
+            // and DraftValidator decide what it means. The Level section runs
+            // its own change check rather than sitting inside this one: an
+            // inner check's change propagates to an enclosing one, which would
+            // discard the solve its edits are meant to keep.
             if (selection != null && inspectors.TryGetValue(selection.GetType(), out var draw))
             {
+                EditorGUI.BeginChangeCheck();
                 draw(selection);
+                if (EditorGUI.EndChangeCheck())
+                {
+                    Mutated();
+                }
+            }
+            else if (!InWaveScope())
+            {
+                DrawLevelProperties();
             }
             else
             {
                 EditorGUILayout.HelpBox("Select something in the grid or the list above.", MessageType.None);
             }
 
-            if (EditorGUI.EndChangeCheck())
-            {
-                Mutated();
-            }
-
             EditorGUILayout.EndScrollView();
             EditorGUILayout.EndVertical();
+        }
+
+        /// <summary>
+        /// The level's own fields, shown when nothing is selected on the board.
+        /// None of them reaches the solver, so their edits keep the last solve
+        /// (<see cref="Mutated"/> with <c>discardSolve: false</c>).
+        /// </summary>
+        private void DrawLevelProperties()
+        {
+            EditorGUILayout.LabelField("Level", EditorStyles.miniBoldLabel);
+
+            EditorGUI.BeginChangeCheck();
+
+            // Clamped like the grid size fields, so Save As never suggests a
+            // file name such as "level--1". Only a typed value is clamped: a
+            // negative id read from a file is left as loaded rather than
+            // rewritten behind the change check's back.
+            var levelId = EditorGUILayout.IntField("Level id", draft.LevelId);
+            if (levelId != draft.LevelId)
+            {
+                draft.LevelId = Mathf.Max(0, levelId);
+            }
+
+            draft.GoldReward = EditorGUILayout.IntField("Gold reward", draft.GoldReward);
+            draft.SuggestedTimeBudgetSeconds = EditorGUILayout.IntField("Time budget (s)", draft.SuggestedTimeBudgetSeconds);
+
+            if (EditorGUI.EndChangeCheck())
+            {
+                Mutated(discardSolve: false);
+            }
+
+            var suggested = metrics?.SuggestedTimeBudgetSeconds;
+            EditorGUILayout.BeginHorizontal();
+            using (new EditorGUI.DisabledScope(!suggested.HasValue))
+            {
+                if (GUILayout.Button("Use suggested", EditorStyles.miniButton, GUILayout.ExpandWidth(false)))
+                {
+                    // A focused Time budget field would keep showing, and could
+                    // re-commit, the text typed into it; ending the edit first
+                    // makes the copied value stick and records it with focus
+                    // key 0, as its own undo step.
+                    GUIUtility.keyboardControl = 0;
+                    EditorGUIUtility.editingTextField = false;
+                    draft.SuggestedTimeBudgetSeconds = suggested.Value;
+                    Mutated(discardSolve: false);
+                }
+            }
+
+            if (suggested.HasValue)
+            {
+                var note = metrics.IsTimeBudgetFromUnprovenLength ? " (from unproven length)" : string.Empty;
+                GUILayout.Label($"{suggested.Value}s{note}", EditorStyles.miniLabel);
+            }
+            else
+            {
+                GUILayout.Label("Validate to get a suggestion", EditorStyles.miniLabel);
+            }
+
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space();
+            EditorGUILayout.HelpBox("Select something in the grid or the list above to edit it.", MessageType.None);
         }
 
         private void DrawOutlineList()
@@ -2687,7 +2816,7 @@ namespace GateRush.Editor
             queueEntriesInFreeMode.Clear();
             LeaveWaveScope();
             SyncGridFields();
-            Revalidate();
+            RefreshOtherLevelIds();
         }
 
         private void SyncGridFields()
@@ -2737,7 +2866,7 @@ namespace GateRush.Editor
                 queueEntriesInFreeMode.Clear();
                 LeaveWaveScope();
                 SyncGridFields();
-                Revalidate();
+                RefreshOtherLevelIds();
             }
             catch (Exception e)
             {
@@ -2761,6 +2890,7 @@ namespace GateRush.Editor
             AssetDatabase.Refresh();
             assetPath = path;
             dirty = false;
+            RefreshOtherLevelIds();
         }
 
         // -- resize (LevelDraft decides what is lost) ----------

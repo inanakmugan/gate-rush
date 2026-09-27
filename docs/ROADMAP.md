@@ -76,9 +76,11 @@ synthetic corpus; this is the first time the editor, the solver, and
 serialization run against a real, non-trivial level. Cheaper to find an
 editor or data-model gap here than after 2.1 depends on the level format.
 
-*Status: in progress.* level-0, level-1 and level-3 are authored and validate,
-but none starts with a ready opening move (D16), and all carry `levelId`,
-`goldReward` and a suggested time budget of 0, which the editor cannot yet set.
+*Status: in progress.* level-0, level-1, level-3 and level-4 are authored and
+validate. The editor now sets `levelId`, `goldReward` and the time budget, and
+warns when they are unset, duplicated or below the suggestion; the levels still
+carry 0 for all three until they are re-saved. None starts with a ready opening
+move (D16).
 
 **2.1 — Static skeleton.** Render the board, wire pointer input straight to
 `MoveResolver`, apply moves instantly — no animation, no countdown, no

@@ -2,7 +2,7 @@
 
 **Assembly:** `GateRush.Editor` (editor-only)
 **Depends on:** `GateRush.Core`, `GateRush.Serialization`, `GateRush.Solver`
-**Phase:** 1.10
+**Phase:** 1.10 (the Level section: 2.0)
 
 ---
 
@@ -32,9 +32,9 @@ levels have been authored yet, so version 1 is simply refused.
 
 ### Not in scope
 
-Generators and elevators are *authored* here but do not yet *run* — spawning at
-runtime is phase 1.13's `CheckSpawnTriggers`. A level with a generator can be
-built, saved, and will read as unsolvable until then. That is expected.
+Generators and elevators are *authored* here; running them is Module 10's
+`CheckSpawnTriggers`. Until phase 1.13 a level with a generator could be built
+and saved but not solved; it now validates like any other.
 
 ---
 
@@ -89,6 +89,7 @@ GateRush.Editor
     LevelSolveRunner                      the two-stage A* search (now the cross-check, D37)
     NextClearRunner                       nearest-next-clear plus its A* cross-check (D37)
     ValidationPipeline                    what [ Validate ] runs, off the main thread (D38)
+    LevelIdIndex                          the ids other level files declare (phase 2.0)
 ```
 
 The footer has since changed (D36, D38): the solver line names the stage that
@@ -175,6 +176,27 @@ scope switching inside one window is the familiar pattern.
 Generators need no scope. Their queue is an ordered list in the properties panel,
 because generator output has no position to author.
 
+### The Level section (phase 2.0)
+
+With nothing selected on the board, the properties panel shows the level's own
+fields: **Level id**, **Gold reward** and **Time budget (s)**. Save As suggests
+`level-{id}`, so the id field is clamped to zero or more when typed.
+
+**Use suggested** copies the last solve's suggested budget into the field, as
+one undoable edit, and says when that suggestion came from a length not proven
+shortest. The budget stays hand-editable (D12).
+
+Edits to these three fields **keep the last solve**. None of them reaches the
+solver, and discarding the solve would take the suggestion, the button and the
+below-suggested warning with it while the budget is being typed. Every board
+edit, and every undo or redo, still discards it.
+
+The duplicate-id warning needs the ids of the other files in
+`Resources/Levels`. The window reads the folder — on enable, focus, open, save
+and new level, never per frame — and `LevelIdIndex` turns the text into ids,
+leaving out the open file. `DraftValidator` receives them, and the current
+suggestion, as inputs, so it still reads no files.
+
 ---
 
 ## Design decisions (owner)
@@ -198,7 +220,8 @@ budget; anything that leaves `Indeterminate` falls through to nearest-next-clear
 with its A\* cross-check (D37). The policy still belongs here rather than in the
 strategy — the strategy honours a budget, the caller decides the policy. All
 budgets live in `LevelEditorSettings`. A level with a generator or an elevator
-gets no verdict until phase 1.13 (D40).
+is validated like any other since phase 1.13 (D40, D42); nearest-next-clear
+reports `Indeterminate` on it at worst (D37).
 
 **Undo.** The editor has undo and redo over level snapshots — D33 records why
 the original "no undo" here was reversed. Destructive edits still confirm first:
@@ -241,6 +264,10 @@ Everything `MECHANICS.md` lists, plus what the board shape adds:
 - A generator is too narrow for a queued block's projection (D34).
 - A shutter region has a cell no block covers (M5).
 - A frozen block's threshold exceeds the total number of clears available.
+- **The time budget or the gold reward is zero or negative** (phase 2.0).
+- **Another level file uses the same level id**, naming that file.
+- **The time budget is shorter than the last solve's suggestion**, reported only
+  while a suggestion exists and the budget is positive.
 
 Warnings never block saving. They are what a designer reads while building.
 
@@ -329,4 +356,10 @@ that warns about everything is as useless as one that warns about nothing.
 - A level the quick exhaustive A\* stage settles runs nothing further.
 - A level it leaves `Indeterminate` falls through to nearest-next-clear.
 - A search error propagates as an exception, never a verdict.
-- A level with a generator or an elevator gets a reason and no search.
+- A level with a generator or an elevator gets a verdict; the D40 guard that
+  refused it was removed in phase 1.13.
+
+**`LevelIdIndex`** (phase 2.0)
+- Collects the id and file name of every readable file.
+- Skips an unreadable file without throwing.
+- Leaves out the open file however its path is spelled — separator and case.
