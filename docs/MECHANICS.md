@@ -88,6 +88,9 @@ Consequences:
   though it does not change position. Because levels start tightly packed, this
   is typically the *first move of the level*: the block that starts pre-aligned
   with its gate has nowhere to slide, and is cleared in place.
+- **A push goes toward the gate.** A block flush against two edges, in a
+  corner, clears only when pushed toward the edge that holds its usable
+  gate; pushing it into the other edge does nothing (D43).
 - **A gate that opens later needs no special rule.** The waiting block is
   cleared by an ordinary zero-distance move once the player pushes it.
 

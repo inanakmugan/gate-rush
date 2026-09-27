@@ -87,7 +87,10 @@ win/lose UI. Proves the simulation and input are wired correctly before any
 presentation exists. This is the first point the game is actually
 playable by hand.
 
-*Spec: `Modules/11-static-skeleton.md`. Status: in progress.*
+*Spec: `Modules/11-static-skeleton.md`. Status: done.* A level loads from a
+JSON asset, draws with placeholder visuals, and plays by hand: the block
+follows the finger cell by cell, a push into the facing gate clears in place
+(D43), R restarts, and a solved level is logged.
 
 **2.2 — Polish.** DOTween movement, countdown, win/lose UI, layered on top
 of 2.1 once the core loop is confirmed correct.

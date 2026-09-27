@@ -1,6 +1,7 @@
 # Module 11 — Static skeleton: a level playable by hand
 
-**Assembly:** `GateRush.Runtime` (tests in `GateRush.Tests`)
+**Assembly:** `GateRush.Runtime` (tests in `GateRush.Tests`), plus one small
+addition to `GateRush.Core`
 **Depends on:** Modules 01, 02, 03, 08
 **Phase:** 2.1
 
@@ -49,9 +50,12 @@ LevelSession                    plain C#
     event Action StateChanged
 
 DragController                  plain C#
-    bool TryBegin(LevelContext ctx, BoardState state, Coord grabbedCell)
-    Coord Update(Coord pointerCell)     // the block's displayed origin
-    Move? End(Coord pointerCell)        // the move to apply, or none
+    bool TryBegin(LevelContext ctx, BoardState state, Vector2 pointer)
+    Coord Update(Vector2 pointer)       // the block's displayed origin
+    Move? End(Vector2 pointer)          // the move to apply, or none
+    // pointer: fractional grid position in cell units. The integer part is
+    // the cell; the fraction gives displacement finer than a cell, which the
+    // push needs (a full cell would be too coarse for the opening move).
     void Cancel()
     int BlockIndex
     bool IsDragging
@@ -71,6 +75,23 @@ InputController : MonoBehaviour     Input System pointer -> DragController
 
 Names and the exact split among the MonoBehaviours are negotiable; the three
 plain classes and where the decisions live are not.
+
+One addition to `Core`, because the push needs a direction `Move` does not
+carry:
+
+```
+BlockReachability
+    static bool CanClearInPlace(LevelContext ctx, BoardState state,
+                                int blockIndex, Direction push)
+        // CanClearInPlace(ctx, state, blockIndex), restricted to a compatible
+        // open gate on the edge that push faces; false when the block's
+        // MovementAxis does not permit that direction (D39)
+```
+
+`Move` and `MoveResolver` are unchanged: the resolver still judges a
+zero-distance move without a direction. The overload lets the input layer
+emit the push only when it would clear through the gate the player is
+pushing toward.
 
 ---
 
@@ -112,16 +133,19 @@ index stays bound to the same block.
   one that only passed in front of a gate does not, because passing is not
   ending.
 - **The block is back at its start.** This is a push candidate (the
-  zero-distance move of M1 and D25). Take the drag's direction: the dominant
-  axis of the pointer's displacement from where it grabbed, if that
-  displacement is at least `RuntimeConfig`'s drag threshold. If a step in that
-  direction would take the block off the board — it is flush against that
-  edge — apply `Move(block, start)` and let `MoveResolver` decide whether it
-  clears (`CanClearInPlace`, including D39's axis rule). Otherwise apply
-  nothing.
+  zero-distance move of M1 and D25). Take the drag's direction: the pointer's
+  displacement from where it grabbed, projected onto the axes the block's
+  `MovementAxis` permits, then its dominant axis — if that displacement is at
+  least `RuntimeConfig`'s drag threshold (in cells, fractional). Apply
+  `Move(block, start)` only when
+  `BlockReachability.CanClearInPlace(ctx, state, block, direction)` holds:
+  the block is pushed into a compatible open gate on the edge it is pushed
+  toward. Otherwise apply nothing. Pushing into a wall, a board edge with no
+  usable gate, or another block does nothing; so does pushing up in a corner
+  whose usable gate is on the left.
 - **A rejected move is a bug.** Every move the drag produces is legal by
-  construction. If `TryApply` returns false, log an error naming the move; do
-  not swallow it.
+  construction, the push included. If `TryApply` returns false, log an error
+  naming the move; do not swallow it.
 
 This is the case ROADMAP warns about: a drag with a determined direction and
 no displacement must still clear a block at a gate. It is also the first move
@@ -135,6 +159,9 @@ of most levels.
   remaining count.
 - **Locked block (M8):** its colour and shape as normal, plus a lock badge in
   the lock identifier's badge colour and the number of keys still required.
+  The badge palette in `RuntimeConfig` is indexed by lock id — M8: the
+  identifier doubles as the badge colour — so distinct ids always read as
+  distinct badges. An id outside the palette logs an error naming the lock.
 - **Key-carrying block:** a key badge in the target lock's badge colour.
 - **Layered block (M4):** the outer colour and the one beneath it; a numeral
   when more than two colours remain.
@@ -206,11 +233,26 @@ Edit Mode, against the plain classes. The MonoBehaviours are checked by hand.
   pointer paths on a corpus board.
 - An axis-restricted block ignores pointer movement across its axis.
 - A frozen, locked, shuttered or dead block cannot be grabbed.
-- A drag with no displacement toward the edge the block is flush against
-  returns `Move(block, start)`; the same drag toward a neighbouring block,
-  or below the threshold, returns no move.
+- A push into a compatible open gate the block is flush against returns
+  `Move(block, start)`; the same push toward a neighbouring block, a wall, an
+  edge with no usable gate, or below the threshold returns no move.
+- In a corner, a push toward the edge without the usable gate returns no
+  move; toward the edge with it, the push.
 - A drag that leaves and comes back to the start behaves the same way: the
   final direction decides.
+
+**`BlockReachability.CanClearInPlace(..., Direction)`** (Core)
+- True only for the direction facing the compatible gate; false for the
+  other three, including toward a second edge the block is flush against.
+- False for a direction the block's `MovementAxis` does not permit (D39).
+- Agrees with the directionless overload: true for some direction exactly
+  when the directionless one is true.
+
+**`VisibilityLayer`**
+- Remaining counts are `threshold − current count`, and a satisfied
+  threshold shows nothing.
+- A frozen block hides its colour; a closed shutter hides every block under
+  it; neither changes `BoardState`.
 
 **`LevelSession`**
 - `TryApply` of a legal move replaces the state and raises `StateChanged`
@@ -224,3 +266,20 @@ Edit Mode, against the plain classes. The MonoBehaviours are checked by hand.
 - Cell to world to cell round-trips on every cell of a non-square board.
 - The fitted camera size contains the whole board plus the margin in both a
   portrait and a landscape aspect.
+
+---
+
+## Resolved during implementation
+
+- **`DragController.Stepped`**, an event raised once per single-cell step.
+  One `Update` may take several steps, so the test that no step is diagonal
+  needs it; 2.2's movement animation will listen to it too.
+- **`BlockCellRects`**, a plain helper that gives each footprint cell its
+  drawn rectangle. A cell is inset by half the cell gap only on sides facing
+  outside its own block, so a multi-cell block reads as one shape while two
+  different blocks keep the gap between them. The inner corner of an L keeps
+  a gap-sized square filled; proper outlines are 2.2 polish.
+- **The push direction** is the pointer's displacement projected onto the
+  block's permitted axes, then its dominant axis, horizontal on a tie.
+- **Scene and assets:** `Assets/Scenes/Level.unity` (Lit 2D URP template),
+  `Assets/Config/RuntimeConfig.asset`, `Assets/Art/Sprites/Square`.
