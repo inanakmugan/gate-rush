@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b19f262d1ea14c0439104a6ff2d2a87c, type: 3}
+  m_Name: RuntimeConfig
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.RuntimeConfig
+  cellSprite: {fileID: 7482667652216324306, guid: 11ae25fa028900843b7335ef0991e270, type: 3}
+  spriteMaterial: {fileID: 2100000, guid: a97c105638bdf8b4a8650670310a4cd3, type: 2}
+  labelFont: {fileID: 0}
+  cellSize: 1
+  cameraMarginCells: 1
+  cellGap: 0.06
+  beneathColorSize: 0.45
+  edgeBarThickness: 0.3
+  elevatorOutlineThickness: 0.08
+  badgeSize: 0.36
+  pushThresholdCells: 0.3
+  blockPalette:
+  - {r: 0.9, g: 0.24, b: 0.24, a: 1}
+  - {r: 0.22, g: 0.45, b: 0.92, a: 1}
+  - {r: 0.25, g: 0.72, b: 0.33, a: 1}
+  - {r: 0.97, g: 0.82, b: 0.2, a: 1}
+  - {r: 0.58, g: 0.34, b: 0.82, a: 1}
+  - {r: 0.97, g: 0.55, b: 0.18, a: 1}
+  - {r: 0.96, g: 0.52, b: 0.74, a: 1}
+  - {r: 0.26, g: 0.82, b: 0.86, a: 1}
+  lockBadgePalette:
+  - {r: 1, g: 1, b: 1, a: 1}
+  - {r: 0.72, g: 0.72, b: 0.72, a: 1}
+  - {r: 0.86, g: 0.72, b: 0.52, a: 1}
+  - {r: 0.72, g: 0.95, b: 0.72, a: 1}
+  - {r: 0.82, g: 0.76, b: 1, a: 1}
+  - {r: 1, g: 0.8, b: 0.8, a: 1}
+  unknownBadgeColor: {r: 1, g: 0, b: 1, a: 1}
+  backgroundColor: {r: 0.12, g: 0.13, b: 0.16, a: 1}
+  emptyCellColor: {r: 0.22, g: 0.24, b: 0.29, a: 1}
+  wallColor: {r: 0.07, g: 0.07, b: 0.09, a: 1}
+  frozenTint: {r: 0.72, g: 0.86, b: 0.95, a: 1}
+  closedGateColor: {r: 0.6, g: 0.72, b: 0.8, a: 1}
+  shutterColor: {r: 0.36, g: 0.38, b: 0.44, a: 1}
+  generatorColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
+  elevatorOutlineColor: {r: 1, g: 1, b: 1, a: 0.8}
+  labelFontSize: 4
+  badgeLabelFontSize: 2.5
+  labelColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
+  lightLabelColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
+  cellOrder: 0
+  edgeFeatureOrder: 1
+  blockOrder: 2
+  beneathColorOrder: 3
+  badgeOrder: 4
+  shutterOrder: 5
+  elevatorOrder: 6
+  labelOrder: 7
