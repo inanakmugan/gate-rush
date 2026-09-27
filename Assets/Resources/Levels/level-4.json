@@ -1,6 +1,6 @@
 {
     "formatVersion": 3,
-    "levelId": 0,
+    "levelId": 4,
     "width": 10,
     "height": 10,
     "staticWalls": [],
@@ -323,6 +323,6 @@
             ]
         }
     ],
-    "suggestedTimeBudgetSeconds": 0,
-    "goldReward": 0
+    "suggestedTimeBudgetSeconds": 35,
+    "goldReward": 30
 }

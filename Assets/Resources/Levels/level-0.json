@@ -488,6 +488,6 @@
     "shutters": [],
     "generators": [],
     "elevators": [],
-    "suggestedTimeBudgetSeconds": 0,
-    "goldReward": 0
+    "suggestedTimeBudgetSeconds": 95,
+    "goldReward": 30
 }
