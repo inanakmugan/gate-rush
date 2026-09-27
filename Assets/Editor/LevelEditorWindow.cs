@@ -60,6 +60,15 @@ namespace GateRush.Editor
         private LevelDraft draft;
         private string assetPath;
         private bool dirty;
+
+        /// <summary>
+        /// The draft as JSON, written only by <see cref="OnBeforeAssemblyReload"/>
+        /// so it survives a script reload that <see cref="LevelDraft"/> itself
+        /// does not. <see cref="OnEnable"/> restores from it and clears it; it is
+        /// never written per frame or per edit.
+        /// </summary>
+        [SerializeField] private string reloadSnapshot;
+
         private LevelEditorSettings settings;
 
         private EditorTool tool = EditorTool.Select;
@@ -135,12 +144,12 @@ namespace GateRush.Editor
         private ValidationResult solve;
 
         /// <summary>
-        /// The ids every other level file declares, for the duplicate-id
-        /// warning. Reading the folder is file IO, so this is rebuilt only by
-        /// <see cref="RefreshOtherLevelIds"/> — on enable, focus, open, save and
-        /// new level — never per frame.
+        /// The ids and board signatures every other level file declares, for
+        /// the duplicate-id and identical-board warnings. Reading the folder is
+        /// file IO, so this is rebuilt only by <see cref="RefreshOtherLevelIds"/>
+        /// — on enable, focus, open, save and new level — never per frame.
         /// </summary>
-        private IReadOnlyList<LevelFileId> otherLevelIds = Array.Empty<LevelFileId>();
+        private IReadOnlyList<LevelFileEntry> otherLevels = Array.Empty<LevelFileEntry>();
 
         // -- Validate on a worker thread --
         private Task<ValidationOutcome> validation;
@@ -173,14 +182,16 @@ namespace GateRush.Editor
 
         private void OnEnable()
         {
-            settings = LevelEditorSettings.GetOrCreate();
-            if (draft == null)
+            // A script reload restores serializable private fields, and a null
+            // string comes back as "". This is the only way an empty path can
+            // arise — every other writer sets null or a real path — so
+            // normalising it here means no reader needs to test for "".
+            if (string.IsNullOrEmpty(assetPath))
             {
-                draft = LevelDraft.NewEmpty(6, 6);
-                history = new DraftHistory(settings.UndoStackDepth);
-                history.Reset(draft.ToDto());
-                SyncGridFields();
+                assetPath = null;
             }
+
+            settings = LevelEditorSettings.GetOrCreate();
 
             inspectors = new Dictionary<Type, Action<object>>
             {
@@ -203,8 +214,94 @@ namespace GateRush.Editor
 
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
             EditorApplication.playModeStateChanged += OnPlayModeStateChanged;
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
 
-            RefreshOtherLevelIds();
+            if (draft == null)
+            {
+                // Adopting a draft below ends by refreshing the other levels.
+                history = new DraftHistory(settings.UndoStackDepth);
+                RecoverDraft();
+            }
+            else
+            {
+                RefreshOtherLevelIds();
+            }
+        }
+
+        /// <summary>
+        /// Rebuilds the draft when the window opens or comes back from a script
+        /// reload, which loses the <see cref="LevelDraft"/> but keeps
+        /// <see cref="assetPath"/> and <see cref="dirty"/>. Prefers the snapshot
+        /// taken just before the reload, so the draft survives exactly, unsaved
+        /// edits included; failing that, reopens the file the window named, so
+        /// the window never names a file while showing a different board; and
+        /// failing that, starts a new level. Undo history does not survive.
+        /// </summary>
+        private void RecoverDraft()
+        {
+            var snapshot = reloadSnapshot;
+            reloadSnapshot = null;
+            var wasDirty = dirty;
+            var path = assetPath;
+
+            if (!string.IsNullOrEmpty(snapshot))
+            {
+                try
+                {
+                    var restored = LevelDraft.FromDto(LevelSerializer.ParseDto(snapshot, "reload snapshot"));
+                    AdoptDraft(restored, path, wasDirty);
+                    return;
+                }
+                catch (Exception)
+                {
+                    // Unreadable snapshot: fall through to the file, then a new level.
+                }
+            }
+
+            string loadError = null;
+            if (path != null && File.Exists(path) && TryLoadFrom(path, out loadError))
+            {
+                if (wasDirty)
+                {
+                    Debug.LogWarning(
+                        $"Unsaved edits to {Path.GetFileName(path)} were lost in the script reload; " +
+                        "the file was reopened as last saved.");
+                }
+
+                return;
+            }
+
+            NewLevel();
+
+            if (path == null)
+            {
+                if (wasDirty)
+                {
+                    Debug.LogWarning("An unsaved level was lost in the script reload; a new empty level was started.");
+                }
+
+                return;
+            }
+
+            var why = loadError != null ? $"could not be reopened ({loadError})" : "no longer exists";
+            var lost = wasDirty ? "Unsaved edits were lost in the script reload, and " : "After the script reload, ";
+            Debug.LogWarning($"{lost}{Path.GetFileName(path)} {why}; a new empty level was started.");
+        }
+
+        /// <summary>
+        /// Stashes the draft in <see cref="reloadSnapshot"/> just before a
+        /// script reload, the one moment it would otherwise be lost. Hooked to
+        /// <see cref="AssemblyReloadEvents.beforeAssemblyReload"/> rather than
+        /// done in <see cref="OnDisable"/>, which also runs when the window
+        /// closes, where a snapshot would be pointless work.
+        /// </summary>
+        private void OnBeforeAssemblyReload()
+        {
+            if (draft != null)
+            {
+                reloadSnapshot = LevelSerializer.ToJson(draft.ToDto());
+            }
         }
 
         /// <summary>
@@ -232,6 +329,7 @@ namespace GateRush.Editor
             CancelValidation("the Level Editor was closed or reloaded");
             EditorApplication.update -= PollValidation;
             EditorApplication.playModeStateChanged -= OnPlayModeStateChanged;
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
         }
 
         /// <summary>
@@ -341,9 +439,9 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Re-reads the level ids of every file in <see cref="LevelsFolder"/>
-        /// except the one open, then revalidates so the duplicate-id warning
-        /// reflects them.
+        /// Re-reads the level ids and board signatures of every file in
+        /// <see cref="LevelsFolder"/> except the one open, then revalidates so
+        /// the duplicate-id and identical-board warnings reflect them.
         /// </summary>
         private void RefreshOtherLevelIds()
         {
@@ -363,7 +461,7 @@ namespace GateRush.Editor
                 }
             }
 
-            otherLevelIds = LevelIdIndex.Build(files, assetPath);
+            otherLevels = LevelIdIndex.Build(files, assetPath);
             Revalidate();
         }
 
@@ -393,7 +491,7 @@ namespace GateRush.Editor
             // After the metrics: the below-suggested warning reads the budget
             // they just derived from the current solve.
             warnings = new DraftValidator().Validate(
-                draft, otherLevelIds, metrics.SuggestedTimeBudgetSeconds, metrics.IsTimeBudgetFromUnprovenLength);
+                draft, otherLevels, metrics.SuggestedTimeBudgetSeconds, metrics.IsTimeBudgetFromUnprovenLength);
         }
 
         // -- toolbar (new / open / save + breadcrumb) --------------
@@ -2806,10 +2904,24 @@ namespace GateRush.Editor
 
         private void NewLevel()
         {
-            draft = LevelDraft.NewEmpty(newWidth, newHeight);
+            AdoptDraft(LevelDraft.NewEmpty(newWidth, newHeight), null, false);
+        }
+
+        /// <summary>
+        /// Makes <paramref name="adopted"/> the level under edit and resets
+        /// everything that described the previous one — history, solve,
+        /// selection, drag, wave scope, grid fields, the other levels. The one
+        /// path a new level, an opened file and a draft restored after a script
+        /// reload all take, so no reset can be missed by one of them.
+        /// </summary>
+        /// <param name="path">The file the draft belongs to, or <c>null</c> for an unsaved one.</param>
+        /// <param name="isDirty">Whether the draft has edits that file does not hold.</param>
+        private void AdoptDraft(LevelDraft adopted, string path, bool isDirty)
+        {
+            draft = adopted;
             history.Reset(draft.ToDto());
-            assetPath = null;
-            dirty = false;
+            assetPath = path;
+            dirty = isDirty;
             DiscardSolve();
             selection = null;
             dragKind = DragKind.None;
@@ -2853,25 +2965,35 @@ namespace GateRush.Editor
 
         private void LoadFrom(string path)
         {
+            if (!TryLoadFrom(path, out var error))
+            {
+                EditorUtility.DisplayDialog("Cannot open level", error, "OK");
+            }
+        }
+
+        /// <summary>
+        /// Opens <paramref name="path"/> as the level under edit, or leaves the
+        /// current draft untouched and returns why not. Reports nothing itself,
+        /// so a caller mid-reload can log where <see cref="LoadFrom"/> would
+        /// show a dialog.
+        /// </summary>
+        private bool TryLoadFrom(string path, out string error)
+        {
+            LevelDraft loaded;
             try
             {
                 var dto = LevelSerializer.ParseDto(File.ReadAllText(path), Path.GetFileName(path));
-                draft = LevelDraft.FromDto(dto);
-                history.Reset(draft.ToDto());
-                assetPath = path;
-                dirty = false;
-                DiscardSolve();
-                selection = null;
-                dragKind = DragKind.None;
-                queueEntriesInFreeMode.Clear();
-                LeaveWaveScope();
-                SyncGridFields();
-                RefreshOtherLevelIds();
+                loaded = LevelDraft.FromDto(dto);
             }
             catch (Exception e)
             {
-                EditorUtility.DisplayDialog("Cannot open level", e.Message, "OK");
+                error = e.Message;
+                return false;
             }
+
+            AdoptDraft(loaded, path, false);
+            error = null;
+            return true;
         }
 
         private void SaveAs()

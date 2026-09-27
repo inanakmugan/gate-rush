@@ -73,6 +73,13 @@ namespace GateRush.Editor
         LevelIdAlreadyUsed,
 
         /// <summary>
+        /// Another level file holds exactly this board, whatever its id, reward
+        /// or budget — usually a file copied and never changed. Only exact
+        /// copies are caught (see <see cref="DraftValidator"/>).
+        /// </summary>
+        BoardIdenticalToOtherLevel,
+
+        /// <summary>
         /// The time budget is shorter than the last solve's suggested budget
         /// (D12). Depends on the last solve, not the draft alone, so it is only
         /// reported while a current suggestion exists.
@@ -111,17 +118,29 @@ namespace GateRush.Editor
     /// the draft.
     /// <para>
     /// Two checks read inputs from outside the draft, passed in by the caller
-    /// so this class stays pure and reads no files: the ids other level files
-    /// declare, and the last solve's suggested time budget. Neither needs a
-    /// search; each is only as current as what the caller passes.
+    /// so this class stays pure and reads no files: what other level files
+    /// declare — their ids and board signatures — and the last solve's
+    /// suggested time budget. Neither needs a search; each is only as current
+    /// as what the caller passes.
+    /// </para>
+    /// <para>
+    /// <see cref="DraftWarningCategory.BoardIdenticalToOtherLevel"/> catches
+    /// exact copies only. Deliberately out of scope: near-duplicates — a board
+    /// mirrored, rotated, or with one block moved — and a board drawn twice
+    /// independently, whose internal authoring ids (block, gate, shutter ids)
+    /// differ and so serialize differently. The draft's signature is computed
+    /// afresh on each call rather than cached: one <c>ToDto</c> and one
+    /// <c>ToJson</c> of a hand-sized level is small beside the context build
+    /// and opening-move scan this already does per edit, and a cache would need
+    /// invalidating on every draft mutation, undo and redo included.
     /// </para>
     /// </remarks>
     public sealed class DraftValidator
     {
         /// <param name="draft">The level under edit.</param>
         /// <param name="otherLevels">
-        /// The ids declared by every other level file, excluding the one the
-        /// draft was loaded from. <c>null</c> means there are none.
+        /// The ids and board signatures of every other level file, excluding
+        /// the one the draft was loaded from. <c>null</c> means there are none.
         /// </param>
         /// <param name="suggestedTimeBudgetSeconds">
         /// The last solve's suggested time budget, or <c>null</c> when there is
@@ -135,7 +154,7 @@ namespace GateRush.Editor
         /// </param>
         public IReadOnlyList<DraftWarning> Validate(
             LevelDraft draft,
-            IReadOnlyList<LevelFileId> otherLevels = null,
+            IReadOnlyList<LevelFileEntry> otherLevels = null,
             int? suggestedTimeBudgetSeconds = null,
             bool isSuggestionFromUnprovenLength = false)
         {
@@ -176,6 +195,7 @@ namespace GateRush.Editor
             AddShutterCoverageWarnings(draft, warnings);
             AddNonPositiveMetadataWarnings(draft, warnings);
             AddLevelIdClashWarnings(draft, otherLevels, warnings);
+            AddIdenticalBoardWarnings(draft, otherLevels, warnings);
             AddTimeBudgetBelowSuggestedWarning(
                 draft, suggestedTimeBudgetSeconds, isSuggestionFromUnprovenLength, warnings);
 
@@ -618,7 +638,7 @@ namespace GateRush.Editor
 
         /// <summary>Reports one warning per other level file declaring this draft's id.</summary>
         private static void AddLevelIdClashWarnings(
-            LevelDraft draft, IReadOnlyList<LevelFileId> otherLevels, List<DraftWarning> warnings)
+            LevelDraft draft, IReadOnlyList<LevelFileEntry> otherLevels, List<DraftWarning> warnings)
         {
             if (otherLevels == null)
             {
@@ -632,6 +652,33 @@ namespace GateRush.Editor
                     warnings.Add(new DraftWarning(
                         DraftWarningCategory.LevelIdAlreadyUsed,
                         $"Level id {draft.LevelId} is also used by {other.FileName}."));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Reports one warning per other level file whose board signature
+        /// equals the draft's. The draft's signature comes from the same
+        /// <see cref="LevelIdIndex.BoardSignature"/> over a
+        /// <see cref="LevelDraft.ToDto"/> result that the index used for the
+        /// files, so equal boards produce equal strings.
+        /// </summary>
+        private static void AddIdenticalBoardWarnings(
+            LevelDraft draft, IReadOnlyList<LevelFileEntry> otherLevels, List<DraftWarning> warnings)
+        {
+            if (otherLevels == null || otherLevels.Count == 0)
+            {
+                return;
+            }
+
+            var signature = LevelIdIndex.BoardSignature(draft.ToDto());
+            foreach (var other in otherLevels)
+            {
+                if (string.Equals(other.BoardSignature, signature, StringComparison.Ordinal))
+                {
+                    warnings.Add(new DraftWarning(
+                        DraftWarningCategory.BoardIdenticalToOtherLevel,
+                        $"This board is identical to {other.FileName}."));
                 }
             }
         }
