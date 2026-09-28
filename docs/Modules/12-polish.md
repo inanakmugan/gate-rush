@@ -180,3 +180,38 @@ is not.
 - Next is the smallest greater id, not the next file name.
 - The highest id has no next.
 - Ids need not be contiguous: with 0, 1, 3 and 4, the next after 1 is 3.
+
+---
+
+## Resolved during implementation
+
+- **`BlockReachability.FindExitGate(ctx, state, blockIndex, origin, Direction? push)`**
+  returns the gate a clear went through, or -1, so `Runtime` never
+  re-derives gate compatibility. It shares the one gate scan with
+  `IsAtCompatibleExitGate` and both `CanClearInPlace` overloads. With a push
+  direction it returns the gate on the edge the push faces (D43); for an
+  arrival any edge counts, and in a corner with two usable gates the lowest
+  gate index wins.
+- **`DragController.End(pointer, out Direction? push)`** reports the push
+  direction it used, so the clear effect knows which gate a push went into.
+- **`ResolutionDiff` looks only at the moved block.** It is the only block a
+  move can clear; any other change appears when the board redraws. A
+  cleared block with no exit gate is a bug: the bootstrap logs it and still
+  redraws from the new state.
+- **`LevelRun`** holds the session and the countdown and decides the
+  outcome: a win stops the countdown at once, a time-out ends the level
+  only while it is still being played, and bonuses count only while it is.
+  A bonus earned by the winning move is added just before the win, so the
+  timer can rise at that moment.
+- **Timing.** The view plays queued steps, then the clear effects, then
+  redraws; input waits for all three. A win shows its panel after the
+  effects; a time-out cancels any drag and shows its panel at once. R and
+  Restart work at any moment, effects included.
+- **Catch-up** is a time budget: any backlog finishes in about
+  `maxLag` step durations, and no step is ever skipped.
+- **`LevelCatalog`** treats two files with one `levelId` as a level data
+  error; the bootstrap logs it, hides Next and keeps the current level
+  playing.
+- **Scene:** a screen-space canvas holds the timer and the result panel;
+  the `ResultPanel` component sits on the canvas so hiding the panel never
+  disables it. The EventSystem uses `InputSystemUIInputModule`.

@@ -62,6 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
+*Status: done.* Levels chain through Next rather than one hardcoded level.
+
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
 menus, one hardcoded level.
 
@@ -95,7 +97,9 @@ follows the finger cell by cell, a push into the facing gate clears in place
 **2.2 — Polish.** DOTween movement, countdown, win/lose UI, layered on top
 of 2.1 once the core loop is confirmed correct.
 
-*Spec: `Modules/12-polish.md`. Status: in progress.*
+*Spec: `Modules/12-polish.md`. Status: done.* Blocks glide cell by cell,
+a cleared block leaves through its gate, the level runs against a countdown
+with M10 bonuses, and a result panel offers Restart and Next.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
