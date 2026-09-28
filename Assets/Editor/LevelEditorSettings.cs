@@ -9,7 +9,8 @@ namespace GateRush.Editor
     /// Validate budgets (the quick optimal attempt, and the canonical and
     /// exhaustive budgets, D5), the suggested-time-budget formula (D12), and the
     /// window-layout proportions the docs/Modules/09a follow-up replaced fixed
-    /// pixel constants with. Kept in an asset so no number is fixed at a call
+    /// pixel constants with, how the board fits its canvas, and how the solver
+    /// result line is presented. Kept in an asset so no number is fixed at a call
     /// site and every one of them can be edited in the window and persist.
     /// </summary>
     /// <remarks>
@@ -54,6 +55,22 @@ namespace GateRush.Editor
 
         [Header("Undo (docs/Modules/09a, Session C): depth of the level editor's undo stack. A level's DTO is a few kilobytes, so memory is not a consideration.")]
         [SerializeField] private int undoStackDepth = 50;
+
+        [Header("Board fit: the grid fills the canvas, keeping this many cells of margin (room for edge markers), with each cell clamped to this pixel range")]
+        [SerializeField] private float boardMarginCells = 1f;
+        [SerializeField] private float boardMinCellSize = 16f;
+        [SerializeField] private float boardMaxCellSize = 96f;
+
+        [Header("Solver result line: tint per verdict, and the Validate button's size")]
+        [SerializeField] private Color solverSolvableColor = new Color(0.4f, 0.85f, 0.45f);
+        [SerializeField] private Color solverUnsolvableColor = new Color(0.95f, 0.42f, 0.38f);
+        [SerializeField] private Color solverIndeterminateColor = new Color(0.95f, 0.75f, 0.3f);
+        [SerializeField] private Color solverNotRunColor = new Color(0.7f, 0.7f, 0.72f);
+        [SerializeField] private float validateButtonWidth = 120f;
+        [SerializeField] private float validateButtonHeight = 28f;
+
+        [Header("Warnings list: the icon's drawn size in pixels, matched to the mini label's line height")]
+        [SerializeField] private float warningIconSize = 12f;
 
         /// <summary>
         /// The quick optimal attempt Validate makes first: exhaustive A* at a
@@ -108,6 +125,44 @@ namespace GateRush.Editor
 
         /// <summary>The Level Editor undo stack's depth (docs/Modules/09a, Session C). Default 50.</summary>
         public int UndoStackDepth => undoStackDepth;
+
+        /// <summary>
+        /// How the main board fits its canvas (<see cref="EditorGridLayout.Fit"/>).
+        /// The margin is in cells so the edge markers, which are sized in cells,
+        /// stay inside the canvas at any size. Default 1 cell, 16–96 px.
+        /// </summary>
+        public GridFit BoardFit => new GridFit(boardMarginCells, boardMinCellSize, boardMaxCellSize);
+
+        /// <summary>The solver line's tint for <paramref name="kind"/>.</summary>
+        public Color SolverLineColor(SolverLineKind kind)
+        {
+            switch (kind)
+            {
+                case SolverLineKind.Solvable:
+                    return solverSolvableColor;
+                case SolverLineKind.Unsolvable:
+                    return solverUnsolvableColor;
+                case SolverLineKind.Indeterminate:
+                    return solverIndeterminateColor;
+                case SolverLineKind.NotRun:
+                    return solverNotRunColor;
+                default:
+                    throw new System.ArgumentOutOfRangeException(nameof(kind), kind, "Unknown solver line kind.");
+            }
+        }
+
+        /// <summary>The Validate (and Cancel) button's width. Default 120.</summary>
+        public float ValidateButtonWidth => validateButtonWidth;
+
+        /// <summary>The Validate (and Cancel) button's height. Default 28.</summary>
+        public float ValidateButtonHeight => validateButtonHeight;
+
+        /// <summary>
+        /// The square size each warning line's icon is drawn at. The built-in
+        /// icon that loads is the large variant, so without this it draws at
+        /// about twice the text's height. Default 12, the mini label's line height.
+        /// </summary>
+        public float WarningIconSize => warningIconSize;
 
         private const string AssetPath = "Assets/Editor/LevelEditorSettings.asset";
 

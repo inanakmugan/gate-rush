@@ -17,7 +17,7 @@
                 "Yellow"
             ],
             "startOrigin": {
-                "x": 4,
+                "x": 3,
                 "y": 4
             },
             "axis": "Free",
@@ -41,7 +41,7 @@
             ],
             "startOrigin": {
                 "x": 3,
-                "y": 4
+                "y": 3
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -132,8 +132,8 @@
                 "Red"
             ],
             "startOrigin": {
-                "x": 3,
-                "y": 3
+                "x": 4,
+                "y": 4
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -519,6 +519,6 @@
     "shutters": [],
     "generators": [],
     "elevators": [],
-    "suggestedTimeBudgetSeconds": 95,
+    "suggestedTimeBudgetSeconds": 90,
     "goldReward": 30
 }

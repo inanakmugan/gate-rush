@@ -85,6 +85,95 @@ namespace GateRush.Tests
             }
         }
 
+        // -- EditorGridLayout.Fit and GridFit (the main board's fit) --
+
+        private static readonly GridFit BoardFit = new GridFit(marginCells: 1f, minCellSize: 16f, maxCellSize: 96f);
+
+        [Test]
+        public void Fit_RoomyCanvas_CellFillsTheLimitingAxisWithTheMarginInCells()
+        {
+            // 6 columns + 2 margin cells across 1000 → 125; 4 rows + 2 margin cells down 480 → 80.
+            var layout = EditorGridLayout.Fit(new Rect(0f, 0f, 1000f, 480f), 6, 4, BoardFit);
+
+            Assert.AreEqual(80f, layout.CellSize);
+        }
+
+        [Test]
+        public void Fit_HugeCanvas_ClampsToTheMaximumAndCentres()
+        {
+            var canvas = new Rect(10f, 20f, 3000f, 3000f);
+
+            var layout = EditorGridLayout.Fit(canvas, 6, 4, BoardFit);
+
+            Assert.AreEqual(BoardFit.MaxCellSize, layout.CellSize);
+            Assert.AreEqual(canvas.center.x, layout.Area.center.x, 0.5f);
+            Assert.AreEqual(canvas.center.y, layout.Area.center.y, 0.5f);
+        }
+
+        [Test]
+        public void Fit_TinyCanvas_ClampsToTheMinimum()
+        {
+            var layout = EditorGridLayout.Fit(new Rect(0f, 0f, 100f, 100f), 6, 6, BoardFit);
+
+            Assert.AreEqual(BoardFit.MinCellSize, layout.CellSize);
+        }
+
+        [Test]
+        public void Fit_UnclampedFit_LeavesAtLeastTheMarginOnEverySide()
+        {
+            var canvas = new Rect(0f, 0f, 1000f, 480f);
+
+            var layout = EditorGridLayout.Fit(canvas, 6, 4, BoardFit);
+
+            var margin = BoardFit.MarginCells * layout.CellSize;
+            Assert.GreaterOrEqual(layout.Area.xMin - canvas.xMin, margin - 0.01f);
+            Assert.GreaterOrEqual(canvas.xMax - layout.Area.xMax, margin - 0.01f);
+            Assert.GreaterOrEqual(layout.Area.yMin - canvas.yMin, margin - 0.01f);
+            Assert.GreaterOrEqual(canvas.yMax - layout.Area.yMax, margin - 0.01f);
+        }
+
+        [Test]
+        public void Fit_CellRectThenTryPick_RoundTripsEveryCell()
+        {
+            var layout = EditorGridLayout.Fit(new Rect(15f, 25f, 900f, 700f), 7, 5, BoardFit);
+
+            for (var x = 0; x < 7; x++)
+            {
+                for (var y = 0; y < 5; y++)
+                {
+                    var rect = layout.CellRect(new Coord(x, y));
+
+                    Assert.IsTrue(layout.TryPick(rect.center, out var picked));
+                    Assert.AreEqual(new Coord(x, y), picked);
+                }
+            }
+        }
+
+        [Test]
+        public void RequiredCanvasSize_IsTheGridPlusItsMarginAtTheMinimumCellSize()
+        {
+            var required = BoardFit.RequiredCanvasSize(6, 4);
+
+            Assert.AreEqual((6 + 2) * 16f, required.x);
+            Assert.AreEqual((4 + 2) * 16f, required.y);
+        }
+
+        [Test]
+        public void Fit_CanvasOfExactlyTheRequiredSize_KeepsTheGridAndMarginInsideIt()
+        {
+            var required = BoardFit.RequiredCanvasSize(9, 7);
+            var canvas = new Rect(5f, 5f, required.x, required.y);
+
+            var layout = EditorGridLayout.Fit(canvas, 9, 7, BoardFit);
+
+            var margin = BoardFit.MarginCells * layout.CellSize;
+            Assert.AreEqual(BoardFit.MinCellSize, layout.CellSize);
+            Assert.GreaterOrEqual(layout.Area.xMin - canvas.xMin, margin - 0.01f);
+            Assert.LessOrEqual(layout.Area.xMax, canvas.xMax - margin + 0.01f);
+            Assert.GreaterOrEqual(layout.Area.yMin - canvas.yMin, margin - 0.01f);
+            Assert.LessOrEqual(layout.Area.yMax, canvas.yMax - margin + 0.01f);
+        }
+
         // -- EditorGrid.EdgeMarker (item 3: clamp, never a garbage rect) --
 
         [Test]
