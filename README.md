@@ -4,13 +4,20 @@ A Unity reimplementation of the sliding-block puzzle *Block Out!* by Grand Games
 built as a portfolio project with an emphasis on engine-independent game logic,
 solver-verified level design, and a documented architecture.
 
+<p align="center">
+  <img src="docs/media/gameplay.gif" alt="Gate Rush gameplay: blocks slide cell by cell and leave through matching gates" width="360">
+</p>
+
 **▶ Play in browser:** *(coming with the first web build — Phase 3)*
 
 Unity 6000.3.22f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL and
 Android
 
 **Status:** work in progress. The puzzle core, the solver and the level editor
-are built (Phase 1); the first playable level is next. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+are built (Phase 1), and the game is playable in the editor: levels load,
+blocks glide cell by cell, cleared blocks leave through their gates, and each
+level runs against a countdown (Phase 2). The first web build is next. See
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -42,10 +49,9 @@ guessed.
 
 **Ten mechanics compose without knowing about each other.** Every removal in the
 game emits one event; every unlock condition listens to that event; the resolver
-loops to a fixpoint. Clearing a key-carrying block can fire its key, whose
-effect clears a colour on a locked block, whose clear crosses a shutter's
-threshold and opens it — all within a single move, with no mechanic
-referencing another.
+loops to a fixpoint. A single clear can release a key that unlocks a block,
+cross a shutter's threshold and open it, and empty an elevator's region so its
+next wave arrives — all within one move, with no mechanic referencing another.
 
 **The search space is stratified, not cyclic.** Because blocks leave the board
 permanently, progress counters increase monotonically, so the state graph is a
@@ -54,6 +60,27 @@ visited set on advance, bounding memory to the largest single stratum rather
 than the whole space; nearest-next-clear searches one stratum at a time. This
 is the structural difference from Rush Hour–style puzzles, where nothing is ever
 removed.
+
+## The level editor
+
+<p align="center">
+  <img src="docs/media/editor-overview.png" alt="The Gate Rush level editor with a level open and the solver's verdict in the footer">
+</p>
+
+Every mechanic is authored in one editor window: blocks, gates, shutters,
+walls, generators and elevator waves. Warnings update live as the level is
+built, and **Validate** runs the solver off the main thread. The footer above
+reads *solvable in 26, shortest*, with the states explored, the time taken and
+the countdown the level should get.
+
+<p align="center">
+  <img src="docs/media/editor-warnings.png" alt="The level editor's live warnings on a level with authoring mistakes">
+</p>
+
+The warnings catch authoring mistakes before the solver runs: a colour with
+no gate to leave through, a gate too narrow for a block, a lock without
+enough keys, a board that is an exact copy of another level. They never
+block saving; they are what a designer reads while building.
 
 ## Architecture
 
