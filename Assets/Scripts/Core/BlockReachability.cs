@@ -183,12 +183,57 @@ namespace GateRush.Core
                 ctx, state, blockIndex, state.Origins[blockIndex], ctx.SpecAt(blockIndex).Axis, EdgeFacing(push));
 
         /// <summary>
-        /// The one gate scan behind <see cref="IsAtCompatibleExitGate"/> and both
-        /// <c>CanClearInPlace</c> overloads: a compatible open gate at
-        /// <paramref name="origin"/> on an edge a push along
-        /// <paramref name="pushAxis"/> can reach, and on
-        /// <paramref name="onlyEdge"/> when one is given. An arrival passes
-        /// <see cref="MovementAxis.Free"/> and no edge, so every edge counts.
+        /// The index in <see cref="LevelContext.Gates"/> of the gate block
+        /// <paramref name="blockIndex"/> exits through with its origin at
+        /// <paramref name="origin"/>, or -1 when there is none. Presentation
+        /// uses it to show a cleared block leaving through its gate; the rules
+        /// never need to know which gate, only whether one qualifies.
+        /// <list type="bullet">
+        /// <item>With <paramref name="push"/>, a push in place: only a gate on
+        /// the edge that direction faces, and none for a direction the block's
+        /// <see cref="MovementAxis"/> does not permit — the gate
+        /// <see cref="CanClearInPlace(LevelContext, BoardState, int, Direction)"/>
+        /// finds.</item>
+        /// <item>With null, an arrival: a gate on any edge — the gate
+        /// <see cref="IsAtCompatibleExitGate"/> finds.</item>
+        /// </list>
+        /// When more than one gate qualifies — an arriving block in a corner,
+        /// flush against compatible gates on two edges — the lowest gate index
+        /// is returned. Checks the gate only, not whether the block may move:
+        /// that is the resolver's call, made before any clear.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="ctx"/> or <paramref name="state"/> is null.</exception>
+        public static int FindExitGate(
+            LevelContext ctx, BoardState state, int blockIndex, Coord origin, Direction? push)
+        {
+            if (ctx == null)
+            {
+                throw new ArgumentNullException(nameof(ctx));
+            }
+
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
+            return push.HasValue
+                ? CompatibleGateIndex(ctx, state, blockIndex, origin, ctx.SpecAt(blockIndex).Axis, EdgeFacing(push.Value))
+                : CompatibleGateIndex(ctx, state, blockIndex, origin, MovementAxis.Free, onlyEdge: null);
+        }
+
+        private static bool HasCompatibleGate(
+            LevelContext ctx, BoardState state, int blockIndex, Coord origin,
+            MovementAxis pushAxis, BoardEdge? onlyEdge) =>
+            CompatibleGateIndex(ctx, state, blockIndex, origin, pushAxis, onlyEdge) >= 0;
+
+        /// <summary>
+        /// The one gate scan behind <see cref="IsAtCompatibleExitGate"/>, both
+        /// <c>CanClearInPlace</c> overloads and <see cref="FindExitGate"/>: the
+        /// lowest index of a compatible open gate at <paramref name="origin"/>
+        /// on an edge a push along <paramref name="pushAxis"/> can reach, and on
+        /// <paramref name="onlyEdge"/> when one is given; -1 when there is none.
+        /// An arrival passes <see cref="MovementAxis.Free"/> and no edge, so
+        /// every edge counts.
         /// <para>A directional push needs no axis test of its own: it passes the
         /// edge its direction faces, and <see cref="CanPushToward"/> rejects that
         /// edge whenever the axis forbids the direction. That holds because
@@ -196,7 +241,7 @@ namespace GateRush.Core
         /// toward this edge" and "the axis permits this direction" are the same
         /// test.</para>
         /// </summary>
-        private static bool HasCompatibleGate(
+        private static int CompatibleGateIndex(
             LevelContext ctx, BoardState state, int blockIndex, Coord origin,
             MovementAxis pushAxis, BoardEdge? onlyEdge)
         {
@@ -301,10 +346,10 @@ namespace GateRush.Core
                     continue;
                 }
 
-                return true;
+                return g;
             }
 
-            return false;
+            return -1;
         }
 
         /// <summary>

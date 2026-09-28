@@ -13,7 +13,9 @@ namespace GateRush.Runtime
     /// <remarks>
     /// Owns its own <see cref="MoveResolver"/>: a resolver keeps reusable
     /// buffers and must never be shared (Module 03). The time bonus a
-    /// resolution reports is discarded here — the countdown is phase 2.2 work.
+    /// resolution reports is passed on through <see cref="TimeBonusEarned"/>;
+    /// the countdown it feeds lives outside the session, as time lives outside
+    /// <c>Core</c> (D12).
     /// </remarks>
     public sealed class LevelSession
     {
@@ -34,6 +36,15 @@ namespace GateRush.Runtime
         /// <summary>Raised once every time <see cref="State"/> is replaced.</summary>
         public event Action StateChanged;
 
+        /// <summary>
+        /// Raised with the seconds a resolution earned when it destroyed one or
+        /// more time-bonus blocks (M10), and only when those seconds are
+        /// positive; a clear that leaves its block alive earns nothing. Raised
+        /// after <see cref="State"/> is replaced and before
+        /// <see cref="StateChanged"/>.
+        /// </summary>
+        public event Action<int> TimeBonusEarned;
+
         /// <summary>The level being played. Never changes.</summary>
         public LevelContext Context { get; }
 
@@ -46,20 +57,26 @@ namespace GateRush.Runtime
         /// <summary>
         /// Applies <paramref name="move"/> through
         /// <see cref="MoveResolver.TryApplyMove"/>. On success replaces
-        /// <see cref="State"/> with the fully resolved successor and raises
-        /// <see cref="StateChanged"/> once; on rejection changes nothing, raises
-        /// nothing and returns false. The input layer only produces moves that
-        /// are legal by construction, so a false here is a bug for the caller
-        /// to report.
+        /// <see cref="State"/> with the fully resolved successor, raises
+        /// <see cref="TimeBonusEarned"/> if the resolution earned seconds, and
+        /// raises <see cref="StateChanged"/> once; on rejection changes nothing,
+        /// raises nothing and returns false. The input layer only produces moves
+        /// that are legal by construction, so a false here is a bug for the
+        /// caller to report.
         /// </summary>
         public bool TryApply(Move move)
         {
-            if (!resolver.TryApplyMove(Context, State, move, out var next, out _))
+            if (!resolver.TryApplyMove(Context, State, move, out var next, out var timeBonusSeconds))
             {
                 return false;
             }
 
             State = next;
+            if (timeBonusSeconds > 0)
+            {
+                TimeBonusEarned?.Invoke(timeBonusSeconds);
+            }
+
             StateChanged?.Invoke();
             return true;
         }

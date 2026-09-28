@@ -173,12 +173,23 @@ namespace GateRush.Runtime
         /// </list>
         /// </summary>
         /// <exception cref="InvalidOperationException">No drag is in progress.</exception>
-        public Move? End(Vector2 pointer)
+        public Move? End(Vector2 pointer) => End(pointer, out _);
+
+        /// <summary>
+        /// <see cref="End(Vector2)"/>, also reporting the direction of the push
+        /// when the move it returns is a push in place — the direction that
+        /// decided which gate the block clears through, for presentation to
+        /// show it leaving that way. Null for a move that arrives somewhere, and
+        /// when no move is returned.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">No drag is in progress.</exception>
+        public Move? End(Vector2 pointer, out Direction? pushDirection)
         {
             Update(pointer);
 
             var blockIndex = BlockIndex;
             Move? result = null;
+            pushDirection = null;
 
             if (origin != start)
             {
@@ -188,6 +199,7 @@ namespace GateRush.Runtime
                      && BlockReachability.CanClearInPlace(ctx, state, blockIndex, push))
             {
                 result = new Move(blockIndex, start);
+                pushDirection = push;
             }
 
             Cancel();
