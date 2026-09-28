@@ -82,6 +82,60 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Defaults_BoardFit_IsOneCellMarginAnd16To96Pixels()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            var fit = settings.BoardFit;
+
+            Assert.AreEqual(1f, fit.MarginCells);
+            Assert.AreEqual(16f, fit.MinCellSize);
+            Assert.AreEqual(96f, fit.MaxCellSize);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_SolverLineColor_IsDistinctForEveryKind()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var kinds = (SolverLineKind[])System.Enum.GetValues(typeof(SolverLineKind));
+
+            for (var i = 0; i < kinds.Length; i++)
+            {
+                for (var j = i + 1; j < kinds.Length; j++)
+                {
+                    Assert.AreNotEqual(
+                        settings.SolverLineColor(kinds[i]), settings.SolverLineColor(kinds[j]),
+                        $"{kinds[i]} and {kinds[j]} share a tint");
+                }
+            }
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_WarningIconSize_Is12()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(12f, settings.WarningIconSize);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_ValidateButton_Is120By28()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(120f, settings.ValidateButtonWidth);
+            Assert.AreEqual(28f, settings.ValidateButtonHeight);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
         public void Defaults_QueueEntryFreeDrawMaxDepth_Is4()
         {
             var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();

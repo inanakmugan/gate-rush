@@ -180,6 +180,17 @@ namespace GateRush.Editor
         private int newWidth = 6;
         private int newHeight = 6;
 
+        // Which outline-list sections are expanded. Window UI state: serialized
+        // on the window so a script reload keeps it, but never part of the
+        // draft, so it is not undone, not saved, and never marks the level
+        // dirty. Blocks starts collapsed — it is the long list, and the grid is
+        // the usual way to pick a block.
+        [SerializeField] private bool blocksExpanded;
+        [SerializeField] private bool gatesExpanded = true;
+        [SerializeField] private bool shuttersExpanded = true;
+        [SerializeField] private bool generatorsExpanded = true;
+        [SerializeField] private bool elevatorsExpanded = true;
+
         private void OnEnable()
         {
             // A script reload restores serializable private fields, and a null
@@ -657,17 +668,24 @@ namespace GateRush.Editor
             // The canvas takes all the width the properties column leaves and
             // whatever height the enclosing scroll view has left over once its
             // other content — the properties column and the footer — has its
-            // own natural or floored size (item 4). EditorGridLayout centres the
-            // (capped) grid inside whatever it is handed, both axes.
-            var rect = GUILayoutUtility.GetRect(
-                200f, settings.CanvasMinHeight, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-            EditorGUI.DrawRect(rect, new Color(0.16f, 0.16f, 0.18f));
-
-            var padded = new Rect(rect.x + 24f, rect.y + 24f, rect.width - 48f, rect.height - 48f);
+            // own natural or floored size (item 4). EditorGridLayout.Fit sizes
+            // the grid to that canvas and centres it, both axes. The canvas asks
+            // for at least what the grid needs at its minimum cell size, so when
+            // the window is too small for that the outer scroll view scrolls
+            // rather than the grid drawing over the footer.
             int columns;
             int rows;
             GridBounds(out columns, out rows);
-            var layout = new EditorGridLayout(padded, columns, rows);
+            var fit = settings.BoardFit;
+            var required = fit.RequiredCanvasSize(columns, rows);
+            var rect = GUILayoutUtility.GetRect(
+                Mathf.Max(200f, required.x),
+                Mathf.Max(settings.CanvasMinHeight, required.y),
+                GUILayout.ExpandWidth(true),
+                GUILayout.ExpandHeight(true));
+            EditorGUI.DrawRect(rect, new Color(0.16f, 0.16f, 0.18f));
+
+            var layout = EditorGridLayout.Fit(rect, columns, rows, fit);
 
             EditorGrid.DrawCells(layout, FillOf);
             DrawBlockOutlines(layout);
@@ -2135,21 +2153,27 @@ namespace GateRush.Editor
 
         private void DrawOutlineList()
         {
-            SelectableList("Blocks", draft.Blocks, b => $"Block {b.Id}");
-            SelectableList("Gates", draft.Gates, g => $"Gate {g.Id} ({g.Edge})");
-            SelectableList("Shutters", draft.Shutters, s => $"Shutter {s.Id}");
-            SelectableList("Generators", draft.Generators, g => $"Generator {g.Id}");
-            SelectableList("Elevators", draft.Elevators, e => $"Elevator {e.Id}");
+            SelectableList("Blocks", draft.Blocks, b => $"Block {b.Id}", ref blocksExpanded);
+            SelectableList("Gates", draft.Gates, g => $"Gate {g.Id} ({g.Edge})", ref gatesExpanded);
+            SelectableList("Shutters", draft.Shutters, s => $"Shutter {s.Id}", ref shuttersExpanded);
+            SelectableList("Generators", draft.Generators, g => $"Generator {g.Id}", ref generatorsExpanded);
+            SelectableList("Elevators", draft.Elevators, e => $"Elevator {e.Id}", ref elevatorsExpanded);
         }
 
-        private void SelectableList<T>(string header, IReadOnlyList<T> items, Func<T, string> label) where T : class
+        private void SelectableList<T>(string header, IReadOnlyList<T> items, Func<T, string> label, ref bool expanded)
+            where T : class
         {
             if (items.Count == 0)
             {
                 return;
             }
 
-            EditorGUILayout.LabelField(header, EditorStyles.miniBoldLabel);
+            expanded = EditorGUILayout.Foldout(expanded, $"{header} ({items.Count})", toggleOnLabelClick: true);
+            if (!expanded)
+            {
+                return;
+            }
+
             foreach (var item in items)
             {
                 var isSelected = ReferenceEquals(selection, item);
@@ -2604,6 +2628,50 @@ namespace GateRush.Editor
 
         // -- footer: warnings, metrics, solve ------------------
 
+        /// <summary>The solver line's style, built on first draw; its text colour is set each frame from the verdict.</summary>
+        private static GUIStyle solverLineStyle;
+
+        /// <summary>
+        /// Built-in warning icon names, tried in order; the first that loads is
+        /// used. Built-in icon names shift between Unity versions (6000.3 has no
+        /// "console.warnicon.sm"), hence a list rather than one name.
+        /// </summary>
+        private static readonly string[] WarningIconNames = { "console.warnicon", "d_console.warnicon", "console.warnicon.sm" };
+
+        /// <summary>What a warning line starts with when none of <see cref="WarningIconNames"/> loads.</summary>
+        private const string WarningFallbackPrefix = "• ";
+
+        private static Texture warningIcon;
+        private static bool warningIconResolved;
+
+        /// <summary>
+        /// The warning icon, resolved once and cached — including a failed
+        /// lookup, so a missing icon costs one search, not one per repaint. Uses
+        /// <see cref="EditorGUIUtility.FindTexture"/>, which returns null for an
+        /// unknown name, not <c>IconContent</c>, which logs an error for one.
+        /// Null when no name loads; the caller then falls back to
+        /// <see cref="WarningFallbackPrefix"/>.
+        /// </summary>
+        private static Texture WarningIcon()
+        {
+            if (warningIconResolved)
+            {
+                return warningIcon;
+            }
+
+            warningIconResolved = true;
+            foreach (var name in WarningIconNames)
+            {
+                warningIcon = EditorGUIUtility.FindTexture(name);
+                if (warningIcon != null)
+                {
+                    break;
+                }
+            }
+
+            return warningIcon;
+        }
+
         private void DrawFooter()
         {
             EditorGUILayout.BeginVertical(EditorStyles.helpBox);
@@ -2611,9 +2679,26 @@ namespace GateRush.Editor
             EditorGUILayout.LabelField($"Warnings ({warnings.Count})", EditorStyles.boldLabel);
             var warningsHeight = settings.WarningsListHeight.Resolve(position.height);
             warningScroll = EditorGUILayout.BeginScrollView(warningScroll, GUILayout.Height(warningsHeight));
-            foreach (var warning in warnings)
+            // The icon that loads is the large variant; drawn at its own size it
+            // is twice the height of the text beside it. SetIconSize applies to
+            // every icon drawn until it is reset, so it is scoped to this loop and
+            // always restored to zero (the texture's own size) afterwards.
+            var warningIcon = WarningIcon();
+            var iconSize = settings.WarningIconSize;
+            EditorGUIUtility.SetIconSize(new Vector2(iconSize, iconSize));
+            try
             {
-                EditorGUILayout.LabelField("• " + warning.Message, EditorStyles.wordWrappedMiniLabel);
+                foreach (var warning in warnings)
+                {
+                    var content = warningIcon != null
+                        ? new GUIContent(warning.Message, warningIcon)
+                        : new GUIContent(WarningFallbackPrefix + warning.Message);
+                    EditorGUILayout.LabelField(content, EditorStyles.wordWrappedMiniLabel);
+                }
+            }
+            finally
+            {
+                EditorGUIUtility.SetIconSize(Vector2.zero);
             }
 
             EditorGUILayout.EndScrollView();
@@ -2638,17 +2723,31 @@ namespace GateRush.Editor
                 EditorGUILayout.HelpBox(validationNotice, MessageType.Warning);
             }
 
+            // The solver line tints by the answer it is showing: while a run is
+            // in progress it shows progress, not the held verdict, so it reads
+            // as not run until the new answer lands.
+            var lineKind = SolverLineKinds.Of(IsValidating || solve == null ? (LevelSolveVerdict?)null : solve.Verdict);
+            if (solverLineStyle == null)
+            {
+                solverLineStyle = new GUIStyle(EditorStyles.boldLabel) { wordWrap = true };
+            }
+
+            solverLineStyle.normal.textColor = settings.SolverLineColor(lineKind);
+
+            var buttonWidth = GUILayout.Width(settings.ValidateButtonWidth);
+            var buttonHeight = GUILayout.Height(settings.ValidateButtonHeight);
+
             EditorGUILayout.BeginHorizontal();
-            GUILayout.Label(IsValidating ? ValidationProgress() : SolveSummary(), EditorStyles.miniLabel);
+            GUILayout.Label(IsValidating ? ValidationProgress() : SolveSummary(), solverLineStyle);
             GUILayout.FlexibleSpace();
             if (IsValidating)
             {
-                if (GUILayout.Button("Cancel", GUILayout.Width(80f)))
+                if (GUILayout.Button("Cancel", buttonWidth, buttonHeight))
                 {
                     CancelValidation("you cancelled it");
                 }
             }
-            else if (GUILayout.Button("Validate", GUILayout.Width(80f)))
+            else if (GUILayout.Button("Validate", buttonWidth, buttonHeight))
             {
                 StartValidation();
             }

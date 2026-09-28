@@ -29,13 +29,30 @@ namespace GateRush.Editor
         public int Rows { get; }
         public float CellSize { get; }
 
-        public EditorGridLayout(Rect available, int columns, int rows, float maxCellSize = DefaultMaxCellSize)
-        {
-            Columns = Math.Max(columns, 1);
-            Rows = Math.Max(rows, 1);
+        /// <summary>
+        /// The smallest cell either construction path yields, whatever it is
+        /// offered or configured with: below one pixel a cell cannot be drawn,
+        /// and a zero size would divide by zero in <see cref="TryPick"/>.
+        /// </summary>
+        private const float SmallestDrawableCellSize = 1f;
 
-            var fit = Mathf.Floor(Mathf.Min(available.width / Columns, available.height / Rows));
-            CellSize = Mathf.Min(fit < 1f ? 1f : fit, maxCellSize);
+        public EditorGridLayout(Rect available, int columns, int rows, float maxCellSize = DefaultMaxCellSize)
+            : this(
+                Math.Max(columns, 1),
+                Math.Max(rows, 1),
+                Mathf.Min(
+                    Mathf.Max(FitCellSize(available, Math.Max(columns, 1), Math.Max(rows, 1), 0f), SmallestDrawableCellSize),
+                    maxCellSize),
+                available)
+        {
+        }
+
+        /// <summary>A grid of exactly <paramref name="cellSize"/> cells, centred in <paramref name="available"/>. Both public paths end here once they have chosen a size.</summary>
+        private EditorGridLayout(int columns, int rows, float cellSize, Rect available)
+        {
+            Columns = columns;
+            Rows = rows;
+            CellSize = cellSize;
 
             var w = CellSize * Columns;
             var h = CellSize * Rows;
@@ -44,6 +61,35 @@ namespace GateRush.Editor
                 available.y + ((available.height - h) * 0.5f),
                 w,
                 h);
+        }
+
+        /// <summary>
+        /// The main board's layout: the largest whole-pixel cell that fits
+        /// <paramref name="canvas"/> with <see cref="GridFit.MarginCells"/> cells
+        /// of clearance on every side, clamped to <paramref name="fit"/>'s
+        /// minimum and maximum, and centred in the canvas. The margin is counted
+        /// in cells rather than pixels because the edge markers that live in it
+        /// are sized in cells — a pixel margin clips them once cells grow.
+        /// Every hit test and drag reads the returned layout, so they cannot
+        /// disagree with what is drawn. When the minimum wins, the grid is larger
+        /// than the fit; a caller that sizes its canvas to
+        /// <see cref="GridFit.RequiredCanvasSize"/> never sees that overflow.
+        /// </summary>
+        public static EditorGridLayout Fit(Rect canvas, int columns, int rows, GridFit fit)
+        {
+            var c = Math.Max(columns, 1);
+            var r = Math.Max(rows, 1);
+            var cell = FitCellSize(canvas, c, r, fit.MarginCells);
+            cell = Mathf.Min(Mathf.Max(cell, fit.MinCellSize), fit.MaxCellSize);
+            cell = Mathf.Max(cell, SmallestDrawableCellSize);
+            return new EditorGridLayout(c, r, cell, canvas);
+        }
+
+        /// <summary>The largest whole-pixel cell for which <paramref name="columns"/> × <paramref name="rows"/> cells plus <paramref name="marginCells"/> on each side fit <paramref name="available"/>; unclamped.</summary>
+        private static float FitCellSize(Rect available, int columns, int rows, float marginCells)
+        {
+            var margin = Mathf.Max(marginCells, 0f) * 2f;
+            return Mathf.Floor(Mathf.Min(available.width / (columns + margin), available.height / (rows + margin)));
         }
 
         /// <summary>
@@ -89,6 +135,43 @@ namespace GateRush.Editor
 
             cell = new Coord(col, Rows - 1 - screenRow);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// How the main board fits its canvas (<see cref="EditorGridLayout.Fit"/>):
+    /// a clearance around the grid, in cells, and the range a cell's pixel size
+    /// is clamped to. The values come from <see cref="LevelEditorSettings"/>;
+    /// this type only carries them and answers how much canvas they need.
+    /// </summary>
+    public readonly struct GridFit
+    {
+        /// <summary>Clearance on each side of the grid, in cells — room for the edge markers, which are sized in cells.</summary>
+        public float MarginCells { get; }
+        public float MinCellSize { get; }
+        public float MaxCellSize { get; }
+
+        public GridFit(float marginCells, float minCellSize, float maxCellSize)
+        {
+            MarginCells = marginCells;
+            MinCellSize = minCellSize;
+            MaxCellSize = maxCellSize;
+        }
+
+        /// <summary>
+        /// The smallest canvas that holds a <paramref name="columns"/> ×
+        /// <paramref name="rows"/> grid and its margin at
+        /// <see cref="MinCellSize"/>. A canvas requested at least this large
+        /// never makes <see cref="EditorGridLayout.Fit"/> overflow it, so an
+        /// enclosing scroll view scrolls instead of the grid drawing over
+        /// whatever sits below it.
+        /// </summary>
+        public Vector2 RequiredCanvasSize(int columns, int rows)
+        {
+            var margin = Mathf.Max(MarginCells, 0f) * 2f;
+            return new Vector2(
+                (Math.Max(columns, 1) + margin) * MinCellSize,
+                (Math.Max(rows, 1) + margin) * MinCellSize);
         }
     }
 
