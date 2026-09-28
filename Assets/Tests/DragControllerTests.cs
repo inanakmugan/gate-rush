@@ -296,6 +296,49 @@ namespace GateRush.Tests
             }
         }
 
+        [TestCase(BoardEdge.Left, Direction.Left)]
+        [TestCase(BoardEdge.Bottom, Direction.Down)]
+        public void End_PushInPlace_ReportsThePushDirection(BoardEdge gateEdge, Direction push)
+        {
+            var ctx = Ctx(3, 3, new[] { Block(1, new Coord(0, 0)) }, new[] { Gate(1, gateEdge, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+            var drag = new DragController(Threshold);
+            drag.TryBegin(ctx, state, At(0, 0));
+
+            var move = drag.End(Push(At(0, 0), push, AboveThreshold), out var reported);
+
+            Assert.AreEqual(new Move(0, new Coord(0, 0)), move);
+            Assert.AreEqual(push, reported);
+        }
+
+        [Test]
+        public void End_MoveThatArrives_ReportsNoPushDirection()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)) }, new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Red) });
+            var state = BoardState.CreateInitial(ctx);
+            var drag = new DragController(Threshold);
+            drag.TryBegin(ctx, state, At(0, 0));
+
+            var move = drag.End(At(2, 0), out var reported);
+
+            Assert.AreEqual(new Move(0, new Coord(2, 0)), move);
+            Assert.IsNull(reported);
+        }
+
+        [Test]
+        public void End_PushThatCannotClear_ReportsNoPushDirection()
+        {
+            var ctx = PushBoard();
+            var state = BoardState.CreateInitial(ctx);
+            var drag = new DragController(Threshold);
+            drag.TryBegin(ctx, state, At(0, 0));
+
+            var move = drag.End(Push(At(0, 0), Direction.Right, AboveThreshold), out var reported);
+
+            Assert.IsNull(move);
+            Assert.IsNull(reported);
+        }
+
         [Test]
         public void End_PushAlongAMultiCellBlocksAxis_UsesTheGrabbedCellsDisplacement()
         {

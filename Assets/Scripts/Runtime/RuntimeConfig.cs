@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Core;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 
@@ -8,8 +9,9 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Every tunable value the board's presentation and input read: palette,
-    /// tints, sizes, margins, sorting orders, the drag threshold and label
-    /// settings. Nothing in <c>GateRush.Runtime</c> hardcodes one of these at a
+    /// tints, sizes, margins, sorting orders, the drag threshold, label
+    /// settings, movement and clear-effect timings, and the result panel's
+    /// titles. Nothing in <c>GateRush.Runtime</c> hardcodes one of these at a
     /// call site. Sizes are in cells unless named otherwise, so the board keeps
     /// its proportions whatever <see cref="CellSize"/> is.
     /// </summary>
@@ -51,6 +53,37 @@ namespace GateRush.Runtime
         [Header("Input")]
         [Tooltip("How far the pointer must travel, in cells, before a release at the start reads as a push.")]
         [SerializeField] private float pushThresholdCells = 0.3f;
+
+        [Header("Movement")]
+        [Tooltip("Seconds one single-cell step of a dragged block takes to show, with no backlog.")]
+        [SerializeField] private float stepSeconds = 0.06f;
+
+        [Tooltip("Easing of each single-cell step. Linear keeps a long drag smooth; an in-out ease stutters at every cell.")]
+        [SerializeField] private Ease stepEase = Ease.Linear;
+
+        [Tooltip("Queued steps above this many speed up, so any backlog plays out in about this many ordinary steps. No step is ever skipped.")]
+        [SerializeField, Min(1)] private int maxLagSteps = 3;
+
+        [Header("Clear effect")]
+        [Tooltip("Seconds a destroyed block takes to shrink and fade toward its gate.")]
+        [SerializeField] private float clearSeconds = 0.25f;
+
+        [SerializeField] private Ease clearEase = Ease.InQuad;
+
+        [Tooltip("How far a destroyed block travels toward and through its gate while it shrinks, in cells.")]
+        [SerializeField] private float clearTravelCells = 0.6f;
+
+        [Tooltip("Seconds a surviving layered block takes to peel its removed outer colour.")]
+        [SerializeField] private float peelSeconds = 0.2f;
+
+        [SerializeField] private Ease peelEase = Ease.InQuad;
+
+        [Tooltip("Sorting order of the peeling outer colour, above the block cells (the exposed colour shows beneath it).")]
+        [SerializeField] private int peelOrder = 3;
+
+        [Header("Result panel")]
+        [SerializeField] private string winTitle = "Level Complete";
+        [SerializeField] private string lossTitle = "Time's Up";
 
         [Header("Colours")]
         [Tooltip("One colour per BlockColor, in enum order: Red, Blue, Green, Yellow, Purple, Orange, Pink, Cyan.")]
@@ -137,6 +170,39 @@ namespace GateRush.Runtime
 
         /// <summary>Pointer travel, in cells, that makes a release at the start a push.</summary>
         public float PushThresholdCells => pushThresholdCells;
+
+        /// <summary>Seconds one single-cell step takes with no backlog.</summary>
+        public float StepSeconds => stepSeconds;
+
+        /// <summary>Easing of each single-cell step.</summary>
+        public Ease StepEase => stepEase;
+
+        /// <summary>The backlog of steps above which steps speed up (<see cref="StepPlayback"/>).</summary>
+        public int MaxLagSteps => maxLagSteps;
+
+        /// <summary>Seconds a destroyed block's exit takes.</summary>
+        public float ClearSeconds => clearSeconds;
+
+        /// <summary>Easing of a destroyed block's exit.</summary>
+        public Ease ClearEase => clearEase;
+
+        /// <summary>How far a destroyed block travels toward its gate, in cells.</summary>
+        public float ClearTravelCells => clearTravelCells;
+
+        /// <summary>Seconds a surviving layered block's peel takes.</summary>
+        public float PeelSeconds => peelSeconds;
+
+        /// <summary>Easing of the peel.</summary>
+        public Ease PeelEase => peelEase;
+
+        /// <summary>Sorting order of the peeling outer colour.</summary>
+        public int PeelOrder => peelOrder;
+
+        /// <summary>Result panel title after a win.</summary>
+        public string WinTitle => winTitle;
+
+        /// <summary>Result panel title after the countdown runs out.</summary>
+        public string LossTitle => lossTitle;
 
         /// <summary>Camera clear colour behind the board.</summary>
         public Color BackgroundColor => backgroundColor;
@@ -261,6 +327,31 @@ namespace GateRush.Runtime
             if (!(pushThresholdCells > 0f))
             {
                 problems.Add($"{name}: Push Threshold Cells must be positive.");
+            }
+
+            if (!(stepSeconds > 0f))
+            {
+                problems.Add($"{name}: Step Seconds must be positive.");
+            }
+
+            if (maxLagSteps < 1)
+            {
+                problems.Add($"{name}: Max Lag Steps must be at least 1.");
+            }
+
+            if (!(clearSeconds > 0f))
+            {
+                problems.Add($"{name}: Clear Seconds must be positive.");
+            }
+
+            if (clearTravelCells < 0f)
+            {
+                problems.Add($"{name}: Clear Travel Cells may not be negative.");
+            }
+
+            if (!(peelSeconds > 0f))
+            {
+                problems.Add($"{name}: Peel Seconds must be positive.");
             }
 
             if (blockPalette == null || blockPalette.Length < colourCount)

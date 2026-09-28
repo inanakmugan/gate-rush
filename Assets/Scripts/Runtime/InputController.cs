@@ -1,3 +1,5 @@
+using System;
+using GateRush.Core;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -5,47 +7,124 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Wires the Input System to the drag model: pointer presses, moves and
-    /// releases go to <see cref="DragController"/>, the move it produces goes to
-    /// <see cref="LevelSession"/>, and the displayed origin goes to
-    /// <see cref="BoardView"/>. <b>R</b> restarts the level. Decides nothing
-    /// itself.
+    /// releases go to <see cref="DragController"/>, each step it takes goes to
+    /// <see cref="BoardView"/> to play, and the move it produces goes to
+    /// <see cref="LevelSession"/>. <b>R</b> asks for a restart. Decides
+    /// nothing itself.
     /// </summary>
     /// <remarks>
-    /// Mouse and touch share one path through <see cref="Pointer.current"/>:
+    /// <para>Mouse and touch share one path through <see cref="Pointer.current"/>:
     /// a touchscreen's primary touch is a pointer like a mouse is. A move the
     /// session rejects is a bug — every drag produces a legal move by
-    /// construction — so it is logged as an error, never swallowed.
+    /// construction — so it is logged as an error, never swallowed.</para>
+    /// <para>No drag starts while the view is busy — steps still playing, or a
+    /// move being presented — or once the level has ended.</para>
+    /// <para><b>Subscription.</b> Awake and OnEnable order across GameObjects
+    /// is not guaranteed, so this component's OnEnable may run before the
+    /// bootstrap calls <see cref="Initialize"/>. The subscription to
+    /// <see cref="DragController.Stepped"/> is therefore made in
+    /// <see cref="Initialize"/> as well; OnEnable and OnDisable re-subscribe and
+    /// unsubscribe only when a drag controller exists, and a flag keeps the
+    /// two paths from subscribing twice.</para>
     /// </remarks>
     public sealed class InputController : MonoBehaviour
     {
-        private LevelSession session;
+        private LevelRun run;
         private DragController drag;
         private BoardLayout layout;
         private BoardView view;
         private Camera boardCamera;
+        private bool isSubscribed;
 
-        /// <summary>Binds the controller to one level. Until this is called it ignores input.</summary>
+        /// <summary>
+        /// Raised after a move from a drag has been applied, with the state it
+        /// was applied to, the move, and the push direction when the move was a
+        /// push in place (null for a move that arrived). The session's state is
+        /// already the new one.
+        /// </summary>
+        public event Action<BoardState, Move, Direction?> MoveApplied;
+
+        /// <summary>Raised when the player presses <b>R</b>. Any drag in progress has been cancelled.</summary>
+        public event Action RestartRequested;
+
+        /// <summary>
+        /// Binds the controller to one level, replacing any earlier binding.
+        /// Until this is called it ignores input.
+        /// </summary>
         public void Initialize(
-            LevelSession session, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera)
+            LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera)
         {
-            this.session = session;
+            Unsubscribe();
+
+            this.run = run;
             this.drag = drag;
             this.layout = layout;
             this.view = view;
             this.boardCamera = boardCamera;
+
+            if (isActiveAndEnabled)
+            {
+                Subscribe();
+            }
+        }
+
+        /// <summary>
+        /// Abandons any drag in progress and shows its block back at its origin.
+        /// Does nothing when no drag is in progress.
+        /// </summary>
+        public void CancelDrag()
+        {
+            if (drag == null || !drag.IsDragging)
+            {
+                return;
+            }
+
+            var blockIndex = drag.BlockIndex;
+            drag.Cancel();
+            view.Snap(blockIndex, run.Session.State.Origins[blockIndex]);
+        }
+
+        private void OnEnable()
+        {
+            Subscribe();
         }
 
         private void OnDisable()
         {
-            if (drag != null && drag.IsDragging)
+            CancelDrag();
+            Unsubscribe();
+        }
+
+        private void Subscribe()
+        {
+            if (isSubscribed || drag == null)
             {
-                CancelDrag();
+                return;
             }
+
+            drag.Stepped += OnStepped;
+            isSubscribed = true;
+        }
+
+        private void Unsubscribe()
+        {
+            if (!isSubscribed)
+            {
+                return;
+            }
+
+            drag.Stepped -= OnStepped;
+            isSubscribed = false;
+        }
+
+        private void OnStepped(Coord origin)
+        {
+            view.EnqueueStep(origin);
         }
 
         private void Update()
         {
-            if (session == null)
+            if (run == null)
             {
                 return;
             }
@@ -53,8 +132,13 @@ namespace GateRush.Runtime
             var keyboard = Keyboard.current;
             if (keyboard != null && keyboard.rKey.wasPressedThisFrame)
             {
-                drag.Cancel();
-                session.Restart();
+                CancelDrag();
+                RestartRequested?.Invoke();
+                return;
+            }
+
+            if (run.Outcome != LevelOutcome.None)
+            {
                 return;
             }
 
@@ -66,9 +150,11 @@ namespace GateRush.Runtime
 
             var grid = PointerGridPosition(pointer);
 
-            if (pointer.press.wasPressedThisFrame)
+            if (pointer.press.wasPressedThisFrame
+                && !view.IsBusy
+                && drag.TryBegin(run.Session.Context, run.Session.State, grid))
             {
-                drag.TryBegin(session.Context, session.State, grid);
+                view.BeginDrag(drag.BlockIndex);
             }
 
             if (!drag.IsDragging)
@@ -82,37 +168,36 @@ namespace GateRush.Runtime
             }
             else
             {
-                view.ShowDragOrigin(drag.BlockIndex, drag.Update(grid));
+                // The steps it takes reach the view through Stepped.
+                drag.Update(grid);
             }
         }
 
         private void Release(Vector2 grid)
         {
+            var session = run.Session;
+            var before = session.State;
             var blockIndex = drag.BlockIndex;
-            var move = drag.End(grid);
+            var move = drag.End(grid, out var push);
 
-            if (move.HasValue && session.TryApply(move.Value))
+            if (!move.HasValue)
             {
-                // StateChanged has redrawn the board.
+                // No move means the block ended where it started; the queued
+                // steps finish playing it back there.
                 return;
             }
 
-            if (move.HasValue)
+            if (session.TryApply(move.Value))
             {
-                Debug.LogError(
-                    $"Level {session.Context.LevelId}: the resolver rejected {move.Value}, which the drag produced as legal. " +
-                    "The block is shown back at its origin.",
-                    this);
+                MoveApplied?.Invoke(before, move.Value, push);
+                return;
             }
 
-            view.ShowDragOrigin(blockIndex, session.State.Origins[blockIndex]);
-        }
-
-        private void CancelDrag()
-        {
-            var blockIndex = drag.BlockIndex;
-            drag.Cancel();
-            view.ShowDragOrigin(blockIndex, session.State.Origins[blockIndex]);
+            Debug.LogError(
+                $"Level {session.Context.LevelId}: the resolver rejected {move.Value}, which the drag produced as legal. " +
+                "The block is shown back at its origin.",
+                this);
+            view.Snap(blockIndex, session.State.Origins[blockIndex]);
         }
 
         /// <summary>
