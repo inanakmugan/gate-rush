@@ -45,8 +45,7 @@ namespace GateRush.Tests
                 elevatorWaveActive: elevatorActive,
                 totalClearCount: totalClearCount,
                 clearCountByColor: Array.Empty<int>(),
-                keyConsumed: Array.Empty<bool>(),
-                waitingKeyEffect: Array.Empty<KeyEffect?>());
+                keyConsumed: Array.Empty<bool>());
         }
 
         [Test]

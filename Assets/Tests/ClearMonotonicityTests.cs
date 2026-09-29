@@ -13,9 +13,8 @@ namespace GateRush.Tests
     /// directly, independent of any strategy that relies on it: over seeded
     /// random clear-monotone boards A\* proves solvable, every clear reachable
     /// from the first stratum must lead to a board A\* does not prove
-    /// unsolvable. Boards the flag excludes are skipped, and one of them — a
-    /// mixed-effect lock — is shown to break the claim, which is why the flag
-    /// excludes it.
+    /// unsolvable. Boards the flag excludes — those with a generator or an
+    /// elevator — are skipped.
     /// </summary>
     /// <remarks>
     /// If a future rule change quietly breaks the claim — a clear that closes
@@ -51,7 +50,7 @@ namespace GateRush.Tests
                 var ctx = RandomBoards.Next(rng, MaxSide);
                 if (!ctx.IsClearMonotone)
                 {
-                    // The claim is not made for these; see the counterexample below.
+                    // The claim is not made for levels with a spawner.
                     continue;
                 }
 
@@ -92,16 +91,15 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void WaitingKeyEffectBoards_EveryReachableClear_LeavesThemSolvable()
+        public void LockAndKeyBoards_EveryReachableState_StaysSolvable()
         {
-            // D41: a key effect waiting for a shutter delays the effect and never
-            // removes it, so the clear-monotone boards built around it keep the
-            // claim over their whole reachable state space, not just a sample.
+            // D45: a key only unlocks, and a lock opens at once whatever the
+            // order of its keys, so the lock boards keep the claim over their
+            // whole reachable state space, not just a sample.
             var boards = new[]
             {
-                SearchCorpus.ShutteredClearOuterColorLockBoard(),
-                SearchCorpus.ShutteredUnlockMovementLockBoard(),
-                SearchCorpus.TwoWaitingClearsUnderOneShutterBoard()
+                SearchCorpus.TwoKeyLockBoard(),
+                SearchCorpus.ShutteredKeyLockBoard()
             };
             var generator = new MoveGenerator();
             var resolver = new MoveResolver();
@@ -132,23 +130,6 @@ namespace GateRush.Tests
                     }
                 }
             }
-        }
-
-        [Test]
-        public void MixedEffectLock_AClearCanTurnASolvableBoardUnsolvable_SoTheLevelIsNotClearMonotone()
-        {
-            // Why IsClearMonotone must be false for a lock whose keys carry
-            // different effects: clearing the pre-aligned ClearOuterColor key
-            // first wastes its effect, and the red owner can no longer leave.
-            var ctx = SearchCorpus.WastedClearKeyTrapBoard();
-            var initial = BoardState.CreateInitial(ctx);
-            Assert.AreEqual(SolveStatus.Solvable, new AStarStrategy().Search(ctx, initial, GroundTruth()).Status);
-
-            Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, initial, new Move(0, new Coord(0, 0)), out var afterClear, out _));
-            Assert.AreEqual(1, afterClear.TotalClearCount);
-
-            Assert.AreEqual(SolveStatus.Unsolvable, new AStarStrategy().Search(ctx, afterClear, GroundTruth()).Status);
-            Assert.IsFalse(ctx.IsClearMonotone);
         }
 
         /// <summary>

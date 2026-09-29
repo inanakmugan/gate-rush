@@ -72,26 +72,13 @@ namespace GateRush.Core
         /// things up — counters rise, gates, shutters, frozen blocks and locks
         /// only open, destroyed blocks free their cells. So a solution from
         /// before any clear still works after it.</para>
-        /// <para>Three things break it, and make this false:</para>
-        /// <list type="bullet">
-        /// <item>A generator or an elevator. A spawn places blocks between
-        /// clears and cannot be undone, and a clear can trigger one.</item>
-        /// <item>A lock whose keys carry different effects. The key consumed
-        /// last decides whether the lock only unlocks or also clears its owner
-        /// (M8), so clearing one key's carrier early can change which effect the
-        /// lock gets — and an owner that can only leave by being cleared is then
-        /// stranded. A lock whose keys all share one effect is safe: an early
-        /// clear only makes that same effect arrive sooner.</item>
-        /// </list>
-        /// <para><b>A key effect waiting for a shutter (D41) leaves it true.</b>
-        /// With every key of a lock sharing one effect, which effect the lock
-        /// gets never depends on clear order; waiting only decides when it
-        /// lands. It lands the moment the shutter opens — the earliest moment
-        /// anything can interact with a block under it, since until then the
-        /// block can be neither moved nor targeted and its region is closed
-        /// either way. An early clear therefore never makes the effect arrive
-        /// later than it otherwise would, and the effect only unlocks or
-        /// clears, which only opens things up.</para>
+        /// <para>A generator or an elevator breaks it, and makes this false: a
+        /// spawn places blocks between clears and cannot be undone, and a clear
+        /// can trigger one.</para>
+        /// <para><b>Locks and keys leave it true.</b> A key only unlocks (D45),
+        /// and a lock opens on the count of its consumed keys, whatever their
+        /// order — even under a closed shutter or before its block spawns — so
+        /// clearing a key's carrier early only opens its lock sooner.</para>
         /// <para><b>Every new mechanic must decide this flag consciously.</b> One
         /// that changes the board between clears, closes anything on a clear,
         /// makes a move irreversible, or lets the order of clears change what a
@@ -195,7 +182,7 @@ namespace GateRush.Core
             lockOwnerByLockId = BuildLockOwnerLookup(specByIndex);
             keyIndicesByLockId = BuildKeyIndexLookup(specByIndex);
             LockOwnerIndices = BuildLockOwnerIndices(specByIndex);
-            IsClearMonotone = Generators.Count == 0 && Elevators.Count == 0 && !HasLockWithMixedKeyEffects();
+            IsClearMonotone = Generators.Count == 0 && Elevators.Count == 0;
             // Fully qualified because the property name shadows the type name
             // inside this class — the same shape as BoardState.ProgressVector.
             BlockSymmetry = GateRush.Core.BlockSymmetry.Of(specByIndex);
@@ -370,12 +357,10 @@ namespace GateRush.Core
         /// <summary>
         /// Every flat block index that owns a lock — top-level or spawned — in
         /// ascending index order. Empty on a level with no locks. Precomputed
-        /// for the same reason as <see cref="LockOwnerIndex"/> (D28):
-        /// <c>MoveResolver</c> walks it when a shutter opens, to release every
-        /// key effect waiting on a block the opening uncovered (D41), and
-        /// scanning every block slot there would repeat a walk over data that
-        /// never changes. The ascending order is what makes several releases in
-        /// one opening enqueue their clears in a fixed, reproducible order.
+        /// for the same reason as <see cref="LockOwnerIndex"/> (D28): a caller
+        /// that visits every lock — the runtime checking each lock's badge
+        /// colour at load — should not have to scan every block slot for data
+        /// that never changes.
         /// </summary>
         public IReadOnlyList<int> LockOwnerIndices { get; }
 
@@ -427,27 +412,6 @@ namespace GateRush.Core
         /// that each lock has enough of them is already enforced by
         /// <see cref="ValidateLocksAndKeys"/>.
         /// </summary>
-        /// <summary>
-        /// True when some lock is targeted by keys — top-level or spawned — that
-        /// do not all carry the same <see cref="KeyEffect"/>. See
-        /// <see cref="IsClearMonotone"/> for why that matters.
-        /// </summary>
-        private bool HasLockWithMixedKeyEffects()
-        {
-            foreach (var keyIndices in keyIndicesByLockId.Values)
-            {
-                for (var k = 1; k < keyIndices.Length; k++)
-                {
-                    if (specByIndex[keyIndices[k]].KeyEffect != specByIndex[keyIndices[0]].KeyEffect)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
-        }
-
         private static Dictionary<int, int[]> BuildKeyIndexLookup(IReadOnlyList<BlockSpec> specs)
         {
             var keyLists = new Dictionary<int, List<int>>();

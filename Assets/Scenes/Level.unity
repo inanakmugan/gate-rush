@@ -1411,7 +1411,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 7cf0541fa9244c343bf49172adc5533d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.LevelBootstrap
-  level: {fileID: 4900000, guid: 8459b7639a811784d820a6b2f9714aa8, type: 3}
+  level: {fileID: 4900000, guid: 2688dad6665041a47b0559f6587f984e, type: 3}
   config: {fileID: 11400000, guid: 9cd3ac5d10531b440817f895710981e1, type: 2}
   boardCamera: {fileID: 519420031}
   boardView: {fileID: 1462388029}

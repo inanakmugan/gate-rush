@@ -7,8 +7,7 @@ namespace GateRush.Tests
     /// <summary>
     /// Builds <see cref="LevelContext"/> and its definition types with the fields
     /// every test leaves at one value pre-filled: level id 1, a 60-second
-    /// suggested time budget, a gold reward of 100, an unlock-movement key
-    /// effect, no time bonus, a single red 1x1 footprint, and empty collections
+    /// suggested time budget, a gold reward of 100, no time bonus, a single red 1x1 footprint, and empty collections
     /// for the spawner and obstacle lists a given test does not exercise. A test
     /// then names only the parameters it is actually about.
     /// </summary>
@@ -35,7 +34,6 @@ namespace GateRush.Tests
             int? lockId = null,
             int requiredKeys = 0,
             int? keyTarget = null,
-            KeyEffect keyEffect = KeyEffect.UnlockMovement,
             int timeBonusSeconds = 0)
         {
             return new BlockDefinition(
@@ -48,7 +46,6 @@ namespace GateRush.Tests
                 lockId: lockId,
                 requiredKeyCount: requiredKeys,
                 keyTargetLockId: keyTarget,
-                keyEffect: keyEffect,
                 timeBonusSeconds: timeBonusSeconds);
         }
 
@@ -115,7 +112,6 @@ namespace GateRush.Tests
             int? lockId = null,
             int requiredKeys = 0,
             int? keyTarget = null,
-            KeyEffect keyEffect = KeyEffect.UnlockMovement,
             int timeBonusSeconds = 0,
             Coord? regionOrigin = null)
         {
@@ -127,7 +123,6 @@ namespace GateRush.Tests
                 lockId: lockId,
                 requiredKeyCount: requiredKeys,
                 keyTargetLockId: keyTarget,
-                keyEffect: keyEffect,
                 timeBonusSeconds: timeBonusSeconds,
                 regionOrigin: regionOrigin);
         }

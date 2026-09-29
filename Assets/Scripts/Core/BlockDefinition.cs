@@ -28,7 +28,6 @@ namespace GateRush.Core
         public int? LockId { get; }
         public int RequiredKeyCount { get; }
         public int? KeyTargetLockId { get; }
-        public KeyEffect KeyEffect { get; }
         public int TimeBonusSeconds { get; }
 
         public BlockDefinition(
@@ -41,7 +40,6 @@ namespace GateRush.Core
             int? lockId,
             int requiredKeyCount,
             int? keyTargetLockId,
-            KeyEffect keyEffect,
             int timeBonusSeconds)
         {
             var description = $"Block {id}";
@@ -68,7 +66,6 @@ namespace GateRush.Core
             LockId = lockId;
             RequiredKeyCount = requiredKeyCount;
             KeyTargetLockId = keyTargetLockId;
-            KeyEffect = keyEffect;
             TimeBonusSeconds = timeBonusSeconds;
         }
     }

@@ -23,7 +23,7 @@ namespace GateRush.Tests
         /// <summary>Each mechanic must appear on at least one compared board in this many.</summary>
         private const int CoverageDivisor = 15;
 
-        /// <summary>The looser floor for non-monotone boards, which need a rarer two-key mixed-effect lock.</summary>
+        /// <summary>The looser floor for non-monotone boards, which only a generator or an elevator makes (D45).</summary>
         private const int NonMonotoneCoverageDivisor = 60;
 
         /// <summary>At least one confirmed-solvable commit point per this many boards drawn.</summary>
@@ -144,20 +144,6 @@ namespace GateRush.Tests
                 new[] { Gate(1, BoardEdge.Right, 0, 1, BlockColor.Blue) },
                 generators: new[] { Spawner(1, BoardEdge.Left, 0, 1, Spawned()) });
             Assert.IsFalse(ctx.IsClearMonotone);
-
-            var result = Search(ctx);
-
-            Assert.AreEqual(SolveStatus.Indeterminate, result.Status);
-        }
-
-        [Test]
-        public void Search_MixedEffectLockTrap_IsIndeterminateNeverUnsolvable()
-        {
-            // The nearest clear wastes the ClearOuterColor key and strands the
-            // lock's owner; the level is solvable (A* finds 3 moves). Because a
-            // mixed-effect lock makes the level non-monotone, the dead end the
-            // commitment leads to must not be reported as a proof.
-            var ctx = WastedClearKeyTrapBoard();
 
             var result = Search(ctx);
 
@@ -297,8 +283,8 @@ namespace GateRush.Tests
                 Assert.GreaterOrEqual(coverage.TryGetValue(key, out var n) ? n : 0, minimum, $"boards compared with: {key}");
             }
 
-            // Mixed-effect locks need a two-key lock whose keys differ, so they
-            // are rarer in the corpus; they get their own, lower floor.
+            // Only a generator or an elevator makes a board non-monotone (D45);
+            // such boards get their own, lower floor.
             var nonMonotoneMinimum = boardCount / NonMonotoneCoverageDivisor;
             Assert.GreaterOrEqual(
                 coverage.TryGetValue("nonMonotone", out var nonMonotone) ? nonMonotone : 0, nonMonotoneMinimum,

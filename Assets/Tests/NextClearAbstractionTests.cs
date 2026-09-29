@@ -110,23 +110,24 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Of_OwnerWithAKeyEffectWaiting_StaysHeldUnderItsKeptShutterAndCarriesTheEffect()
+        public void Of_UnlockedOwnerUnderAClosedShutter_StaysHeldUnderItsKeptShutter()
         {
-            // D41: the key has died and its ClearOuterColor waits on the owner.
-            // The copy needs no lock to stay exact — the owner is held and its
-            // shutter kept — but its state carries the waiting value across.
-            var ctx = SearchCorpus.ShutteredClearOuterColorLockBoard();
+            // D45: the key has died and unlocked the owner at once, under its
+            // closed shutter. The copy does not freeze the owner — it is no longer
+            // locked — and the kept shutter alone holds it, exactly as on the
+            // source board.
+            var ctx = SearchCorpus.ShutteredKeyLockBoard();
             new MoveResolver().TryApplyMove(
-                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
+                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var unlocked, out _);
 
-            var abstraction = NextClearAbstraction.Of(ctx, waiting);
+            var abstraction = NextClearAbstraction.Of(ctx, unlocked);
 
             // The key is dead, so the copy holds green at 0 and the owner at 1.
+            Assert.IsTrue(unlocked.Unlocked[2]);
             Assert.AreEqual(2, abstraction.ToSourceMove(new Move(1, new Coord(2, 0))).BlockIndex);
             Assert.AreEqual(1, abstraction.Context.Shutters.Count);
-            Assert.IsFalse(abstraction.Initial.CanMove(abstraction.Context, 1));
-            Assert.AreEqual(KeyEffect.ClearOuterColor, abstraction.Initial.WaitingKeyEffect[1]);
-            Assert.IsNull(abstraction.Initial.WaitingKeyEffect[0]);
+            Assert.IsNull(abstraction.Context.Blocks[1].UnfreezeAtClearCount, "not held as frozen");
+            Assert.IsFalse(abstraction.Initial.CanMove(abstraction.Context, 1), "held by the shutter");
         }
 
         [Test]

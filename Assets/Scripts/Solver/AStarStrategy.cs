@@ -12,68 +12,17 @@ namespace GateRush.Solver
     /// <c>f = g + h</c> rather than depth alone (<c>DECISIONS.md</c> D3).
     /// </summary>
     /// <remarks>
-    /// <para><b>Heuristic.</b> <c>h = C − F</c>, computed by
-    /// <see cref="EstimateRemainingMoves"/>. <c>C</c> is every colour still to be
-    /// cleared: the remaining stack of each living block plus the full stack of
-    /// each not-yet-spawned generator or elevator slot. <c>F</c> is the number of
-    /// "free clears" still possible: locks that are still locked, whose owner is
-    /// alive or not yet spawned, and that either have
-    /// <see cref="KeyEffect.ClearOuterColor"/> waiting for a shutter to open
-    /// (<see cref="BoardState.WaitingKeyEffect"/>, <c>DECISIONS.md</c> D41) or,
-    /// with nothing waiting, are targeted by at least one unconsumed
-    /// <see cref="KeyEffect.ClearOuterColor"/> key. A lock with
-    /// <see cref="KeyEffect.UnlockMovement"/> waiting is not counted: its
-    /// completing key has already decided, and later keys change nothing
-    /// (M8).</para>
+    /// <para><b>Heuristic.</b> <c>h = C</c>, computed by
+    /// <see cref="EstimateRemainingMoves"/>: every colour still to be cleared —
+    /// the remaining stack of each living block plus the full stack of each
+    /// not-yet-spawned generator or elevator slot.</para>
     ///
-    /// <para><b>Free clears.</b> A move clears at most one colour through a
-    /// gate (<c>p ≤ 1</c>). The fixpoint loop can add <c>b</c> more, each a
-    /// lock firing <see cref="KeyEffect.ClearOuterColor"/> on its owner —
-    /// either on completion, or released by a shutter opening (D41), and one
-    /// opening can release several. The lock-or-key rule stops each chain
-    /// there, because the cleared owner holds a lock and so carries no key
-    /// (Module 07). Each lock fires at most once, since firing unlocks it.
-    /// <c>F</c> counts a lock as soon as <em>any</em> unconsumed key could
-    /// deliver the clear, deliberately: keys for one lock may carry different
-    /// effects, and the one that completes the count decides. Overcounting
-    /// <c>F</c> only lowers <c>h</c>; undercounting it would overestimate.</para>
-    ///
-    /// <para><b>Why it is consistent.</b> Every edge costs one move, so
-    /// consistency means <c>h</c> drops by at most one per move. Three facts:
-    /// (1) each of a move's <c>b</c> free clears belongs to a distinct lock that
-    /// the same move unlocks, so that lock leaves <c>F</c>; (2) each such lock
-    /// was in <c>F</c> before the move — firing on completion, its completing
-    /// <see cref="KeyEffect.ClearOuterColor"/> key was still unconsumed and
-    /// nothing was waiting; released, <see cref="KeyEffect.ClearOuterColor"/>
-    /// was already waiting; completing and released in the same move, the key
-    /// was unconsumed before it; (3) no lock ever joins <c>F</c> — unconsumed
-    /// keys only disappear, locks only unlock, and a lock that starts waiting
-    /// <see cref="KeyEffect.ClearOuterColor"/> was already counted through the
-    /// very key that completed it, so it only switches the reason it is
-    /// counted. Hence <c>ΔC = −(p + b)</c> and <c>ΔF = −b − L</c>, where
-    /// <c>L ≥ 0</c> counts locks leaving <c>F</c> without firing (a lock's last
-    /// <see cref="KeyEffect.ClearOuterColor"/> key consumed without completing
-    /// it, an <see cref="KeyEffect.UnlockMovement"/> key completing it, whether
-    /// applied or waiting). So <c>Δh = −p + L ≥ −1</c>.</para>
-    ///
-    /// <para><b>Spawning.</b> A not-yet-spawned block is counted in <c>C</c>,
-    /// and in <c>F</c> if it owns a qualifying lock, before it spawns, so a
-    /// spawn by itself changes neither. A lock whose keys complete before its
-    /// block spawns (<c>DECISIONS.md</c> D42) behaves as under a closed
-    /// shutter: its effect waits and it switches from being counted through
-    /// its completing key to being counted through the waiting
-    /// <see cref="KeyEffect.ClearOuterColor"/>. When the block spawns uncovered
-    /// the effect applies — one more way a counted lock fires, so it is one
-    /// more <c>b</c>: fact (2) holds because the lock was counted before the
-    /// move, whether it began waiting in an earlier move or completed in this
-    /// one through a key that was then unconsumed. Several spawns in one move
-    /// each release a distinct lock. A block spawning under a closed shutter
-    /// keeps waiting, and its opening is the D41 case above.</para>
-    ///
-    /// <para><b>Why it is admissible.</b> On a solved state <c>C = 0</c> and
-    /// every lock's owner is dead, so <c>F = 0</c> and <c>h = 0</c>. A
-    /// consistent heuristic that is zero on every goal never overestimates:
-    /// summing <c>Δh ≥ −1</c> along any solution gives <c>moves ≥ h</c>.</para>
+    /// <para><b>Why it is consistent and admissible.</b> Every edge costs one
+    /// move, and a move clears at most one colour: only a gate exit clears,
+    /// and a key only unlocks (<c>DECISIONS.md</c> D45). A queued block is
+    /// counted before it spawns, so a spawn changes nothing. So <c>h</c> drops
+    /// by at most one per move, and on a solved state <c>C = 0</c>; summing
+    /// along any solution gives <c>moves ≥ h</c>.</para>
     ///
     /// <para>Consistency is what
     /// makes a closed set safe: a state is expanded with its shortest
@@ -100,10 +49,7 @@ namespace GateRush.Solver
     /// <para><b>Goal test on pop.</b> Unlike breadth-first search, A\* does not
     /// expand in depth order, so a goal is accepted only when it leaves the open
     /// set. <c>h == 0</c> is not used as the goal test:
-    /// <see cref="BoardState.IsSolved"/> is the one definition of solved, and
-    /// <c>C − F</c> can reach zero on an unsolved state — a not-yet-spawned
-    /// single-colour lock with <see cref="KeyEffect.ClearOuterColor"/> already
-    /// waiting (D42) contributes one to each.</para>
+    /// <see cref="BoardState.IsSolved"/> is the one definition of solved.</para>
     ///
     /// <para><b>Cancellation.</b> <see cref="SearchBudget.Cancellation"/> is
     /// checked before every expansion and throws
@@ -320,8 +266,8 @@ namespace GateRush.Solver
 
         /// <summary>
         /// The heuristic: a lower bound on the moves still needed to solve
-        /// <paramref name="state"/>, <c>C − F</c>. See the type remarks for the
-        /// definitions and the admissibility and consistency argument.
+        /// <paramref name="state"/>, <c>C</c>. See the type remarks for the
+        /// definition and the admissibility and consistency argument.
         /// </summary>
         /// <remarks>
         /// <c>internal</c> so Edit Mode tests can check the admissibility and
@@ -331,7 +277,6 @@ namespace GateRush.Solver
         internal static int EstimateRemainingMoves(LevelContext ctx, BoardState state)
         {
             var coloursRemaining = 0;
-            var freeClears = 0;
 
             for (var i = 0; i < ctx.TotalBlockCapacity; i++)
             {
@@ -343,50 +288,10 @@ namespace GateRush.Solver
                     continue;
                 }
 
-                var spec = ctx.SpecAt(i);
-                coloursRemaining += spec.ColorStack.Count - state.ClearedColors[i];
-
-                if (spec.LockId.HasValue
-                    && !state.Unlocked[i]
-                    && CanStillClearForFree(ctx, state, i, spec.LockId.Value))
-                {
-                    freeClears++;
-                }
+                coloursRemaining += ctx.SpecAt(i).ColorStack.Count - state.ClearedColors[i];
             }
 
-            return coloursRemaining - freeClears;
-        }
-
-        /// <summary>
-        /// Whether a still-locked lock may yet fire
-        /// <see cref="KeyEffect.ClearOuterColor"/>: decided by the waiting effect
-        /// when its keys completed under a closed shutter (D41), otherwise by
-        /// whether any unconsumed key could still deliver it.
-        /// </summary>
-        private static bool CanStillClearForFree(LevelContext ctx, BoardState state, int ownerIndex, int lockId)
-        {
-            var waiting = state.WaitingKeyEffect[ownerIndex];
-            if (waiting.HasValue)
-            {
-                return waiting.Value == KeyEffect.ClearOuterColor;
-            }
-
-            return HasUnconsumedClearOuterColorKey(ctx, state, lockId);
-        }
-
-        private static bool HasUnconsumedClearOuterColorKey(LevelContext ctx, BoardState state, int lockId)
-        {
-            var keyIndices = ctx.KeyIndicesForLock(lockId);
-            for (var k = 0; k < keyIndices.Count; k++)
-            {
-                var keyIndex = keyIndices[k];
-                if (!state.KeyConsumed[keyIndex] && ctx.SpecAt(keyIndex).KeyEffect == KeyEffect.ClearOuterColor)
-                {
-                    return true;
-                }
-            }
-
-            return false;
+            return coloursRemaining;
         }
 
         private static IReadOnlyList<Move> Reconstruct(Node solved)

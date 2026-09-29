@@ -25,12 +25,6 @@ namespace GateRush.Solver
     /// until the first clear, and a shuttered block stays under its shutter.
     /// A lock and a freeze are identical to movement, and keys only fire when a
     /// block is destroyed, which is a clear.</item>
-    /// <item>A key effect waiting for a shutter (<c>DECISIONS.md</c> D41)
-    /// needs no lock in the copy. It fires only when its shutter opens, a
-    /// shutter only opens on a clear, and the copy never reaches one; until
-    /// then its block is locked, so held, and under a kept closed shutter.
-    /// The waiting values are still carried into the copy's state, block for
-    /// block, so the two states never silently diverge.</item>
     /// <item>A block keeps its current colour only if it can move and some open
     /// gate has that colour. Every other block gets one shared colour no open
     /// gate has. Such a block can never be the one that clears next, so its
@@ -155,7 +149,6 @@ namespace GateRush.Solver
                     lockId: null,
                     requiredKeyCount: 0,
                     keyTargetLockId: null,
-                    keyEffect: KeyEffect.UnlockMovement,
                     timeBonusSeconds: 0));
                 sourceIndices.Add(i);
             }
@@ -173,18 +166,9 @@ namespace GateRush.Solver
                 suggestedTimeBudgetSeconds: 0,
                 goldReward: 0);
 
-            // Carried block for block so the copy's state never silently
-            // disagrees with its source. Before the first clear nothing reads
-            // it: the copy has no locks, so nothing is ever released.
-            var waitingKeyEffect = new KeyEffect?[sourceIndices.Count];
-            for (var k = 0; k < waitingKeyEffect.Length; k++)
-            {
-                waitingKeyEffect[k] = state.WaitingKeyEffect[sourceIndices[k]];
-            }
-
             return new NextClearAbstraction(
                 context,
-                BoardState.CreateInitialWithWaitingKeyEffects(context, waitingKeyEffect),
+                BoardState.CreateInitial(context),
                 sourceIndices.ToArray());
         }
 

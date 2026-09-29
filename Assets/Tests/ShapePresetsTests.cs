@@ -40,7 +40,6 @@ namespace GateRush.Tests
                         lockId: null,
                         requiredKeyCount: 0,
                         keyTargetLockId: null,
-                        keyEffect: KeyEffect.UnlockMovement,
                         timeBonusSeconds: 0),
                     $"{preset} is not a valid block shape");
             }

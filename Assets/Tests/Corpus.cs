@@ -16,8 +16,7 @@ namespace GateRush.Tests
         /// <summary>
         /// Carries, between its parts: a nullable that is set (block 1's
         /// unfreeze) and ones that are not, a layered block, axis-restricted
-        /// blocks, two lock/key pairs — one key of each <see cref="KeyEffect"/> —
-        /// a time bonus, a colour-bound shutter and a global one, a generator two
+        /// blocks, two lock/key pairs, a time bonus, a colour-bound shutter and a global one, a generator two
         /// cells wide with a queue, an elevator with two waves of unequal block
         /// count that both tile the region (so each wave block carries a
         /// RegionOrigin), and a static wall.
@@ -35,11 +34,11 @@ namespace GateRush.Tests
                 Block(2, new Coord(4, 1), colors: new[] { BlockColor.Green },
                     lockId: 7, requiredKeys: 1),
                 Block(3, new Coord(5, 1), colors: new[] { BlockColor.Red },
-                    keyTarget: 7, keyEffect: KeyEffect.ClearOuterColor),
+                    keyTarget: 7),
                 Block(4, new Coord(3, 0), colors: new[] { BlockColor.Orange },
                     lockId: 8, requiredKeys: 1),
                 Block(5, new Coord(2, 0), colors: new[] { BlockColor.Purple },
-                    keyTarget: 8, keyEffect: KeyEffect.UnlockMovement),
+                    keyTarget: 8),
             };
 
             var gates = new[]

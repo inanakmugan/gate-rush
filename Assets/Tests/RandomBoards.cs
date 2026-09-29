@@ -14,9 +14,7 @@ namespace GateRush.Tests
     /// <remarks>
     /// <para>Every mechanic that exists at runtime can appear: static walls,
     /// multi-cell and L-shaped blocks, layered colour stacks, axis-restricted
-    /// and frozen blocks, count-gated gates, locks with
-    /// <see cref="KeyEffect.UnlockMovement"/> or
-    /// <see cref="KeyEffect.ClearOuterColor"/> keys, global or colour-bound
+    /// and frozen blocks, count-gated gates, locks and keys, global or colour-bound
     /// shutters, generators and elevators (M6, M9). A lock's owner may be a
     /// generator's queued block, so a key can complete a lock that has not
     /// spawned yet (D42); keys are always carried by top-level blocks.</para>
@@ -29,7 +27,8 @@ namespace GateRush.Tests
     /// overlapping, a shutter or a spawn footprint over a wall, a lock with too
     /// few keys — is redrawn from the same generator, which keeps the sequence
     /// deterministic. Adding generators and elevators changed the boards every
-    /// existing seed produces, once.</para>
+    /// existing seed produces, once; removing the key-effect draw (D45) changed
+    /// them again.</para>
     /// <para>Boards are not required to be solvable.</para>
     /// </remarks>
     internal static class RandomBoards
@@ -45,7 +44,6 @@ namespace GateRush.Tests
         private const double AxisChance = 0.1;
         private const double FrozenChance = 0.1;
         private const double LockChance = 0.35;
-        private const double ClearOuterColorKeyChance = 0.5;
         private const double ShutterChance = 0.35;
         private const double ColorBoundShutterChance = 0.4;
         private const double WallChance = 0.3;
@@ -184,8 +182,7 @@ namespace GateRush.Tests
                     unfreezeAt: attributes.UnfreezeAt,
                     lockId: lockIdByBlock[b],
                     requiredKeys: requiredKeysByBlock[b],
-                    keyTarget: keyTargetByBlock[b],
-                    keyEffect: attributes.KeyEffect));
+                    keyTarget: keyTargetByBlock[b]));
             }
 
             var generators = new List<GeneratorDefinition>();
@@ -366,25 +363,21 @@ namespace GateRush.Tests
         /// <summary>The colours and modifiers every drawn block gets — top-level, queued or wave.</summary>
         private readonly struct BlockAttributes
         {
-            public BlockAttributes(List<BlockColor> colors, MovementAxis axis, int? unfreezeAt, KeyEffect keyEffect)
+            public BlockAttributes(List<BlockColor> colors, MovementAxis axis, int? unfreezeAt)
             {
                 Colors = colors;
                 Axis = axis;
                 UnfreezeAt = unfreezeAt;
-                KeyEffect = keyEffect;
             }
 
             public List<BlockColor> Colors { get; }
             public MovementAxis Axis { get; }
             public int? UnfreezeAt { get; }
-            public KeyEffect KeyEffect { get; }
         }
 
         /// <summary>
         /// One block's colours and modifiers, drawn in a fixed order: colour
-        /// stack, axis, freeze threshold, key effect. The key effect is drawn
-        /// for every block, used or not, so the draw count per block never
-        /// depends on whether it carries a key.
+        /// stack, axis, freeze threshold.
         /// </summary>
         private static BlockAttributes DrawAttributes(Random rng, int colorCount)
         {
@@ -406,9 +399,8 @@ namespace GateRush.Tests
             }
 
             int? unfreezeAt = rng.NextDouble() < FrozenChance ? rng.Next(1, MaxThreshold + 1) : (int?)null;
-            var effect = rng.NextDouble() < ClearOuterColorKeyChance ? KeyEffect.ClearOuterColor : KeyEffect.UnlockMovement;
 
-            return new BlockAttributes(colors, axis, unfreezeAt, effect);
+            return new BlockAttributes(colors, axis, unfreezeAt);
         }
 
         private static int EdgeLength(BoardEdge edge, int width, int height) =>

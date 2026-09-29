@@ -198,25 +198,10 @@ namespace GateRush.Tests
             AssertGroups(ctx);
         }
 
-        [Test]
-        public void Of_KeysForTheSameLockWithDifferentEffects_AreNotGrouped()
-        {
-            var ctx = Ctx(
-                4, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), lockId: 1, requiredKeys: 2),
-                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
-                    Block(3, new Coord(2, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor)
-                });
-
-            AssertGroups(ctx);
-        }
-
         // ----- What must be grouped ---------------------------------------
 
         [Test]
-        public void Of_KeysForTheSameLockWithTheSameEffect_AreGrouped()
+        public void Of_KeysForTheSameLock_AreGrouped()
         {
             // Nothing distinguishes two such keys: MoveResolver counts consumed
             // keys against a lock rather than telling them apart.
@@ -225,8 +210,8 @@ namespace GateRush.Tests
                 new[]
                 {
                     Block(1, new Coord(0, 0), lockId: 1, requiredKeys: 2),
-                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(3, new Coord(2, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor)
+                    Block(2, new Coord(1, 0), keyTarget: 1),
+                    Block(3, new Coord(2, 0), keyTarget: 1)
                 });
 
             AssertGroups(ctx, new[] { 1, 2 });

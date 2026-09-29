@@ -575,7 +575,7 @@ namespace GateRush.Tests
                         id = 1,
                         cells = new[] { new CoordDto { x = 0, y = 0 } },
                         colorStack = new[] { "Mauve" },
-                        axis = "Free", keyEffect = "UnlockMovement",
+                        axis = "Free",
                         unfreezeAtClearCount = -1, lockId = -1, keyTargetLockId = -1,
                     },
                 },

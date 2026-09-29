@@ -2200,10 +2200,6 @@ namespace GateRush.Editor
             }
 
             block.KeyTargetLockId = NullableIntField("Key targets lock id", block.KeyTargetLockId);
-            if (block.KeyTargetLockId.HasValue)
-            {
-                block.KeyEffect = (KeyEffect)EditorGUILayout.EnumPopup("Key effect", block.KeyEffect);
-            }
 
             DeleteButton();
         }
@@ -2265,10 +2261,6 @@ namespace GateRush.Editor
             }
 
             block.KeyTargetLockId = NullableIntField("Key targets lock id", block.KeyTargetLockId);
-            if (block.KeyTargetLockId.HasValue)
-            {
-                block.KeyEffect = (KeyEffect)EditorGUILayout.EnumPopup("Key effect", block.KeyEffect);
-            }
         }
 
         /// <summary>

@@ -14,9 +14,10 @@ namespace GateRush.Tests
     /// </summary>
     /// <remarks>
     /// Every solvable board is chosen so canonical pruning does not lengthen the
-    /// optimum, so both <c>MoveGenMode</c>s agree on it. A board with no keys has
-    /// an optimum of at least its colour count, since every clear then costs a
-    /// move of its own; most boards below meet that bound exactly, which is what
+    /// optimum, so both <c>MoveGenMode</c>s agree on it. Every board has an
+    /// optimum of at least its colour count, since every clear costs a move of
+    /// its own — a key only unlocks (D45); most boards below meet that bound
+    /// exactly, and every board with a lock does, which is what
     /// makes their optima easy to verify by hand. Grid conventions: y = 0 is the
     /// bottom row, and an edge feature's offset is measured along its edge.
     /// </remarks>
@@ -109,7 +110,7 @@ namespace GateRush.Tests
                 2, 1,
                 new[]
                 {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(1, new Coord(0, 0), keyTarget: 1),
                     Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
                 },
                 new[]
@@ -117,26 +118,10 @@ namespace GateRush.Tests
                     Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
                     Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
                 });
-            yield return ("unlock-movement key frees the locked block", unlockKey, BoardState.CreateInitial(unlockKey), 2);
+            yield return ("key frees the locked block", unlockKey, BoardState.CreateInitial(unlockKey), 2);
 
-            // M8: clearing the key block clears the locked block in the same move —
-            // two colours, one move.
-            var clearKey = Ctx(
-                2, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
-                },
-                new[]
-                {
-                    Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Right, 0, 1, BlockColor.Blue)
-                });
-            yield return ("clear-outer-colour key clears the lock for free", clearKey, BoardState.CreateInitial(clearKey), 1);
-
-            var mixed = MixedKeyEffectLockBoard();
-            yield return ("mixed key effects, last key consumed decides", mixed, BoardState.CreateInitial(mixed), 2);
+            var twoKeys = TwoKeyLockBoard();
+            yield return ("lock needing two keys, either order", twoKeys, BoardState.CreateInitial(twoKeys), 3);
 
             // D35: four interchangeable blocks on an open grid. Every ordering of
             // them is a different labelling of the same board, so this is the
@@ -149,28 +134,17 @@ namespace GateRush.Tests
             yield return ("two interchangeable colour groups, one gate each", twoColourGroups,
                 BoardState.CreateInitial(twoColourGroups), 6);
 
-            // D41: key effects that wait for a closed shutter.
-            var shutteredClear = ShutteredClearOuterColorLockBoard();
-            yield return ("shuttered lock waits for its clear-outer-colour key", shutteredClear,
-                BoardState.CreateInitial(shutteredClear), 2);
-
-            var shutteredUnlock = ShutteredUnlockMovementLockBoard();
-            yield return ("shuttered lock waits to unlock", shutteredUnlock,
-                BoardState.CreateInitial(shutteredUnlock), 3);
-
-            var shutteredMixed = ShutteredMixedKeyEffectLockBoard();
-            yield return ("shuttered lock with mixed keys, completing key decides what waits", shutteredMixed,
-                BoardState.CreateInitial(shutteredMixed), 3);
-
-            var twoWaiting = TwoWaitingClearsUnderOneShutterBoard();
-            yield return ("one opening releases two waiting clears", twoWaiting,
-                BoardState.CreateInitial(twoWaiting), 3);
+            // D45: a lock under a closed shutter opens at once; its block moves
+            // once the shutter opens.
+            var shutteredLock = ShutteredKeyLockBoard();
+            yield return ("shuttered lock opens at once, moves once uncovered", shutteredLock,
+                BoardState.CreateInitial(shutteredLock), 3);
 
             // D42: spawners. Both boards reach their optimum in any clear order,
             // so nearest-next-clear solves them as well.
-            var generatorRelease = GeneratorReleasesAWaitingKeyEffectBoard();
-            yield return ("generator's block lands and a waiting key clear applies", generatorRelease,
-                BoardState.CreateInitial(generatorRelease), 2);
+            var generatorLock = GeneratorLockCompletedBeforeSpawnBoard();
+            yield return ("generator's block arrives unlocked when its lock completed first", generatorLock,
+                BoardState.CreateInitial(generatorLock), 3);
 
             var elevatorHeld = ElevatorHeldByATopLevelBlockBoard();
             yield return ("elevator wave waits for a top-level block to leave", elevatorHeld,
@@ -339,64 +313,20 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// A 3x2 board where the nearest clear is a trap. A red vertical block at
-        /// column 2 carries a lock needing two keys, and there is no red gate: it
-        /// can only leave by being cleared, which happens only if the last key
-        /// consumed is <see cref="KeyEffect.ClearOuterColor"/>. That key's green
-        /// carrier starts flush against the green gate at (0, 0); the
-        /// <see cref="KeyEffect.UnlockMovement"/> key's green carrier waits at
-        /// (1, 1). Optimum 3: step the first carrier aside to (1, 0), clear the
-        /// second, then clear the first — its key completes the lock and clears
-        /// the red block for free. Clearing the pre-aligned carrier first
-        /// instead spends its effect on a lock that is not yet complete, and the
-        /// board can no longer be solved.
+        /// One blue lock needing two keys: a red key and a green key. Every
+        /// block is flush against its own gate on a packed 3x1 row. Optimum 3,
+        /// its colour count: the two keys in either order, then the owner's
+        /// push — the lock opens on the second key whichever it is.
         /// </summary>
-        /// <remarks>
-        /// The counterexample to clear monotonicity for mixed-effect locks: a
-        /// clear that turns a solvable board unsolvable. Its
-        /// <see cref="LevelContext.IsClearMonotone"/> is false. Found by the
-        /// random-board comparison against A\*, then reduced to this.
-        /// </remarks>
-        internal static LevelContext WastedClearKeyTrapBoard()
-        {
-            return Ctx(
-                3, 2,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green },
-                        keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(2, new Coord(1, 1), colors: new[] { BlockColor.Green },
-                        keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
-                    Block(3, new Coord(2, 0), cells: new[] { new Coord(0, 0), new Coord(0, 1) },
-                        lockId: 1, requiredKeys: 2)
-                },
-                new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Green) });
-        }
-
-        /// <summary>
-        /// One blue lock needing two keys: a red <see cref="KeyEffect.ClearOuterColor"/>
-        /// key and a green <see cref="KeyEffect.UnlockMovement"/> key. Every block
-        /// is flush against its own gate on a packed 3x1 row. The key consumed
-        /// last decides the effect: green then red clears the lock for free
-        /// (2 moves); red then green only unlocks it, costing a third move.
-        /// Optimum 2.
-        /// </summary>
-        /// <remarks>
-        /// The regression board for the heuristic's free-clear count. A criterion
-        /// requiring <em>every</em> unconsumed key to be
-        /// <see cref="KeyEffect.ClearOuterColor"/> gives <c>h = 3</c> here at the
-        /// start — an overestimate of the 2-move optimum.
-        /// </remarks>
-        internal static LevelContext MixedKeyEffectLockBoard()
+        internal static LevelContext TwoKeyLockBoard()
         {
             return Ctx(
                 3, 1,
                 new[]
                 {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(1, new Coord(0, 0), keyTarget: 1),
                     Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 2),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green },
-                        keyTarget: 1, keyEffect: KeyEffect.UnlockMovement)
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }, keyTarget: 1)
                 },
                 new[]
                 {
@@ -407,44 +337,20 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// A 3x1 row, every block flush above its own bottom gate except the
-        /// owner: a red <see cref="KeyEffect.ClearOuterColor"/> key for lock 1,
-        /// a green block, and lock 1's blue owner under a green-bound shutter.
-        /// Optimum 2: in either order, the key and the green block each cost a
-        /// push and the owner's clear comes free — on the key's death if the
-        /// shutter is already open, otherwise released by the opening (D41).
+        /// A 3x1 row, every block flush above its own bottom gate: a red key for
+        /// lock 1, a green block, and lock 1's blue owner under a green-bound
+        /// shutter. Optimum 3, its colour count: the key and the green block in
+        /// either order, then the owner's own push. Pushing the key first opens
+        /// the lock at once under the closed shutter (D45); the owner still
+        /// cannot move until the green push opens the shutter.
         /// </summary>
-        internal static LevelContext ShutteredClearOuterColorLockBoard()
+        internal static LevelContext ShutteredKeyLockBoard()
         {
             return Ctx(
                 3, 1,
                 new[]
                 {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
-                },
-                new[]
-                {
-                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Green)
-                },
-                shutters: new[] { Shutter(1, new Coord(2, 0), new Coord(2, 0), 1, BlockColor.Green) });
-        }
-
-        /// <summary>
-        /// <see cref="ShutteredClearOuterColorLockBoard"/> with an
-        /// <see cref="KeyEffect.UnlockMovement"/> key and a blue gate under the
-        /// owner. Optimum 3: the key, the green block, then the owner's own push
-        /// once it is uncovered and unlocked.
-        /// </summary>
-        internal static LevelContext ShutteredUnlockMovementLockBoard()
-        {
-            return Ctx(
-                3, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
+                    Block(1, new Coord(0, 0), keyTarget: 1),
                     Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }),
                     Block(3, new Coord(2, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
                 },
@@ -458,67 +364,6 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// A 4x1 row: a red <see cref="KeyEffect.ClearOuterColor"/> key and a
-        /// red <see cref="KeyEffect.UnlockMovement"/> key, both for lock 1
-        /// (which needs both), a green block, and lock 1's blue owner under a
-        /// green-bound shutter with its own blue gate. Optimum 3: the
-        /// <see cref="KeyEffect.UnlockMovement"/> key first, so the
-        /// <see cref="KeyEffect.ClearOuterColor"/> key completes the count and
-        /// the owner's clear comes free. The other order still solves, in 4 —
-        /// the owner has a gate, so no order traps it.
-        /// </summary>
-        internal static LevelContext ShutteredMixedKeyEffectLockBoard()
-        {
-            return Ctx(
-                4, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
-                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 2)
-                },
-                new[]
-                {
-                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
-                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green),
-                    Gate(4, BoardEdge.Bottom, 3, 1, BlockColor.Blue)
-                },
-                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green) });
-        }
-
-        /// <summary>
-        /// A 5x1 row: two red <see cref="KeyEffect.ClearOuterColor"/> keys (for
-        /// locks 1 and 2), a green block, and the two blue owners side by side
-        /// under one green-bound shutter. Five colours, optimum 3: three pushes,
-        /// two free clears. Pushing both keys first leaves both effects waiting,
-        /// and the green push then releases both at once (D41) — the board that
-        /// shows the heuristic must count a waiting clear in <c>F</c>: after the
-        /// two keys one move remains, and without that <c>h</c> would be 3.
-        /// </summary>
-        internal static LevelContext TwoWaitingClearsUnderOneShutterBoard()
-        {
-            return Ctx(
-                5, 1,
-                new[]
-                {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(2, new Coord(1, 0), keyTarget: 2, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
-                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1),
-                    Block(5, new Coord(4, 0), colors: new[] { BlockColor.Blue }, lockId: 2, requiredKeys: 1)
-                },
-                new[]
-                {
-                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
-                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green)
-                },
-                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(4, 0), 1, BlockColor.Green) });
-        }
-
-        /// <summary>
         /// A 4x2 board: one horizontal-only red block at (1, 0), flush above the
         /// red bottom gate at offset 1, with a static wall at (3, 0). Optimum 2:
         /// the block cannot be pushed down into the gate in place (D39), so it
@@ -527,32 +372,30 @@ namespace GateRush.Tests
         /// modes agree on the optimum.
         /// </summary>
         /// <summary>
-        /// 3x2. A red key block (index 0, a <see cref="KeyEffect.ClearOuterColor"/>
-        /// key for lock 1) sits flush against a red gate on the left, row 0; a
-        /// green block (index 1) sits flush against a green gate on the right,
-        /// row 1, on the cell a top-edge generator spawns into. The generator's
-        /// one queued block (index 2) is blue and owns lock 1; no blue gate
-        /// exists, so only its key can clear it. Optimum 2 in either order:
-        /// green first spawns the locked block and the red push then clears it;
-        /// red first leaves the effect waiting in the unspawned slot (D42), and
-        /// the green push — or merely moving green aside — spawns it and the
-        /// effect applies in that resolution. The heuristic is 2 at the start
-        /// (three colours, one free clear), and the release-at-spawn edge is
-        /// the one A\*'s consistency argument has to cover.
+        /// 3x2. A red key block (index 0, a key for lock 1) sits flush against a
+        /// red gate on the left, row 0; a green block (index 1) sits flush
+        /// against a green gate on the right, row 1, on the cell a top-edge
+        /// generator spawns into. The generator's one queued block (index 2) is
+        /// blue and owns lock 1; its blue gate is on the bottom edge under
+        /// column 2. Optimum 3, its colour count, in either order: green first
+        /// spawns the locked block, the red push unlocks it, and it steps down
+        /// into its gate; red first unlocks the unspawned slot (D45), so the
+        /// green push spawns the block already unlocked.
         /// </summary>
-        internal static LevelContext GeneratorReleasesAWaitingKeyEffectBoard()
+        internal static LevelContext GeneratorLockCompletedBeforeSpawnBoard()
         {
             return Ctx(
                 3, 2,
                 new[]
                 {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
+                    Block(1, new Coord(0, 0), keyTarget: 1),
                     Block(2, new Coord(2, 1), colors: new[] { BlockColor.Green })
                 },
                 new[]
                 {
                     Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Right, 1, 1, BlockColor.Green)
+                    Gate(2, BoardEdge.Right, 1, 1, BlockColor.Green),
+                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Blue)
                 },
                 generators: new[]
                 {
