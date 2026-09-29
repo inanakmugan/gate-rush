@@ -11,30 +11,39 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Draws one board state: the floor, the frame with walls drawn as frame,
-    /// gates as coloured arrowed frame segments, generators, blocks, shutters
-    /// and elevators, plus a count label wherever a count matters to the
-    /// player. What is shown is decided by <see cref="VisibilityLayer"/>; this
-    /// component only turns that into sprites and labels, all sized and
-    /// coloured from <see cref="RuntimeConfig"/>. It also shows what happens
-    /// between redraws: a dragged block floating at a continuous position and
-    /// settling into its cell on release (Module 13), and a cleared block
-    /// leaving through its gate.
+    /// gates, generator machines, elevators, blocks with their marks, and
+    /// shutters, each count on the shared badge. What is shown is decided by
+    /// <see cref="VisibilityLayer"/>; this component only turns that into
+    /// sprites and labels, all sized and coloured from
+    /// <see cref="RuntimeConfig"/>. It also shows what happens between redraws:
+    /// a dragged block floating at a continuous position and settling into its
+    /// cell on release (Module 13), and a cleared block leaving through its
+    /// gate.
     /// </summary>
     /// <remarks>
     /// <para>Everything is rebuilt from scratch on every <see cref="Rebuild"/>.
     /// Positions are local to this transform: the board is centred on it.</para>
-    /// <para><b>Shapes from quarters (Module 15).</b> Blocks, the frame and open
-    /// gates are drawn from the generated quarter sprites, laid out by
-    /// <see cref="BlockTiling"/> and <see cref="FrameTiling"/> and tinted at
-    /// runtime. Each is drawn twice: a darker copy offset downward (the lip),
-    /// then the face. Frozen, locked and key-carrying blocks, shutters,
-    /// generators, elevators and closed gates keep their 2.1 placeholder
-    /// marks, placed on the new board; 2.4b redraws them.</para>
+    /// <para><b>Shapes from quarters (Module 15).</b> Blocks, the frame, gates
+    /// and the next block on a generator's screen are drawn from the generated
+    /// quarter sprites, laid out by <see cref="BlockTiling"/> and
+    /// <see cref="FrameTiling"/> and tinted at runtime. Each is drawn twice: a
+    /// darker copy offset downward (the lip), then the face.</para>
+    /// <para><b>State (Module 16, D48).</b> A frozen block and a closed gate are
+    /// ice with frost and a count; a locked block carries a chain along each
+    /// row of its cells and a gold padlock with the keys still required; a
+    /// key-carrying block carries a gold key whose gem is its lock's colour
+    /// (D47); a closed shutter is slats with a border and a count; a generator
+    /// is a machine outside the frame whose screen shows its next block; an
+    /// elevator is a pair of lift doors under its blocks. Every count sits on
+    /// one badge (<see cref="DrawBadge"/>).</para>
     /// <para><b>Blocks.</b> Each shown block gets one root at its origin's
     /// corner holding everything it draws: a <c>Lip</c> group, a <c>Face</c>
-    /// group (quarters plus studs and gloss, or the axis arrow), beneath
-    /// squares, labels and badges. The drag, the settle and the exit effect
-    /// move or scale that root alone, so every part follows it.</para>
+    /// group (quarters plus studs and gloss, frost, or the axis arrow), then
+    /// beneath squares, chains, padlock or key, badges and labels. The drag,
+    /// the settle and the exit effect move or scale that root alone, so every
+    /// part follows it, and the exit's fade reaches every part. A peel replaces
+    /// only the face; its sorting group sits above every part of a face and
+    /// below every mark.</para>
     /// <para><b>Presenting a move.</b> <see cref="Present"/> holds the new
     /// state back until the dragged block has settled, then plays the clear
     /// effects, and only then redraws from the new state and reports done.
@@ -56,9 +65,10 @@ namespace GateRush.Runtime
         private VisibilityLayer visibility;
         private BoardState drawnState;
 
-        // Static per level, so tiled once in Initialize.
+        // Static per level, so worked out once in Initialize.
         private IReadOnlyList<QuarterTile> frameTiles;
         private IReadOnlyList<QuarterTile>[] gateTiles;
+        private MachinePlacement[] machines;
         private Func<QuarterTile, Rect> blockQuarterRect;
         private Func<QuarterTile, Rect> frameQuarterRect;
 
@@ -82,8 +92,14 @@ namespace GateRush.Runtime
         /// </summary>
         public bool IsBusy => settleTween != null || isPresenting;
 
-        /// <summary>Binds the view to one level. Call before the first <see cref="Rebuild"/>.</summary>
-        public void Initialize(RuntimeConfig config, LevelContext ctx, BoardLayout layout, VisibilityLayer visibility)
+        /// <summary>
+        /// Binds the view to one level. Call before the first
+        /// <see cref="Rebuild"/>. <paramref name="machine"/> must be the rule
+        /// <paramref name="layout"/>'s reach came from, so every machine drawn
+        /// is inside the fitted view.
+        /// </summary>
+        public void Initialize(
+            RuntimeConfig config, LevelContext ctx, BoardLayout layout, VisibilityLayer visibility, GeneratorMachine machine)
         {
             StopAnimations();
             this.config = config;
@@ -96,6 +112,12 @@ namespace GateRush.Runtime
             for (var g = 0; g < ctx.Gates.Count; g++)
             {
                 gateTiles[g] = BlockTiling.Compute(FrameTiling.GateCells(ctx, g));
+            }
+
+            machines = new MachinePlacement[ctx.Generators.Count];
+            for (var g = 0; g < ctx.Generators.Count; g++)
+            {
+                machines[g] = machine.Place(ctx.Width, ctx.Height, ctx.Generators[g]);
             }
 
             // A block's quarters are local to its root, which sits at the
@@ -116,12 +138,12 @@ namespace GateRush.Runtime
             drawnState = state;
 
             DrawFloor();
+            DrawElevators(state);
             DrawFrame();
             DrawGates(state);
             DrawGenerators(state);
             DrawBlocks(state);
             DrawShutters(state);
-            DrawElevators(state);
         }
 
         /// <summary>
@@ -336,7 +358,7 @@ namespace GateRush.Runtime
         /// A destroyed block shrinks around its footprint's centre and fades
         /// while travelling toward, and through, the gate it was cleared at.
         /// The fade reaches every renderer and label under the block's root:
-        /// lip, face, studs, gloss, arrow, marks.
+        /// lip, face, studs, gloss, arrow, frost, chains, icons, badges.
         /// </summary>
         private Tween ExitEffect(DrawnBlock block, BoardEdge gateEdge)
         {
@@ -364,8 +386,8 @@ namespace GateRush.Runtime
         /// A surviving layered block peels its removed outer colour: a new face
         /// in the exposed colour is drawn beneath, the lip takes the exposed
         /// colour at once, and the old face — lifted above every part of the new
-        /// one by a sorting group — shrinks about the footprint's centre and
-        /// fades away.
+        /// one by a sorting group, and still below the block's marks — shrinks
+        /// about the footprint's centre and fades away.
         /// </summary>
         private Tween PeelEffect(DrawnBlock block, BlockColor exposed)
         {
@@ -453,10 +475,10 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// An open gate is its own segment of the frame, in the gate's colour,
-        /// with a lip, a face and a white arrow pointing out of the board. A
-        /// closed gate (M2) keeps its colourless bar and count, filling the
-        /// hole the frame leaves for it; 2.4b gives it ice.
+        /// A gate is its own segment of the frame, with a lip and a face. Open,
+        /// it is in the gate's colour with a white arrow pointing out of the
+        /// board. Closed (M2), it is ice with frost on each of its cells and the
+        /// clears still needed on a badge at its middle, and no arrow.
         /// </summary>
         private void DrawGates(BoardState state)
         {
@@ -467,48 +489,94 @@ namespace GateRush.Runtime
                 var span = GridRectToLocal(FrameTiling.EdgeSpanRect(
                     ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, layout.FrameThicknessCells));
 
-                if (!visual.IsOpen)
-                {
-                    AddSquare(transform, $"Gate {gate.Id}", span.center, span.size, config.ClosedGateColor, config.EdgeFeatureOrder);
-                    AddLabel(transform, $"Gate {gate.Id} count", span.center, visual.OpensInClears, config.BadgeLabelFontSize, config.LabelColor);
-                    continue;
-                }
-
-                var fill = config.BlockFill(visual.Color.Value);
+                var fill = visual.IsOpen ? config.BlockFill(visual.Color.Value) : config.IceColor;
                 var root = AddGroup(transform, $"Gate {gate.Id}", Vector2.zero);
                 var lip = AddGroup(root, "Lip", LipOffset());
                 AddQuarters(lip, gateTiles[g], frameQuarterRect, config.LipFill(fill), config.FrameLipOrder);
                 AddQuarters(root, gateTiles[g], frameQuarterRect, fill, config.FrameOrder);
 
-                var arrow = CellsToWorld(config.GateArrowSizeCells);
-                AddSprite(
-                    root, "Arrow", config.GateArrowSprite, span.center, new Vector2(arrow, arrow),
-                    config.GateArrowColor, config.GateArrowOrder,
-                    Vector2.SignedAngle(Vector2.up, EdgeOutward(gate.Edge)));
+                if (visual.IsOpen)
+                {
+                    var arrow = CellsToWorld(config.GateArrowSizeCells);
+                    AddSprite(
+                        root, "Arrow", config.GateArrowSprite, span.center, new Vector2(arrow, arrow),
+                        config.GateArrowColor, config.GateMarkOrder,
+                        Vector2.SignedAngle(Vector2.up, EdgeOutward(gate.Edge)));
+                    continue;
+                }
+
+                for (var i = 0; i < gate.Width; i++)
+                {
+                    var cell = GridRectToLocal(FrameTiling.EdgeSpanRect(
+                        ctx.Width, ctx.Height, gate.Edge, gate.Offset + i, 1, layout.FrameThicknessCells));
+                    AddSprite(root, $"Frost {i}", config.FrostSprite, cell.center, cell.size, config.FrostColor, config.GateMarkOrder);
+                }
+
+                DrawBadge(root, span.center, visual.OpensInClears, config.BadgeRimColor);
             }
         }
 
         /// <summary>
-        /// A generator keeps its placeholder bar and queue count, drawn on the
-        /// frame at the frame's thickness; the frame runs on beneath it.
+        /// A generator with blocks still queued is a machine outside the frame
+        /// (D48): a body with a lip, a dark screen showing the next block in
+        /// miniature — in ice when it would spawn frozen (M3) — and the queued
+        /// count on a badge at its outer end. An exhausted one is destroyed
+        /// (M6) and draws nothing.
         /// </summary>
         private void DrawGenerators(BoardState state)
         {
+            var corner = CellsToWorld(config.MachineCornerCells);
             for (var g = 0; g < ctx.Generators.Count; g++)
             {
-                var queued = visibility.GeneratorQueued(state, g);
-                if (queued <= 0)
+                var visual = visibility.Generator(state, g);
+                if (!visual.IsShown)
                 {
-                    // M6: an exhausted generator is destroyed.
                     continue;
                 }
 
-                var generator = ctx.Generators[g];
-                var span = GridRectToLocal(FrameTiling.EdgeSpanRect(
-                    ctx.Width, ctx.Height, generator.Edge, generator.Offset, generator.Width, layout.FrameThicknessCells));
-                AddSquare(transform, $"Generator {generator.Id}", span.center, span.size, config.GeneratorColor, config.EdgeFeatureOrder);
-                AddLabel(transform, $"Generator {generator.Id} count", span.center, queued, config.BadgeLabelFontSize, config.LabelColor);
+                var placement = machines[g];
+                var body = GridRectToLocal(placement.Body);
+                var screen = GridRectToLocal(placement.Screen);
+                var root = AddGroup(transform, $"Generator {ctx.Generators[g].Id}", Vector2.zero);
+
+                var lip = AddGroup(root, "Lip", LipOffset());
+                AddSliced(lip, "Body", config.RoundedRectSprite, body.center, body.size, corner, config.LipFill(config.MachineColor), config.MachineLipOrder);
+                AddSliced(root, "Body", config.RoundedRectSprite, body.center, body.size, corner, config.MachineColor, config.MachineOrder);
+                AddSliced(root, "Screen", config.RoundedRectSprite, screen.center, screen.size, corner, config.MachineScreenColor, config.MachineScreenOrder);
+
+                var fill = visual.IsNextFrozen ? config.IceColor : config.BlockFill(visual.NextColor.Value);
+                DrawMiniature(root, visual.NextCells, screen, fill);
+
+                DrawBadge(root, GridToLocal(placement.BadgeCenter), visual.Queued, config.BadgeRimColor);
             }
+        }
+
+        /// <summary>
+        /// The next block on a machine's screen: its quarters and lip, scaled
+        /// uniformly to the largest size that fits <paramref name="screen"/>
+        /// and centred on it. Blocks never rotate, so it shows the block as it
+        /// will arrive. No studs and no marks: it is a preview of shape and
+        /// colour.
+        /// </summary>
+        private void DrawMiniature(Transform parent, IReadOnlyList<Coord> cells, Rect screen, Color fill)
+        {
+            MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            var spanX = maxX + 1 - minX;
+            var spanY = maxY + 1 - minY;
+            var perCell = Mathf.Min(screen.width / spanX, screen.height / spanY);
+            var shapeCenter = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f);
+            var tiles = BlockTiling.Compute(cells);
+
+            Rect RectOf(QuarterTile tile)
+            {
+                var cellRect = BlockTiling.QuarterRect(tile);
+                return new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
+            }
+
+            var miniature = AddGroup(parent, "Next block", Vector2.zero);
+            var lip = AddGroup(miniature, "Lip", LipOffset() * (perCell / layout.CellSize));
+            AddQuarters(lip, tiles, RectOf, config.LipFill(fill), config.MiniatureLipOrder);
+            AddQuarters(miniature, tiles, RectOf, fill, config.MiniatureOrder);
         }
 
         private void DrawBlocks(BoardState state)
@@ -531,14 +599,13 @@ namespace GateRush.Runtime
                 var cells = spec.Cells;
                 var tiles = BlockTiling.Compute(cells);
 
-                // M3: a frozen block shows its shape in the frozen tint, never
-                // its colour; studs or its axis arrow still show.
-                var fill = visual.IsFrozen ? config.FrozenTint : config.BlockFill(visual.OuterColor.Value);
+                // M3: a frozen block is ice, never its colour.
+                var fill = visual.IsFrozen ? config.IceColor : config.BlockFill(visual.OuterColor.Value);
 
                 var lip = AddGroup(root, "Lip", LipOffset());
                 AddQuarters(lip, tiles, blockQuarterRect, config.LipFill(fill), config.BlockLipOrder);
 
-                var drawn = new DrawnBlock(root, FootprintCenterInBlock(cells), lip, cells, tiles, spec.Axis);
+                var drawn = new DrawnBlock(root, FootprintCenterInBlock(cells), lip, cells, tiles, spec.Axis, visual.IsFrozen);
                 drawn.Face = DrawFace(drawn, fill);
                 drawnBlocks[i] = drawn;
 
@@ -553,34 +620,40 @@ namespace GateRush.Runtime
                     }
                 }
 
-                // Labels and badges sit on the first cell of the footprint.
-                DrawBlockMarks(root, cells[0], visual);
+                DrawBlockMarks(root, cells, visual);
             }
         }
 
         /// <summary>
-        /// A block's face under its root: the quarter tiles, then either studs
-        /// with their gloss on every cell or, for an axis-restricted block
-        /// (M7), one double-headed arrow along its axis instead.
+        /// A block's face under its root: the quarter tiles, then frost on
+        /// every cell when it is ice, studs with their gloss on every cell when
+        /// it is not, and — for an axis-restricted block (M7), ice or not —
+        /// one double-headed arrow along its axis instead of studs.
         /// </summary>
         private Transform DrawFace(DrawnBlock block, Color fill)
         {
             var face = AddGroup(block.Root, "Face", Vector2.zero);
             AddQuarters(face, block.Tiles, blockQuarterRect, fill, config.BlockOrder);
 
-            if (block.Axis != MovementAxis.Free)
-            {
-                DrawAxisArrow(face, block);
-                return face;
-            }
-
             var cellSize = new Vector2(layout.CellSize, layout.CellSize);
             for (var c = 0; c < block.Cells.Count; c++)
             {
                 var cell = block.Cells[c];
                 var center = CellCenterInBlock(cell);
-                AddSprite(face, $"Studs {cell}", config.StudsSprite, center, cellSize, fill, config.StudOrder);
-                AddSprite(face, $"Gloss {cell}", config.StudGlossSprite, center, cellSize, config.GlossColor, config.GlossOrder);
+                if (block.IsIce)
+                {
+                    AddSprite(face, $"Frost {cell}", config.FrostSprite, center, cellSize, config.FrostColor, config.StudOrder);
+                }
+                else if (block.Axis == MovementAxis.Free)
+                {
+                    AddSprite(face, $"Studs {cell}", config.StudsSprite, center, cellSize, fill, config.StudOrder);
+                    AddSprite(face, $"Gloss {cell}", config.StudGlossSprite, center, cellSize, config.GlossColor, config.GlossOrder);
+                }
+            }
+
+            if (block.Axis != MovementAxis.Free)
+            {
+                DrawAxisArrow(face, block);
             }
 
             return face;
@@ -595,7 +668,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void DrawAxisArrow(Transform face, DrawnBlock block)
         {
-            FootprintBounds(block.Cells, out var minX, out var maxX, out var minY, out var maxY);
+            MarkLayout.Bounds(block.Cells, out var minX, out var maxX, out var minY, out var maxY);
             var isHorizontal = block.Axis == MovementAxis.HorizontalOnly;
             var alongCells = isHorizontal ? maxX + 1 - minX : maxY + 1 - minY;
             var length = CellsToWorld(alongCells - 2f * config.AxisArrowEndInsetCells);
@@ -617,41 +690,77 @@ namespace GateRush.Runtime
             renderer.drawMode = SpriteDrawMode.Sliced;
             renderer.size = new Vector2(length / scale, spriteSize.y);
             renderer.color = config.AxisArrowColor;
-            renderer.sortingOrder = config.AxisArrowOrder;
+            renderer.sortingOrder = config.GlossOrder;
         }
 
-        private void DrawBlockMarks(Transform root, Coord labelCell, BlockVisual visual)
+        /// <summary>
+        /// Everything a block carries on top of its face, under its root:
+        /// <list type="bullet">
+        /// <item>frozen (M3): the clears still needed on a badge at the
+        /// footprint's anchor (<see cref="MarkLayout.Anchor"/>);</item>
+        /// <item>locked (M8): a chain along each row of its cells, and a gold
+        /// padlock at the anchor with the keys still required on a badge on its
+        /// body;</item>
+        /// <item>carrying a key: a gold key at the anchor whose gem is its
+        /// lock's colour (D47);</item>
+        /// <item>layered (M4): the remaining-colour numeral on its first cell,
+        /// as before.</item>
+        /// </list>
+        /// A frozen block's padlock or key is raised above its frozen badge so
+        /// the two do not overlap.
+        /// </summary>
+        private void DrawBlockMarks(Transform root, IReadOnlyList<Coord> cells, BlockVisual visual)
         {
-            var center = CellCenterInBlock(labelCell);
+            var anchor = MarkLayout.Anchor(cells) * layout.CellSize;
+            var icon = anchor;
             if (visual.IsFrozen)
             {
-                AddLabel(root, "Frozen count", center, visual.FrozenRemaining, config.LabelFontSize, config.LabelColor);
-            }
-            else if (visual.LayerNumeral.HasValue)
-            {
-                AddLabel(root, "Layer count", center, visual.LayerNumeral.Value, config.LabelFontSize, config.LabelColor);
+                DrawBadge(root, anchor, visual.FrozenRemaining, config.BadgeRimColor);
+                icon += new Vector2(0f, CellsToWorld(config.FrozenMarkRaiseCells));
             }
 
-            // Badges hug the top corners of the label cell: lock left, key right.
-            var inset = 0.5f - config.BadgeInsetCells - config.BadgeSize * 0.5f;
-            var badge = new Vector2(CellsToWorld(config.BadgeSize), CellsToWorld(config.BadgeSize));
-
-            if (visual.LockId.HasValue)
+            if (visual.IsLocked)
             {
-                config.TryGetBadgeColor(visual.LockId.Value, out var lockColor);
-                var lockCenter = center + new Vector2(-CellsToWorld(inset), CellsToWorld(inset));
-                AddSquare(root, "Lock badge", lockCenter, badge, lockColor, config.BadgeOrder);
-                AddLabel(root, "Lock count", lockCenter, visual.KeysStillRequired, config.BadgeLabelFontSize, config.LabelColor);
+                var chains = AddGroup(root, "Chains", Vector2.zero);
+                var strips = MarkLayout.ChainStrips(cells, config.ChainThicknessCells, config.ChainEndInsetCells);
+                var sprite = config.ChainSprite;
+                var scale = CellsToWorld(config.ChainThicknessCells) / sprite.bounds.size.y;
+                for (var s = 0; s < strips.Count; s++)
+                {
+                    var strip = CellRectToLocal(strips[s]);
+                    AddTiled(chains, $"Chain {s}", sprite, strip.center, strip.size, scale, config.ChainColor, config.ChainOrder);
+                }
+
+                var padlock = CellsToWorld(config.PadlockSizeCells);
+                AddSprite(root, "Padlock", config.PadlockSprite, icon, new Vector2(padlock, padlock), config.PadlockColor, config.IconOrder);
+                DrawBadge(
+                    root, icon - new Vector2(0f, CellsToWorld(config.PadlockBadgeDropCells)),
+                    visual.KeysStillRequired, config.BadgeRimColor);
             }
 
-            if (visual.KeyTargetLockId.HasValue)
+            if (visual.KeyMarkColor.HasValue)
             {
-                config.TryGetBadgeColor(visual.KeyTargetLockId.Value, out var keyColor);
-                var keyCenter = center + new Vector2(CellsToWorld(inset), CellsToWorld(inset));
-                AddSquare(root, "Key badge", keyCenter, badge, keyColor, config.BadgeOrder);
+                var bounds = config.KeyBodySprite.bounds.size;
+                var length = CellsToWorld(config.KeySizeCells);
+                var size = new Vector2(length, length * bounds.y / bounds.x);
+                AddSprite(root, "Key", config.KeyBodySprite, icon, size, config.KeyColor, config.IconOrder, config.KeyRotationDegrees);
+                AddSprite(
+                    root, "Key gem", config.KeyGemSprite, icon, size, config.BlockFill(visual.KeyMarkColor.Value),
+                    config.KeyGemOrder, config.KeyRotationDegrees);
+            }
+
+            if (visual.LayerNumeral.HasValue)
+            {
+                AddLabel(root, "Layer count", CellCenterInBlock(cells[0]), visual.LayerNumeral.Value, config.LabelFontSize, config.LabelColor);
             }
         }
 
+        /// <summary>
+        /// A closed shutter (M5): slats over its whole region, a border, and the
+        /// clears still needed on a badge at its centre; a colour-bound
+        /// shutter's badge rim is the colour it counts. The blocks under it are
+        /// not drawn at all.
+        /// </summary>
         private void DrawShutters(BoardState state)
         {
             for (var s = 0; s < ctx.Shutters.Count; s++)
@@ -664,52 +773,80 @@ namespace GateRush.Runtime
 
                 var shutter = ctx.Shutters[s];
                 var center = RegionCenter(shutter.Min, shutter.Max);
-                AddSquare(transform, $"Shutter {shutter.Id}", center, RegionSize(shutter.Min, shutter.Max), config.ShutterColor, config.ShutterOrder);
+                var size = RegionSize(shutter.Min, shutter.Max);
+                var root = AddGroup(transform, $"Shutter {shutter.Id}", Vector2.zero);
 
-                var labelColor = visual.CountsColor.HasValue ? config.BlockFill(visual.CountsColor.Value) : config.LightLabelColor;
-                AddLabel(transform, $"Shutter {shutter.Id} count", center, visual.OpensInClears, config.LabelFontSize, labelColor);
+                AddTiled(
+                    root, "Slats", config.ShutterSlatsSprite, center, size, CellTileScale(config.ShutterSlatsSprite),
+                    config.ShutterSlatColor, config.ShutterOrder);
+                AddSliced(
+                    root, "Border", config.RingSprite, center, size, CellsToWorld(config.ShutterBorderCells),
+                    config.ShutterBorderColor, config.ShutterBorderOrder);
+
+                var rim = visual.CountsColor.HasValue ? config.BlockFill(visual.CountsColor.Value) : config.BadgeRimColor;
+                DrawBadge(root, center, visual.OpensInClears, rim);
             }
         }
 
+        /// <summary>
+        /// An elevator (M9), until its final wave has been cleared: lift doors
+        /// over its region with a divider down the middle and a border, above
+        /// the floor and below the blocks, so a wave stands on the doors. How
+        /// many waves remain is never shown (D48).
+        /// </summary>
         private void DrawElevators(BoardState state)
         {
-            var thickness = CellsToWorld(config.ElevatorOutlineThickness);
-
             for (var e = 0; e < ctx.Elevators.Count; e++)
             {
-                var wavesToCome = visibility.ElevatorWavesToCome(state, e);
-                if (wavesToCome <= 0 && !state.ElevatorWaveActive[e])
+                if (!visibility.ElevatorPresent(state, e))
                 {
-                    // M9: after its final wave is cleared, the elevator is destroyed.
                     continue;
                 }
 
                 var elevator = ctx.Elevators[e];
                 var center = RegionCenter(elevator.Min, elevator.Max);
                 var size = RegionSize(elevator.Min, elevator.Max);
-                var halfX = (size.x - thickness) * 0.5f;
-                var halfY = (size.y - thickness) * 0.5f;
-                var elevatorName = $"Elevator {elevator.Id}";
+                var root = AddGroup(transform, $"Elevator {elevator.Id}", Vector2.zero);
 
-                AddSquare(transform, elevatorName + " top", center + new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSquare(transform, elevatorName + " bottom", center - new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSquare(transform, elevatorName + " left", center - new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSquare(transform, elevatorName + " right", center + new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
+                AddTiled(
+                    root, "Doors", config.DoorPanelSprite, center, size, CellTileScale(config.DoorPanelSprite),
+                    config.ElevatorDoorColor, config.ElevatorDoorOrder);
 
-                if (wavesToCome > 0)
-                {
-                    var topLeft = layout.CellCenter(new Coord(elevator.Min.X, elevator.Max.Y));
-                    AddLabel(transform, elevatorName + " count", topLeft, wavesToCome, config.BadgeLabelFontSize, config.LightLabelColor);
-                }
+                var divider = CellsToWorld(config.ElevatorDividerCells);
+                AddSliced(
+                    root, "Divider", config.RoundedRectSprite, center, new Vector2(divider, size.y), divider * 0.5f,
+                    config.ElevatorDividerColor, config.ElevatorDividerOrder);
+                AddSliced(
+                    root, "Border", config.RingSprite, center, size, CellsToWorld(config.ElevatorBorderCells),
+                    config.ElevatorBorderColor, config.ElevatorBorderOrder);
             }
+        }
+
+        /// <summary>
+        /// The one count badge (D48): a rounded box in <paramref name="rim"/>
+        /// with a slightly smaller one in the badge colour on it, and
+        /// <paramref name="value"/> in cream on top. It widens with the number
+        /// of digits (<see cref="MarkLayout.BadgeWidth"/>).
+        /// </summary>
+        private void DrawBadge(Transform parent, Vector2 center, int value, Color rim)
+        {
+            var height = CellsToWorld(config.BadgeHeightCells);
+            var width = CellsToWorld(config.BadgeWidthCells(value));
+            var rimThickness = CellsToWorld(config.BadgeRimCells);
+            var inner = new Vector2(width - 2f * rimThickness, height - 2f * rimThickness);
+
+            var badge = AddGroup(parent, "Badge", center);
+            AddSliced(badge, "Rim", config.RoundedRectSprite, Vector2.zero, new Vector2(width, height), height * 0.5f, rim, config.BadgeRimOrder);
+            AddSliced(badge, "Fill", config.RoundedRectSprite, Vector2.zero, inner, inner.y * 0.5f, config.BadgeColor, config.BadgeOrder);
+            AddLabel(badge, "Count", Vector2.zero, value, config.BadgeLabelFontSize, config.BadgeTextColor);
         }
 
         /// <summary>
         /// Draws <paramref name="tiles"/> under <paramref name="parent"/>, one
         /// renderer per quarter, each posed as its tile says and enlarged by
         /// the seam overlap. The one path for block faces and lips, the frame
-        /// and its lip, and open gates and their lips; only the arguments
-        /// differ.
+        /// and its lip, gates and their lips, and the next block on a
+        /// generator's screen; only the arguments differ.
         /// </summary>
         /// <param name="rectOf">Where a tile goes, in <paramref name="parent"/>'s local world units.</param>
         private void AddQuarters(
@@ -759,24 +896,8 @@ namespace GateRush.Runtime
         /// <summary>The centre of a footprint's bounding box relative to its block's root.</summary>
         private Vector2 FootprintCenterInBlock(IReadOnlyList<Coord> cells)
         {
-            FootprintBounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
             return new Vector2(CellsToWorld((minX + maxX + 1) * 0.5f), CellsToWorld((minY + maxY + 1) * 0.5f));
-        }
-
-        /// <summary>The lowest and highest cell coordinates of a footprint on each axis.</summary>
-        private static void FootprintBounds(IReadOnlyList<Coord> cells, out int minX, out int maxX, out int minY, out int maxY)
-        {
-            minX = int.MaxValue;
-            maxX = int.MinValue;
-            minY = int.MaxValue;
-            maxY = int.MinValue;
-            for (var i = 0; i < cells.Count; i++)
-            {
-                minX = Math.Min(minX, cells[i].X);
-                maxX = Math.Max(maxX, cells[i].X);
-                minY = Math.Min(minY, cells[i].Y);
-                maxY = Math.Max(maxY, cells[i].Y);
-            }
         }
 
         private float CellsToWorld(float cells) => cells * layout.CellSize;
@@ -791,7 +912,10 @@ namespace GateRush.Runtime
         private Vector2 RegionSize(Coord min, Coord max) =>
             new Vector2(CellsToWorld(max.X - min.X + 1), CellsToWorld(max.Y - min.Y + 1));
 
-        /// <summary>A tinted copy of the config's plain square, for the placeholder shapes.</summary>
+        /// <summary>The uniform scale at which one tile of a cell-sized sprite covers one cell.</summary>
+        private float CellTileScale(Sprite sprite) => layout.CellSize / sprite.bounds.size.x;
+
+        /// <summary>A tinted copy of the config's plain square: the floor's backing and beneath squares.</summary>
         private SpriteRenderer AddSquare(Transform parent, string name, Vector2 localCenter, Vector2 size, Color color, int order) =>
             AddSprite(parent, name, config.CellSprite, localCenter, size, color, order);
 
@@ -806,6 +930,55 @@ namespace GateRush.Runtime
             Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, Color color, int order,
             float rotationDegrees = 0f)
         {
+            var renderer = AddRenderer(parent, name, sprite, localCenter, color, order, rotationDegrees);
+            var bounds = sprite.bounds.size;
+            renderer.transform.localScale = new Vector3(size.x / bounds.x, size.y / bounds.y, 1f);
+            return renderer;
+        }
+
+        /// <summary>
+        /// A 9-sliced <paramref name="sprite"/> covering <paramref name="size"/>
+        /// world units, scaled uniformly so its slice border draws
+        /// <paramref name="border"/> wide — a rounded box's corner, a ring's
+        /// width — at any size. The border is capped at half the smaller side,
+        /// so the corners never overlap. Draws nothing when the border is not
+        /// positive.
+        /// </summary>
+        private void AddSliced(
+            Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, float border, Color color, int order)
+        {
+            var drawn = Mathf.Min(border, Mathf.Min(size.x, size.y) * 0.5f);
+            if (!(drawn > 0f))
+            {
+                return;
+            }
+
+            var spriteBorder = sprite.border.x / sprite.pixelsPerUnit;
+            var scale = drawn / spriteBorder;
+            var renderer = AddRenderer(parent, name, sprite, localCenter, color, order, 0f);
+            renderer.transform.localScale = new Vector3(scale, scale, 1f);
+            renderer.drawMode = SpriteDrawMode.Sliced;
+            renderer.size = size / scale;
+        }
+
+        /// <summary>
+        /// <paramref name="sprite"/> repeated to cover <paramref name="size"/>
+        /// world units, each tile drawn at <paramref name="scale"/> times its
+        /// own size: slats and doors over a region, a chain along a row.
+        /// </summary>
+        private void AddTiled(
+            Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, float scale, Color color, int order)
+        {
+            var renderer = AddRenderer(parent, name, sprite, localCenter, color, order, 0f);
+            renderer.transform.localScale = new Vector3(scale, scale, 1f);
+            renderer.drawMode = SpriteDrawMode.Tiled;
+            renderer.tileMode = SpriteTileMode.Continuous;
+            renderer.size = size / scale;
+        }
+
+        private SpriteRenderer AddRenderer(
+            Transform parent, string name, Sprite sprite, Vector2 localCenter, Color color, int order, float rotationDegrees)
+        {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localCenter;
@@ -816,9 +989,6 @@ namespace GateRush.Runtime
             renderer.sharedMaterial = config.SpriteMaterial;
             renderer.color = color;
             renderer.sortingOrder = order;
-
-            var bounds = sprite.bounds.size;
-            go.transform.localScale = new Vector3(size.x / bounds.x, size.y / bounds.y, 1f);
             return renderer;
         }
 
@@ -848,7 +1018,7 @@ namespace GateRush.Runtime
         {
             public DrawnBlock(
                 Transform root, Vector2 footprintCenter, Transform lip,
-                IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, MovementAxis axis)
+                IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, MovementAxis axis, bool isIce)
             {
                 Root = root;
                 FootprintCenter = footprintCenter;
@@ -856,6 +1026,7 @@ namespace GateRush.Runtime
                 Cells = cells;
                 Tiles = tiles;
                 Axis = axis;
+                IsIce = isIce;
             }
 
             /// <summary>Sits at the origin's corner; moving it moves the whole block.</summary>
@@ -867,7 +1038,7 @@ namespace GateRush.Runtime
             /// <summary>The lip's quarters, offset below the face.</summary>
             public Transform Lip { get; }
 
-            /// <summary>The face group: quarters plus studs and gloss, or the axis arrow. A peel draws a new one.</summary>
+            /// <summary>The face group: quarters plus studs and gloss, frost, or the axis arrow. A peel draws a new one.</summary>
             public Transform Face { get; set; }
 
             /// <summary>The footprint, relative to the origin.</summary>
@@ -878,6 +1049,9 @@ namespace GateRush.Runtime
 
             /// <summary>The block's movement axis: a restricted one shows an arrow instead of studs.</summary>
             public MovementAxis Axis { get; }
+
+            /// <summary>True for a frozen block (M3): its face is ice with frost, without studs.</summary>
+            public bool IsIce { get; }
 
             /// <summary>The beneath-colour squares of a layered block (M4); empty otherwise.</summary>
             public List<SpriteRenderer> BeneathSquares { get; } = new List<SpriteRenderer>();

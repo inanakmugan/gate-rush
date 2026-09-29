@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Core;
 
 namespace GateRush.Runtime
@@ -7,8 +8,8 @@ namespace GateRush.Runtime
     /// Decides what the player may see of a board (D13). <see cref="BoardState"/>
     /// always holds the whole truth; this layer hides from the player what the
     /// rules say is hidden — a frozen block's colour (M3), every block under a
-    /// closed shutter (M5) — and derives the counts shown on labels. It reads
-    /// state and never changes it.
+    /// closed shutter (M5), an elevator's waves still to come (D48) — and
+    /// derives the counts shown on badges. It reads state and never changes it.
     /// </summary>
     /// <remarks>
     /// Every remaining count is the number of clears still needed:
@@ -37,8 +38,10 @@ namespace GateRush.Runtime
         /// What the player sees of block <paramref name="blockIndex"/>. A dead or
         /// not-yet-spawned block, or one under a closed shutter, is not shown at
         /// all. A frozen block shows its shape and its remaining count, never
-        /// its colours or layer numeral. Lock and key badges show on any shown
-        /// block, frozen included: they identify a pairing, not a colour.
+        /// its colours or layer numeral. Locks and keys show on any shown
+        /// block, frozen included: a lock is known by its block's colour at
+        /// level start and a key is marked with that colour (D47), whatever the
+        /// colour of the block carrying it.
         /// </summary>
         public BlockVisual Block(BoardState state, int blockIndex)
         {
@@ -80,12 +83,18 @@ namespace GateRush.Runtime
                 }
             }
 
-            int? lockId = null;
+            BlockColor? lockColor = null;
             var keysStillRequired = 0;
             if (spec.LockId.HasValue && !state.Unlocked[blockIndex])
             {
-                lockId = spec.LockId.Value;
-                keysStillRequired = spec.RequiredKeyCount - ConsumedKeyCount(state, lockId.Value);
+                lockColor = LockColorOf(spec);
+                keysStillRequired = spec.RequiredKeyCount - ConsumedKeyCount(state, spec.LockId.Value);
+            }
+
+            BlockColor? keyMarkColor = null;
+            if (spec.KeyTargetLockId.HasValue)
+            {
+                keyMarkColor = LockColorOf(ctx.SpecAt(ctx.LockOwnerIndex(spec.KeyTargetLockId.Value)));
             }
 
             return new BlockVisual(
@@ -95,9 +104,9 @@ namespace GateRush.Runtime
                 outerColor: outer,
                 beneathColor: beneath,
                 layerNumeral: layerNumeral,
-                lockId: lockId,
+                lockColor: lockColor,
                 keysStillRequired: keysStillRequired,
-                keyTargetLockId: spec.KeyTargetLockId);
+                keyMarkColor: keyMarkColor);
         }
 
         /// <summary>
@@ -142,13 +151,49 @@ namespace GateRush.Runtime
                 countsColor: shutter.RequiredColor);
         }
 
-        /// <summary>How many blocks generator <paramref name="generatorIndex"/> still has queued.</summary>
-        public int GeneratorQueued(BoardState state, int generatorIndex) =>
-            ctx.Generators[generatorIndex].Queue.Count - state.GeneratorIndex[generatorIndex];
+        /// <summary>
+        /// What the player sees of generator <paramref name="generatorIndex"/>:
+        /// while it still has blocks queued, how many, and the next one on its
+        /// screen (M6, D48). An exhausted generator is destroyed and shows
+        /// nothing. The next block's colour is hidden, like a frozen block's
+        /// (M3), when it would spawn frozen at the current counts.
+        /// </summary>
+        public GeneratorVisual Generator(BoardState state, int generatorIndex)
+        {
+            var queue = ctx.Generators[generatorIndex].Queue;
+            var spawned = state.GeneratorIndex[generatorIndex];
+            if (spawned >= queue.Count)
+            {
+                return default;
+            }
 
-        /// <summary>How many of elevator <paramref name="elevatorIndex"/>'s waves have not arrived yet.</summary>
-        public int ElevatorWavesToCome(BoardState state, int elevatorIndex) =>
-            ctx.Elevators[elevatorIndex].Waves.Count - state.ElevatorWaveIndex[elevatorIndex];
+            var next = queue[spawned];
+
+            // The same test the resolver makes when the block spawns: frozen
+            // while its threshold is unmet by the running total.
+            var isNextFrozen = next.UnfreezeAtClearCount.HasValue
+                               && !UnlockConditions.IsThresholdMet(
+                                   state.TotalClearCount, state.ClearCountByColor, next.UnfreezeAtClearCount.Value, null);
+
+            return new GeneratorVisual(
+                isShown: true,
+                queued: queue.Count - spawned,
+                nextCells: next.Cells,
+                nextColor: isNextFrozen ? (BlockColor?)null : next.ColorStack[0],
+                isNextFrozen: isNextFrozen);
+        }
+
+        /// <summary>
+        /// True while elevator <paramref name="elevatorIndex"/> is drawn: until
+        /// its final wave has been cleared (M9). How many waves remain is never
+        /// shown (D48).
+        /// </summary>
+        public bool ElevatorPresent(BoardState state, int elevatorIndex) =>
+            state.ElevatorWaveIndex[elevatorIndex] < ctx.Elevators[elevatorIndex].Waves.Count
+            || state.ElevatorWaveActive[elevatorIndex];
+
+        /// <summary>A lock's colour: its block's outer colour at level start (D47).</summary>
+        private static BlockColor LockColorOf(BlockSpec spec) => spec.ColorStack[0];
 
         /// <summary>
         /// <c>threshold − counter</c>, where the counter is the total clear count,
@@ -191,7 +236,7 @@ namespace GateRush.Runtime
         public BlockVisual(
             bool isShown, bool isFrozen, int frozenRemaining,
             BlockColor? outerColor, BlockColor? beneathColor, int? layerNumeral,
-            int? lockId, int keysStillRequired, int? keyTargetLockId)
+            BlockColor? lockColor, int keysStillRequired, BlockColor? keyMarkColor)
         {
             IsShown = isShown;
             IsFrozen = isFrozen;
@@ -199,15 +244,15 @@ namespace GateRush.Runtime
             OuterColor = outerColor;
             BeneathColor = beneathColor;
             LayerNumeral = layerNumeral;
-            LockId = lockId;
+            LockColor = lockColor;
             KeysStillRequired = keysStillRequired;
-            KeyTargetLockId = keyTargetLockId;
+            KeyMarkColor = keyMarkColor;
         }
 
         /// <summary>False for a dead or unspawned block, or one under a closed shutter.</summary>
         public bool IsShown { get; }
 
-        /// <summary>True while the block is frozen (M3): drawn in the frozen tint, colours hidden.</summary>
+        /// <summary>True while the block is frozen (M3): drawn in ice, colours hidden.</summary>
         public bool IsFrozen { get; }
 
         /// <summary>Clears still needed to unfreeze; 0 when not frozen.</summary>
@@ -222,14 +267,57 @@ namespace GateRush.Runtime
         /// <summary>Colours remaining, shown only when more than two remain (M4); otherwise null.</summary>
         public int? LayerNumeral { get; }
 
-        /// <summary>The lock id for the badge while the block is still locked; otherwise null.</summary>
-        public int? LockId { get; }
+        /// <summary>
+        /// While the block is still locked, the lock's colour: the block's outer
+        /// colour at level start (D47). Null when it carries no lock or the lock
+        /// has opened.
+        /// </summary>
+        public BlockColor? LockColor { get; }
+
+        /// <summary>True while the block is drawn locked: chains and a padlock.</summary>
+        public bool IsLocked => LockColor.HasValue;
 
         /// <summary>Keys still needed to open the lock; 0 when there is no lock showing.</summary>
         public int KeysStillRequired { get; }
 
-        /// <summary>The lock this block's key opens, for the key badge; null when it carries no key.</summary>
-        public int? KeyTargetLockId { get; }
+        /// <summary>
+        /// The colour this block's key is marked with — its lock's colour
+        /// (D47), whatever this block's own colour. Null when it carries no key.
+        /// </summary>
+        public BlockColor? KeyMarkColor { get; }
+    }
+
+    /// <summary>
+    /// What the player sees of one generator (M6, D48). The default value is an
+    /// exhausted generator, which draws nothing.
+    /// </summary>
+    public readonly struct GeneratorVisual
+    {
+        /// <summary>A generator visual with every field given.</summary>
+        public GeneratorVisual(
+            bool isShown, int queued, IReadOnlyList<Coord> nextCells, BlockColor? nextColor, bool isNextFrozen)
+        {
+            IsShown = isShown;
+            Queued = queued;
+            NextCells = nextCells;
+            NextColor = nextColor;
+            IsNextFrozen = isNextFrozen;
+        }
+
+        /// <summary>False once every queued block has spawned: the generator is destroyed.</summary>
+        public bool IsShown { get; }
+
+        /// <summary>Blocks still queued, the next one included; 0 when not shown.</summary>
+        public int Queued { get; }
+
+        /// <summary>The next block's footprint, normalised to a (0, 0) minimum; null when not shown.</summary>
+        public IReadOnlyList<Coord> NextCells { get; }
+
+        /// <summary>The next block's colour; null when it would spawn frozen (M3), or when not shown.</summary>
+        public BlockColor? NextColor { get; }
+
+        /// <summary>True when the next block would spawn frozen at the current counts: drawn in ice.</summary>
+        public bool IsNextFrozen { get; }
     }
 
     /// <summary>What the player sees of one gate.</summary>

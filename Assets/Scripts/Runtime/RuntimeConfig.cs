@@ -4,6 +4,7 @@ using GateRush.Core;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace GateRush.Runtime
 {
@@ -16,16 +17,50 @@ namespace GateRush.Runtime
     /// the board keeps its proportions whatever <see cref="CellSize"/> is.
     /// </summary>
     /// <remarks>
-    /// The art sprites are generated in greyscale from the <c>ArtRecipe</c>
-    /// asset (<i>Gate Rush → Generate Art</i>) and tinted here: one set serves
-    /// every colour (D46). What must not take a block's colour — the stud
-    /// gloss, the arrows — has its own sprite and its own colour below.
+    /// <para>The art sprites are generated in greyscale from the
+    /// <c>ArtRecipe</c> asset (<i>Gate Rush → Generate Art</i>) and tinted here:
+    /// one set serves every colour (D46). What must not take a block's colour —
+    /// the stud gloss, the arrows, the frost, the key's gold — has its own
+    /// sprite and its own colour below.</para>
+    /// <para><b>Sorting orders</b> have their defaults as constants, used both by
+    /// the fields and by <i>Reset Sorting Orders</i> in the component's context
+    /// menu, which resets those fields alone.</para>
     /// </remarks>
     [CreateAssetMenu(fileName = "RuntimeConfig", menuName = "Gate Rush/Runtime Config")]
     public sealed class RuntimeConfig : ScriptableObject
     {
+        private const int DefaultBackgroundOrder = -20;
+        private const int DefaultVignetteOrder = -19;
+        private const int DefaultFloorUnderlayOrder = -1;
+        private const int DefaultFloorOrder = 0;
+        private const int DefaultElevatorDoorOrder = 1;
+        private const int DefaultElevatorDividerOrder = 2;
+        private const int DefaultElevatorBorderOrder = 3;
+        private const int DefaultMachineLipOrder = 4;
+        private const int DefaultMachineOrder = 5;
+        private const int DefaultMachineScreenOrder = 6;
+        private const int DefaultMiniatureLipOrder = 7;
+        private const int DefaultMiniatureOrder = 8;
+        private const int DefaultFrameLipOrder = 9;
+        private const int DefaultFrameOrder = 10;
+        private const int DefaultGateMarkOrder = 11;
+        private const int DefaultBlockLipOrder = 12;
+        private const int DefaultBlockOrder = 13;
+        private const int DefaultStudOrder = 14;
+        private const int DefaultGlossOrder = 15;
+        private const int DefaultPeelOrder = 16;
+        private const int DefaultBeneathColorOrder = 17;
+        private const int DefaultChainOrder = 18;
+        private const int DefaultIconOrder = 19;
+        private const int DefaultKeyGemOrder = 20;
+        private const int DefaultShutterOrder = 21;
+        private const int DefaultShutterBorderOrder = 22;
+        private const int DefaultBadgeRimOrder = 23;
+        private const int DefaultBadgeOrder = 24;
+        private const int DefaultLabelOrder = 25;
+
         [Header("Assets")]
-        [Tooltip("A plain white square sprite. The shapes still drawn as placeholders (2.4b) — shutters, elevators, badges, beneath squares, generators, closed gates, the floor underlay — are this sprite, tinted and scaled.")]
+        [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing and a layered block's beneath-colour squares.")]
         [SerializeField] private Sprite cellSprite;
 
         [Tooltip("Sprite-Unlit-Default. Under the 2D Renderer a lit sprite renders black with no Light 2D.")]
@@ -46,12 +81,21 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite axisArrowSprite;
         [SerializeField] private Sprite backgroundRampSprite;
         [SerializeField] private Sprite vignetteSprite;
+        [SerializeField] private Sprite frostSprite;
+        [SerializeField] private Sprite roundedRectSprite;
+        [SerializeField] private Sprite ringSprite;
+        [SerializeField] private Sprite chainSprite;
+        [SerializeField] private Sprite padlockSprite;
+        [SerializeField] private Sprite keyBodySprite;
+        [SerializeField] private Sprite keyGemSprite;
+        [SerializeField] private Sprite shutterSlatsSprite;
+        [SerializeField] private Sprite doorPanelSprite;
 
         [Header("Board")]
         [Tooltip("World units per cell.")]
         [SerializeField] private float cellSize = 1f;
 
-        [Tooltip("Empty space kept on each side of the framed board when fitting the camera, in cells.")]
+        [Tooltip("Empty space kept on each side of the framed board, and of any generator machine, when fitting the camera, in cells.")]
         [SerializeField] private float sideMarginCells = 0.3f;
 
         [Tooltip("Part of the screen's height kept free above the board for the HUD, from 0 to 1. Top and bottom together must stay below 1.")]
@@ -60,7 +104,7 @@ namespace GateRush.Runtime
         [Tooltip("Part of the screen's height kept free below the board for the HUD, from 0 to 1. Top and bottom together must stay below 1.")]
         [SerializeField] private float bottomBandScreenFraction = 0.10f;
 
-        [Tooltip("Thickness of the frame around the grid, in cells: above 0, at most 1. Generators and closed gates are drawn at this thickness too.")]
+        [Tooltip("Thickness of the frame around the grid, in cells: above 0, at most 1. Closed gates are drawn at this thickness too.")]
         [SerializeField] private float frameThicknessCells = 0.45f;
 
         [Tooltip("How far the floor's backing reaches past the grid under the frame, in cells, so no background shows between floor and frame. At most the frame thickness.")]
@@ -87,14 +131,66 @@ namespace GateRush.Runtime
         [Tooltip("Size of the beneath-colour square drawn inside each cell of a layered block, as a fraction of a cell.")]
         [SerializeField, Range(0f, 1f)] private float beneathColorSize = 0.45f;
 
-        [Tooltip("Thickness of an elevator's region outline, in cells.")]
-        [SerializeField] private float elevatorOutlineThickness = 0.08f;
+        [Header("Count badge")]
+        [Tooltip("Height of the badge every count sits on, in cells.")]
+        [SerializeField] private float badgeHeightCells = 0.34f;
 
-        [Tooltip("Side of a lock or key badge, in cells.")]
-        [SerializeField] private float badgeSize = 0.36f;
+        [Tooltip("Width each digit adds to a badge, in cells. A one-digit badge is never narrower than it is tall.")]
+        [SerializeField] private float badgeDigitWidthCells = 0.15f;
 
-        [Tooltip("Space between a badge and the edge of its cell, in cells.")]
-        [SerializeField] private float badgeInsetCells = 0.06f;
+        [Tooltip("Space either side of a badge's digits, in cells.")]
+        [SerializeField] private float badgePaddingCells = 0.08f;
+
+        [Tooltip("Thickness of a badge's lighter rim, in cells. Below half the badge's height.")]
+        [SerializeField] private float badgeRimCells = 0.035f;
+
+        [Header("Locks and keys")]
+        [Tooltip("Thickness of a locked block's chains, in cells: above 0, at most 1.")]
+        [SerializeField] private float chainThicknessCells = 0.2f;
+
+        [Tooltip("How far a chain stops short of each end of its row of cells, in cells. Below 0.5.")]
+        [SerializeField] private float chainEndInsetCells = 0.1f;
+
+        [Tooltip("Size of the padlock on a locked block, in cells.")]
+        [SerializeField] private float padlockSizeCells = 0.62f;
+
+        [Tooltip("How far below the padlock's centre its count badge sits, in cells, so the badge lands on the padlock's body.")]
+        [SerializeField] private float padlockBadgeDropCells = 0.1f;
+
+        [Tooltip("Length of the key on a key-carrying block, in cells.")]
+        [SerializeField] private float keySizeCells = 0.72f;
+
+        [Tooltip("How far the key is turned from horizontal, in degrees, counter-clockwise.")]
+        [SerializeField] private float keyRotationDegrees = 35f;
+
+        [Tooltip("How far a frozen block's padlock or key is raised above its frozen count, in cells, so the two do not overlap.")]
+        [SerializeField] private float frozenMarkRaiseCells = 0.3f;
+
+        [Header("Shutters and elevators")]
+        [Tooltip("Thickness of a closed shutter's border, in cells.")]
+        [SerializeField] private float shutterBorderCells = 0.07f;
+
+        [Tooltip("Thickness of an elevator's border, in cells.")]
+        [SerializeField] private float elevatorBorderCells = 0.05f;
+
+        [Tooltip("Width of the divider down the middle of an elevator's doors, in cells.")]
+        [SerializeField] private float elevatorDividerCells = 0.07f;
+
+        [Header("Generator machines")]
+        [Tooltip("How deep a generator's machine is, out from the frame, in cells.")]
+        [SerializeField] private float machineDepthCells = 1f;
+
+        [Tooltip("How far a machine runs past its generator's span at each end, in cells.")]
+        [SerializeField] private float machineSideOverhangCells = 0.12f;
+
+        [Tooltip("How far a machine's inner side reaches back under the frame, in cells. Below the depth.")]
+        [SerializeField] private float machineFrameOverlapCells = 0.15f;
+
+        [Tooltip("Margin between a machine's rim and its screen, in cells.")]
+        [SerializeField] private float machineScreenInsetCells = 0.12f;
+
+        [Tooltip("Corner radius of a machine's body and screen, in cells.")]
+        [SerializeField] private float machineCornerCells = 0.18f;
 
         [Header("Input")]
         [Tooltip("How far the pointer must travel, in cells, before a release at the start reads as a push.")]
@@ -144,20 +240,6 @@ namespace GateRush.Runtime
             new Color(0.15f, 0.85f, 0.95f)
         };
 
-        [Tooltip("Lock and key badge colours, indexed by lock id (M8: the identifier doubles as the badge colour). Keep them light: the count on a lock badge is drawn in Label Color.")]
-        [SerializeField] private Color[] lockBadgePalette =
-        {
-            new Color(1.00f, 1.00f, 1.00f),
-            new Color(0.72f, 0.72f, 0.72f),
-            new Color(0.86f, 0.72f, 0.52f),
-            new Color(0.72f, 0.95f, 0.72f),
-            new Color(0.82f, 0.76f, 1.00f),
-            new Color(1.00f, 0.80f, 0.80f)
-        };
-
-        [Tooltip("Badge colour used for a lock id outside the badge palette. The load logs an error naming the lock.")]
-        [SerializeField] private Color unknownBadgeColor = new Color(1f, 0f, 1f);
-
         [Tooltip("Top of the background gradient.")]
         [SerializeField] private Color backgroundTop = new Color(0.23f, 0.20f, 0.42f);
 
@@ -175,50 +257,104 @@ namespace GateRush.Runtime
 
         [SerializeField] private Color gateArrowColor = new Color(1f, 1f, 1f, 1f);
         [SerializeField] private Color axisArrowColor = new Color(1f, 1f, 1f, 0.9f);
-        [SerializeField] private Color frozenTint = new Color(0.72f, 0.86f, 0.95f);
-        [SerializeField] private Color closedGateColor = new Color(0.60f, 0.72f, 0.80f);
-        [SerializeField] private Color shutterColor = new Color(0.36f, 0.38f, 0.44f);
-        [SerializeField] private Color generatorColor = new Color(0.85f, 0.85f, 0.85f);
-        [SerializeField] private Color elevatorOutlineColor = new Color(1f, 1f, 1f, 0.8f);
+
+        [Tooltip("Fill of a frozen block (M3) and a closed gate (M2); their lip is this colour darkened.")]
+        [FormerlySerializedAs("frozenTint")]
+        [SerializeField] private Color iceColor = new Color(0.70f, 0.88f, 1.00f);
+
+        [Tooltip("The frost streaks over ice. Not tinted by anything else.")]
+        [SerializeField] private Color frostColor = new Color(1f, 1f, 1f, 0.85f);
+
+        [Tooltip("Fill of the badge every count sits on.")]
+        [SerializeField] private Color badgeColor = new Color(0.80f, 0.45f, 0.18f);
+
+        [Tooltip("Rim of a badge. A colour-bound shutter's badge takes the colour it counts instead.")]
+        [SerializeField] private Color badgeRimColor = new Color(1.00f, 0.78f, 0.45f);
+
+        [Tooltip("The number on a badge.")]
+        [SerializeField] private Color badgeTextColor = new Color(1.00f, 0.96f, 0.85f);
+
+        [SerializeField] private Color chainColor = new Color(0.62f, 0.64f, 0.70f);
+        [SerializeField] private Color padlockColor = new Color(1.00f, 0.80f, 0.25f);
+
+        [Tooltip("The key's gold. Its gem takes the colour of the lock it opens (D47).")]
+        [SerializeField] private Color keyColor = new Color(1.00f, 0.80f, 0.25f);
+
+        [SerializeField] private Color shutterSlatColor = new Color(0.30f, 0.18f, 0.45f);
+        [SerializeField] private Color shutterBorderColor = new Color(1.00f, 0.66f, 0.20f);
+        [SerializeField] private Color machineColor = new Color(0.55f, 0.58f, 0.70f);
+        [SerializeField] private Color machineScreenColor = new Color(0.06f, 0.07f, 0.12f);
+        [SerializeField] private Color elevatorDoorColor = new Color(0.22f, 0.14f, 0.34f);
+        [SerializeField] private Color elevatorDividerColor = new Color(1.00f, 0.78f, 0.30f);
+        [SerializeField] private Color elevatorBorderColor = new Color(1.00f, 0.66f, 0.20f);
 
         [Header("Labels")]
+        [Tooltip("Font size of a layered block's remaining-colour numeral (M4).")]
         [SerializeField] private float labelFontSize = 4f;
+
+        [Tooltip("Font size of the number on a badge.")]
         [SerializeField] private float badgeLabelFontSize = 2.5f;
+
+        [Tooltip("Colour of a layered block's numeral.")]
         [SerializeField] private Color labelColor = new Color(0.08f, 0.08f, 0.10f);
-        [SerializeField] private Color lightLabelColor = new Color(0.95f, 0.95f, 0.95f);
 
-        [Header("Sorting orders (back to front)")]
-        [SerializeField] private int backgroundOrder = -20;
-        [SerializeField] private int vignetteOrder = -19;
-        [SerializeField] private int floorUnderlayOrder = -1;
-        [SerializeField] private int floorOrder;
+        [Header("Sorting orders (back to front; context menu → Reset Sorting Orders)")]
+        [SerializeField] private int backgroundOrder = DefaultBackgroundOrder;
+        [SerializeField] private int vignetteOrder = DefaultVignetteOrder;
+        [SerializeField] private int floorUnderlayOrder = DefaultFloorUnderlayOrder;
+        [SerializeField] private int floorOrder = DefaultFloorOrder;
+        [SerializeField] private int elevatorDoorOrder = DefaultElevatorDoorOrder;
+        [SerializeField] private int elevatorDividerOrder = DefaultElevatorDividerOrder;
+        [SerializeField] private int elevatorBorderOrder = DefaultElevatorBorderOrder;
 
-        [Tooltip("The frame's lip, and an open gate's.")]
-        [SerializeField] private int frameLipOrder = 1;
+        [Tooltip("A generator machine's lip. Machines sit behind the frame, which runs on over them.")]
+        [SerializeField] private int machineLipOrder = DefaultMachineLipOrder;
 
-        [Tooltip("The frame's face, and an open gate's.")]
-        [SerializeField] private int frameOrder = 2;
+        [SerializeField] private int machineOrder = DefaultMachineOrder;
+        [SerializeField] private int machineScreenOrder = DefaultMachineScreenOrder;
+        [SerializeField] private int miniatureLipOrder = DefaultMiniatureLipOrder;
+        [SerializeField] private int miniatureOrder = DefaultMiniatureOrder;
 
-        [Tooltip("Generator bars and closed-gate bars, drawn over the frame.")]
-        [SerializeField] private int edgeFeatureOrder = 3;
+        [Tooltip("The frame's lip, and a gate's.")]
+        [SerializeField] private int frameLipOrder = DefaultFrameLipOrder;
 
-        [SerializeField] private int gateArrowOrder = 3;
-        [SerializeField] private int blockLipOrder = 4;
-        [SerializeField] private int blockOrder = 5;
-        [SerializeField] private int studOrder = 6;
-        [SerializeField] private int glossOrder = 7;
-        [SerializeField] private int axisArrowOrder = 7;
+        [Tooltip("The frame's face, and a gate's.")]
+        [SerializeField] private int frameOrder = DefaultFrameOrder;
 
-        [Tooltip("Sorting group order of a peeling outer colour: above every part of a block's face, so the exposed colour shows beneath it.")]
-        [SerializeField] private int peelOrder = 8;
+        [Tooltip("An open gate's arrow and a closed gate's frost.")]
+        [SerializeField] private int gateMarkOrder = DefaultGateMarkOrder;
 
-        [SerializeField] private int beneathColorOrder = 9;
-        [SerializeField] private int badgeOrder = 10;
-        [SerializeField] private int shutterOrder = 11;
-        [SerializeField] private int elevatorOrder = 12;
-        [SerializeField] private int labelOrder = 13;
+        [SerializeField] private int blockLipOrder = DefaultBlockLipOrder;
+        [SerializeField] private int blockOrder = DefaultBlockOrder;
 
-        /// <summary>The white square every placeholder shape is drawn with.</summary>
+        [Tooltip("Studs, and a frozen block's frost, which has no studs.")]
+        [SerializeField] private int studOrder = DefaultStudOrder;
+
+        [Tooltip("Stud gloss, and an axis-restricted block's arrow, which has no studs.")]
+        [SerializeField] private int glossOrder = DefaultGlossOrder;
+
+        [Tooltip("Sorting group order of a peeling outer colour: above every part of a block's face, below its marks.")]
+        [SerializeField] private int peelOrder = DefaultPeelOrder;
+
+        [SerializeField] private int beneathColorOrder = DefaultBeneathColorOrder;
+        [SerializeField] private int chainOrder = DefaultChainOrder;
+
+        [Tooltip("A padlock or a key.")]
+        [SerializeField] private int iconOrder = DefaultIconOrder;
+
+        [SerializeField] private int keyGemOrder = DefaultKeyGemOrder;
+        [SerializeField] private int shutterOrder = DefaultShutterOrder;
+        [SerializeField] private int shutterBorderOrder = DefaultShutterBorderOrder;
+
+        [Tooltip("A badge's rim: a full-size rounded box behind its fill.")]
+        [SerializeField] private int badgeRimOrder = DefaultBadgeRimOrder;
+
+        [SerializeField] private int badgeOrder = DefaultBadgeOrder;
+
+        [Tooltip("Every label: badge numbers and layer numerals, in front of everything else.")]
+        [SerializeField] private int labelOrder = DefaultLabelOrder;
+
+        /// <summary>The white square the floor's backing and beneath squares are drawn with.</summary>
         public Sprite CellSprite => cellSprite;
 
         /// <summary>The material every sprite uses: <c>Sprite-Unlit-Default</c>.</summary>
@@ -247,6 +383,33 @@ namespace GateRush.Runtime
 
         /// <summary>Radial alpha, tinted <see cref="VignetteColor"/>.</summary>
         public Sprite VignetteSprite => vignetteSprite;
+
+        /// <summary>One cell of frost streaks over ice, drawn in <see cref="FrostColor"/>.</summary>
+        public Sprite FrostSprite => frostSprite;
+
+        /// <summary>A 9-sliced bevelled rounded box whose slice border is its corner: badge rim and fill, machine body and screen, elevator divider.</summary>
+        public Sprite RoundedRectSprite => roundedRectSprite;
+
+        /// <summary>A 9-sliced rounded outline whose slice border is its width: shutter and elevator borders.</summary>
+        public Sprite RingSprite => ringSprite;
+
+        /// <summary>One period of chain, tiled along its length.</summary>
+        public Sprite ChainSprite => chainSprite;
+
+        /// <summary>The padlock on a locked block, tinted <see cref="PadlockColor"/>.</summary>
+        public Sprite PadlockSprite => padlockSprite;
+
+        /// <summary>The key on a key-carrying block, horizontal, tinted <see cref="KeyColor"/>.</summary>
+        public Sprite KeyBodySprite => keyBodySprite;
+
+        /// <summary>The gem in the key's bow, on the same canvas as <see cref="KeyBodySprite"/>, tinted the lock's colour.</summary>
+        public Sprite KeyGemSprite => keyGemSprite;
+
+        /// <summary>One cell of shutter slats, tiled over the region.</summary>
+        public Sprite ShutterSlatsSprite => shutterSlatsSprite;
+
+        /// <summary>One cell of lift door, tiled over an elevator's region.</summary>
+        public Sprite DoorPanelSprite => doorPanelSprite;
 
         /// <summary>World units per cell.</summary>
         public float CellSize => cellSize;
@@ -284,14 +447,44 @@ namespace GateRush.Runtime
         /// <summary>Side of the beneath-colour square, as a fraction of a cell.</summary>
         public float BeneathColorSize => beneathColorSize;
 
-        /// <summary>Thickness of an elevator outline, in cells.</summary>
-        public float ElevatorOutlineThickness => elevatorOutlineThickness;
+        /// <summary>Height of a count badge, in cells.</summary>
+        public float BadgeHeightCells => badgeHeightCells;
 
-        /// <summary>Side of a lock or key badge, in cells.</summary>
-        public float BadgeSize => badgeSize;
+        /// <summary>Thickness of a badge's rim, in cells.</summary>
+        public float BadgeRimCells => badgeRimCells;
 
-        /// <summary>Space between a badge and its cell's edge, in cells.</summary>
-        public float BadgeInsetCells => badgeInsetCells;
+        /// <summary>Thickness of a locked block's chains, in cells.</summary>
+        public float ChainThicknessCells => chainThicknessCells;
+
+        /// <summary>How far a chain stops short of each end of its row, in cells.</summary>
+        public float ChainEndInsetCells => chainEndInsetCells;
+
+        /// <summary>Size of a padlock, in cells.</summary>
+        public float PadlockSizeCells => padlockSizeCells;
+
+        /// <summary>How far below a padlock's centre its badge sits, in cells.</summary>
+        public float PadlockBadgeDropCells => padlockBadgeDropCells;
+
+        /// <summary>Length of a key, in cells.</summary>
+        public float KeySizeCells => keySizeCells;
+
+        /// <summary>How far a key is turned from horizontal, in degrees.</summary>
+        public float KeyRotationDegrees => keyRotationDegrees;
+
+        /// <summary>How far a frozen block's padlock or key is raised above its frozen count, in cells.</summary>
+        public float FrozenMarkRaiseCells => frozenMarkRaiseCells;
+
+        /// <summary>Thickness of a shutter's border, in cells.</summary>
+        public float ShutterBorderCells => shutterBorderCells;
+
+        /// <summary>Thickness of an elevator's border, in cells.</summary>
+        public float ElevatorBorderCells => elevatorBorderCells;
+
+        /// <summary>Width of an elevator's door divider, in cells.</summary>
+        public float ElevatorDividerCells => elevatorDividerCells;
+
+        /// <summary>Corner radius of a machine's body and screen, in cells.</summary>
+        public float MachineCornerCells => machineCornerCells;
 
         /// <summary>Pointer travel, in cells, that makes a release at the start a push.</summary>
         public float PushThresholdCells => pushThresholdCells;
@@ -353,32 +546,59 @@ namespace GateRush.Runtime
         /// <summary>Colour of an axis-restricted block's arrow.</summary>
         public Color AxisArrowColor => axisArrowColor;
 
-        /// <summary>Fill of a frozen block, whose colour is hidden (M3).</summary>
-        public Color FrozenTint => frozenTint;
+        /// <summary>Fill of a frozen block (M3) and a closed gate (M2).</summary>
+        public Color IceColor => iceColor;
 
-        /// <summary>Fill of a closed, colourless gate (M2).</summary>
-        public Color ClosedGateColor => closedGateColor;
+        /// <summary>Colour of the frost over ice.</summary>
+        public Color FrostColor => frostColor;
 
-        /// <summary>Fill of a closed shutter's cover (M5).</summary>
-        public Color ShutterColor => shutterColor;
+        /// <summary>Fill of a count badge.</summary>
+        public Color BadgeColor => badgeColor;
 
-        /// <summary>Fill of a generator's edge marker (M6).</summary>
-        public Color GeneratorColor => generatorColor;
+        /// <summary>Rim of a count badge that counts no particular colour.</summary>
+        public Color BadgeRimColor => badgeRimColor;
 
-        /// <summary>Colour of an elevator's region outline (M9).</summary>
-        public Color ElevatorOutlineColor => elevatorOutlineColor;
+        /// <summary>The number on a badge.</summary>
+        public Color BadgeTextColor => badgeTextColor;
 
-        /// <summary>Font size of count labels on cells.</summary>
+        /// <summary>Tint of a locked block's chains.</summary>
+        public Color ChainColor => chainColor;
+
+        /// <summary>Tint of a padlock.</summary>
+        public Color PadlockColor => padlockColor;
+
+        /// <summary>Tint of a key's body.</summary>
+        public Color KeyColor => keyColor;
+
+        /// <summary>Tint of a closed shutter's slats.</summary>
+        public Color ShutterSlatColor => shutterSlatColor;
+
+        /// <summary>Tint of a closed shutter's border.</summary>
+        public Color ShutterBorderColor => shutterBorderColor;
+
+        /// <summary>Tint of a generator machine's body.</summary>
+        public Color MachineColor => machineColor;
+
+        /// <summary>Tint of a generator machine's screen.</summary>
+        public Color MachineScreenColor => machineScreenColor;
+
+        /// <summary>Tint of an elevator's doors.</summary>
+        public Color ElevatorDoorColor => elevatorDoorColor;
+
+        /// <summary>Tint of the divider between an elevator's doors.</summary>
+        public Color ElevatorDividerColor => elevatorDividerColor;
+
+        /// <summary>Tint of an elevator's border.</summary>
+        public Color ElevatorBorderColor => elevatorBorderColor;
+
+        /// <summary>Font size of a layered block's numeral.</summary>
         public float LabelFontSize => labelFontSize;
 
-        /// <summary>Font size of the count on a badge.</summary>
+        /// <summary>Font size of the number on a badge.</summary>
         public float BadgeLabelFontSize => badgeLabelFontSize;
 
-        /// <summary>Label colour on light fills.</summary>
+        /// <summary>Colour of a layered block's numeral.</summary>
         public Color LabelColor => labelColor;
-
-        /// <summary>Label colour on dark fills: shutters, the frame, the background.</summary>
-        public Color LightLabelColor => lightLabelColor;
 
         /// <summary>Sorting order of the background gradient.</summary>
         public int BackgroundOrder => backgroundOrder;
@@ -392,17 +612,38 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of the floor tiles.</summary>
         public int FloorOrder => floorOrder;
 
-        /// <summary>Sorting order of the frame's and open gates' lip.</summary>
+        /// <summary>Sorting order of an elevator's doors.</summary>
+        public int ElevatorDoorOrder => elevatorDoorOrder;
+
+        /// <summary>Sorting order of an elevator's divider.</summary>
+        public int ElevatorDividerOrder => elevatorDividerOrder;
+
+        /// <summary>Sorting order of an elevator's border.</summary>
+        public int ElevatorBorderOrder => elevatorBorderOrder;
+
+        /// <summary>Sorting order of a generator machine's lip.</summary>
+        public int MachineLipOrder => machineLipOrder;
+
+        /// <summary>Sorting order of a generator machine's body.</summary>
+        public int MachineOrder => machineOrder;
+
+        /// <summary>Sorting order of a generator machine's screen.</summary>
+        public int MachineScreenOrder => machineScreenOrder;
+
+        /// <summary>Sorting order of the lip of the next block on a machine's screen.</summary>
+        public int MiniatureLipOrder => miniatureLipOrder;
+
+        /// <summary>Sorting order of the next block on a machine's screen.</summary>
+        public int MiniatureOrder => miniatureOrder;
+
+        /// <summary>Sorting order of the frame's and gates' lip.</summary>
         public int FrameLipOrder => frameLipOrder;
 
-        /// <summary>Sorting order of the frame's and open gates' face.</summary>
+        /// <summary>Sorting order of the frame's and gates' face.</summary>
         public int FrameOrder => frameOrder;
 
-        /// <summary>Sorting order of generator and closed-gate bars.</summary>
-        public int EdgeFeatureOrder => edgeFeatureOrder;
-
-        /// <summary>Sorting order of an open gate's arrow.</summary>
-        public int GateArrowOrder => gateArrowOrder;
+        /// <summary>Sorting order of an open gate's arrow and a closed gate's frost.</summary>
+        public int GateMarkOrder => gateMarkOrder;
 
         /// <summary>Sorting order of a block's lip.</summary>
         public int BlockLipOrder => blockLipOrder;
@@ -410,14 +651,11 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of a block's face quarters.</summary>
         public int BlockOrder => blockOrder;
 
-        /// <summary>Sorting order of a block's studs.</summary>
+        /// <summary>Sorting order of a block's studs, and of a frozen block's frost.</summary>
         public int StudOrder => studOrder;
 
-        /// <summary>Sorting order of the stud highlights.</summary>
+        /// <summary>Sorting order of the stud highlights and of an axis-restricted block's arrow.</summary>
         public int GlossOrder => glossOrder;
-
-        /// <summary>Sorting order of an axis-restricted block's arrow.</summary>
-        public int AxisArrowOrder => axisArrowOrder;
 
         /// <summary>Sorting group order of a peeling outer colour.</summary>
         public int PeelOrder => peelOrder;
@@ -425,14 +663,26 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of the beneath-colour squares.</summary>
         public int BeneathColorOrder => beneathColorOrder;
 
-        /// <summary>Sorting order of lock and key badges.</summary>
-        public int BadgeOrder => badgeOrder;
+        /// <summary>Sorting order of a locked block's chains.</summary>
+        public int ChainOrder => chainOrder;
 
-        /// <summary>Sorting order of shutter covers.</summary>
+        /// <summary>Sorting order of a padlock or a key's body.</summary>
+        public int IconOrder => iconOrder;
+
+        /// <summary>Sorting order of a key's gem.</summary>
+        public int KeyGemOrder => keyGemOrder;
+
+        /// <summary>Sorting order of a closed shutter's slats.</summary>
         public int ShutterOrder => shutterOrder;
 
-        /// <summary>Sorting order of elevator outlines.</summary>
-        public int ElevatorOrder => elevatorOrder;
+        /// <summary>Sorting order of a closed shutter's border.</summary>
+        public int ShutterBorderOrder => shutterBorderOrder;
+
+        /// <summary>Sorting order of a badge's rim, a full-size rounded box behind its fill.</summary>
+        public int BadgeRimOrder => badgeRimOrder;
+
+        /// <summary>Sorting order of a badge's fill, inset by the rim's thickness.</summary>
+        public int BadgeOrder => badgeOrder;
 
         /// <summary>Sorting order of every label, in front of everything else.</summary>
         public int LabelOrder => labelOrder;
@@ -471,22 +721,16 @@ namespace GateRush.Runtime
         public Color LipFill(Color face) =>
             new Color(face.r * lipDarken, face.g * lipDarken, face.b * lipDarken, face.a);
 
-        /// <summary>
-        /// The badge colour for lock <paramref name="lockId"/>. False — with
-        /// <see cref="unknownBadgeColor"/> in <paramref name="color"/> — when the
-        /// id lies outside the badge palette.
-        /// </summary>
-        public bool TryGetBadgeColor(int lockId, out Color color)
-        {
-            if (lockBadgePalette != null && lockId >= 0 && lockId < lockBadgePalette.Length)
-            {
-                color = lockBadgePalette[lockId];
-                return true;
-            }
+        /// <summary>The width, in cells, of the badge showing <paramref name="value"/>.</summary>
+        public float BadgeWidthCells(int value) =>
+            MarkLayout.BadgeWidth(value, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells);
 
-            color = unknownBadgeColor;
-            return false;
-        }
+        /// <summary>The generator machine placement rule these values describe.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">A machine size is out of range; see <see cref="Problems"/>.</exception>
+        public GeneratorMachine CreateGeneratorMachine() =>
+            new GeneratorMachine(
+                frameThicknessCells, machineDepthCells, machineSideOverhangCells, machineFrameOverlapCells,
+                machineScreenInsetCells, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells);
 
         /// <summary>
         /// Every reason this config cannot draw a board, as messages naming the
@@ -518,6 +762,15 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, axisArrowSprite, "Axis Arrow Sprite");
             AddIfUnassigned(problems, backgroundRampSprite, "Background Ramp Sprite");
             AddIfUnassigned(problems, vignetteSprite, "Vignette Sprite");
+            AddIfUnassigned(problems, frostSprite, "Frost Sprite");
+            AddIfUnassigned(problems, roundedRectSprite, "Rounded Rect Sprite");
+            AddIfUnassigned(problems, ringSprite, "Ring Sprite");
+            AddIfUnassigned(problems, chainSprite, "Chain Sprite");
+            AddIfUnassigned(problems, padlockSprite, "Padlock Sprite");
+            AddIfUnassigned(problems, keyBodySprite, "Key Body Sprite");
+            AddIfUnassigned(problems, keyGemSprite, "Key Gem Sprite");
+            AddIfUnassigned(problems, shutterSlatsSprite, "Shutter Slats Sprite");
+            AddIfUnassigned(problems, doorPanelSprite, "Door Panel Sprite");
 
             if (!(cellSize > 0f))
             {
@@ -565,9 +818,40 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Axis Arrow End Inset Cells must be at least 0 and below 0.5.");
             }
 
-            if (!(badgeInsetCells >= 0f))
+            if (!(badgeHeightCells > 0f && badgeDigitWidthCells > 0f && badgePaddingCells >= 0f))
             {
-                problems.Add($"{name}: Badge Inset Cells may not be negative.");
+                problems.Add($"{name}: Badge Height Cells and Badge Digit Width Cells must be positive, and Badge Padding Cells at least 0.");
+            }
+
+            if (!(badgeRimCells >= 0f && badgeRimCells < badgeHeightCells * 0.5f))
+            {
+                problems.Add($"{name}: Badge Rim Cells must be at least 0 and below half of Badge Height Cells.");
+            }
+
+            if (!(chainThicknessCells > 0f && chainThicknessCells <= 1f))
+            {
+                problems.Add($"{name}: Chain Thickness Cells must be above 0 and at most 1.");
+            }
+
+            if (!(chainEndInsetCells >= 0f && chainEndInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Chain End Inset Cells must be at least 0 and below 0.5.");
+            }
+
+            if (!(padlockSizeCells > 0f && keySizeCells > 0f))
+            {
+                problems.Add($"{name}: Padlock Size Cells and Key Size Cells must be positive.");
+            }
+
+            if (!(shutterBorderCells >= 0f && elevatorBorderCells >= 0f && elevatorDividerCells >= 0f && machineCornerCells >= 0f))
+            {
+                problems.Add($"{name}: Shutter Border Cells, Elevator Border Cells, Elevator Divider Cells and Machine Corner Cells may not be negative.");
+            }
+
+            foreach (var problem in GeneratorMachine.Problems(
+                         machineDepthCells, machineSideOverhangCells, machineFrameOverlapCells, machineScreenInsetCells))
+            {
+                problems.Add($"{name}: {problem}");
             }
 
             foreach (var problem in DragSettings.Problems(pushThresholdCells, followRate, cornerAssistCells))
@@ -601,6 +885,51 @@ namespace GateRush.Runtime
             }
 
             return problems;
+        }
+
+        /// <summary>
+        /// Sets every sorting order back to its default and leaves every other
+        /// field as it is: the way to take up a new drawing order without
+        /// losing tuned colours, sizes and sprite assignments.
+        /// </summary>
+        [ContextMenu("Reset Sorting Orders")]
+        private void ResetSortingOrders()
+        {
+#if UNITY_EDITOR
+            UnityEditor.Undo.RecordObject(this, "Reset Sorting Orders");
+#endif
+            backgroundOrder = DefaultBackgroundOrder;
+            vignetteOrder = DefaultVignetteOrder;
+            floorUnderlayOrder = DefaultFloorUnderlayOrder;
+            floorOrder = DefaultFloorOrder;
+            elevatorDoorOrder = DefaultElevatorDoorOrder;
+            elevatorDividerOrder = DefaultElevatorDividerOrder;
+            elevatorBorderOrder = DefaultElevatorBorderOrder;
+            machineLipOrder = DefaultMachineLipOrder;
+            machineOrder = DefaultMachineOrder;
+            machineScreenOrder = DefaultMachineScreenOrder;
+            miniatureLipOrder = DefaultMiniatureLipOrder;
+            miniatureOrder = DefaultMiniatureOrder;
+            frameLipOrder = DefaultFrameLipOrder;
+            frameOrder = DefaultFrameOrder;
+            gateMarkOrder = DefaultGateMarkOrder;
+            blockLipOrder = DefaultBlockLipOrder;
+            blockOrder = DefaultBlockOrder;
+            studOrder = DefaultStudOrder;
+            glossOrder = DefaultGlossOrder;
+            peelOrder = DefaultPeelOrder;
+            beneathColorOrder = DefaultBeneathColorOrder;
+            chainOrder = DefaultChainOrder;
+            iconOrder = DefaultIconOrder;
+            keyGemOrder = DefaultKeyGemOrder;
+            shutterOrder = DefaultShutterOrder;
+            shutterBorderOrder = DefaultShutterBorderOrder;
+            badgeOrder = DefaultBadgeOrder;
+            badgeRimOrder = DefaultBadgeRimOrder;
+            labelOrder = DefaultLabelOrder;
+#if UNITY_EDITOR
+            UnityEditor.EditorUtility.SetDirty(this);
+#endif
         }
 
         private void AddIfUnassigned(List<string> problems, Sprite sprite, string field)

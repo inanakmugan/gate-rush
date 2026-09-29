@@ -136,7 +136,6 @@ namespace GateRush.Runtime
                 return;
             }
 
-            LogLockIdsOutsideBadgePalette(ctx, asset.name);
             inputController.CancelDrag();
 
             Countdown countdown = null;
@@ -155,9 +154,12 @@ namespace GateRush.Runtime
             var session = new LevelSession(ctx);
             run = new LevelRun(session, countdown);
             levelName = asset.name;
-            layout = new BoardLayout(ctx.Width, ctx.Height, config.CellSize, config.FrameThicknessCells);
+            // One machine rule for the fit's room and for where BoardView draws
+            // each machine (D48).
+            var machine = config.CreateGeneratorMachine();
+            layout = new BoardLayout(ctx.Width, ctx.Height, config.CellSize, config.FrameThicknessCells, machine.Reach(ctx));
 
-            boardView.Initialize(config, ctx, layout, new VisibilityLayer(ctx));
+            boardView.Initialize(config, ctx, layout, new VisibilityLayer(ctx), machine);
             boardView.Rebuild(session.State);
             inputController.Initialize(
                 run,
@@ -280,11 +282,12 @@ namespace GateRush.Runtime
             boardCamera.orthographicSize = size;
 
             // The board stays centred on its view; the camera moves so the
-            // board sits centred between the HUD bands.
+            // board and its machines sit centred between the HUD bands.
             var boardCenter = boardView.transform.position;
+            var offset = layout.CameraCenterOffset(size, top, bottom);
             boardCamera.transform.position = new Vector3(
-                boardCenter.x,
-                boardCenter.y + layout.CameraCenterOffset(size, top, bottom),
+                boardCenter.x + offset.x,
+                boardCenter.y + offset.y,
                 boardCamera.transform.position.z);
 
             backgroundView.Fit(boardCamera);
@@ -398,28 +401,6 @@ namespace GateRush.Runtime
             }
 
             return isAssigned;
-        }
-
-        /// <summary>
-        /// M8: the lock identifier doubles as the badge colour, so the palette is
-        /// indexed by lock id. An id outside it is an error worth a message at
-        /// load rather than a silent colour at draw time; the lock and its keys
-        /// are then drawn in the unknown-badge colour.
-        /// </summary>
-        private void LogLockIdsOutsideBadgePalette(LevelContext ctx, string name)
-        {
-            var owners = ctx.LockOwnerIndices;
-            for (var i = 0; i < owners.Count; i++)
-            {
-                var lockId = ctx.SpecAt(owners[i]).LockId.Value;
-                if (!config.TryGetBadgeColor(lockId, out _))
-                {
-                    Debug.LogError(
-                        $"Level '{name}': lock {lockId} (block slot {owners[i]}) has no entry in " +
-                        $"{config.name}'s lock badge palette; its lock and key badges are drawn in the unknown-badge colour.",
-                        this);
-                }
-            }
         }
     }
 }
