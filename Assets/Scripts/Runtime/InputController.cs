@@ -7,25 +7,20 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Wires the Input System to the drag model: pointer presses, moves and
-    /// releases go to <see cref="DragController"/>, each step it takes goes to
-    /// <see cref="BoardView"/> to play, and the move it produces goes to
-    /// <see cref="LevelSession"/>. <b>R</b> asks for a restart. Decides
-    /// nothing itself.
+    /// releases go to <see cref="DragController"/>, the block's continuous
+    /// position and its settle on release go to <see cref="BoardView"/>, and
+    /// the move the release produces goes to <see cref="LevelSession"/>.
+    /// <b>R</b> asks for a restart. Decides nothing itself.
     /// </summary>
     /// <remarks>
     /// <para>Mouse and touch share one path through <see cref="Pointer.current"/>:
     /// a touchscreen's primary touch is a pointer like a mouse is. A move the
     /// session rejects is a bug — every drag produces a legal move by
     /// construction — so it is logged as an error, never swallowed.</para>
-    /// <para>No drag starts while the view is busy — steps still playing, or a
+    /// <para>No drag starts while the view is busy — a block settling, or a
     /// move being presented — or once the level has ended.</para>
-    /// <para><b>Subscription.</b> Awake and OnEnable order across GameObjects
-    /// is not guaranteed, so this component's OnEnable may run before the
-    /// bootstrap calls <see cref="Initialize"/>. The subscription to
-    /// <see cref="DragController.Stepped"/> is therefore made in
-    /// <see cref="Initialize"/> as well; OnEnable and OnDisable re-subscribe and
-    /// unsubscribe only when a drag controller exists, and a flag keeps the
-    /// two paths from subscribing twice.</para>
+    /// <para>The drag advances on <see cref="Time.unscaledDeltaTime"/>, the
+    /// clock the countdown runs on.</para>
     /// </remarks>
     public sealed class InputController : MonoBehaviour
     {
@@ -34,7 +29,6 @@ namespace GateRush.Runtime
         private BoardLayout layout;
         private BoardView view;
         private Camera boardCamera;
-        private bool isSubscribed;
 
         /// <summary>
         /// Raised after a move from a drag has been applied, with the state it
@@ -54,18 +48,11 @@ namespace GateRush.Runtime
         public void Initialize(
             LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera)
         {
-            Unsubscribe();
-
             this.run = run;
             this.drag = drag;
             this.layout = layout;
             this.view = view;
             this.boardCamera = boardCamera;
-
-            if (isActiveAndEnabled)
-            {
-                Subscribe();
-            }
         }
 
         /// <summary>
@@ -84,42 +71,9 @@ namespace GateRush.Runtime
             view.Snap(blockIndex, run.Session.State.Origins[blockIndex]);
         }
 
-        private void OnEnable()
-        {
-            Subscribe();
-        }
-
         private void OnDisable()
         {
             CancelDrag();
-            Unsubscribe();
-        }
-
-        private void Subscribe()
-        {
-            if (isSubscribed || drag == null)
-            {
-                return;
-            }
-
-            drag.Stepped += OnStepped;
-            isSubscribed = true;
-        }
-
-        private void Unsubscribe()
-        {
-            if (!isSubscribed)
-            {
-                return;
-            }
-
-            drag.Stepped -= OnStepped;
-            isSubscribed = false;
-        }
-
-        private void OnStepped(Coord origin)
-        {
-            view.EnqueueStep(origin);
         }
 
         private void Update()
@@ -168,8 +122,7 @@ namespace GateRush.Runtime
             }
             else
             {
-                // The steps it takes reach the view through Stepped.
-                drag.Update(grid);
+                view.ShowDragged(drag.Update(grid, Time.unscaledDeltaTime));
             }
         }
 
@@ -180,10 +133,13 @@ namespace GateRush.Runtime
             var blockIndex = drag.BlockIndex;
             var move = drag.End(grid, out var push);
 
+            // Settle before applying: the presentation the move starts waits
+            // for the settle to finish. No move settles the block back at its
+            // start.
+            view.Settle(move.HasValue ? move.Value.TargetOrigin : before.Origins[blockIndex]);
+
             if (!move.HasValue)
             {
-                // No move means the block ended where it started; the queued
-                // steps finish playing it back there.
                 return;
             }
 

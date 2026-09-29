@@ -14,21 +14,21 @@ namespace GateRush.Runtime
     /// count matters to the player. What is shown is decided by
     /// <see cref="VisibilityLayer"/>; this component only turns that into
     /// sprites and labels, all sized and coloured from <see cref="RuntimeConfig"/>.
-    /// It also animates the two things that happen between redraws: a dragged
-    /// block walking cell by cell (<see cref="StepPlayback"/>), and a cleared
-    /// block leaving through its gate.
+    /// It also shows what happens between redraws: a dragged block floating at
+    /// a continuous position and settling into its cell on release (Module 13),
+    /// and a cleared block leaving through its gate.
     /// </summary>
     /// <remarks>
     /// <para>Everything is rebuilt from scratch on every <see cref="Rebuild"/>.
     /// Positions are local to this transform: the board is centred on it. Each
     /// shown block gets one root placed at its origin's corner with one sprite
-    /// per cell beneath it, so a step moves a block by moving that root alone.
-    /// </para>
+    /// per cell beneath it, so the dragged block moves by moving that root
+    /// alone while the rest of the board stays on the grid.</para>
     /// <para><b>Presenting a move.</b> <see cref="Present"/> holds the new
-    /// state back until the dragged block's queued steps have played, then
-    /// plays the clear effects, and only then redraws from the new state and
-    /// reports done. <see cref="IsBusy"/> is true for all of that, so input can
-    /// never start a drag from a stale picture.</para>
+    /// state back until the dragged block has settled, then plays the clear
+    /// effects, and only then redraws from the new state and reports done.
+    /// <see cref="IsBusy"/> is true for all of that, so input can never start
+    /// a drag from a stale picture.</para>
     /// <para><b>Tweens.</b> DOTween keeps static state, and Enter Play Mode
     /// runs without a domain reload. Every tween this view starts carries it as
     /// its id and is killed by <see cref="Rebuild"/>, <see cref="Clear"/>, and
@@ -45,9 +45,11 @@ namespace GateRush.Runtime
         private VisibilityLayer visibility;
         private BoardState drawnState;
 
-        private StepPlayback playback;
-        private int steppingBlock = -1;
-        private Tween stepTween;
+        private int draggedBlock = -1;
+
+        // Null whenever no settle is playing: cleared on completion and on
+        // every kill, or IsBusy would hold for good and lock input.
+        private Tween settleTween;
 
         // A presentation holds its state and callback from Present until it
         // finishes; the effects flag says whether its sequence has started.
@@ -58,10 +60,10 @@ namespace GateRush.Runtime
         private Action presentationDone;
 
         /// <summary>
-        /// True while queued steps are still playing or a move is being
+        /// True while a released block is settling or a move is being
         /// presented. Input must not start a drag while it holds.
         /// </summary>
-        public bool IsBusy => stepTween != null || isPresenting;
+        public bool IsBusy => settleTween != null || isPresenting;
 
         /// <summary>Binds the view to one level. Call before the first <see cref="Rebuild"/>.</summary>
         public void Initialize(RuntimeConfig config, LevelContext ctx, BoardLayout layout, VisibilityLayer visibility)
@@ -71,7 +73,6 @@ namespace GateRush.Runtime
             this.ctx = ctx;
             this.layout = layout;
             this.visibility = visibility;
-            playback = new StepPlayback(config.StepSeconds, config.MaxLagSteps);
         }
 
         /// <summary>
@@ -93,43 +94,68 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Starts playing the steps of a drag of block
-        /// <paramref name="blockIndex"/>: each <see cref="EnqueueStep"/> after
-        /// this moves that block.
+        /// Starts showing a drag of block <paramref name="blockIndex"/>:
+        /// <see cref="ShowDragged"/> and <see cref="Settle"/> after this move
+        /// that block.
         /// </summary>
         public void BeginDrag(int blockIndex)
         {
-            KillStepTween();
-            steppingBlock = blockIndex;
+            KillSettle();
+            draggedBlock = blockIndex;
         }
 
         /// <summary>
-        /// Queues one single-cell step of the dragged block, to be shown after
-        /// every step queued before it — fed from <see cref="DragController.Stepped"/>.
+        /// Shows the dragged block at the continuous origin
+        /// <paramref name="origin"/>, in cell units — fed every frame from
+        /// <see cref="DragController.Position"/>. Does nothing when the block is
+        /// not drawn.
         /// </summary>
-        public void EnqueueStep(Coord origin)
+        public void ShowDragged(Vector2 origin)
         {
-            if (steppingBlock < 0)
+            if (drawnBlocks.TryGetValue(draggedBlock, out var block))
+            {
+                block.Root.localPosition = GridToLocal(origin);
+            }
+        }
+
+        /// <summary>
+        /// Tweens the dragged block from where it was released into the cell
+        /// <paramref name="origin"/>. A block already there — a push in place,
+        /// or a release exactly on a cell — is placed at once with no tween, so
+        /// a clear effect waiting on the settle starts without delay.
+        /// <see cref="IsBusy"/> holds while the tween plays.
+        /// </summary>
+        public void Settle(Coord origin)
+        {
+            KillSettle();
+            if (!drawnBlocks.TryGetValue(draggedBlock, out var block))
             {
                 return;
             }
 
-            playback.Enqueue(origin);
-            if (stepTween == null)
+            var target = OriginToLocal(origin);
+            if ((Vector2)block.Root.localPosition == target)
             {
-                PlayNextStep();
+                block.Root.localPosition = target;
+                return;
             }
+
+            settleTween = block.Root
+                .DOLocalMove(target, config.SettleSeconds)
+                .SetEase(config.SettleEase)
+                .SetId(this)
+                .OnComplete(OnSettled);
         }
 
         /// <summary>
         /// Shows block <paramref name="blockIndex"/> at
-        /// <paramref name="origin"/> at once, dropping any steps still queued —
-        /// for a drag that is cancelled or whose move was rejected. Does nothing
-        /// for a block that is not drawn.
+        /// <paramref name="origin"/> at once, stopping any settle — for a drag
+        /// that is cancelled or whose move was rejected. Does nothing for a
+        /// block that is not drawn.
         /// </summary>
         public void Snap(int blockIndex, Coord origin)
         {
-            KillStepTween();
+            KillSettle();
 
             if (drawnBlocks.TryGetValue(blockIndex, out var block))
             {
@@ -138,8 +164,8 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Shows the result of a move: waits for the dragged block's queued
-        /// steps to finish, plays the effect of every block in
+        /// Shows the result of a move: waits for the dragged block to settle,
+        /// plays the effect of every block in
         /// <paramref name="clears"/>, then redraws from <paramref name="state"/>
         /// and calls <paramref name="onDone"/>. <see cref="IsBusy"/> holds
         /// throughout. A <see cref="Rebuild"/> before then abandons it, and
@@ -153,7 +179,7 @@ namespace GateRush.Runtime
             presentedClears = clears ?? throw new ArgumentNullException(nameof(clears));
             presentationDone = onDone;
 
-            if (stepTween == null)
+            if (settleTween == null)
             {
                 PlayEffects();
             }
@@ -190,22 +216,21 @@ namespace GateRush.Runtime
         {
             // The presentation, if any, is kept so OnEnable can finish it.
             DOTween.Kill(this);
-            stepTween = null;
-            playback?.Clear();
+            settleTween = null;
             areEffectsPlaying = false;
         }
 
         private void OnDestroy()
         {
             DOTween.Kill(this);
+            settleTween = null;
         }
 
         private void StopAnimations()
         {
             DOTween.Kill(this);
-            stepTween = null;
-            playback?.Clear();
-            steppingBlock = -1;
+            settleTween = null;
+            draggedBlock = -1;
             isPresenting = false;
             areEffectsPlaying = false;
             presentedState = null;
@@ -213,38 +238,32 @@ namespace GateRush.Runtime
             presentationDone = null;
         }
 
-        private void KillStepTween()
-        {
-            stepTween?.Kill();
-            stepTween = null;
-            playback?.Clear();
-        }
-
         /// <summary>
-        /// Tweens the dragged block one cell to the next queued origin and
-        /// chains itself on completion. When the queue is empty the playback
-        /// rests, and a presentation waiting for it starts its effects.
+        /// Stops a settle where it is. A presentation waiting on it starts its
+        /// effects rather than waiting for a completion that will never come.
         /// </summary>
-        private void PlayNextStep()
+        private void KillSettle()
         {
-            if (!drawnBlocks.TryGetValue(steppingBlock, out var block)
-                || !playback.TryDequeue(out var origin, out var seconds))
+            if (settleTween == null)
             {
-                stepTween = null;
-                playback.Clear();
-                if (isPresenting && !areEffectsPlaying)
-                {
-                    PlayEffects();
-                }
-
                 return;
             }
 
-            stepTween = block.Root
-                .DOLocalMove(OriginToLocal(origin), seconds)
-                .SetEase(config.StepEase)
-                .SetId(this)
-                .OnComplete(PlayNextStep);
+            settleTween.Kill();
+            OnSettled();
+        }
+
+        /// <summary>
+        /// The settle is over, finished or killed: input may resume, and a
+        /// presentation waiting for it starts its effects.
+        /// </summary>
+        private void OnSettled()
+        {
+            settleTween = null;
+            if (isPresenting && !areEffectsPlaying)
+            {
+                PlayEffects();
+            }
         }
 
         private void PlayEffects()

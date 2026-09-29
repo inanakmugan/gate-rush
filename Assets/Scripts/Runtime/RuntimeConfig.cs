@@ -9,8 +9,8 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Every tunable value the board's presentation and input read: palette,
-    /// tints, sizes, margins, sorting orders, the drag threshold, label
-    /// settings, movement and clear-effect timings, and the result panel's
+    /// tints, sizes, margins, sorting orders, the drag settings, label
+    /// settings, settle and clear-effect timings, and the result panel's
     /// titles. Nothing in <c>GateRush.Runtime</c> hardcodes one of these at a
     /// call site. Sizes are in cells unless named otherwise, so the board keeps
     /// its proportions whatever <see cref="CellSize"/> is.
@@ -54,15 +54,17 @@ namespace GateRush.Runtime
         [Tooltip("How far the pointer must travel, in cells, before a release at the start reads as a push.")]
         [SerializeField] private float pushThresholdCells = 0.3f;
 
-        [Header("Movement")]
-        [Tooltip("Seconds one single-cell step of a dragged block takes to show, with no backlog.")]
-        [SerializeField] private float stepSeconds = 0.06f;
+        [Tooltip("How fast, per second, a dragged block catches up with the finger. Higher follows more tightly; the lag is the same at any frame rate.")]
+        [SerializeField] private float followRate = 20f;
 
-        [Tooltip("Easing of each single-cell step. Linear keeps a long drag smooth; an in-out ease stutters at every cell.")]
-        [SerializeField] private Ease stepEase = Ease.Linear;
+        [Tooltip("How far, in cells, a block stopped against a corner may be off a corridor's line and still slide into it. 0 turns the assist off; must stay below 0.5.")]
+        [SerializeField] private float cornerAssistCells = 0.3f;
 
-        [Tooltip("Queued steps above this many speed up, so any backlog plays out in about this many ordinary steps. No step is ever skipped.")]
-        [SerializeField, Min(1)] private int maxLagSteps = 3;
+        [Header("Settle")]
+        [Tooltip("Seconds a released block takes to settle from where it was dropped into its cell.")]
+        [SerializeField] private float settleSeconds = 0.08f;
+
+        [SerializeField] private Ease settleEase = Ease.OutQuad;
 
         [Header("Clear effect")]
         [Tooltip("Seconds a destroyed block takes to shrink and fade toward its gate.")]
@@ -171,14 +173,17 @@ namespace GateRush.Runtime
         /// <summary>Pointer travel, in cells, that makes a release at the start a push.</summary>
         public float PushThresholdCells => pushThresholdCells;
 
-        /// <summary>Seconds one single-cell step takes with no backlog.</summary>
-        public float StepSeconds => stepSeconds;
+        /// <summary>How fast the dragged block's smoothed pointer closes on the real one, per second (<see cref="DragSettings.FollowRate"/>).</summary>
+        public float FollowRate => followRate;
 
-        /// <summary>Easing of each single-cell step.</summary>
-        public Ease StepEase => stepEase;
+        /// <summary>How far off a corridor's line a block may be and still slide in, in cells (<see cref="DragSettings.CornerAssistCells"/>).</summary>
+        public float CornerAssistCells => cornerAssistCells;
 
-        /// <summary>The backlog of steps above which steps speed up (<see cref="StepPlayback"/>).</summary>
-        public int MaxLagSteps => maxLagSteps;
+        /// <summary>Seconds a released block takes to settle into its cell.</summary>
+        public float SettleSeconds => settleSeconds;
+
+        /// <summary>Easing of the settle.</summary>
+        public Ease SettleEase => settleEase;
 
         /// <summary>Seconds a destroyed block's exit takes.</summary>
         public float ClearSeconds => clearSeconds;
@@ -324,19 +329,14 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Camera Margin Cells may not be negative.");
             }
 
-            if (!(pushThresholdCells > 0f))
+            foreach (var problem in DragSettings.Problems(pushThresholdCells, followRate, cornerAssistCells))
             {
-                problems.Add($"{name}: Push Threshold Cells must be positive.");
+                problems.Add($"{name}: {problem}");
             }
 
-            if (!(stepSeconds > 0f))
+            if (!(settleSeconds > 0f))
             {
-                problems.Add($"{name}: Step Seconds must be positive.");
-            }
-
-            if (maxLagSteps < 1)
-            {
-                problems.Add($"{name}: Max Lag Steps must be at least 1.");
+                problems.Add($"{name}: Settle Seconds must be positive.");
             }
 
             if (!(clearSeconds > 0f))
