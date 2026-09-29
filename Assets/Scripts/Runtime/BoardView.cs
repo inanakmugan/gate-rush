@@ -5,25 +5,36 @@ using DG.Tweening;
 using GateRush.Core;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Draws one board state with placeholder visuals: grid, walls, gates,
-    /// generators, blocks, shutters and elevators, plus a count label wherever a
-    /// count matters to the player. What is shown is decided by
-    /// <see cref="VisibilityLayer"/>; this component only turns that into
-    /// sprites and labels, all sized and coloured from <see cref="RuntimeConfig"/>.
-    /// It also shows what happens between redraws: a dragged block floating at
-    /// a continuous position and settling into its cell on release (Module 13),
-    /// and a cleared block leaving through its gate.
+    /// Draws one board state: the floor, the frame with walls drawn as frame,
+    /// gates as coloured arrowed frame segments, generators, blocks, shutters
+    /// and elevators, plus a count label wherever a count matters to the
+    /// player. What is shown is decided by <see cref="VisibilityLayer"/>; this
+    /// component only turns that into sprites and labels, all sized and
+    /// coloured from <see cref="RuntimeConfig"/>. It also shows what happens
+    /// between redraws: a dragged block floating at a continuous position and
+    /// settling into its cell on release (Module 13), and a cleared block
+    /// leaving through its gate.
     /// </summary>
     /// <remarks>
     /// <para>Everything is rebuilt from scratch on every <see cref="Rebuild"/>.
-    /// Positions are local to this transform: the board is centred on it. Each
-    /// shown block gets one root placed at its origin's corner with one sprite
-    /// per cell beneath it, so the dragged block moves by moving that root
-    /// alone while the rest of the board stays on the grid.</para>
+    /// Positions are local to this transform: the board is centred on it.</para>
+    /// <para><b>Shapes from quarters (Module 15).</b> Blocks, the frame and open
+    /// gates are drawn from the generated quarter sprites, laid out by
+    /// <see cref="BlockTiling"/> and <see cref="FrameTiling"/> and tinted at
+    /// runtime. Each is drawn twice: a darker copy offset downward (the lip),
+    /// then the face. Frozen, locked and key-carrying blocks, shutters,
+    /// generators, elevators and closed gates keep their 2.1 placeholder
+    /// marks, placed on the new board; 2.4b redraws them.</para>
+    /// <para><b>Blocks.</b> Each shown block gets one root at its origin's
+    /// corner holding everything it draws: a <c>Lip</c> group, a <c>Face</c>
+    /// group (quarters plus studs and gloss, or the axis arrow), beneath
+    /// squares, labels and badges. The drag, the settle and the exit effect
+    /// move or scale that root alone, so every part follows it.</para>
     /// <para><b>Presenting a move.</b> <see cref="Present"/> holds the new
     /// state back until the dragged block has settled, then plays the clear
     /// effects, and only then redraws from the new state and reports done.
@@ -44,6 +55,12 @@ namespace GateRush.Runtime
         private BoardLayout layout;
         private VisibilityLayer visibility;
         private BoardState drawnState;
+
+        // Static per level, so tiled once in Initialize.
+        private IReadOnlyList<QuarterTile> frameTiles;
+        private IReadOnlyList<QuarterTile>[] gateTiles;
+        private Func<QuarterTile, Rect> blockQuarterRect;
+        private Func<QuarterTile, Rect> frameQuarterRect;
 
         private int draggedBlock = -1;
 
@@ -73,6 +90,19 @@ namespace GateRush.Runtime
             this.ctx = ctx;
             this.layout = layout;
             this.visibility = visibility;
+
+            frameTiles = FrameTiling.Compute(ctx);
+            gateTiles = new IReadOnlyList<QuarterTile>[ctx.Gates.Count];
+            for (var g = 0; g < ctx.Gates.Count; g++)
+            {
+                gateTiles[g] = BlockTiling.Compute(FrameTiling.GateCells(ctx, g));
+            }
+
+            // A block's quarters are local to its root, which sits at the
+            // origin's corner; the frame's and gates' are in grid units.
+            blockQuarterRect = tile => CellRectToLocal(BlockTiling.QuarterRect(tile));
+            frameQuarterRect = tile => GridRectToLocal(
+                FrameTiling.QuarterRect(tile, ctx.Width, ctx.Height, layout.FrameThicknessCells));
         }
 
         /// <summary>
@@ -85,7 +115,8 @@ namespace GateRush.Runtime
             Clear();
             drawnState = state;
 
-            DrawCells();
+            DrawFloor();
+            DrawFrame();
             DrawGates(state);
             DrawGenerators(state);
             DrawBlocks(state);
@@ -304,6 +335,8 @@ namespace GateRush.Runtime
         /// <summary>
         /// A destroyed block shrinks around its footprint's centre and fades
         /// while travelling toward, and through, the gate it was cleared at.
+        /// The fade reaches every renderer and label under the block's root:
+        /// lip, face, studs, gloss, arrow, marks.
         /// </summary>
         private Tween ExitEffect(DrawnBlock block, BoardEdge gateEdge)
         {
@@ -328,9 +361,11 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A surviving layered block peels its removed outer colour: each outer
-        /// cell shrinks about its own centre and fades, uncovering a full cell
-        /// of the exposed colour beneath it.
+        /// A surviving layered block peels its removed outer colour: a new face
+        /// in the exposed colour is drawn beneath, the lip takes the exposed
+        /// colour at once, and the old face — lifted above every part of the new
+        /// one by a sorting group — shrinks about the footprint's centre and
+        /// fades away.
         /// </summary>
         private Tween PeelEffect(DrawnBlock block, BlockColor exposed)
         {
@@ -339,29 +374,29 @@ namespace GateRush.Runtime
                 block.BeneathSquares[i].gameObject.SetActive(false);
             }
 
-            var fills = block.Fills;
-            var scales = new Vector3[fills.Count];
-            var colors = new Color[fills.Count];
-            for (var i = 0; i < fills.Count; i++)
+            var exposedFill = config.BlockFill(exposed);
+            var lipFill = config.LipFill(exposedFill);
+            foreach (var lip in block.Lip.GetComponentsInChildren<SpriteRenderer>())
             {
-                var fill = fills[i];
-                var under = Instantiate(fill, fill.transform.parent);
-                under.color = config.BlockFill(exposed);
-                under.sortingOrder = config.BlockOrder;
-                fill.sortingOrder = config.PeelOrder;
-                scales[i] = fill.transform.localScale;
-                colors[i] = fill.color;
+                lip.color = lipFill;
             }
 
+            var peeling = block.Face;
+            var group = peeling.gameObject.AddComponent<SortingGroup>();
+            group.sortingOrder = config.PeelOrder;
+            block.Face = DrawFace(block, exposedFill);
+
+            var center = block.FootprintCenter;
+            var fade = new Fade(peeling);
+
+            // The face group sits at the root's origin; the same shift as the
+            // exit effect keeps the footprint's centre fixed while it shrinks.
             return DOVirtual.Float(0f, 1f, config.PeelSeconds, t =>
                 {
-                    for (var i = 0; i < fills.Count; i++)
-                    {
-                        fills[i].transform.localScale = scales[i] * (1f - t);
-                        var color = colors[i];
-                        color.a *= 1f - t;
-                        fills[i].color = color;
-                    }
+                    var scale = 1f - t;
+                    peeling.localScale = new Vector3(scale, scale, 1f);
+                    peeling.localPosition = center * t;
+                    fade.Apply(1f - t);
                 })
                 .SetEase(config.PeelEase);
         }
@@ -381,36 +416,82 @@ namespace GateRush.Runtime
             }
         }
 
-        private void DrawCells()
+        /// <summary>
+        /// One floor tile per grid cell, walls included — the gap around a wall
+        /// drawn as frame then reads as a groove in the floor — over a backing
+        /// that reaches under the frame, so no background shows between them.
+        /// </summary>
+        private void DrawFloor()
         {
-            var side = CellsToWorld(1f - config.CellGap);
+            var underlay = config.FloorUnderlayCells;
+            AddSquare(
+                transform, "Floor underlay",
+                GridToLocal(new Vector2(ctx.Width * 0.5f, ctx.Height * 0.5f)),
+                new Vector2(CellsToWorld(ctx.Width + 2f * underlay), CellsToWorld(ctx.Height + 2f * underlay)),
+                config.FloorColor, config.FloorUnderlayOrder);
+
+            var floor = AddGroup(transform, "Floor", Vector2.zero);
+            var tile = new Vector2(layout.CellSize, layout.CellSize);
             for (var y = 0; y < ctx.Height; y++)
             {
                 for (var x = 0; x < ctx.Width; x++)
                 {
                     var cell = new Coord(x, y);
-                    var fill = ctx.IsStaticWall(cell) ? config.WallColor : config.EmptyCellColor;
-                    AddSprite(transform, $"Cell {cell}", layout.CellCenter(cell), new Vector2(side, side), fill, config.CellOrder);
+                    AddSprite(floor, $"Floor {cell}", config.FloorSprite, layout.CellCenter(cell), tile, config.FloorColor, config.FloorOrder);
                 }
             }
         }
 
+        /// <summary>The frame ring and every wall cell, lip then face.</summary>
+        private void DrawFrame()
+        {
+            var lip = AddGroup(transform, "Frame lip", LipOffset());
+            AddQuarters(lip, frameTiles, frameQuarterRect, config.LipFill(config.FrameColor), config.FrameLipOrder);
+
+            var face = AddGroup(transform, "Frame", Vector2.zero);
+            AddQuarters(face, frameTiles, frameQuarterRect, config.FrameColor, config.FrameOrder);
+        }
+
+        /// <summary>
+        /// An open gate is its own segment of the frame, in the gate's colour,
+        /// with a lip, a face and a white arrow pointing out of the board. A
+        /// closed gate (M2) keeps its colourless bar and count, filling the
+        /// hole the frame leaves for it; 2.4b gives it ice.
+        /// </summary>
         private void DrawGates(BoardState state)
         {
             for (var g = 0; g < ctx.Gates.Count; g++)
             {
                 var gate = ctx.Gates[g];
                 var visual = visibility.Gate(state, g);
-                var fill = visual.IsOpen ? config.BlockFill(visual.Color.Value) : config.ClosedGateColor;
-                var center = DrawEdgeBar($"Gate {gate.Id}", gate.Edge, gate.Offset, gate.Width, fill);
+                var span = GridRectToLocal(FrameTiling.EdgeSpanRect(
+                    ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, layout.FrameThicknessCells));
 
                 if (!visual.IsOpen)
                 {
-                    AddLabel(transform, $"Gate {gate.Id} count", center, visual.OpensInClears, config.BadgeLabelFontSize, config.LabelColor);
+                    AddSquare(transform, $"Gate {gate.Id}", span.center, span.size, config.ClosedGateColor, config.EdgeFeatureOrder);
+                    AddLabel(transform, $"Gate {gate.Id} count", span.center, visual.OpensInClears, config.BadgeLabelFontSize, config.LabelColor);
+                    continue;
                 }
+
+                var fill = config.BlockFill(visual.Color.Value);
+                var root = AddGroup(transform, $"Gate {gate.Id}", Vector2.zero);
+                var lip = AddGroup(root, "Lip", LipOffset());
+                AddQuarters(lip, gateTiles[g], frameQuarterRect, config.LipFill(fill), config.FrameLipOrder);
+                AddQuarters(root, gateTiles[g], frameQuarterRect, fill, config.FrameOrder);
+
+                var arrow = CellsToWorld(config.GateArrowSizeCells);
+                AddSprite(
+                    root, "Arrow", config.GateArrowSprite, span.center, new Vector2(arrow, arrow),
+                    config.GateArrowColor, config.GateArrowOrder,
+                    Vector2.SignedAngle(Vector2.up, EdgeOutward(gate.Edge)));
             }
         }
 
+        /// <summary>
+        /// A generator keeps its placeholder bar and queue count, drawn on the
+        /// frame at the frame's thickness; the frame runs on beneath it.
+        /// </summary>
         private void DrawGenerators(BoardState state)
         {
             for (var g = 0; g < ctx.Generators.Count; g++)
@@ -423,8 +504,10 @@ namespace GateRush.Runtime
                 }
 
                 var generator = ctx.Generators[g];
-                var center = DrawEdgeBar($"Generator {generator.Id}", generator.Edge, generator.Offset, generator.Width, config.GeneratorColor);
-                AddLabel(transform, $"Generator {generator.Id} count", center, queued, config.BadgeLabelFontSize, config.LabelColor);
+                var span = GridRectToLocal(FrameTiling.EdgeSpanRect(
+                    ctx.Width, ctx.Height, generator.Edge, generator.Offset, generator.Width, layout.FrameThicknessCells));
+                AddSquare(transform, $"Generator {generator.Id}", span.center, span.size, config.GeneratorColor, config.EdgeFeatureOrder);
+                AddLabel(transform, $"Generator {generator.Id} count", span.center, queued, config.BadgeLabelFontSize, config.LabelColor);
             }
         }
 
@@ -444,31 +527,97 @@ namespace GateRush.Runtime
                 root.SetParent(transform, false);
                 root.localPosition = OriginToLocal(state.Origins[i]);
 
+                var spec = ctx.SpecAt(i);
+                var cells = spec.Cells;
+                var tiles = BlockTiling.Compute(cells);
+
+                // M3: a frozen block shows its shape in the frozen tint, never
+                // its colour; studs or its axis arrow still show.
                 var fill = visual.IsFrozen ? config.FrozenTint : config.BlockFill(visual.OuterColor.Value);
-                var cells = ctx.SpecAt(i).Cells;
-                var rects = BlockCellRects.Compute(cells, config.CellGap);
-                var drawn = new DrawnBlock(root, FootprintCenterInBlock(cells));
+
+                var lip = AddGroup(root, "Lip", LipOffset());
+                AddQuarters(lip, tiles, blockQuarterRect, config.LipFill(fill), config.BlockLipOrder);
+
+                var drawn = new DrawnBlock(root, FootprintCenterInBlock(cells), lip, cells, tiles, spec.Axis);
+                drawn.Face = DrawFace(drawn, fill);
                 drawnBlocks[i] = drawn;
 
-                for (var c = 0; c < cells.Count; c++)
+                if (visual.BeneathColor.HasValue)
                 {
-                    drawn.Fills.Add(AddSprite(
-                        root, $"Cell {cells[c]}", rects[c].center * layout.CellSize, rects[c].size * layout.CellSize,
-                        fill, config.BlockOrder));
-
-                    var center = CellCenterInBlock(cells[c]);
-
-                    if (visual.BeneathColor.HasValue)
+                    var beneath = config.BlockFill(visual.BeneathColor.Value);
+                    for (var c = 0; c < cells.Count; c++)
                     {
-                        drawn.BeneathSquares.Add(AddSprite(
-                            root, $"Beneath {cells[c]}", center, new Vector2(beneathSide, beneathSide),
-                            config.BlockFill(visual.BeneathColor.Value), config.BeneathColorOrder));
+                        drawn.BeneathSquares.Add(AddSquare(
+                            root, $"Beneath {cells[c]}", CellCenterInBlock(cells[c]), new Vector2(beneathSide, beneathSide),
+                            beneath, config.BeneathColorOrder));
                     }
                 }
 
                 // Labels and badges sit on the first cell of the footprint.
                 DrawBlockMarks(root, cells[0], visual);
             }
+        }
+
+        /// <summary>
+        /// A block's face under its root: the quarter tiles, then either studs
+        /// with their gloss on every cell or, for an axis-restricted block
+        /// (M7), one double-headed arrow along its axis instead.
+        /// </summary>
+        private Transform DrawFace(DrawnBlock block, Color fill)
+        {
+            var face = AddGroup(block.Root, "Face", Vector2.zero);
+            AddQuarters(face, block.Tiles, blockQuarterRect, fill, config.BlockOrder);
+
+            if (block.Axis != MovementAxis.Free)
+            {
+                DrawAxisArrow(face, block);
+                return face;
+            }
+
+            var cellSize = new Vector2(layout.CellSize, layout.CellSize);
+            for (var c = 0; c < block.Cells.Count; c++)
+            {
+                var cell = block.Cells[c];
+                var center = CellCenterInBlock(cell);
+                AddSprite(face, $"Studs {cell}", config.StudsSprite, center, cellSize, fill, config.StudOrder);
+                AddSprite(face, $"Gloss {cell}", config.StudGlossSprite, center, cellSize, config.GlossColor, config.GlossOrder);
+            }
+
+            return face;
+        }
+
+        /// <summary>
+        /// The M7 arrow: a 9-sliced sprite through the centre of the
+        /// footprint's bounding box, along the block's axis, stopping
+        /// <see cref="RuntimeConfig.AxisArrowEndInsetCells"/> short of each end.
+        /// It is scaled uniformly to its thickness and stretched only in its
+        /// sliced middle, so the heads keep their shape at any length.
+        /// </summary>
+        private void DrawAxisArrow(Transform face, DrawnBlock block)
+        {
+            FootprintBounds(block.Cells, out var minX, out var maxX, out var minY, out var maxY);
+            var isHorizontal = block.Axis == MovementAxis.HorizontalOnly;
+            var alongCells = isHorizontal ? maxX + 1 - minX : maxY + 1 - minY;
+            var length = CellsToWorld(alongCells - 2f * config.AxisArrowEndInsetCells);
+
+            var sprite = config.AxisArrowSprite;
+            var spriteSize = sprite.bounds.size;
+            var scale = CellsToWorld(config.AxisArrowThicknessCells) / spriteSize.y;
+
+            var go = new GameObject("Axis arrow");
+            go.transform.SetParent(face, false);
+            go.transform.localPosition = block.FootprintCenter;
+            go.transform.localRotation = Quaternion.Euler(
+                0f, 0f, isHorizontal ? 0f : Vector2.SignedAngle(Vector2.right, Vector2.up));
+            go.transform.localScale = new Vector3(scale, scale, 1f);
+
+            var renderer = go.AddComponent<SpriteRenderer>();
+            renderer.sprite = sprite;
+            renderer.sharedMaterial = config.SpriteMaterial;
+            renderer.drawMode = SpriteDrawMode.Sliced;
+            renderer.size = new Vector2(length / scale, spriteSize.y);
+            renderer.color = config.AxisArrowColor;
+            renderer.sortingOrder = config.AxisArrowOrder;
         }
 
         private void DrawBlockMarks(Transform root, Coord labelCell, BlockVisual visual)
@@ -484,14 +633,14 @@ namespace GateRush.Runtime
             }
 
             // Badges hug the top corners of the label cell: lock left, key right.
-            var inset = (1f - config.CellGap - config.BadgeSize) * 0.5f;
+            var inset = 0.5f - config.BadgeInsetCells - config.BadgeSize * 0.5f;
             var badge = new Vector2(CellsToWorld(config.BadgeSize), CellsToWorld(config.BadgeSize));
 
             if (visual.LockId.HasValue)
             {
                 config.TryGetBadgeColor(visual.LockId.Value, out var lockColor);
                 var lockCenter = center + new Vector2(-CellsToWorld(inset), CellsToWorld(inset));
-                AddSprite(root, "Lock badge", lockCenter, badge, lockColor, config.BadgeOrder);
+                AddSquare(root, "Lock badge", lockCenter, badge, lockColor, config.BadgeOrder);
                 AddLabel(root, "Lock count", lockCenter, visual.KeysStillRequired, config.BadgeLabelFontSize, config.LabelColor);
             }
 
@@ -499,7 +648,7 @@ namespace GateRush.Runtime
             {
                 config.TryGetBadgeColor(visual.KeyTargetLockId.Value, out var keyColor);
                 var keyCenter = center + new Vector2(CellsToWorld(inset), CellsToWorld(inset));
-                AddSprite(root, "Key badge", keyCenter, badge, keyColor, config.BadgeOrder);
+                AddSquare(root, "Key badge", keyCenter, badge, keyColor, config.BadgeOrder);
             }
         }
 
@@ -515,7 +664,7 @@ namespace GateRush.Runtime
 
                 var shutter = ctx.Shutters[s];
                 var center = RegionCenter(shutter.Min, shutter.Max);
-                AddSprite(transform, $"Shutter {shutter.Id}", center, RegionSize(shutter.Min, shutter.Max), config.ShutterColor, config.ShutterOrder);
+                AddSquare(transform, $"Shutter {shutter.Id}", center, RegionSize(shutter.Min, shutter.Max), config.ShutterColor, config.ShutterOrder);
 
                 var labelColor = visual.CountsColor.HasValue ? config.BlockFill(visual.CountsColor.Value) : config.LightLabelColor;
                 AddLabel(transform, $"Shutter {shutter.Id} count", center, visual.OpensInClears, config.LabelFontSize, labelColor);
@@ -542,10 +691,10 @@ namespace GateRush.Runtime
                 var halfY = (size.y - thickness) * 0.5f;
                 var elevatorName = $"Elevator {elevator.Id}";
 
-                AddSprite(transform, elevatorName + " top", center + new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSprite(transform, elevatorName + " bottom", center - new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSprite(transform, elevatorName + " left", center - new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
-                AddSprite(transform, elevatorName + " right", center + new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
+                AddSquare(transform, elevatorName + " top", center + new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
+                AddSquare(transform, elevatorName + " bottom", center - new Vector2(0f, halfY), new Vector2(size.x, thickness), config.ElevatorOutlineColor, config.ElevatorOrder);
+                AddSquare(transform, elevatorName + " left", center - new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
+                AddSquare(transform, elevatorName + " right", center + new Vector2(halfX, 0f), new Vector2(thickness, size.y), config.ElevatorOutlineColor, config.ElevatorOrder);
 
                 if (wavesToCome > 0)
                 {
@@ -556,45 +705,53 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Draws a bar just outside the board along <paramref name="edge"/>,
-        /// covering <paramref name="width"/> cells from <paramref name="offset"/>
-        /// (measured along the edge), and returns its local centre. The one
-        /// shape for both gates and generators: edge features never overlap
-        /// (M6), so their bars never do either.
+        /// Draws <paramref name="tiles"/> under <paramref name="parent"/>, one
+        /// renderer per quarter, each posed as its tile says and enlarged by
+        /// the seam overlap. The one path for block faces and lips, the frame
+        /// and its lip, and open gates and their lips; only the arguments
+        /// differ.
         /// </summary>
-        private Vector2 DrawEdgeBar(string name, BoardEdge edge, int offset, int width, Color fill)
+        /// <param name="rectOf">Where a tile goes, in <paramref name="parent"/>'s local world units.</param>
+        private void AddQuarters(
+            Transform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order)
         {
-            var t = config.EdgeBarThickness;
-            var along = offset + width * 0.5f;
-            Vector2 centerGrid;
-            Vector2 sizeCells;
-
-            switch (edge)
+            var overlap = CellsToWorld(config.SeamOverlapCells) * 2f;
+            for (var i = 0; i < tiles.Count; i++)
             {
-                case BoardEdge.Bottom:
-                    centerGrid = new Vector2(along, -t * 0.5f);
-                    sizeCells = new Vector2(width, t);
-                    break;
-                case BoardEdge.Top:
-                    centerGrid = new Vector2(along, ctx.Height + t * 0.5f);
-                    sizeCells = new Vector2(width, t);
-                    break;
-                case BoardEdge.Left:
-                    centerGrid = new Vector2(-t * 0.5f, along);
-                    sizeCells = new Vector2(t, width);
-                    break;
-                default:
-                    centerGrid = new Vector2(ctx.Width + t * 0.5f, along);
-                    sizeCells = new Vector2(t, width);
-                    break;
-            }
+                var tile = tiles[i];
+                var rect = rectOf(tile);
+                var size = rect.size + new Vector2(overlap, overlap);
 
-            var center = GridToLocal(centerGrid);
-            AddSprite(transform, name, center, sizeCells * layout.CellSize, fill, config.EdgeFeatureOrder);
-            return center;
+                // A rotated sprite's own x runs along the board's y.
+                var spriteFrameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
+                var renderer = AddSprite(
+                    parent, tile.ToString(), config.QuarterSprite(tile.SpriteKind), rect.center, spriteFrameSize,
+                    color, order, tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
+                renderer.flipX = tile.FlipX;
+                renderer.flipY = tile.FlipY;
+            }
         }
 
+        private static Transform AddGroup(Transform parent, string name, Vector2 localPosition)
+        {
+            var group = new GameObject(name).transform;
+            group.SetParent(parent, false);
+            group.localPosition = localPosition;
+            return group;
+        }
+
+        /// <summary>Where a lip group sits relative to its face: straight down by the lip offset.</summary>
+        private Vector2 LipOffset() => new Vector2(0f, -CellsToWorld(config.LipOffsetCells));
+
         private Vector2 GridToLocal(Vector2 grid) => layout.GridToWorld(grid);
+
+        /// <summary>A rectangle in grid units, in this view's local world units.</summary>
+        private Rect GridRectToLocal(Rect grid) =>
+            new Rect(GridToLocal(grid.min), grid.size * layout.CellSize);
+
+        /// <summary>A rectangle in cell units relative to a block's origin, in its root's local world units.</summary>
+        private Rect CellRectToLocal(Rect cells) =>
+            new Rect(cells.min * layout.CellSize, cells.size * layout.CellSize);
 
         /// <summary>Where a block's root sits for <paramref name="origin"/>: the origin cell's lower-left corner.</summary>
         private Vector2 OriginToLocal(Coord origin) => GridToLocal(new Vector2(origin.X, origin.Y));
@@ -602,10 +759,17 @@ namespace GateRush.Runtime
         /// <summary>The centre of a footprint's bounding box relative to its block's root.</summary>
         private Vector2 FootprintCenterInBlock(IReadOnlyList<Coord> cells)
         {
-            var minX = int.MaxValue;
-            var maxX = int.MinValue;
-            var minY = int.MaxValue;
-            var maxY = int.MinValue;
+            FootprintBounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            return new Vector2(CellsToWorld((minX + maxX + 1) * 0.5f), CellsToWorld((minY + maxY + 1) * 0.5f));
+        }
+
+        /// <summary>The lowest and highest cell coordinates of a footprint on each axis.</summary>
+        private static void FootprintBounds(IReadOnlyList<Coord> cells, out int minX, out int maxX, out int minY, out int maxY)
+        {
+            minX = int.MaxValue;
+            maxX = int.MinValue;
+            minY = int.MaxValue;
+            maxY = int.MinValue;
             for (var i = 0; i < cells.Count; i++)
             {
                 minX = Math.Min(minX, cells[i].X);
@@ -613,8 +777,6 @@ namespace GateRush.Runtime
                 minY = Math.Min(minY, cells[i].Y);
                 maxY = Math.Max(maxY, cells[i].Y);
             }
-
-            return new Vector2(CellsToWorld((minX + maxX + 1) * 0.5f), CellsToWorld((minY + maxY + 1) * 0.5f));
         }
 
         private float CellsToWorld(float cells) => cells * layout.CellSize;
@@ -629,18 +791,26 @@ namespace GateRush.Runtime
         private Vector2 RegionSize(Coord min, Coord max) =>
             new Vector2(CellsToWorld(max.X - min.X + 1), CellsToWorld(max.Y - min.Y + 1));
 
+        /// <summary>A tinted copy of the config's plain square, for the placeholder shapes.</summary>
+        private SpriteRenderer AddSquare(Transform parent, string name, Vector2 localCenter, Vector2 size, Color color, int order) =>
+            AddSprite(parent, name, config.CellSprite, localCenter, size, color, order);
+
         /// <summary>
-        /// A tinted copy of the config's square sprite, scaled to
-        /// <paramref name="size"/> world units whatever the sprite's own pixels
-        /// per unit.
+        /// A tinted <paramref name="sprite"/> centred on
+        /// <paramref name="localCenter"/> and turned by
+        /// <paramref name="rotationDegrees"/>, scaled so that before the turn it
+        /// covers <paramref name="size"/> world units, whatever the sprite's own
+        /// pixels per unit.
         /// </summary>
-        private SpriteRenderer AddSprite(Transform parent, string name, Vector2 localCenter, Vector2 size, Color color, int order)
+        private SpriteRenderer AddSprite(
+            Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, Color color, int order,
+            float rotationDegrees = 0f)
         {
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             go.transform.localPosition = localCenter;
+            go.transform.localRotation = Quaternion.Euler(0f, 0f, rotationDegrees);
 
-            var sprite = config.CellSprite;
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;
             renderer.sharedMaterial = config.SpriteMaterial;
@@ -673,13 +843,19 @@ namespace GateRush.Runtime
             label.sortingOrder = config.LabelOrder;
         }
 
-        /// <summary>A drawn block: its root, and the parts its clear effect animates.</summary>
+        /// <summary>A drawn block: its root, and the parts its effects animate.</summary>
         private sealed class DrawnBlock
         {
-            public DrawnBlock(Transform root, Vector2 footprintCenter)
+            public DrawnBlock(
+                Transform root, Vector2 footprintCenter, Transform lip,
+                IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, MovementAxis axis)
             {
                 Root = root;
                 FootprintCenter = footprintCenter;
+                Lip = lip;
+                Cells = cells;
+                Tiles = tiles;
+                Axis = axis;
             }
 
             /// <summary>Sits at the origin's corner; moving it moves the whole block.</summary>
@@ -688,8 +864,20 @@ namespace GateRush.Runtime
             /// <summary>The centre of the footprint's bounding box, relative to <see cref="Root"/>.</summary>
             public Vector2 FootprintCenter { get; }
 
-            /// <summary>One sprite per footprint cell, in the outer colour (or the frozen tint).</summary>
-            public List<SpriteRenderer> Fills { get; } = new List<SpriteRenderer>();
+            /// <summary>The lip's quarters, offset below the face.</summary>
+            public Transform Lip { get; }
+
+            /// <summary>The face group: quarters plus studs and gloss, or the axis arrow. A peel draws a new one.</summary>
+            public Transform Face { get; set; }
+
+            /// <summary>The footprint, relative to the origin.</summary>
+            public IReadOnlyList<Coord> Cells { get; }
+
+            /// <summary>The footprint's quarter tiles, shared by lip and face.</summary>
+            public IReadOnlyList<QuarterTile> Tiles { get; }
+
+            /// <summary>The block's movement axis: a restricted one shows an arrow instead of studs.</summary>
+            public MovementAxis Axis { get; }
 
             /// <summary>The beneath-colour squares of a layered block (M4); empty otherwise.</summary>
             public List<SpriteRenderer> BeneathSquares { get; } = new List<SpriteRenderer>();
