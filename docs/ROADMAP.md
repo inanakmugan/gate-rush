@@ -118,7 +118,7 @@ steps, each its own spec and PR:
 
 - **2.4a — Board and blocks.** Background, frame and walls, studded
   one-piece blocks, arrowed gates, the board filling the screen.
-  *Spec: `Modules/15-board-and-blocks.md`. Status: next.*
+  *Spec: `Modules/15-board-and-blocks.md`. Status: done.*
 - **2.4b — State visuals.** Frozen blocks and gates as ice with a count,
   locks with chains and a padlock, keys, shutters, generators as machines
   showing their next block. Keys and locks pair by the locked block's
@@ -149,7 +149,8 @@ Deliberately early. Build, open in a browser, confirm it runs.
 
 Checks: code stripping did not remove anything reflective; portrait framing works
 in a landscape page; pointer input behaves as in the editor; `PlayerPrefs`
-persistence survives a reload; build size and load time are acceptable.
+persistence survives a reload; build size and load time are acceptable; draw
+calls and the per-move board rebuild are profiled on a phone (Module 15).
 
 Finding a stripping problem here costs an afternoon. Finding it in Phase 7 costs
 a week.
