@@ -62,7 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: done.* Levels chain through Next rather than one hardcoded level.
+*Status: playable; visual polish (2.4) in progress.* Levels chain through Next
+rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
 menus, one hardcoded level.
@@ -110,6 +111,21 @@ only; the rules, the solver and gate behaviour are unchanged (D44).
 *Spec: `Modules/13-free-drag.md`. Status: done.* A dragged block floats
 under the finger, stops flush against obstacles, slides into corridors
 through a corner assist, and settles into the nearest cell on release.
+
+**2.4 — Visual polish before the first shared build (D46).** The first
+build goes to a mentor, so the prototype look is replaced first, in three
+steps, each its own spec and PR:
+
+- **2.4a — Board and blocks.** Background, frame and walls, studded
+  one-piece blocks, arrowed gates, the board filling the screen.
+  *Spec: `Modules/15-board-and-blocks.md`. Status: next.*
+- **2.4b — State visuals.** Frozen blocks and gates as ice with a count,
+  locks with chains and a padlock, keys, shutters, generators as machines
+  showing their next block. Keys and locks pair by the locked block's
+  colour, one locked block per colour in a level (D47).
+- **2.4c — HUD and feedback.** Timer in minutes and seconds, level number,
+  restart button, font, and animations for exits, ice breaking, shutters
+  and locks opening, spawns and time bonuses.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no

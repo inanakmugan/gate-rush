@@ -239,13 +239,20 @@ row or column touches. The editor warns when there is none.
 
 ## M8 — Locks and keys
 
-A block may carry a **lock**; another block may carry a **key**. Lock and key are
-paired by an identifier rendered as a colour badge, independent of the blocks'
-own colours.
+A block may carry a **lock**; another block may carry a **key**. The player
+pairs them by colour: **a lock is known by the colour of its locked block**,
+and a key is marked with that colour, whatever colour the block carrying it
+has (D47). A red locked block is opened by keys marked red, which may sit on
+blocks of any colour.
 
-- **Lock identifiers are unique within a level.** The identifier doubles as the
-  badge colour shown to the player, so two locked blocks sharing one would be
-  unreadable — the player could not tell which key opens which.
+- **One locked block per colour in a level.** Two locked blocks of the same
+  colour would be unreadable — the player could not tell which one a red key
+  opens. This counts every locked block the level will ever hold, including
+  those under shutters and in elevator waves, not only the ones on the board
+  at once.
+- **The lock is on the outermost colour.** A locked block's colour, for
+  pairing, is its outer colour at level start; a lock never sits on a colour
+  beneath.
 - A locked block cannot be moved by the player. Its colour and shape remain
   visible. It still obstructs.
 - **Jokers can still target a locked block.**
@@ -396,6 +403,7 @@ Not runtime rules, but properties the Level Editor should measure and report.
 - Overlapping blocks at start, footprints outside the grid, gates outside their
   edge, keys pointing at non-existent locks.
 - A lock with fewer keys in the level than it requires, a block carrying both
-  a lock and a key, or two locks sharing an id.
+  a lock and a key, two locks sharing an id, or two locked blocks sharing an
+  outer colour (D47).
 - Overlapping edge features (M6).
 - An elevator wave with no blocks: every wave must tile its region (M9).
