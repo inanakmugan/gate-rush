@@ -4,6 +4,10 @@
 **Depends on:** Module 01
 **Phase:** 1.2
 
+> *Later.* `WaitingKeyEffect` and `CreateInitialWithWaitingKeyEffects` were
+> removed: keys only unlock, and a completed lock opens at once (D45, Module
+> 14).
+
 ---
 
 ## Responsibility

@@ -131,8 +131,8 @@ removals." Rather than six systems, there is **one event type**:
 ColorCleared(blockId, colour)
 ```
 
-Every removal in the game emits it — a block pushed into a matching gate, a key
-effect, a rocket, a broom. Every counter listens to it.
+Every removal in the game emits it — a block pushed into a matching gate, a
+rocket, a broom. Every counter listens to it.
 
 Most blocks carry a single colour, so clearing it removes the block. A few carry
 a stack, in which case clearing the outer colour exposes the next one. **The
@@ -147,7 +147,7 @@ event. It does not mean touching existing mechanics.
 Applying a move is not a single step. One move can start a chain:
 
 > The last block of an elevator wave is cleared → it carried a key → a locked
-> block's outer colour is cleared → the counter hits 4 → a shutter opens → the
+> block opens → the same clear brings the counter to 4 → a shutter opens → the
 > elevator's region reads empty → the next wave arrives.
 
 `MoveResolver` therefore loops until nothing changes:
@@ -157,8 +157,8 @@ Applying a move is not a single step. One move can start a chain:
 2. Move the block
 3. If it ends flush against a matching open gate: clear its colour, emit event
    The block STAYS at the gate mouth and now obstructs it
-4. Drain the event queue: update counters, apply key effects
-   (a key effect may emit new events — they join the queue)
+4. Drain the event queue: update counters, deliver keys
+   (a key only unlocks; it never emits an event, D45)
 5. Re-evaluate every unlock condition (gates, frozen blocks, shutters)
 6. Check every spawn trigger (generators, elevators)
 7. If anything changed in 4–6, go back to 4

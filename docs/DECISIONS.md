@@ -88,6 +88,10 @@ waiting. Each free clear still belongs to a distinct lock that leaves `F` in
 the same move, so `h` still drops by at most one per move;
 `AStarStrategy`'s remarks carry the proof.
 
+**Later (D45).** `ClearOuterColor` is removed: keys only unlock, so no
+move clears more than one colour. `h = C`, the plain colour count, is
+admissible and consistent again; `F` and its proof are gone.
+
 ---
 
 ## D4 — Three-valued solve result
@@ -192,6 +196,11 @@ being "the rocket opened the gate but the shutter didn't."
 **Consequence.** Rocket is `ClearOuterColor` on one target — exactly the existing
 key effect. Broom is the same effect applied to every block currently showing the
 chosen colour. Jokers introduce **no new core concept**.
+
+**Later (D45).** The key effect is gone. Rocket and broom never went
+through it: they enter the resolver through `TryClearBlock` and
+`TrySweepColor`, which share one clear step with a gate exit. Nothing about
+jokers changes.
 
 ---
 
@@ -984,6 +993,9 @@ cost on the common case.
 rather than just existence. Existence is the priority for the Level
 Editor's Validate button; may be added later if a real need surfaces.
 
+**Later (D45).** Every key only unlocks, so no lock can have mixed-effect
+keys. `IsClearMonotone` is simply: no generators and no elevators.
+
 ---
 
 ## D38 — Validate pipeline: quick proof, then nearest-next-clear, cancellable
@@ -1124,6 +1136,12 @@ for good because of an order the player could not see. Also rejected:
 unlocking at once and dropping only the clear — it splits one effect into
 two halves with different timing, for no gain.
 
+**Later (D45).** Superseded. With keys only unlocking, waiting is
+unobservable: a block under a closed shutter cannot move either way and its
+badge is hidden. A completed lock now opens at once, even under a closed
+shutter, and the block stays unreachable until the shutter opens. No key is
+lost to an order the player could not see, which was the point.
+
 ---
 
 ## D42 — Spawning runs at level start, ignores shutters, and holds keys
@@ -1160,6 +1178,10 @@ dead until the opening, and nothing about a shutter says it pauses an
 elevator. Spending a key on an unspawned lock with no effect: the lock
 could stay shut for good because of an order the player could not see —
 the outcome D41 already rejected.
+
+**Later (D45).** The key rule is simplified: a key that completes the lock
+of a block not yet spawned unlocks its slot at once, and the block spawns
+unlocked. Nothing waits.
 
 ---
 
@@ -1242,5 +1264,53 @@ reason. Longer, eased tweens between whole cells: softer, but the block
 still never rests between cells, which is the feel being asked for.
 Continuous positions in the rules: the reference game rests every block on
 the grid, and the solver's state space depends on it.
+
+---
+
+## D45 — Keys only unlock
+
+**Decision.** A key has one effect. When the last key a lock requires is
+consumed, the lock opens and its block may move. `KeyEffect`, and with it
+`ClearOuterColor`, is removed from level data, `Core`, the solver,
+serialization and the editor. A completed lock opens at once, even when its
+block is under a closed shutter or has not spawned yet, so the state no
+longer holds a waiting effect. The level format goes to version 4.
+
+**Why.** Observation of the reference game: keys unlock movement and nothing
+else, and nothing clears a block in place except jokers. `ClearOuterColor`
+was never observed and no authored level uses it, yet it carried most of
+the complexity around keys: the heuristic's `F` term (D3), the mixed-effect
+exclusion in `IsClearMonotone` (D37), and the waiting effect released on an
+opening or a spawn (D41, D42).
+
+**Why the waiting goes too.** With unlocking the only effect, waiting cannot
+be observed. A block under a closed shutter cannot move whether or not it is
+locked, and its badge is hidden; the waiting unlock would have applied in
+the same resolution that opens the shutter. A slot that has not spawned
+keeps its `Unlocked` flag when it spawns, so opening its lock early is the
+same as opening it on arrival. D41's and D42's outcome stands — no key is
+lost to an order the player could not see — with no mechanism behind it.
+
+**Consequences.**
+- A\*: `h = C`. Without a key clear, one move removes at most one colour,
+  so the plain count is admissible and consistent.
+- `IsClearMonotone`: no generators and no elevators.
+- `BoardState` loses `WaitingKeyEffect`, a hashed dynamic field (D1), and
+  `CreateInitialWithWaitingKeyEffects`. `MoveResolver` loses
+  `ReleaseWaitingKeyEffects` and every waiting branch.
+- A key effect no longer emits `ColorCleared`, so keys no longer feed the
+  drain loop; conditions and spawns still do.
+- The order in which a lock's keys are consumed no longer matters.
+- Jokers are untouched (D9): rocket and broom share the clear step a gate
+  exit uses, never the key effect.
+- `formatVersion` 4: a block no longer carries `keyEffect`. Version 3 is
+  refused like every earlier version, and the six authored levels are
+  rewritten in the same change, so no file needs a migration path.
+
+**Rejected.** Keeping `KeyEffect` with one value: configuration that can
+only ever say one thing. Keeping the waiting mechanism as a flag: an
+unobservable path, hashed into every state, for nothing. Leaving the format
+at 3: `JsonUtility` ignores the unknown field, so a version-3 file saying
+`ClearOuterColor` would silently mean "unlock".
 
 ---

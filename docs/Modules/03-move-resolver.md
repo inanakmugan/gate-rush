@@ -4,6 +4,10 @@
 **Depends on:** Modules 01, 02
 **Phase:** 1.3 (movement and gates only), extended in 1.7, 1.8, 1.12, 1.13
 
+> *Later.* Key effects no longer clear a colour or wait for a shutter: a
+> completed lock opens at once, and `ReleaseWaitingKeyEffects` is gone (D45,
+> Module 14).
+
 ---
 
 ## Responsibility

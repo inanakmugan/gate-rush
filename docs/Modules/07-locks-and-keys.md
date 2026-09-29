@@ -4,6 +4,10 @@
 **Depends on:** Modules 01, 02, 03, 06
 **Phase:** 1.8
 
+> *Later.* `ClearOuterColor` and the waiting effect (D41) described below
+> were removed: keys only unlock, and a completed lock opens at once (D45,
+> Module 14).
+
 ---
 
 ## Responsibility

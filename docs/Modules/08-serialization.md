@@ -4,6 +4,9 @@
 **Depends on:** Module 01 (`GateRush.Core`), and `UnityEngine` for `JsonUtility`
 **Phase:** 1.9
 
+> *Later.* `formatVersion` is 4 since D45: blocks and queued blocks no
+> longer carry `keyEffect` (Module 14).
+
 ---
 
 ## Responsibility
@@ -171,6 +174,9 @@ missed.
 - **`formatVersion` 3** (D34; it went to 2 in Module 09). Older versions are
   refused. Levels now exist, so the next change needs a migration path rather
   than a refusal.
+- **`formatVersion` 4** (D45): `keyEffect` is removed. Version 3 is still
+  refused rather than migrated, because the six authored levels are
+  rewritten in the same change and no other level file exists.
 - **`GeneratorDto.width`** — the generator's width along its edge (D34).
 - **`SpawnedBlockDto.id`** — a stable per-list authoring identity for queue
   entries and wave blocks, so a selection survives undo (D33, D34). It lives in

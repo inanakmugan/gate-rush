@@ -5,6 +5,9 @@
 **Depends on:** Modules 01, 02, 03, 06, 07
 **Phase:** 1.13
 
+> *Later.* A key that completes the lock of an unspawned block now unlocks
+> its slot at once; nothing waits (D45, Module 14).
+
 ---
 
 ## Responsibility

@@ -4,6 +4,9 @@
 **Depends on:** Modules 01–04
 **Phase:** 1.5
 
+> *Later.* A\*'s `F` term was removed with `ClearOuterColor`; the heuristic
+> is `h = C` (D45, Module 14).
+
 ---
 
 ## Responsibility

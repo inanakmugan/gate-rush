@@ -182,9 +182,9 @@ A rectangular region may be covered by a shutter with a threshold N.
   exists to hide and later reveal blocks, and an empty cell underneath hides
   nothing. The editor warns, but does not refuse to save, when a region has an
   uncovered cell.
-- Nothing reaches a block under a closed shutter — not a move, not a joker,
-  not a key's effect. A key effect aimed at such a block waits and applies
-  when the shutter opens (M8).
+- No move and no joker reaches a block under a closed shutter. A lock
+  under one still opens when its keys complete, but the block stays
+  unreachable until the shutter opens (M8).
 
 Shutters are the only thing that makes a block untargetable by jokers.
 
@@ -250,31 +250,16 @@ own colours.
   visible. It still obstructs.
 - **Jokers can still target a locked block.**
 - A lock may require more than one key; the required count is shown on the lock.
-- When a key-carrying block is destroyed, its key is consumed and applied.
-- The effect fires once, when the last required key is consumed, and the
-  key that completes the count decides which effect it is. A lock's keys
-  may carry different effects, so the order they are consumed in matters.
-  When one action consumes several at once — a broom — they count in the
-  level's block order.
-- A lock whose block is under a closed shutter receives nothing while the
-  shutter stays closed (M5). If its keys complete in the meantime, the
-  effect waits and applies the moment the shutter opens.
-- A lock whose block has not spawned yet — still in a generator's queue or a
-  later elevator wave — works the same way: its keys are consumed, and a
-  completed effect waits and applies when the block spawns (D42).
+- When a key-carrying block is destroyed, its key is consumed.
+- **Keys only unlock.** When the last required key is consumed, the lock
+  opens and the block becomes movable. No key ever clears a colour; nothing
+  in this game clears a block in place except jokers (D45).
+- A lock opens the same way when its block is under a closed shutter or has
+  not spawned yet — still in a generator's queue or a later elevator wave.
+  The block is unlocked at once and becomes reachable when the shutter
+  opens or it spawns (D45).
 - A lock needs at least as many keys in the level as it requires. Fewer is
   a level data error: the lock could never open.
-
-A key has one of two effects, chosen by the designer:
-
-| Effect | Result |
-|---|---|
-| `UnlockMovement` | The target block becomes movable |
-| `ClearOuterColor` | The target block's current colour is removed immediately |
-
-`ClearOuterColor` emits a `ColorCleared` event like any other clear and feeds the
-same counters. It may therefore trigger further unlocks within the same
-resolution pass.
 
 A lock is a single per-block flag, not a per-colour property. A newly exposed
 colour is never locked.
