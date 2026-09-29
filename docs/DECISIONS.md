@@ -1386,3 +1386,33 @@ red lock", which reads well but changes serialization, the editor and every
 lock test for no gain while the one-lock-per-colour rule holds.
 
 ---
+
+## D48 — State visuals follow the reference game
+
+**Decision.** Each mechanic's state is drawn the way the reference game
+draws it, in the project's own generated art (D46): frozen blocks and closed
+gates as ice with a count; a locked block with chains and a gold padlock
+carrying the keys still required; a key as a gold key whose gem shows its
+lock's colour (D47); a closed shutter as a slatted panel with a count; a
+generator as a machine outside the frame whose screen always shows its next
+block, with the number still queued; an elevator as lift doors with no wave
+count. Every count sits on one shared badge.
+
+**Why.** Observation of the reference game, from screenshots the owner
+collected. Two of these change what the mechanics said about presentation:
+M6 had the next block previewed on the target cells when a block in front
+of the generator was grabbed, and Module 11 labelled an elevator with its
+waves still to come. The reference game does neither.
+
+**Consequence.** A generator machine sits outside the frame, so the camera
+fit reserves its depth on every edge that has one. Module 16 specifies
+2.4b; the animations — ice breaking, chains falling, the key flying to its
+lock, doors opening with the wave rising, shutters lifting — are 2.4c.
+
+**Rejected.** Keeping the wave count on elevators as a convenience: the
+reference game withholds it, and how many waves are left is part of the
+puzzle. Keeping the grab-time preview alongside the screen: two previews of
+one block, one of them hidden until the player happens to grab the right
+block.
+
+---

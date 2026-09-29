@@ -121,11 +121,14 @@ steps, each its own spec and PR:
   *Spec: `Modules/15-board-and-blocks.md`. Status: done.*
 - **2.4b — State visuals.** Frozen blocks and gates as ice with a count,
   locks with chains and a padlock, keys, shutters, generators as machines
-  showing their next block. Keys and locks pair by the locked block's
-  colour, one locked block per colour in a level (D47).
+  showing their next block, elevators as lift doors. Keys and locks pair
+  by the locked block's colour, one locked block per colour in a level
+  (D47, D48). *Spec: `Modules/16-state-visuals.md`. Status: next.*
 - **2.4c — HUD and feedback.** Timer in minutes and seconds, level number,
   restart button, font, and animations for exits, ice breaking, shutters
-  and locks opening, spawns and time bonuses.
+  lifting, chains falling and the key flying to its lock, elevator doors
+  opening as a wave rises, spawns and time bonuses; the grabbed block
+  lifts slightly with a white outline.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no

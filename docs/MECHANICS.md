@@ -198,9 +198,9 @@ A generator sits on a board edge and pushes blocks inward — the inverse of a g
   random at runtime.
 - It spawns the next block when **every cell that block would occupy is empty**.
   If even one is occupied, nothing spawns and the generator waits.
-- The player sees the next block's shape and colour before it arrives; when a
-  block in front of the generator is grabbed, the target cells preview the
-  incoming block's colour. This is presentation only.
+- The player sees the next block's shape and colour before it arrives: the
+  generator shows it on its own screen at all times, with the number of
+  blocks still queued (D48). This is presentation only.
 - After its sequence is exhausted, the generator is destroyed.
 - A level is not complete while any generator still has output pending.
 - A generator spans one or two cells of its edge — the reference game never
@@ -280,6 +280,8 @@ An elevator occupies a rectangular region of arbitrary size.
 - Its waves are **explicit, ordered arrays in level data**.
 - The next wave arrives when the region contains **no blocks at all**.
 - After its final wave is cleared, the elevator is destroyed.
+- The player is not shown how many waves remain: the region shows lift
+  doors, and a wave rises through them (D48).
 - A level is not complete while any elevator still has waves pending.
 - **Waves arrive fully packed.** The blocks in a wave tile the region exactly:
 every cell covered once, no gaps, no overlaps. Shapes are unrestricted — L
