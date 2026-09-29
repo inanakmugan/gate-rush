@@ -62,8 +62,7 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: done up to 2.2; 2.3 (free drag) is next.* Levels chain through Next
-rather than one hardcoded level.
+*Status: done.* Levels chain through Next rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
 menus, one hardcoded level.
@@ -108,7 +107,9 @@ magnetised to the grid. In the reference game a dragged block floats under
 the finger and settles into a cell only on release. Presentation and input
 only; the rules, the solver and gate behaviour are unchanged (D44).
 
-*Spec: `Modules/13-free-drag.md`. Status: next.*
+*Spec: `Modules/13-free-drag.md`. Status: done.* A dragged block floats
+under the finger, stops flush against obstacles, slides into corridors
+through a corner assist, and settles into the nearest cell on release.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
