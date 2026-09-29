@@ -26,6 +26,15 @@ MonoBehaviour:
   axisArrowSprite: {fileID: 21300000, guid: a3b998a840230234998d0d2bf0af528e, type: 3}
   backgroundRampSprite: {fileID: 21300000, guid: 3cc213a1173216d489edbeda5e8ccfd0, type: 3}
   vignetteSprite: {fileID: 21300000, guid: 48d7720f252d65444b9aa161843ef1d8, type: 3}
+  frostSprite: {fileID: 21300000, guid: 11ac25c8b75b80543960f733f09c9cca, type: 3}
+  roundedRectSprite: {fileID: 21300000, guid: 352b0b51373934b4cb2108c1e5c87879, type: 3}
+  ringSprite: {fileID: 21300000, guid: c3d0154e087cff54f8f43fee4d4aa0b0, type: 3}
+  chainSprite: {fileID: 21300000, guid: 9c243f91b12a1fd4ead0a5829eeedc8f, type: 3}
+  padlockSprite: {fileID: 21300000, guid: 94f76d6ca442b1d47bbf1c3125d693f6, type: 3}
+  keyBodySprite: {fileID: 21300000, guid: d791657bfbb562849b4b8aabb5c74333, type: 3}
+  keyGemSprite: {fileID: 21300000, guid: c30ffc22fc1e5dc439123155839799d3, type: 3}
+  shutterSlatsSprite: {fileID: 21300000, guid: 18041f29213268c43a9bf2f689c5a938, type: 3}
+  doorPanelSprite: {fileID: 21300000, guid: 40868de770378ac49b71f39dcc429d56, type: 3}
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.14
@@ -39,9 +48,25 @@ MonoBehaviour:
   axisArrowThicknessCells: 0.42
   axisArrowEndInsetCells: 0.14
   beneathColorSize: 0.45
-  elevatorOutlineThickness: 0.08
-  badgeSize: 0.36
-  badgeInsetCells: 0.06
+  badgeHeightCells: 0.34
+  badgeDigitWidthCells: 0.15
+  badgePaddingCells: 0.08
+  badgeRimCells: 0.035
+  chainThicknessCells: 0.2
+  chainEndInsetCells: 0.1
+  padlockSizeCells: 0.62
+  padlockBadgeDropCells: 0.1
+  keySizeCells: 0.72
+  keyRotationDegrees: 35
+  frozenMarkRaiseCells: 0.3
+  shutterBorderCells: 0.07
+  elevatorBorderCells: 0.05
+  elevatorDividerCells: 0.07
+  machineDepthCells: 1
+  machineSideOverhangCells: 0.12
+  machineFrameOverlapCells: 0.15
+  machineScreenInsetCells: 0.12
+  machineCornerCells: 0.18
   pushThresholdCells: 0.3
   followRate: 20
   cornerAssistCells: 0.3
@@ -63,14 +88,6 @@ MonoBehaviour:
   - {r: 1, g: 0.52, b: 0.1, a: 1}
   - {r: 1, g: 0.45, b: 0.75, a: 1}
   - {r: 0.15, g: 0.85, b: 0.95, a: 1}
-  lockBadgePalette:
-  - {r: 1, g: 1, b: 1, a: 1}
-  - {r: 0.72, g: 0.72, b: 0.72, a: 1}
-  - {r: 0.86, g: 0.72, b: 0.52, a: 1}
-  - {r: 0.72, g: 0.95, b: 0.72, a: 1}
-  - {r: 0.82, g: 0.76, b: 1, a: 1}
-  - {r: 1, g: 0.8, b: 0.8, a: 1}
-  unknownBadgeColor: {r: 1, g: 0, b: 1, a: 1}
   backgroundTop: {r: 0.23, g: 0.2, b: 0.42, a: 1}
   backgroundBottom: {r: 0.07, g: 0.07, b: 0.15, a: 1}
   vignetteColor: {r: 0, g: 0, b: 0, a: 0.5}
@@ -79,31 +96,50 @@ MonoBehaviour:
   glossColor: {r: 1, g: 1, b: 1, a: 0.85}
   gateArrowColor: {r: 1, g: 1, b: 1, a: 1}
   axisArrowColor: {r: 1, g: 1, b: 1, a: 0.9}
-  frozenTint: {r: 0.72, g: 0.86, b: 0.95, a: 1}
-  closedGateColor: {r: 0.6, g: 0.72, b: 0.8, a: 1}
-  shutterColor: {r: 0.36, g: 0.38, b: 0.44, a: 1}
-  generatorColor: {r: 0.85, g: 0.85, b: 0.85, a: 1}
-  elevatorOutlineColor: {r: 1, g: 1, b: 1, a: 0.8}
+  iceColor: {r: 0.72, g: 0.86, b: 0.95, a: 1}
+  frostColor: {r: 1, g: 1, b: 1, a: 0.85}
+  badgeColor: {r: 0.8, g: 0.45, b: 0.18, a: 1}
+  badgeRimColor: {r: 1, g: 0.78, b: 0.45, a: 1}
+  badgeTextColor: {r: 1, g: 0.96, b: 0.85, a: 1}
+  chainColor: {r: 0.62, g: 0.64, b: 0.7, a: 1}
+  padlockColor: {r: 1, g: 0.8, b: 0.25, a: 1}
+  keyColor: {r: 1, g: 0.8, b: 0.25, a: 1}
+  shutterSlatColor: {r: 0.3, g: 0.18, b: 0.45, a: 1}
+  shutterBorderColor: {r: 1, g: 0.66, b: 0.2, a: 1}
+  machineColor: {r: 0.55, g: 0.58, b: 0.7, a: 1}
+  machineScreenColor: {r: 0.06, g: 0.07, b: 0.12, a: 1}
+  elevatorDoorColor: {r: 0.22, g: 0.14, b: 0.34, a: 1}
+  elevatorDividerColor: {r: 1, g: 0.78, b: 0.3, a: 1}
+  elevatorBorderColor: {r: 1, g: 0.66, b: 0.2, a: 1}
   labelFontSize: 4
   badgeLabelFontSize: 2.5
   labelColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
-  lightLabelColor: {r: 0.95, g: 0.95, b: 0.95, a: 1}
   backgroundOrder: -20
   vignetteOrder: -19
   floorUnderlayOrder: -1
   floorOrder: 0
-  frameLipOrder: 1
-  frameOrder: 2
-  edgeFeatureOrder: 3
-  gateArrowOrder: 3
-  blockLipOrder: 4
-  blockOrder: 5
-  studOrder: 6
-  glossOrder: 7
-  axisArrowOrder: 7
-  peelOrder: 8
-  beneathColorOrder: 9
-  badgeOrder: 10
-  shutterOrder: 11
-  elevatorOrder: 12
-  labelOrder: 13
+  elevatorDoorOrder: 1
+  elevatorDividerOrder: 2
+  elevatorBorderOrder: 3
+  machineLipOrder: 4
+  machineOrder: 5
+  machineScreenOrder: 6
+  miniatureLipOrder: 7
+  miniatureOrder: 8
+  frameLipOrder: 9
+  frameOrder: 10
+  gateMarkOrder: 11
+  blockLipOrder: 12
+  blockOrder: 13
+  studOrder: 14
+  glossOrder: 15
+  peelOrder: 16
+  beneathColorOrder: 17
+  chainOrder: 18
+  iconOrder: 19
+  keyGemOrder: 20
+  shutterOrder: 21
+  shutterBorderOrder: 22
+  badgeRimOrder: 23
+  badgeOrder: 24
+  labelOrder: 25

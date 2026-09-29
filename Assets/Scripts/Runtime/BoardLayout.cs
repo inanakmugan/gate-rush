@@ -21,7 +21,9 @@ namespace GateRush.Runtime
     /// The top and bottom bands are fractions of the screen's height: the HUD
     /// is a screen-space canvas, so a band given in cells would grow with the
     /// board's on-screen cell size and either eat a small board's screen or let
-    /// the HUD overlap a large one. <see cref="Problems"/> is the single
+    /// the HUD overlap a large one. Generator machines sit outside the frame
+    /// (D48), so the fit also counts <see cref="Reach"/> on each side that has
+    /// one. <see cref="Problems"/> is the single
     /// statement of the valid values; the constructor and
     /// <see cref="FitOrthographicSize"/> throw on what it reports.</para>
     /// </remarks>
@@ -35,8 +37,13 @@ namespace GateRush.Runtime
         /// <summary>A layout for a <paramref name="width"/> x <paramref name="height"/> board.</summary>
         /// <param name="cellSize">World units per cell. Comes from <c>RuntimeConfig</c>.</param>
         /// <param name="frameThicknessCells">The frame's thickness around the grid, in cells: above 0, at most 1.</param>
+        /// <param name="reach">
+        /// How far anything drawn outside the frame reaches beyond it on each
+        /// side — generator machines (<see cref="GeneratorMachine.Reach"/>) — for
+        /// the camera fit to keep in view. The default reaches nowhere.
+        /// </param>
         /// <exception cref="ArgumentOutOfRangeException">A dimension or the cell size is not positive, or the frame thickness is out of range.</exception>
-        public BoardLayout(int width, int height, float cellSize, float frameThicknessCells)
+        public BoardLayout(int width, int height, float cellSize, float frameThicknessCells, EdgeReach reach = default)
         {
             if (width < 1)
             {
@@ -62,6 +69,7 @@ namespace GateRush.Runtime
             Height = height;
             CellSize = cellSize;
             FrameThicknessCells = frameThicknessCells;
+            Reach = reach;
         }
 
         /// <summary>Board width in cells.</summary>
@@ -75,6 +83,9 @@ namespace GateRush.Runtime
 
         /// <summary>The frame's thickness around the grid, in cells.</summary>
         public float FrameThicknessCells { get; }
+
+        /// <summary>How far drawing outside the frame reaches beyond it on each side, in cells.</summary>
+        public EdgeReach Reach { get; }
 
         /// <summary>The cell containing a grid position: its floor on both axes.</summary>
         public static Coord CellOf(Vector2 gridPosition) =>
@@ -128,8 +139,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The orthographic size (half the visible height, in world units) at
-        /// which the board plus its frame fits a screen of
-        /// <paramref name="aspect"/> (width / height): the full width less
+        /// which the board plus its frame and <see cref="Reach"/> fits a screen
+        /// of <paramref name="aspect"/> (width / height): the full width less
         /// <paramref name="sideMarginCells"/> on each side, and the height
         /// between a top and a bottom band given as fractions of the screen's
         /// height. The width decides on a portrait screen; on a landscape or
@@ -158,21 +169,26 @@ namespace GateRush.Runtime
                 throw new ArgumentOutOfRangeException(nameof(topBandScreenFraction), topBandScreenFraction, BandsMessage);
             }
 
-            var framedWidth = Width + 2f * FrameThicknessCells;
-            var framedHeight = Height + 2f * FrameThicknessCells;
+            var framedWidth = Width + 2f * FrameThicknessCells + Reach.Left + Reach.Right;
+            var framedHeight = Height + 2f * FrameThicknessCells + Reach.Bottom + Reach.Top;
             var widthFit = (framedWidth * 0.5f + sideMarginCells) * CellSize / aspect;
             var heightFit = framedHeight * CellSize * 0.5f / (1f - topBandScreenFraction - bottomBandScreenFraction);
             return Math.Max(widthFit, heightFit);
         }
 
         /// <summary>
-        /// How far above the board's centre the camera sits, in world units, so
-        /// the board is centred between the top and bottom bands of a camera of
-        /// <paramref name="orthographicSize"/>. Positive when the top band is
-        /// the larger.
+        /// Where the camera sits relative to the board's centre, in world units:
+        /// on the middle of the framed board plus its <see cref="Reach"/>, and
+        /// raised so that middle is centred between the top and bottom bands of
+        /// a camera of <paramref name="orthographicSize"/>. Only the camera
+        /// moves, so the mapping between grid and world stays centred on the
+        /// board.
         /// </summary>
-        public float CameraCenterOffset(float orthographicSize, float topBandScreenFraction, float bottomBandScreenFraction) =>
-            (topBandScreenFraction - bottomBandScreenFraction) * orthographicSize;
+        public Vector2 CameraCenterOffset(float orthographicSize, float topBandScreenFraction, float bottomBandScreenFraction) =>
+            new Vector2(
+                (Reach.Right - Reach.Left) * 0.5f * CellSize,
+                (Reach.Top - Reach.Bottom) * 0.5f * CellSize
+                + (topBandScreenFraction - bottomBandScreenFraction) * orthographicSize);
 
         private static bool IsValidFrameThickness(float cells) => cells > 0f && cells <= 1f;
 

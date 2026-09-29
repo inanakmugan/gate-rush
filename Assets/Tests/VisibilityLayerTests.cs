@@ -163,35 +163,159 @@ namespace GateRush.Tests
             Assert.IsNull(two.LayerNumeral);
         }
 
-        [Test]
-        public void Block_LockedAfterOneOfTwoKeys_ShowsItsLockIdAndOneKeyStillRequired()
-        {
-            // Two red key blocks, each pre-aligned with a red left gate; the
-            // locked block needs both.
-            var ctx = Ctx(
+        /// <summary>
+        /// 4x4: slot 0 is a blue-over-green block locked by lock 5, which needs
+        /// both keys; slots 1 and 2 are red key carriers, each pre-aligned with a
+        /// red left gate; slot 3 carries nothing.
+        /// </summary>
+        private static LevelContext LockBoard() =>
+            Ctx(
                 4, 4,
                 new[]
                 {
-                    Block(1, new Coord(2, 2), colors: new[] { BlockColor.Blue }, lockId: 5, requiredKeys: 2),
+                    Block(1, new Coord(2, 2), colors: new[] { BlockColor.Blue, BlockColor.Green }, lockId: 5, requiredKeys: 2),
                     Block(2, new Coord(0, 0), keyTarget: 5),
-                    Block(3, new Coord(0, 3), keyTarget: 5)
+                    Block(3, new Coord(0, 3), keyTarget: 5),
+                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Yellow })
                 },
                 new[]
                 {
                     Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red),
                     Gate(2, BoardEdge.Left, 3, 1, BlockColor.Red)
                 });
+
+        [Test]
+        public void Block_LockedAfterOneOfTwoKeys_LockColorIsItsOuterColourAtLevelStartWithOneKeyStillRequired()
+        {
+            var ctx = LockBoard();
             var initial = BoardState.CreateInitial(ctx);
             Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, initial, new Move(1, new Coord(0, 0)), out var state, out _));
             var visibility = new VisibilityLayer(ctx);
 
             var locked = visibility.Block(state, 0);
-            var remainingKey = visibility.Block(state, 2);
+            var plain = visibility.Block(state, 3);
 
-            Assert.AreEqual(5, locked.LockId);
+            Assert.IsTrue(locked.IsLocked);
+            Assert.AreEqual(BlockColor.Blue, locked.LockColor);
             Assert.AreEqual(1, locked.KeysStillRequired);
-            Assert.AreEqual(BlockColor.Blue, locked.OuterColor);
-            Assert.AreEqual(5, remainingKey.KeyTargetLockId);
+            Assert.IsFalse(plain.IsLocked);
+            Assert.IsNull(plain.LockColor);
+        }
+
+        [Test]
+        public void Block_AfterItsLastKey_IsNoLongerLocked()
+        {
+            var ctx = LockBoard();
+            var resolver = new MoveResolver();
+            Assert.IsTrue(resolver.TryApplyMove(ctx, BoardState.CreateInitial(ctx), new Move(1, new Coord(0, 0)), out var first, out _));
+            Assert.IsTrue(resolver.TryApplyMove(ctx, first, new Move(2, new Coord(0, 3)), out var second, out _));
+            var visibility = new VisibilityLayer(ctx);
+
+            var opened = visibility.Block(second, 0);
+
+            Assert.IsFalse(opened.IsLocked);
+            Assert.IsNull(opened.LockColor);
+            Assert.AreEqual(0, opened.KeysStillRequired);
+        }
+
+        [Test]
+        public void Block_KeyCarrier_IsMarkedWithItsLocksColourNotItsOwn_AndABlockWithoutAKeyHasNoMark()
+        {
+            // D47: the red carriers' keys are marked blue, the lock's colour.
+            var ctx = LockBoard();
+            var state = BoardState.CreateInitial(ctx);
+            var visibility = new VisibilityLayer(ctx);
+
+            var key = visibility.Block(state, 1);
+            var plain = visibility.Block(state, 3);
+            var locked = visibility.Block(state, 0);
+
+            Assert.AreEqual(BlockColor.Red, key.OuterColor);
+            Assert.AreEqual(BlockColor.Blue, key.KeyMarkColor);
+            Assert.IsNull(plain.KeyMarkColor);
+            Assert.IsNull(locked.KeyMarkColor);
+        }
+
+        /// <summary>
+        /// 2x1: a left-edge generator queues a red 1x1, which spawns at level
+        /// start over the red bottom gate, then a blue horizontal 1x2 frozen
+        /// until <paramref name="unfreezeAt"/> clears.
+        /// </summary>
+        private static LevelContext GeneratorBoard(int? unfreezeAt) =>
+            Ctx(
+                2, 1,
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red) },
+                generators: new[]
+                {
+                    Spawner(1, BoardEdge.Left, 0, 1,
+                        Spawned(),
+                        Spawned(
+                            colors: new[] { BlockColor.Blue },
+                            cells: new[] { new Coord(0, 0), new Coord(1, 0) },
+                            unfreezeAt: unfreezeAt))
+                });
+
+        [Test]
+        public void Generator_WithABlockQueued_ReportsTheCountAndTheNextBlocksCellsAndColour_NothingOnceExhausted()
+        {
+            var ctx = GeneratorBoard(unfreezeAt: null);
+            var initial = BoardState.CreateInitial(ctx);
+            Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, initial, new Move(0, new Coord(0, 0)), out var exhausted, out _));
+            var visibility = new VisibilityLayer(ctx);
+
+            var before = visibility.Generator(initial, 0);
+            var after = visibility.Generator(exhausted, 0);
+
+            Assert.IsTrue(before.IsShown);
+            Assert.AreEqual(1, before.Queued, "the red block spawned at level start; the blue one waits");
+            CollectionAssert.AreEqual(new[] { new Coord(0, 0), new Coord(1, 0) }, before.NextCells);
+            Assert.AreEqual(BlockColor.Blue, before.NextColor);
+            Assert.IsFalse(before.IsNextFrozen);
+            Assert.IsFalse(after.IsShown);
+            Assert.AreEqual(0, after.Queued);
+            Assert.IsNull(after.NextCells);
+        }
+
+        [Test]
+        public void Generator_NextBlockThatWouldSpawnFrozenAtTheCurrentCounts_HidesItsColour()
+        {
+            var ctx = GeneratorBoard(unfreezeAt: 1);
+            var state = BoardState.CreateInitial(ctx);
+            var visibility = new VisibilityLayer(ctx);
+
+            var generator = visibility.Generator(state, 0);
+
+            Assert.IsTrue(generator.IsNextFrozen);
+            Assert.IsNull(generator.NextColor);
+            Assert.AreEqual(2, generator.NextCells.Count, "its shape still shows");
+        }
+
+        [Test]
+        public void ElevatorPresent_WhileWavesRemainOrAWaveIsOnTheBoard_TrueAndFalseAfterTheFinalWaveIsCleared()
+        {
+            // 2x1, region (1,0) over a blue gate: two one-block blue waves.
+            var ctx = Ctx(
+                2, 1,
+                gates: new[] { Gate(1, BoardEdge.Bottom, 1, 1, BlockColor.Blue) },
+                elevators: new[]
+                {
+                    Elevator(1, new Coord(1, 0), new Coord(1, 0),
+                        new[] { Spawned(colors: new[] { BlockColor.Blue }, regionOrigin: new Coord(0, 0)) },
+                        new[] { Spawned(colors: new[] { BlockColor.Blue }, regionOrigin: new Coord(0, 0)) })
+                });
+            var resolver = new MoveResolver();
+            var initial = BoardState.CreateInitial(ctx);
+            Assert.IsTrue(resolver.TryApplyMove(ctx, initial, new Move(0, new Coord(1, 0)), out var lastWaveOnBoard, out _));
+            Assert.IsTrue(resolver.TryApplyMove(ctx, lastWaveOnBoard, new Move(1, new Coord(1, 0)), out var cleared, out _));
+            var visibility = new VisibilityLayer(ctx);
+
+            var withWavesToCome = visibility.ElevatorPresent(initial, 0);
+            var withTheLastWaveOnTheBoard = visibility.ElevatorPresent(lastWaveOnBoard, 0);
+            var afterTheLastWave = visibility.ElevatorPresent(cleared, 0);
+
+            Assert.IsTrue(withWavesToCome);
+            Assert.IsTrue(withTheLastWaveOnTheBoard);
+            Assert.IsFalse(afterTheLastWave);
         }
     }
 }

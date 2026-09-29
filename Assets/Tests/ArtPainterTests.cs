@@ -10,6 +10,8 @@ namespace GateRush.Tests
     /// Covers <see cref="ArtPainter"/>: the same recipe always paints the same
     /// bytes (D46), and the quarter pieces carry the same pixels on both sides
     /// of every seam a tiling can put them at, so a block reads as one piece.
+    /// The state sprites (Module 16) stretch only straight profile when sliced,
+    /// tile without seams, and keep frost on a block's face.
     /// </summary>
     /// <remarks>
     /// Seams are checked against one profile: the edge piece's left column,
@@ -52,7 +54,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(11, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(20, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -116,6 +118,98 @@ namespace GateRush.Tests
             {
                 CollectionAssert.AreEqual(middle, Column(arrow, i), $"column {i} of the stretched middle holds only the shaft");
             }
+        }
+
+        [TestCase(ArtSprite.RoundedRect)]
+        [TestCase(ArtSprite.Ring)]
+        public void Paint_SlicedBox_HasOnlyStraightProfileInItsStretchedMiddle(ArtSprite sprite)
+        {
+            var box = ArtPainter.Paint(recipe, sprite);
+
+            Assert.Greater(box.Border.x, 0f);
+            Assert.AreEqual(new Vector4(box.Border.x, box.Border.x, box.Border.x, box.Border.x), box.Border, "the same border on every side");
+            var border = (int)box.Border.x;
+            var middleColumn = Column(box, box.Width / 2);
+            var middleRow = Row(box, box.Height / 2);
+            for (var i = border; i < box.Width - border; i++)
+            {
+                CollectionAssert.AreEqual(middleColumn, Column(box, i), $"column {i}");
+            }
+
+            for (var j = border; j < box.Height - border; j++)
+            {
+                CollectionAssert.AreEqual(middleRow, Row(box, j), $"row {j}");
+            }
+        }
+
+        [Test]
+        public void Paint_Ring_IsOpaqueOnItsOutlineAndClearInItsMiddle()
+        {
+            var ring = ArtPainter.Paint(recipe, ArtSprite.Ring);
+            var middle = Row(ring, ring.Height / 2);
+
+            Assert.AreEqual(255, middle[recipe.RingWidthPixels / 2].a, "on the outline");
+            Assert.AreEqual(0, middle[ring.Width / 2].a, "inside the outline");
+        }
+
+        [TestCase(ArtSprite.Chain)]
+        [TestCase(ArtSprite.DoorPanel)]
+        public void Paint_TiledAlongX_MatchesItselfAcrossTheSeam(ArtSprite sprite)
+        {
+            // Symmetric about the tile's ends: the last column of one tile and
+            // the first of the next are mirror images, so they are equal.
+            var tile = ArtPainter.Paint(recipe, sprite);
+
+            CollectionAssert.AreEqual(Column(tile, 0), Column(tile, tile.Width - 1));
+        }
+
+        [Test]
+        public void Paint_ShutterSlats_MeetAtAGrooveOnTheTopAndBottomEdges()
+        {
+            var slats = ArtPainter.Paint(recipe, ArtSprite.ShutterSlats);
+            var groove = (byte)System.Math.Round(recipe.SlatGapTone * 255.0, System.MidpointRounding.AwayFromZero);
+
+            Assert.IsTrue(Row(slats, 0).All(p => p.r == groove && p.a == 255), "bottom row");
+            Assert.IsTrue(Row(slats, slats.Height - 1).All(p => p.r == groove && p.a == 255), "top row");
+        }
+
+        [Test]
+        public void Paint_Frost_IsTransparentWithinItsInsetOfEveryEdge()
+        {
+            // The inset keeps frost on a block's rounded face; one anti-aliased
+            // pixel inside it may still show the clip's soft edge.
+            var frost = ArtPainter.Paint(recipe, ArtSprite.Frost);
+            var clear = recipe.FrostInsetPixels - recipe.AntiAliasPixels;
+            var checkedPixels = 0;
+
+            for (var j = 0; j < frost.Height; j++)
+            {
+                for (var i = 0; i < frost.Width; i++)
+                {
+                    var toEdge = System.Math.Min(System.Math.Min(i + 0.5, frost.Width - i - 0.5), System.Math.Min(j + 0.5, frost.Height - j - 0.5));
+                    if (toEdge < clear)
+                    {
+                        Assert.AreEqual(0, frost.Pixels[j * frost.Width + i].a, $"pixel ({i}, {j})");
+                        checkedPixels++;
+                    }
+                }
+            }
+
+            Assert.Greater(checkedPixels, 0, "the inset holds pixels to check");
+            Assert.IsTrue(frost.Pixels.Any(p => p.a > 0), "and the frost is drawn somewhere");
+        }
+
+        [Test]
+        public void Paint_KeyGem_SitsInsideTheKeysHole()
+        {
+            var body = ArtPainter.Paint(recipe, ArtSprite.KeyBody);
+            var gem = ArtPainter.Paint(recipe, ArtSprite.KeyGem);
+            var center = recipe.KeyHeightPixels / 2;
+
+            Assert.AreEqual(body.Width, gem.Width);
+            Assert.AreEqual(body.Height, gem.Height);
+            Assert.AreEqual(0, body.Pixels[center * body.Width + center].a, "the bow's hole");
+            Assert.AreEqual(255, gem.Pixels[center * gem.Width + center].a, "filled by the gem");
         }
 
         private static List<Color32> Column(ArtImage image, int x) =>

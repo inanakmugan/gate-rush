@@ -8,7 +8,7 @@ using UnityEngine;
 namespace GateRush.Editor
 {
     /// <summary>
-    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Module 15 from
+    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15 and 16 from
     /// the project's <see cref="ArtRecipe"/> and writes it as a PNG under
     /// <see cref="OutputFolder"/>, with its import settings (D46). The PNGs are
     /// committed; the build never runs this.
@@ -28,7 +28,7 @@ namespace GateRush.Editor
     /// opaque, so tiles meet without seams), and <b>no compression</b>. Block
     /// compression smears anti-aliased edges and smooth gradients; the only
     /// block format both mobile WebGL and Android support, ASTC, is missing on
-    /// desktop WebGL; the whole set is about half a megabyte uncompressed, and
+    /// desktop WebGL; the whole set is under a megabyte uncompressed, and
     /// uncompressed textures ignore a build's texture-compression override.
     /// </para>
     /// <para><b>Batching (deferred until the first WebGL profile).</b> Each

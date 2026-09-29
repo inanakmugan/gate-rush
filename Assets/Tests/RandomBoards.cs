@@ -150,6 +150,8 @@ namespace GateRush.Tests
 
             // Locks and keys: choose the owner first — a top-level block or a
             // generator's queued block — then carriers among the top-level rest.
+            // A board holds at most this one lock, so no two locked blocks can
+            // share an outer colour (D47) and Next never redraws because of it.
             var lockIdByBlock = new int?[placements.Count + queuedCount];
             var requiredKeysByBlock = new int[placements.Count + queuedCount];
             var keyTargetByBlock = new int?[placements.Count];

@@ -63,7 +63,7 @@ namespace GateRush.Tests
             var layout = new BoardLayout(Width, Height, CellSize, Frame);
 
             var size = layout.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
-            var cameraY = layout.CameraCenterOffset(size, TopBand, BottomBand);
+            var cameraY = layout.CameraCenterOffset(size, TopBand, BottomBand).y;
 
             var screenTop = cameraY + size;
             var screenBottom = cameraY - size;
@@ -84,7 +84,7 @@ namespace GateRush.Tests
             var widthFit = (FramedHalfHeight + SideMargin * CellSize) / aspect;
 
             var size = layout.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
-            var cameraY = layout.CameraCenterOffset(size, TopBand, BottomBand);
+            var cameraY = layout.CameraCenterOffset(size, TopBand, BottomBand).y;
 
             Assert.Greater(size, widthFit, "the height decides");
             var freeTop = cameraY + size - TopBand * 2f * size;
@@ -101,7 +101,60 @@ namespace GateRush.Tests
 
             var offset = layout.CameraCenterOffset(4f, 0.1f, 0.1f);
 
-            Assert.AreEqual(0f, offset, Tolerance);
+            Assert.AreEqual(0f, offset.x, Tolerance);
+            Assert.AreEqual(0f, offset.y, Tolerance);
+        }
+
+        [Test]
+        public void FitOrthographicSize_ReachOnTheLeft_WidensTheViewByItOnThatSideOnly()
+        {
+            // A generator machine on the left edge reaches this far beyond the
+            // frame (D48); the right side keeps its plain margin.
+            const float aspect = 9f / 19.5f;
+            const float reach = 1.2f;
+            var layout = new BoardLayout(Width, Height, CellSize, Frame, new EdgeReach(reach, 0f, 0f, 0f));
+
+            var size = layout.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
+            var cameraX = layout.CameraCenterOffset(size, TopBand, BottomBand).x;
+
+            var visibleLeft = cameraX - size * aspect;
+            var visibleRight = cameraX + size * aspect;
+            Assert.AreEqual(-(FramedHalfWidth + (reach + SideMargin) * CellSize), visibleLeft, Tolerance, "the machine and the margin show on the left");
+            Assert.AreEqual(FramedHalfWidth + SideMargin * CellSize, visibleRight, Tolerance, "the right side is as without a machine");
+        }
+
+        [Test]
+        public void FitOrthographicSize_NoReach_FitsAsWithoutMachines()
+        {
+            const float aspect = 9f / 19.5f;
+            var plain = new BoardLayout(Width, Height, CellSize, Frame);
+            var noReach = new BoardLayout(Width, Height, CellSize, Frame, new EdgeReach(0f, 0f, 0f, 0f));
+
+            var plainSize = plain.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
+            var noReachSize = noReach.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
+            var offset = noReach.CameraCenterOffset(noReachSize, TopBand, BottomBand);
+
+            Assert.AreEqual(plainSize, noReachSize, Tolerance);
+            Assert.AreEqual(0f, offset.x, Tolerance);
+            Assert.AreEqual(plain.CameraCenterOffset(plainSize, TopBand, BottomBand).y, offset.y, Tolerance);
+        }
+
+        [Test]
+        public void FitOrthographicSize_ReachAtTheTopInAShortAspect_KeepsTheMachineBetweenTheBands()
+        {
+            // The height decides here; the machine above the frame must still
+            // end below the top band.
+            const float aspect = 2f;
+            const float reach = 1.2f;
+            var layout = new BoardLayout(Height, Height, CellSize, Frame, new EdgeReach(0f, 0f, 0f, reach));
+
+            var size = layout.FitOrthographicSize(aspect, SideMargin, TopBand, BottomBand);
+            var cameraY = layout.CameraCenterOffset(size, TopBand, BottomBand).y;
+
+            var freeTop = cameraY + size - TopBand * 2f * size;
+            var freeBottom = cameraY - size + BottomBand * 2f * size;
+            Assert.AreEqual(FramedHalfHeight + reach * CellSize, freeTop, Tolerance, "the machine reaches the top band");
+            Assert.AreEqual(-FramedHalfHeight, freeBottom, Tolerance, "the frame reaches the bottom band");
         }
 
         [TestCase(0f, SideMargin, TopBand, BottomBand, "Frame Thickness Cells")]

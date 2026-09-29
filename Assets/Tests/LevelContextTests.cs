@@ -13,12 +13,13 @@ namespace GateRush.Tests
             IReadOnlyList<Coord> cells = null,
             int? lockId = null,
             int requiredKeyCount = 0,
-            int? keyTargetLockId = null)
+            int? keyTargetLockId = null,
+            IReadOnlyList<BlockColor> colors = null)
         {
             return new BlockDefinition(
                 id: id,
                 cells: cells ?? new[] { new Coord(0, 0) },
-                colorStack: new[] { BlockColor.Red },
+                colorStack: colors ?? new[] { BlockColor.Red },
                 startOrigin: startOrigin,
                 axis: MovementAxis.Free,
                 unfreezeAtClearCount: null,
@@ -32,11 +33,12 @@ namespace GateRush.Tests
             int? keyTargetLockId = null,
             int? lockId = null,
             int requiredKeyCount = 0,
-            Coord? regionOrigin = null)
+            Coord? regionOrigin = null,
+            IReadOnlyList<BlockColor> colors = null)
         {
             return new SpawnedBlock(
                 cells: new[] { new Coord(0, 0) },
-                colorStack: new[] { BlockColor.Blue },
+                colorStack: colors ?? new[] { BlockColor.Blue },
                 axis: MovementAxis.Free,
                 unfreezeAtClearCount: null,
                 lockId: lockId,
@@ -298,6 +300,99 @@ namespace GateRush.Tests
             Assert.Throws<ArgumentException>(() => CreateContext(3, 3, new[] { block }, generators: new[] { generator }));
         }
 
+        // ----- D47: one locked block per outer colour ----------------------
+
+        [Test]
+        public void Constructor_TwoLockedTopLevelBlocksSharingAnOuterColour_ThrowsNamingBothAndTheColour()
+        {
+            var lockA = CreateBlock(1, new Coord(0, 0), lockId: 5, requiredKeyCount: 1);
+            var lockB = CreateBlock(2, new Coord(1, 0), lockId: 6, requiredKeyCount: 1);
+            var keyA = CreateBlock(3, new Coord(0, 1), keyTargetLockId: 5, colors: new[] { BlockColor.Blue });
+            var keyB = CreateBlock(4, new Coord(1, 1), keyTargetLockId: 6, colors: new[] { BlockColor.Blue });
+
+            var error = Assert.Throws<ArgumentException>(() => CreateContext(3, 3, new[] { lockA, lockB, keyA, keyB }));
+
+            StringAssert.Contains("Block 1", error.Message);
+            StringAssert.Contains("Block 2", error.Message);
+            StringAssert.Contains(BlockColor.Red.ToString(), error.Message);
+        }
+
+        [Test]
+        public void Constructor_LockedWaveBlockAndLockedTopLevelBlockSharingAColour_Throws()
+        {
+            var locked = CreateBlock(1, new Coord(0, 0), lockId: 5, requiredKeyCount: 1);
+            var keyA = CreateBlock(2, new Coord(1, 0), keyTargetLockId: 5, colors: new[] { BlockColor.Blue });
+            var keyB = CreateBlock(3, new Coord(2, 0), keyTargetLockId: 6, colors: new[] { BlockColor.Blue });
+            var elevator = new ElevatorDefinition(
+                1, new Coord(2, 2), new Coord(2, 2),
+                new IReadOnlyList<SpawnedBlock>[]
+                {
+                    new[]
+                    {
+                        CreateSpawnedBlock(
+                            lockId: 6, requiredKeyCount: 1, regionOrigin: new Coord(0, 0), colors: new[] { BlockColor.Red })
+                    }
+                });
+
+            var error = Assert.Throws<ArgumentException>(() =>
+                CreateContext(3, 3, new[] { locked, keyA, keyB }, elevators: new[] { elevator }));
+
+            StringAssert.Contains("Block 1", error.Message);
+            StringAssert.Contains("Elevator 1's wave 0, block 0", error.Message);
+        }
+
+        [Test]
+        public void Constructor_TwoLockedBlocksInOneGeneratorQueueSharingAColour_Throws()
+        {
+            var keyA = CreateBlock(1, new Coord(0, 0), keyTargetLockId: 5);
+            var keyB = CreateBlock(2, new Coord(1, 0), keyTargetLockId: 6);
+            var generator = new GeneratorDefinition(
+                id: 1,
+                edge: BoardEdge.Top,
+                offset: 0,
+                width: 1,
+                queue: new[]
+                {
+                    CreateSpawnedBlock(lockId: 5, requiredKeyCount: 1),
+                    CreateSpawnedBlock(lockId: 6, requiredKeyCount: 1)
+                });
+
+            var error = Assert.Throws<ArgumentException>(() =>
+                CreateContext(3, 3, new[] { keyA, keyB }, generators: new[] { generator }));
+
+            StringAssert.Contains("Generator 1's queue entry 0", error.Message);
+            StringAssert.Contains("Generator 1's queue entry 1", error.Message);
+        }
+
+        [Test]
+        public void Constructor_LockedBlocksOfDifferentColours_Succeeds()
+        {
+            var redLock = CreateBlock(1, new Coord(0, 0), lockId: 5, requiredKeyCount: 1);
+            var blueLock = CreateBlock(2, new Coord(1, 0), lockId: 6, requiredKeyCount: 1, colors: new[] { BlockColor.Blue });
+            var keyA = CreateBlock(3, new Coord(0, 1), keyTargetLockId: 5, colors: new[] { BlockColor.Green });
+            var keyB = CreateBlock(4, new Coord(1, 1), keyTargetLockId: 6, colors: new[] { BlockColor.Green });
+
+            var context = CreateContext(3, 3, new[] { redLock, blueLock, keyA, keyB });
+
+            Assert.AreEqual(2, context.LockOwnerIndices.Count);
+        }
+
+        [Test]
+        public void Constructor_LayeredLockedBlock_CountsByItsOuterColourOnly()
+        {
+            // Red over blue is a red lock; the blue beneath is not addressable
+            // (M4), so it does not clash with a blue lock.
+            var layeredLock = CreateBlock(
+                1, new Coord(0, 0), lockId: 5, requiredKeyCount: 1, colors: new[] { BlockColor.Red, BlockColor.Blue });
+            var blueLock = CreateBlock(2, new Coord(1, 0), lockId: 6, requiredKeyCount: 1, colors: new[] { BlockColor.Blue });
+            var keyA = CreateBlock(3, new Coord(0, 1), keyTargetLockId: 5, colors: new[] { BlockColor.Green });
+            var keyB = CreateBlock(4, new Coord(1, 1), keyTargetLockId: 6, colors: new[] { BlockColor.Green });
+
+            var context = CreateContext(3, 3, new[] { layeredLock, blueLock, keyA, keyB });
+
+            Assert.AreEqual(2, context.LockOwnerIndices.Count);
+        }
+
         [Test]
         public void Constructor_OverlappingShutterRegions_Throws()
         {
@@ -502,7 +597,7 @@ namespace GateRush.Tests
         {
             var lockedLate = CreateBlock(1, new Coord(0, 0), lockId: 7, requiredKeyCount: 1);
             var plain = CreateBlock(2, new Coord(1, 0));
-            var lockedEarly = CreateBlock(3, new Coord(2, 0), lockId: 3, requiredKeyCount: 1);
+            var lockedEarly = CreateBlock(3, new Coord(2, 0), lockId: 3, requiredKeyCount: 1, colors: new[] { BlockColor.Green });
             var keyFor7 = CreateBlock(4, new Coord(0, 1), keyTargetLockId: 7);
             var keyFor3 = CreateBlock(5, new Coord(1, 1), keyTargetLockId: 3);
             var keyFor9 = CreateBlock(6, new Coord(2, 1), keyTargetLockId: 9);

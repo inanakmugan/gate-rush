@@ -18,7 +18,16 @@ namespace GateRush.Editor
         GateArrow,
         AxisArrow,
         BackgroundRamp,
-        Vignette
+        Vignette,
+        Frost,
+        RoundedRect,
+        Ring,
+        Chain,
+        Padlock,
+        KeyBody,
+        KeyGem,
+        ShutterSlats,
+        DoorPanel
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -52,8 +61,9 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Module 15 from an <see cref="ArtRecipe"/>
-    /// alone, in greyscale plus alpha, for the runtime to tint (D46).
+    /// Paints every generated sprite of Modules 15 and 16 from an
+    /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
+    /// to tint (D46).
     /// </summary>
     /// <remarks>
     /// <para><b>Shapes</b> are signed distance functions evaluated at pixel
@@ -70,7 +80,8 @@ namespace GateRush.Editor
     /// Every seam between two pieces carries the same pixels on both sides, as
     /// long as the recipe passes <see cref="ArtRecipe.Problems"/>.</para>
     /// <para><b>Determinism.</b> Only double-precision <c>+ − × ÷</c>,
-    /// <c>Math.Sqrt</c>, <c>Min</c> and <c>Max</c> are used — no <c>Mathf</c>,
+    /// <c>Math.Sqrt</c>, <c>Abs</c>, <c>Floor</c>, <c>Min</c> and <c>Max</c> are
+    /// used, all exactly rounded — no <c>Mathf</c>,
     /// <c>Pow</c> or <c>Exp</c>, no randomness, no clock — and each value is
     /// rounded to a byte with an explicit midpoint rule. The same recipe
     /// always paints the same bytes.</para>
@@ -115,8 +126,26 @@ namespace GateRush.Editor
                     return PaintAxisArrow(recipe);
                 case ArtSprite.BackgroundRamp:
                     return PaintRamp(recipe);
-                default:
+                case ArtSprite.Vignette:
                     return PaintVignette(recipe);
+                case ArtSprite.Frost:
+                    return PaintFrost(recipe);
+                case ArtSprite.RoundedRect:
+                    return PaintRoundedRect(recipe);
+                case ArtSprite.Ring:
+                    return PaintRing(recipe);
+                case ArtSprite.Chain:
+                    return PaintChain(recipe);
+                case ArtSprite.Padlock:
+                    return PaintPadlock(recipe);
+                case ArtSprite.KeyBody:
+                    return PaintKeyBody(recipe);
+                case ArtSprite.KeyGem:
+                    return PaintKeyGem(recipe);
+                case ArtSprite.ShutterSlats:
+                    return PaintSlats(recipe);
+                default:
+                    return PaintDoorPanel(recipe);
             }
         }
 
@@ -282,6 +311,257 @@ namespace GateRush.Editor
         }
 
         /// <summary>
+        /// Frost for one cell of ice: pale streaks on the diagonal, side by
+        /// side, clipped to a box inset from every side so frost never leaves a
+        /// block's rounded face. The clip also shortens the outer streaks.
+        /// White; its colour and strength come from the runtime.
+        /// </summary>
+        private static ArtImage PaintFrost(ArtRecipe recipe)
+        {
+            var center = recipe.CellPixels / 2.0;
+            var clipHalf = center - recipe.FrostInsetPixels;
+            var halfWidth = recipe.FrostStreakWidthPixels / 2.0;
+            var halfLength = recipe.FrostStreakLengthPixels / 2.0;
+            var count = recipe.FrostStreakCount;
+            var diagonal = 1.0 / Math.Sqrt(2.0);
+
+            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
+            {
+                var along = (x - center + (y - center)) * diagonal;
+                var across = (y - center - (x - center)) * diagonal;
+                var nearest = double.MaxValue;
+                for (var i = 0; i < count; i++)
+                {
+                    var offset = (i - (count - 1) / 2.0) * recipe.FrostStreakSpacingPixels;
+                    var sd = Length(Math.Max(Math.Abs(along) - halfLength, 0.0), across - offset) - halfWidth;
+                    nearest = Math.Min(nearest, sd);
+                }
+
+                var clip = SdBox(x - center, y - center, clipHalf, clipHalf);
+                return (1.0, recipe.FrostAlpha * Coverage(recipe, nearest) * Coverage(recipe, clip));
+            });
+        }
+
+        /// <summary>
+        /// A rounded box shaded like a block's face — outline, then a rim
+        /// highlight easing into the face — reaching the sprite's edges. It is
+        /// 9-sliced at <see cref="ArtRecipe.PanelBorderPixels"/> on every side,
+        /// which holds the corner and the bevel, so only straight profile
+        /// stretches.
+        /// </summary>
+        private static ArtImage PaintRoundedRect(ArtRecipe recipe)
+        {
+            var half = recipe.PanelPixels / 2.0;
+            double radius = recipe.PanelCornerRadiusPixels;
+            float border = recipe.PanelBorderPixels;
+
+            return Paint(recipe.PanelPixels, recipe.PanelPixels, new Vector4(border, border, border, border), (x, y) =>
+            {
+                var sd = SdRoundedBox(x - half, y - half, half, half, radius);
+                return (FaceTone(recipe, -sd), Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// A white outline around the sprite's edges, as wide as its 9-slice
+        /// border, with its outer corners rounded by that width. The runtime
+        /// scales it so the border draws at the thickness it asks for.
+        /// </summary>
+        private static ArtImage PaintRing(ArtRecipe recipe)
+        {
+            var half = recipe.RingPixels / 2.0;
+            double width = recipe.RingWidthPixels;
+            float border = recipe.RingWidthPixels;
+
+            return Paint(recipe.RingPixels, recipe.RingPixels, new Vector4(border, border, border, border), (x, y) =>
+            {
+                var outer = SdRoundedBox(x - half, y - half, half, half, width);
+                var inner = SdBox(x - half, y - half, half - width, half - width);
+                return (1.0, Coverage(recipe, outer) * (1.0 - Coverage(recipe, inner)));
+            });
+        }
+
+        /// <summary>
+        /// One period of chain along x: a link seen face-on — an open oval — in
+        /// the middle, and a link seen edge-on — a short bar — straddling both
+        /// ends, drawn over it. The pattern is symmetric about the period's
+        /// ends, so tiles meet without a seam.
+        /// </summary>
+        private static ArtImage PaintChain(ArtRecipe recipe)
+        {
+            double period = recipe.ChainPeriodPixels;
+            var middle = recipe.ChainThicknessPixels / 2.0;
+            double wall = recipe.ChainLinkWallPixels;
+            var halfWall = wall / 2.0;
+            var linkHalfLength = recipe.ChainLinkLengthPixels / 2.0;
+            var edgeHalfLength = recipe.ChainEdgeLinkLengthPixels / 2.0;
+
+            (double tone, double alpha) Metal(double sd) =>
+                (Lerp(recipe.ChainShadeTone, recipe.ChainTone, Clamp01(-sd / halfWall)), Coverage(recipe, sd));
+
+            return Paint(recipe.ChainPeriodPixels, recipe.ChainThicknessPixels, Vector4.zero, (x, y) =>
+            {
+                var v = y - middle;
+                var outline = SdRoundedBox(x - period / 2.0, v, linkHalfLength, middle, middle);
+                var faceOn = Math.Abs(outline + halfWall) - halfWall;
+
+                var edgeOn = Math.Min(
+                    SdRoundedBox(x, v, edgeHalfLength, halfWall, halfWall),
+                    SdRoundedBox(x - period, v, edgeHalfLength, halfWall, halfWall));
+
+                return Over(Metal(edgeOn), Metal(faceOn));
+            });
+        }
+
+        /// <summary>
+        /// A padlock: a bevelled body in the lower part and a shackle arching
+        /// over it, its legs running down behind the body. Body and shackle
+        /// together are centred vertically.
+        /// </summary>
+        private static ArtImage PaintPadlock(ArtRecipe recipe)
+        {
+            double size = recipe.PadlockPixels;
+            var centerX = size / 2.0;
+            var bodyHalfWidth = recipe.PadlockBodyWidth * size / 2.0;
+            var bodyHalfHeight = recipe.PadlockBodyHeight * size / 2.0;
+            var radius = recipe.PadlockShackleRadius * size;
+            var shackleHalf = recipe.PadlockShackleThickness * size / 2.0;
+            var bottom = (size - (2.0 * bodyHalfHeight + radius + shackleHalf)) / 2.0;
+            var bodyCenterY = bottom + bodyHalfHeight;
+            var bodyTop = bottom + 2.0 * bodyHalfHeight;
+
+            return Paint(recipe.PadlockPixels, recipe.PadlockPixels, Vector4.zero, (x, y) =>
+            {
+                var body = SdRoundedBox(x - centerX, y - bodyCenterY, bodyHalfWidth, bodyHalfHeight, recipe.PadlockBodyCornerPixels);
+
+                // Above the body's top the shackle is an arc; below it, two
+                // straight legs ending at the body's middle.
+                var shackle = y >= bodyTop
+                    ? Math.Abs(Length(x - centerX, y - bodyTop) - radius) - shackleHalf
+                    : Length(Math.Abs(Math.Abs(x - centerX) - radius), Math.Max(bodyCenterY - y, 0.0)) - shackleHalf;
+                var shackleTone = Lerp(recipe.OutlineTone, recipe.PadlockShackleTone, Clamp01(-shackle / (shackleHalf / 2.0)));
+
+                return Over(
+                    (FaceTone(recipe, -body), Coverage(recipe, body)),
+                    (shackleTone, Coverage(recipe, shackle)));
+            });
+        }
+
+        /// <summary>
+        /// A key lying horizontally: a round bow on the left with a hole for the
+        /// gem, a shaft to the right edge, and two teeth under its end. Shaded
+        /// like a block's face.
+        /// </summary>
+        private static ArtImage PaintKeyBody(ArtRecipe recipe)
+        {
+            var (bowX, middle) = KeyBowCenter(recipe);
+            var bowRadius = recipe.KeyBowDiameterPixels / 2.0;
+            var holeRadius = recipe.KeyHoleDiameterPixels / 2.0;
+            var shaftHalf = recipe.KeyShaftThicknessPixels / 2.0;
+            var shaftEnd = recipe.KeyWidthPixels - recipe.AntiAliasPixels;
+            var toothWidth = recipe.KeyToothWidthPixels;
+            var toothHalfLength = (recipe.KeyToothLengthPixels + shaftHalf) / 2.0;
+            var toothCenterY = middle - (shaftHalf + recipe.KeyToothLengthPixels) / 2.0;
+
+            return Paint(recipe.KeyWidthPixels, recipe.KeyHeightPixels, Vector4.zero, (x, y) =>
+            {
+                var bow = Length(x - bowX, y - middle) - bowRadius;
+                var shaft = SdBox(x - (bowX + shaftEnd) / 2.0, y - middle, (shaftEnd - bowX) / 2.0, shaftHalf);
+
+                // Two teeth, the first flush with the shaft's end, one tooth
+                // width apart; each reaches up into the shaft so they join.
+                var teeth = Math.Min(
+                    SdBox(x - (shaftEnd - toothWidth / 2.0), y - toothCenterY, toothWidth / 2.0, toothHalfLength),
+                    SdBox(x - (shaftEnd - 2.5 * toothWidth), y - toothCenterY, toothWidth / 2.0, toothHalfLength));
+
+                var hole = holeRadius - Length(x - bowX, y - middle);
+                var sd = Math.Max(Math.Min(bow, Math.Min(shaft, teeth)), hole);
+                return (FaceTone(recipe, -sd), Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// The gem in the key's bow, on the same canvas as the key so the two
+        /// line up: a disc, lighter towards its centre.
+        /// </summary>
+        private static ArtImage PaintKeyGem(ArtRecipe recipe)
+        {
+            var (bowX, middle) = KeyBowCenter(recipe);
+            var radius = recipe.KeyGemDiameterPixels / 2.0;
+
+            return Paint(recipe.KeyWidthPixels, recipe.KeyHeightPixels, Vector4.zero, (x, y) =>
+            {
+                var sd = Length(x - bowX, y - middle) - radius;
+                return (Lerp(recipe.KeyGemEdgeTone, recipe.KeyGemTone, Clamp01(-sd / radius)), Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// One opaque cell of shutter: horizontal slats, each light at its top
+        /// and shaded at its bottom, with a dark groove between them. The
+        /// grooves fall on the cell's top and bottom edges, so tiles meet
+        /// without a seam.
+        /// </summary>
+        private static ArtImage PaintSlats(ArtRecipe recipe)
+        {
+            var pitch = (double)recipe.CellPixels / recipe.SlatsPerCell;
+            var halfGap = recipe.SlatGapPixels / 2.0;
+
+            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
+            {
+                var inSlat = y - pitch * Math.Floor(y / pitch);
+                var toGroove = Math.Min(inSlat, pitch - inSlat);
+                var groove = Clamp01(halfGap - toGroove + 0.5);
+                var slat = Lerp(recipe.SlatShadeTone, recipe.SlatTone, inSlat / pitch);
+                return (Lerp(slat, recipe.SlatGapTone, groove), 1.0);
+            });
+        }
+
+        /// <summary>
+        /// One opaque cell of lift door: a flat panel with faint vertical lines,
+        /// one on each side edge and the rest evenly between, so tiles meet
+        /// without a seam.
+        /// </summary>
+        private static ArtImage PaintDoorPanel(ArtRecipe recipe)
+        {
+            var pitch = (double)recipe.CellPixels / recipe.DoorLinesPerCell;
+            var halfLine = recipe.DoorLineWidthPixels / 2.0;
+
+            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
+            {
+                var inPanel = x - pitch * Math.Floor(x / pitch);
+                var toLine = Math.Min(inPanel, pitch - inPanel);
+                var line = Clamp01(halfLine - toLine + 0.5);
+                return (Lerp(recipe.DoorTone, recipe.DoorLineTone, line), 1.0);
+            });
+        }
+
+        /// <summary>The centre of the key's bow, in pixels: as far in from the left edge as the key is half high.</summary>
+        private static (double x, double y) KeyBowCenter(ArtRecipe recipe)
+        {
+            var middle = recipe.KeyHeightPixels / 2.0;
+            return (middle, middle);
+        }
+
+        /// <summary>
+        /// <paramref name="top"/> composited over <paramref name="bottom"/>:
+        /// alpha adds as paint does, and the tone is their alpha-weighted blend.
+        /// </summary>
+        private static (double tone, double alpha) Over((double tone, double alpha) top, (double tone, double alpha) bottom)
+        {
+            var bottomShown = bottom.alpha * (1.0 - top.alpha);
+            var alpha = top.alpha + bottomShown;
+            if (alpha <= 0.0)
+            {
+                // Keep the upper shape's tone in the transparent fringe, so
+                // filtering pulls no dark edge in.
+                return (top.tone, 0.0);
+            }
+
+            return ((top.tone * top.alpha + bottom.tone * bottomShown) / alpha, alpha);
+        }
+
+        /// <summary>
         /// Evaluates <paramref name="shade"/> at every pixel centre — <c>(x + ½,
         /// y + ½)</c>, bottom row first — and quantizes its tone and alpha.
         /// </summary>
@@ -343,6 +623,17 @@ namespace GateRush.Editor
             var dx = Math.Abs(x) - hx;
             var dy = Math.Abs(y) - hy;
             return Length(Math.Max(dx, 0.0), Math.Max(dy, 0.0)) + Math.Min(Math.Max(dx, dy), 0.0);
+        }
+
+        /// <summary>
+        /// Signed distance to a box centred on the origin with half extents
+        /// <paramref name="hx"/>, <paramref name="hy"/> whose corners are
+        /// rounded by <paramref name="radius"/>, capped at the smaller half extent.
+        /// </summary>
+        private static double SdRoundedBox(double x, double y, double hx, double hy, double radius)
+        {
+            var r = Math.Min(radius, Math.Min(hx, hy));
+            return SdBox(x, y, hx - r, hy - r) - r;
         }
 
         /// <summary>

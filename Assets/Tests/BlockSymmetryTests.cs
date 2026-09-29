@@ -180,15 +180,16 @@ namespace GateRush.Tests
         [Test]
         public void Of_LockedBlocks_AreNeverGrouped()
         {
-            // Lock ids are unique within a level (M8), so two locked blocks can
-            // never share a spec — which is what keeps LevelContext.LockOwnerIndex
-            // outside the reach of any permutation this type admits.
+            // Lock ids are unique within a level (M8), and no two locked blocks
+            // share an outer colour (D47), so two locked blocks can never share
+            // a spec — which is what keeps LevelContext.LockOwnerIndex outside
+            // the reach of any permutation this type admits.
             var ctx = Ctx(
                 5, 1,
                 new[]
                 {
                     Block(1, new Coord(0, 0), lockId: 1, requiredKeys: 1),
-                    Block(2, new Coord(1, 0), lockId: 2, requiredKeys: 1),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 2, requiredKeys: 1),
                     Block(3, new Coord(2, 0), keyTarget: 1),
                     Block(4, new Coord(3, 0), keyTarget: 2)
                 });
