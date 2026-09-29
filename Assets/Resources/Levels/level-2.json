@@ -1,5 +1,5 @@
 {
-    "formatVersion": 3,
+    "formatVersion": 4,
     "levelId": 2,
     "width": 5,
     "height": 8,
@@ -37,7 +37,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -64,7 +63,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -91,7 +89,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -118,7 +115,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -145,7 +141,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -172,7 +167,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -199,7 +193,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -226,7 +219,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -253,7 +245,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -280,7 +271,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -307,7 +297,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -334,7 +323,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -369,7 +357,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -396,7 +383,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -431,7 +417,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         }
     ],
