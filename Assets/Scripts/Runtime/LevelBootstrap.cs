@@ -156,7 +156,11 @@ namespace GateRush.Runtime
             boardView.Initialize(config, ctx, layout, new VisibilityLayer(ctx));
             boardView.Rebuild(session.State);
             inputController.Initialize(
-                run, new DragController(config.PushThresholdCells), layout, boardView, boardCamera);
+                run,
+                new DragController(new DragSettings(config.PushThresholdCells, config.FollowRate, config.CornerAssistCells)),
+                layout,
+                boardView,
+                boardCamera);
 
             boardCamera.orthographic = true;
             boardCamera.clearFlags = CameraClearFlags.SolidColor;

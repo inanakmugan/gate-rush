@@ -94,9 +94,9 @@ four whole-cell origins.
   (`1 − e^(−rate·dt)`), and the collision sweep below then runs toward the
   smoothed pointer. Smoothing the drawn block after the sweep could ease it
   straight across the corner of a wall between two legal positions.
-- **Sweep, one axis at a time.** The block moves toward the target along x,
-  then along y (the larger remaining distance first), each as far as it can
-  go while staying legal. It stops **exactly flush** against whatever blocks
+- **Sweep, one axis at a time.** The block moves toward the target along
+  one axis, then the other — the axis with the larger remaining distance
+  first, horizontal on a tie — each as far as it can go while staying legal. It stops **exactly flush** against whatever blocks
   it — a whole-cell coordinate — never short of it and never inside it.
 - **No tunnelling.** However far the pointer jumps in one frame, the sweep
   checks every whole-cell origin the block would pass over, so it can never
@@ -129,6 +129,10 @@ four whole-cell origins.
   with a duration and ease from `RuntimeConfig`. The clear effect, if any,
   starts from the settled cell. Input waits for the settle as it waited for
   queued steps in Module 12.
+- **Release does not follow the pointer.** `End` rounds the position the
+  player sees; the raw release pointer is used only for the push
+  displacement. A final sweep toward it would make the block jump on
+  release and bypass the smoothing.
 
 ### Timing that carries over from Module 12
 
@@ -208,3 +212,50 @@ Edit Mode, against `DragController`. The MonoBehaviours are checked by hand.
 - `StepPlayback`'s tests and Module 11's step-by-step tests that assert
   whole-cell stepping (`Stepped`, "never a diagonal step") are replaced by
   the legality tests above.
+
+---
+
+## Resolved during implementation
+
+- **`DragSettings`** holds the three drag tunables and a static
+  `Problems(...)` that is the single statement of their valid ranges: the
+  constructor throws on what it reports, and `RuntimeConfig.Problems()`
+  reports the same messages at load. `CornerAssistCells` must be at least 0
+  and below 0.5 (0 turns the assist off), so the two whole cells either side
+  of a coordinate can never tie. There is no inspector slider: a slider can
+  land exactly on 0.5.
+- **The sweep** walks whole-cell lines from the ceil (moving up) or floor
+  (moving down) of the current coordinate. A line is legal when every
+  origin on it that the other coordinate overlaps is; the first illegal
+  line leaves the block exactly on the whole cell before it. The first line
+  off the board is illegal, so the walk ends whatever the target.
+- **Corner assist.** Only the first axis that was blocked is assisted, at
+  most once per update. A whole cell qualifies when it is within the assist
+  distance (inclusive) and the next line along the blocked axis is legal
+  from it. The nudge is capped by the blocked axis's remaining distance to
+  its target; on reaching the cell, the blocked axis is swept again in the
+  same update.
+- **Non-finite input.** A NaN or infinite pointer cannot start a drag and
+  is ignored by `Update`. A zero, negative or non-finite frame time leaves
+  the smoothed pointer where it is. The drag advances on
+  `Time.unscaledDeltaTime`, the countdown's clock.
+- **Rounding.** Each axis rounds to `start + sign(d)·ceil(|d| − ½)`, with
+  `d` the offset from the start: an exact half stays toward the start.
+- **Settle and `IsBusy`.** `BoardView.Settle` places the block at once, with
+  no tween, when it is already on its cell (a push in place, or a release
+  exactly on a cell), so a clear effect does not wait for nothing. The
+  settle tween is reset to null on completion and on every kill — `Snap`,
+  `BeginDrag`, `Rebuild`, disable and destroy — so `IsBusy` cannot hold for
+  good. `Present` starts the effects when the settle finishes, or at once
+  when none is playing.
+- **Time-out during a settle.** A settle already under way when time runs
+  out finishes on its own: there is no drag to cancel, and the move it
+  carries was applied at release. A drag in progress is cancelled and
+  snapped back to its start.
+- **`InputController`** no longer subscribes to anything: with `Stepped`
+  gone, it feeds `drag.Position` to `BoardView.ShowDragged` every frame.
+- **Removed:** `StepPlayback` and its tests, `DragController.Stepped`, and
+  the `stepSeconds`, `maxLagSteps` and `stepEase` fields. New
+  `RuntimeConfig` fields, with soft defaults for tuning in Play Mode:
+  `followRate` 20, `cornerAssistCells` 0.3, `settleSeconds` 0.08,
+  `settleEase` OutQuad.
