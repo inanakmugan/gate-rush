@@ -37,10 +37,13 @@ namespace GateRush.Runtime
 
         [SerializeField] private RuntimeConfig config;
 
-        [Tooltip("The orthographic camera that shows the board. It is centred on the Board View and re-fitted when the screen size changes.")]
+        [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, and re-fitted when the screen size changes.")]
         [SerializeField] private Camera boardCamera;
 
         [SerializeField] private BoardView boardView;
+
+        [Tooltip("Draws the background gradient and vignette; stretched over the camera's view whenever the camera is fitted.")]
+        [SerializeField] private BackgroundView backgroundView;
         [SerializeField] private InputController inputController;
 
         [Tooltip("Shows the remaining time in whole seconds at the top of the screen. Hidden for a level without a countdown.")]
@@ -67,6 +70,7 @@ namespace GateRush.Runtime
             }
 
             isUsable = true;
+            backgroundView.Initialize(config);
             resultPanel.Hide();
             timerLabel.gameObject.SetActive(false);
             BuildCatalog();
@@ -151,7 +155,7 @@ namespace GateRush.Runtime
             var session = new LevelSession(ctx);
             run = new LevelRun(session, countdown);
             levelName = asset.name;
-            layout = new BoardLayout(ctx.Width, ctx.Height, config.CellSize);
+            layout = new BoardLayout(ctx.Width, ctx.Height, config.CellSize, config.FrameThicknessCells);
 
             boardView.Initialize(config, ctx, layout, new VisibilityLayer(ctx));
             boardView.Rebuild(session.State);
@@ -164,11 +168,11 @@ namespace GateRush.Runtime
 
             boardCamera.orthographic = true;
             boardCamera.clearFlags = CameraClearFlags.SolidColor;
-            boardCamera.backgroundColor = config.BackgroundColor;
-            var boardCenter = boardView.transform.position;
-            boardCamera.transform.position = new Vector3(boardCenter.x, boardCenter.y, boardCamera.transform.position.z);
+            boardCamera.backgroundColor = config.BackgroundBottom;
+
             fittedScreenWidth = 0;
             fittedScreenHeight = 0;
+            FitCameraToScreen();
 
             resultPanel.Hide();
             timerLabel.gameObject.SetActive(countdown != null);
@@ -264,11 +268,26 @@ namespace GateRush.Runtime
 
             fittedScreenWidth = Screen.width;
             fittedScreenHeight = Screen.height;
-            if (fittedScreenWidth > 0 && fittedScreenHeight > 0)
+            if (fittedScreenWidth <= 0 || fittedScreenHeight <= 0)
             {
-                boardCamera.orthographicSize = layout.FitOrthographicSize(
-                    (float)fittedScreenWidth / fittedScreenHeight, config.CameraMarginCells);
+                return;
             }
+
+            var top = config.TopBandScreenFraction;
+            var bottom = config.BottomBandScreenFraction;
+            var size = layout.FitOrthographicSize(
+                (float)fittedScreenWidth / fittedScreenHeight, config.SideMarginCells, top, bottom);
+            boardCamera.orthographicSize = size;
+
+            // The board stays centred on its view; the camera moves so the
+            // board sits centred between the HUD bands.
+            var boardCenter = boardView.transform.position;
+            boardCamera.transform.position = new Vector3(
+                boardCenter.x,
+                boardCenter.y + layout.CameraCenterOffset(size, top, bottom),
+                boardCamera.transform.position.z);
+
+            backgroundView.Fit(boardCamera);
         }
 
         private bool TryGetNextLevel(out TextAsset next)
@@ -361,11 +380,11 @@ namespace GateRush.Runtime
                 isAssigned = false;
             }
 
-            if (boardCamera == null || boardView == null || inputController == null
+            if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
                 || timerLabel == null || resultPanel == null)
             {
                 Debug.LogError(
-                    "LevelBootstrap: Board Camera, Board View, Input Controller, Timer Label and Result Panel " +
+                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Timer Label and Result Panel " +
                     "must all be assigned; nothing is drawn.",
                     this);
                 return false;
