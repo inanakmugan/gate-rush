@@ -25,7 +25,6 @@ namespace GateRush.Tests
                 lockId: lockId,
                 requiredKeyCount: requiredKeyCount,
                 keyTargetLockId: keyTargetLockId,
-                keyEffect: KeyEffect.UnlockMovement,
                 timeBonusSeconds: 0);
         }
 
@@ -43,7 +42,6 @@ namespace GateRush.Tests
                 lockId: lockId,
                 requiredKeyCount: requiredKeyCount,
                 keyTargetLockId: keyTargetLockId,
-                keyEffect: KeyEffect.UnlockMovement,
                 timeBonusSeconds: 0,
                 regionOrigin: regionOrigin);
         }
@@ -538,7 +536,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void IsClearMonotone_LockWhoseKeysShareOneEffect_IsTrue()
+        public void IsClearMonotone_LockAndKeysWithoutSpawners_IsTrue()
         {
             var locked = CreateBlock(1, new Coord(0, 0), lockId: 1, requiredKeyCount: 2);
             var keyA = CreateBlock(2, new Coord(1, 0), keyTargetLockId: 1);
@@ -547,14 +545,6 @@ namespace GateRush.Tests
             var context = CreateContext(3, 3, new[] { locked, keyA, keyB });
 
             Assert.IsTrue(context.IsClearMonotone);
-        }
-
-        [Test]
-        public void IsClearMonotone_LockWhoseKeysCarryDifferentEffects_IsFalse()
-        {
-            var context = SearchCorpus.WastedClearKeyTrapBoard();
-
-            Assert.IsFalse(context.IsClearMonotone);
         }
 
         [Test]

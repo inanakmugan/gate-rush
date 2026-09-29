@@ -167,11 +167,11 @@ namespace GateRush.Tests
         {
             var stages = new List<ValidationStage>();
 
-            var result = Run(GeneratorReleasesAWaitingKeyEffectBoard(), Quick(), stages);
+            var result = Run(GeneratorLockCompletedBeforeSpawnBoard(), Quick(), stages);
 
             Assert.AreEqual(ValidationStage.QuickOptimal, result.AnsweredBy);
             Assert.AreEqual(LevelSolveVerdict.Solvable, result.Verdict);
-            Assert.AreEqual(2, result.ProvenShortestLength);
+            Assert.AreEqual(3, result.ProvenShortestLength);
             CollectionAssert.AreEqual(new[] { ValidationStage.QuickOptimal }, stages);
         }
 

@@ -1,5 +1,5 @@
 {
-    "formatVersion": 3,
+    "formatVersion": 4,
     "levelId": 4,
     "width": 10,
     "height": 10,
@@ -37,7 +37,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -64,7 +63,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         },
         {
@@ -95,7 +93,6 @@
             "lockId": -1,
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
-            "keyEffect": "UnlockMovement",
             "timeBonusSeconds": 0
         }
     ],
@@ -161,7 +158,6 @@
                     "lockId": -1,
                     "requiredKeyCount": 0,
                     "keyTargetLockId": -1,
-                    "keyEffect": "UnlockMovement",
                     "timeBonusSeconds": 0,
                     "hasRegionOrigin": false,
                     "regionOrigin": {
@@ -197,7 +193,6 @@
                     "lockId": -1,
                     "requiredKeyCount": 0,
                     "keyTargetLockId": -1,
-                    "keyEffect": "UnlockMovement",
                     "timeBonusSeconds": 0,
                     "hasRegionOrigin": false,
                     "regionOrigin": {
@@ -246,7 +241,6 @@
                             "lockId": -1,
                             "requiredKeyCount": 0,
                             "keyTargetLockId": -1,
-                            "keyEffect": "UnlockMovement",
                             "timeBonusSeconds": 0,
                             "hasRegionOrigin": true,
                             "regionOrigin": {
@@ -282,7 +276,6 @@
                             "lockId": -1,
                             "requiredKeyCount": 0,
                             "keyTargetLockId": -1,
-                            "keyEffect": "UnlockMovement",
                             "timeBonusSeconds": 0,
                             "hasRegionOrigin": true,
                             "regionOrigin": {
@@ -310,7 +303,6 @@
                             "lockId": -1,
                             "requiredKeyCount": 0,
                             "keyTargetLockId": -1,
-                            "keyEffect": "UnlockMovement",
                             "timeBonusSeconds": 0,
                             "hasRegionOrigin": true,
                             "regionOrigin": {

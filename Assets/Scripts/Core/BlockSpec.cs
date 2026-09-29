@@ -27,8 +27,8 @@ namespace GateRush.Core
         public int? LockId { get; }
 
         /// <summary>
-        /// How many keys the lock this block owns requires before its effect
-        /// fires (M8). Meaningful only when <see cref="LockId"/> has a value;
+        /// How many keys the lock this block owns requires before it opens
+        /// (M8). Meaningful only when <see cref="LockId"/> has a value;
         /// zero otherwise. Resolved through this struct for the same reason as
         /// <see cref="Axis"/>: <c>MoveResolver.ApplyKeyEffects</c> addresses the
         /// lock's owner by flat index and must not need a second lookup path for
@@ -43,12 +43,6 @@ namespace GateRush.Core
         /// and <see cref="LockId"/> are never both set.
         /// </summary>
         public int? KeyTargetLockId { get; }
-
-        /// <summary>
-        /// What this block's key does to its target lock when consumed (M8).
-        /// Meaningful only when <see cref="KeyTargetLockId"/> has a value.
-        /// </summary>
-        public KeyEffect KeyEffect { get; }
 
         /// <summary>
         /// Seconds this block adds to the level's countdown when it is destroyed
@@ -68,7 +62,6 @@ namespace GateRush.Core
             LockId = block.LockId;
             RequiredKeyCount = block.RequiredKeyCount;
             KeyTargetLockId = block.KeyTargetLockId;
-            KeyEffect = block.KeyEffect;
             TimeBonusSeconds = block.TimeBonusSeconds;
         }
 
@@ -81,7 +74,6 @@ namespace GateRush.Core
             LockId = block.LockId;
             RequiredKeyCount = block.RequiredKeyCount;
             KeyTargetLockId = block.KeyTargetLockId;
-            KeyEffect = block.KeyEffect;
             TimeBonusSeconds = block.TimeBonusSeconds;
         }
     }

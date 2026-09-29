@@ -413,128 +413,37 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void EstimateRemainingMoves_LockWithMixedKeyEffects_CountsThePossibleFreeClear()
+        public void EstimateRemainingMoves_LevelWithLocksAndKeys_EqualsColoursRemainingPlusColoursQueued()
         {
-            // Three colours, but one lock still has an unconsumed ClearOuterColor
-            // key among its keys, so one clear may come free. Requiring *every*
-            // unconsumed key to be ClearOuterColor would give 3 against a 2-move
-            // optimum.
-            var ctx = MixedKeyEffectLockBoard();
-
-            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, BoardState.CreateInitial(ctx));
-
-            Assert.AreEqual(2, estimate);
-        }
-
-        [Test]
-        public void EstimateRemainingMoves_ClearOuterColorWaitingForAShutter_CountsTheFreeClear()
-        {
-            // D41: after the key's push its lock has no unconsumed key left, but
-            // ClearOuterColor waits on the owner. Two colours remain and one
-            // move — the green push — clears both.
-            var ctx = ShutteredClearOuterColorLockBoard();
-            new MoveResolver().TryApplyMove(
-                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
-
-            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
-
-            Assert.AreEqual(KeyEffect.ClearOuterColor, waiting.WaitingKeyEffect[2]);
-            Assert.AreEqual(1, estimate);
-        }
-
-        [Test]
-        public void EstimateRemainingMoves_UnlockMovementWaiting_DoesNotCountALaterClearOuterColorKey()
-        {
-            // Lock 1 needs one key. The UnlockMovement key completed it under
-            // the shutter, so the ClearOuterColor key still unconsumed can no
-            // longer fire (M8): all three remaining colours cost a move each.
+            // D45: h = C. The red key (one colour), the layered locked owner
+            // (two), a red blocker on the generator's spawn cell (one) and the
+            // generator's pending layered block (two) make six. Pushing the key
+            // clears its one colour and unlocks the owner without clearing any
+            // of the owner's, so h falls by exactly that one.
             var ctx = Ctx(
-                4, 1,
-                new[]
+                3, 2,
+                blocks: new[]
                 {
-                    Block(1, new Coord(0, 0), keyTarget: 1, keyEffect: KeyEffect.UnlockMovement),
-                    Block(2, new Coord(1, 0), keyTarget: 1, keyEffect: KeyEffect.ClearOuterColor),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }),
-                    Block(4, new Coord(3, 0), colors: new[] { BlockColor.Blue }, lockId: 1, requiredKeys: 1)
+                    Block(1, new Coord(0, 0), keyTarget: 1),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue, BlockColor.Yellow }, lockId: 1, requiredKeys: 1),
+                    Block(3, new Coord(2, 1))
                 },
-                new[]
+                gates: new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) },
+                generators: new[]
                 {
-                    Gate(1, BoardEdge.Bottom, 0, 1, BlockColor.Red),
-                    Gate(2, BoardEdge.Bottom, 1, 1, BlockColor.Red),
-                    Gate(3, BoardEdge.Bottom, 2, 1, BlockColor.Green),
-                    Gate(4, BoardEdge.Bottom, 3, 1, BlockColor.Blue)
-                },
-                shutters: new[] { Shutter(1, new Coord(3, 0), new Coord(3, 0), 1, BlockColor.Green) });
-            new MoveResolver().TryApplyMove(
-                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var waiting, out _);
-
-            var estimate = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
-            var remaining = new BreadthFirstStrategy().Search(ctx, waiting, Budget(MoveGenMode.Exhaustive));
-
-            Assert.AreEqual(KeyEffect.UnlockMovement, waiting.WaitingKeyEffect[3]);
-            Assert.AreEqual(3, estimate);
-            Assert.AreEqual(remaining.Solution.Count, estimate, "the estimate is exact here, not merely admissible");
-        }
-
-        [Test]
-        public void EstimateRemainingMoves_OpeningThatReleasesTwoWaitingClears_DropsByExactlyOne()
-        {
-            // The move that opens the shutter clears three colours: its own and
-            // both released owners'. Both locks leave F with it, so h drops by
-            // one — without counting waiting clears in F it would drop by three.
-            var ctx = TwoWaitingClearsUnderOneShutterBoard();
-            var resolver = new MoveResolver();
-            resolver.TryApplyMove(
-                ctx, BoardState.CreateInitial(ctx), new Move(0, new Coord(0, 0)), out var firstKey, out _);
-            resolver.TryApplyMove(ctx, firstKey, new Move(1, new Coord(1, 0)), out var bothWaiting, out _);
-            resolver.TryApplyMove(ctx, bothWaiting, new Move(2, new Coord(2, 0)), out var solved, out _);
-
-            var before = AStarStrategy.EstimateRemainingMoves(ctx, bothWaiting);
-            var after = AStarStrategy.EstimateRemainingMoves(ctx, solved);
-
-            Assert.IsTrue(solved.IsSolved(ctx));
-            Assert.AreEqual(1, before);
-            Assert.AreEqual(0, after);
-        }
-
-        [Test]
-        public void Search_TwoWaitingClearsUnderOneShutter_ReturnsTheBreadthFirstOptimum()
-        {
-            var ctx = TwoWaitingClearsUnderOneShutterBoard();
+                    Spawner(1, BoardEdge.Right, 1, 1, Spawned(colors: new[] { BlockColor.Green, BlockColor.Pink }))
+                });
             var initial = BoardState.CreateInitial(ctx);
-
-            foreach (var mode in new[] { MoveGenMode.Canonical, MoveGenMode.Exhaustive })
-            {
-                var expected = new BreadthFirstStrategy().Search(ctx, initial, Budget(mode));
-                var actual = new AStarStrategy().Search(ctx, initial, Budget(mode));
-
-                Assert.AreEqual(SolveStatus.Solvable, actual.Status, $"[{mode}]");
-                Assert.AreEqual(3, expected.Solution.Count, $"[{mode}] breadth-first optimum");
-                Assert.AreEqual(expected.Solution.Count, actual.Solution.Count, $"[{mode}] A* optimum");
-            }
-        }
-
-        [Test]
-        public void EstimateRemainingMoves_WaitingClearAppliedWhenItsBlockSpawns_NeverDropsByMoreThanOne()
-        {
-            // D42 on the corpus board built for it. The red push leaves
-            // ClearOuterColor waiting in the unspawned slot: the lock is now
-            // counted through what waits instead of through its key. Moving
-            // green aside spawns the lock's block and the effect clears it at
-            // once: one colour and one free clear go together, so h holds.
-            var ctx = GeneratorReleasesAWaitingKeyEffectBoard();
-            var resolver = new MoveResolver();
-            var initial = BoardState.CreateInitial(ctx);
-            resolver.TryApplyMove(ctx, initial, new Move(0, new Coord(0, 0)), out var waiting, out _);
-            resolver.TryApplyMove(ctx, waiting, new Move(1, new Coord(1, 1)), out var spawned, out _);
+            new MoveResolver().TryApplyMove(ctx, initial, new Move(0, new Coord(0, 0)), out var afterKey, out _);
 
             var before = AStarStrategy.EstimateRemainingMoves(ctx, initial);
-            var afterKey = AStarStrategy.EstimateRemainingMoves(ctx, waiting);
-            var afterSpawn = AStarStrategy.EstimateRemainingMoves(ctx, spawned);
+            var after = AStarStrategy.EstimateRemainingMoves(ctx, afterKey);
 
-            Assert.AreEqual(KeyEffect.ClearOuterColor, waiting.WaitingKeyEffect[2]);
-            Assert.IsFalse(spawned.Alive[2], "the released clear destroyed the spawned block");
-            Assert.AreEqual(new[] { 2, 1, 1 }, new[] { before, afterKey, afterSpawn });
+            Assert.IsFalse(initial.Alive[3], "the fixture's generator output must still be pending");
+            Assert.IsTrue(afterKey.Unlocked[1]);
+            Assert.AreEqual(0, afterKey.ClearedColors[1], "the key clears nothing of the owner's");
+            Assert.AreEqual(6, before);
+            Assert.AreEqual(5, after);
         }
 
         [Test]

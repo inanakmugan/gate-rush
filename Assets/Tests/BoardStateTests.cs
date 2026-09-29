@@ -113,8 +113,7 @@ namespace GateRush.Tests
             IReadOnlyList<bool> elevatorWaveActive = null,
             int? totalClearCount = null,
             IReadOnlyList<int> clearCountByColor = null,
-            IReadOnlyList<bool> keyConsumed = null,
-            IReadOnlyList<KeyEffect?> waitingKeyEffect = null)
+            IReadOnlyList<bool> keyConsumed = null)
         {
             // The baseline's symmetry, so a perturbed fixture stays a state of
             // the same level — the same inheritance MoveResolver's successor
@@ -133,8 +132,7 @@ namespace GateRush.Tests
                 elevatorWaveActive ?? baseline.ElevatorWaveActive,
                 totalClearCount ?? baseline.TotalClearCount,
                 clearCountByColor ?? baseline.ClearCountByColor,
-                keyConsumed ?? baseline.KeyConsumed,
-                waitingKeyEffect ?? baseline.WaitingKeyEffect);
+                keyConsumed ?? baseline.KeyConsumed);
         }
 
         private static T[] ReplaceAt<T>(IReadOnlyList<T> source, int index, T value)
@@ -211,74 +209,6 @@ namespace GateRush.Tests
             var mutated = With(baseline, keyConsumed: ReplaceAt(baseline.KeyConsumed, 2, true));
 
             Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
-        }
-
-        [Test]
-        public void GetHashCode_ChangingWaitingKeyEffect_ChangesHash()
-        {
-            var baseline = BoardState.CreateInitial(CreateFullContext());
-            var mutated = With(
-                baseline, waitingKeyEffect: ReplaceAt(baseline.WaitingKeyEffect, 1, (KeyEffect?)KeyEffect.UnlockMovement));
-
-            Assert.AreNotEqual(baseline.GetHashCode(), mutated.GetHashCode());
-        }
-
-        [Test]
-        public void Equals_StatesDifferingOnlyInWhichEffectWaits_AreDifferentStates()
-        {
-            // D41: with mixed-effect keys, two completion orders leave the same
-            // keys consumed but different effects waiting. The visited set must
-            // tell them apart, including UnlockMovement — enum value 0 — from
-            // nothing waiting at all.
-            var baseline = BoardState.CreateInitial(CreateFullContext());
-            var unlock = With(
-                baseline, waitingKeyEffect: ReplaceAt(baseline.WaitingKeyEffect, 1, (KeyEffect?)KeyEffect.UnlockMovement));
-            var clear = With(
-                baseline, waitingKeyEffect: ReplaceAt(baseline.WaitingKeyEffect, 1, (KeyEffect?)KeyEffect.ClearOuterColor));
-
-            Assert.AreNotEqual(baseline, unlock);
-            Assert.AreNotEqual(unlock, clear);
-            Assert.AreNotEqual(unlock.GetHashCode(), clear.GetHashCode());
-        }
-
-        [Test]
-        public void CreateInitial_EveryBlockSlot_HasNothingWaiting()
-        {
-            var ctx = CreateFullContext();
-
-            var state = BoardState.CreateInitial(ctx);
-
-            Assert.AreEqual(ctx.TotalBlockCapacity, state.WaitingKeyEffect.Count);
-            foreach (var waiting in state.WaitingKeyEffect)
-            {
-                Assert.IsNull(waiting);
-            }
-        }
-
-        [Test]
-        public void CreateInitialWithWaitingKeyEffects_CarriesTheGivenValuesAndCopiesThem()
-        {
-            var ctx = CreateFullContext();
-            var given = new KeyEffect?[ctx.TotalBlockCapacity];
-            given[1] = KeyEffect.ClearOuterColor;
-
-            var state = BoardState.CreateInitialWithWaitingKeyEffects(ctx, given);
-            given[1] = null;
-
-            Assert.AreEqual(KeyEffect.ClearOuterColor, state.WaitingKeyEffect[1]);
-            Assert.AreEqual(
-                With(BoardState.CreateInitial(ctx), waitingKeyEffect: ReplaceAt(
-                    BoardState.CreateInitial(ctx).WaitingKeyEffect, 1, (KeyEffect?)KeyEffect.ClearOuterColor)),
-                state);
-        }
-
-        [Test]
-        public void CreateInitialWithWaitingKeyEffects_WrongLength_Throws()
-        {
-            var ctx = CreateFullContext();
-
-            Assert.Throws<ArgumentException>(() =>
-                BoardState.CreateInitialWithWaitingKeyEffects(ctx, new KeyEffect?[ctx.TotalBlockCapacity - 1]));
         }
 
         [Test]
@@ -560,7 +490,7 @@ namespace GateRush.Tests
 
             // The unresolved state: settled, the generator would already have
             // spawned (D42) and a living block would decide this on its own.
-            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
+            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry);
 
             // No blocks were ever placed, so every "Alive" entry is false from
             // the start — indistinguishable from a finished level unless the
@@ -580,7 +510,7 @@ namespace GateRush.Tests
             var ctx = CreateContext(elevators: new[] { elevator });
 
             // Unresolved, for the same reason as the generator case above.
-            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
+            var state = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry);
 
             Assert.IsFalse(state.IsSolved(ctx));
         }
@@ -669,7 +599,7 @@ namespace GateRush.Tests
         public void CreateInitial_LevelWithoutSpawners_IsTheUnresolvedStateFieldForField()
         {
             var ctx = CreateTargetingContext();
-            var unresolved = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry, null);
+            var unresolved = BoardState.CreateUnresolved(ctx, ctx.BlockSymmetry);
 
             var settled = BoardState.CreateInitial(ctx);
 
@@ -681,18 +611,16 @@ namespace GateRush.Tests
         [Test]
         public void CreateInitial_EveryOverload_SettlesTheSameWay()
         {
-            // The public overload, the internal symmetry one BFS's plain-identity
-            // baseline uses, and the waiting-effects one all settle through the
-            // same resolution, so all three start with both spawners fired.
+            // The public overload and the internal symmetry one BFS's
+            // plain-identity baseline uses both settle through the same
+            // resolution, so both start with both spawners fired.
             var ctx = CreateFullContext();
             var viaPublic = BoardState.CreateInitial(ctx);
 
             var viaSymmetry = BoardState.CreateInitial(ctx, BlockSymmetry.None);
-            var viaWaiting = BoardState.CreateInitialWithWaitingKeyEffects(ctx, new KeyEffect?[ctx.TotalBlockCapacity]);
 
             Assert.IsTrue(viaPublic.Alive[3] && viaPublic.Alive[4]);
             AssertEveryArrayEqual(viaPublic, viaSymmetry);
-            AssertEveryArrayEqual(viaPublic, viaWaiting);
         }
 
         /// <summary>
@@ -708,7 +636,6 @@ namespace GateRush.Tests
             CollectionAssert.AreEqual(expected.Unfrozen, actual.Unfrozen, "Unfrozen");
             CollectionAssert.AreEqual(expected.Unlocked, actual.Unlocked, "Unlocked");
             CollectionAssert.AreEqual(expected.KeyConsumed, actual.KeyConsumed, "KeyConsumed");
-            CollectionAssert.AreEqual(expected.WaitingKeyEffect, actual.WaitingKeyEffect, "WaitingKeyEffect");
             CollectionAssert.AreEqual(expected.GateOpen, actual.GateOpen, "GateOpen");
             CollectionAssert.AreEqual(expected.ShutterOpen, actual.ShutterOpen, "ShutterOpen");
             CollectionAssert.AreEqual(expected.GeneratorIndex, actual.GeneratorIndex, "GeneratorIndex");

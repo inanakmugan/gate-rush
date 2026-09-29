@@ -108,7 +108,6 @@ namespace GateRush.Editor
                     LockId = FromSentinel(b.lockId),
                     RequiredKeyCount = b.requiredKeyCount,
                     KeyTargetLockId = FromSentinel(b.keyTargetLockId),
-                    KeyEffect = loader.ParseEnum<KeyEffect>(b.keyEffect, label, "a key effect"),
                     TimeBonusSeconds = b.timeBonusSeconds,
                 });
             }
@@ -256,7 +255,6 @@ namespace GateRush.Editor
                     LockId = FromSentinel(sb.lockId),
                     RequiredKeyCount = sb.requiredKeyCount,
                     KeyTargetLockId = FromSentinel(sb.keyTargetLockId),
-                    KeyEffect = ParseEnum<KeyEffect>(sb.keyEffect, element, "a key effect"),
                     TimeBonusSeconds = sb.timeBonusSeconds,
                     RegionOrigin = sb.hasRegionOrigin ? ToCoord(sb.regionOrigin) : (Coord?)null,
                 };
@@ -286,7 +284,6 @@ namespace GateRush.Editor
                     lockId = ToSentinel(b.LockId),
                     requiredKeyCount = b.RequiredKeyCount,
                     keyTargetLockId = ToSentinel(b.KeyTargetLockId),
-                    keyEffect = b.KeyEffect.ToString(),
                     timeBonusSeconds = b.TimeBonusSeconds,
                 }),
                 gates = Map(Gates, g => new GateDto
@@ -335,7 +332,6 @@ namespace GateRush.Editor
                 lockId = ToSentinel(sb.LockId),
                 requiredKeyCount = sb.RequiredKeyCount,
                 keyTargetLockId = ToSentinel(sb.KeyTargetLockId),
-                keyEffect = sb.KeyEffect.ToString(),
                 timeBonusSeconds = sb.TimeBonusSeconds,
                 hasRegionOrigin = sb.RegionOrigin.HasValue,
                 regionOrigin = sb.RegionOrigin.HasValue ? ToCoordDto(sb.RegionOrigin.Value) : default,
@@ -560,7 +556,6 @@ namespace GateRush.Editor
         public int? LockId { get; set; }
         public int RequiredKeyCount { get; set; }
         public int? KeyTargetLockId { get; set; }
-        public KeyEffect KeyEffect { get; set; }
         public int TimeBonusSeconds { get; set; }
     }
 
@@ -639,7 +634,6 @@ namespace GateRush.Editor
         public int? LockId { get; set; }
         public int RequiredKeyCount { get; set; }
         public int? KeyTargetLockId { get; set; }
-        public KeyEffect KeyEffect { get; set; }
         public int TimeBonusSeconds { get; set; }
         public Coord? RegionOrigin { get; set; }
     }

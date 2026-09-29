@@ -121,7 +121,6 @@ namespace GateRush.Tests
                         cells = new[] { new CoordDto { x = 0, y = 0 } },
                         colorStack = new[] { "Mauve" },
                         axis = "NotARealAxis",
-                        keyEffect = "UnlockMovement",
                         unfreezeAtClearCount = -1,
                         lockId = -1,
                         keyTargetLockId = -1,

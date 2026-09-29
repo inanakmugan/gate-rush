@@ -17,7 +17,7 @@ namespace GateRush.Core
     /// <para><b>What makes two indices interchangeable.</b> Every field
     /// <see cref="LevelContext.SpecAt"/> fixes per index, with one deliberate
     /// exception: shape, colour stack, movement axis, unfreeze threshold, lock
-    /// id, required key count, key target and key effect must all match.
+    /// id, required key count and key target must all match.
     /// <see cref="BlockSpec.TimeBonusSeconds"/> is excluded, because time is
     /// outside the search space (<c>DECISIONS.md</c> D12) — the solver never
     /// reads a bonus, so two blocks differing only in one behave identically
@@ -28,8 +28,8 @@ namespace GateRush.Core
     /// within a level (M8), so no two indices can share a spec that carries
     /// one. A locked block is therefore never grouped, and the permutations
     /// this type admits never disturb <see cref="LevelContext.LockOwnerIndex"/>.
-    /// Key carriers may group freely: identical specs target the same lock with
-    /// the same effect, so they are interchangeable to
+    /// Key carriers may group freely: identical specs target the same lock, so
+    /// they are interchangeable to
     /// <see cref="LevelContext.KeyIndicesForLock"/>'s consumers, which count
     /// consumed keys rather than distinguish them.</para>
     ///
@@ -152,7 +152,6 @@ namespace GateRush.Core
                 && a.LockId == b.LockId
                 && a.RequiredKeyCount == b.RequiredKeyCount
                 && a.KeyTargetLockId == b.KeyTargetLockId
-                && a.KeyEffect == b.KeyEffect
                 && SameColorStack(a.ColorStack, b.ColorStack)
                 && SameShape(a.Cells, b.Cells);
         }

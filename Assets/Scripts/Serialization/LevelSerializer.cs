@@ -55,7 +55,7 @@ namespace GateRush.Serialization
         /// attempted, so a later schema change is a migration rather than a hunt
         /// for silently misread levels.
         /// </summary>
-        public const int FormatVersion = 3;
+        public const int FormatVersion = 4;
 
         /// <summary>
         /// The value every nullable <c>int</c> field takes when absent.
@@ -207,7 +207,6 @@ namespace GateRush.Serialization
                 lockId = ToSentinel(block.LockId),
                 requiredKeyCount = block.RequiredKeyCount,
                 keyTargetLockId = ToSentinel(block.KeyTargetLockId),
-                keyEffect = block.KeyEffect.ToString(),
                 timeBonusSeconds = block.TimeBonusSeconds,
             };
         }
@@ -228,7 +227,6 @@ namespace GateRush.Serialization
                 lockId = ToSentinel(block.LockId),
                 requiredKeyCount = block.RequiredKeyCount,
                 keyTargetLockId = ToSentinel(block.KeyTargetLockId),
-                keyEffect = block.KeyEffect.ToString(),
                 timeBonusSeconds = block.TimeBonusSeconds,
                 hasRegionOrigin = block.RegionOrigin.HasValue,
                 regionOrigin = block.RegionOrigin.HasValue ? ToDto(block.RegionOrigin.Value) : default,
@@ -404,7 +402,6 @@ namespace GateRush.Serialization
                 lockId: FromSentinel(dto.lockId, $"{element}: 'lockId'", source),
                 requiredKeyCount: dto.requiredKeyCount,
                 keyTargetLockId: FromSentinel(dto.keyTargetLockId, $"{element}: 'keyTargetLockId'", source),
-                keyEffect: ParseEnum<KeyEffect>(dto.keyEffect, $"{element}: 'keyEffect'", source),
                 timeBonusSeconds: dto.timeBonusSeconds);
         }
 
@@ -425,7 +422,6 @@ namespace GateRush.Serialization
                 lockId: FromSentinel(dto.lockId, $"{element}: 'lockId'", source),
                 requiredKeyCount: dto.requiredKeyCount,
                 keyTargetLockId: FromSentinel(dto.keyTargetLockId, $"{element}: 'keyTargetLockId'", source),
-                keyEffect: ParseEnum<KeyEffect>(dto.keyEffect, $"{element}: 'keyEffect'", source),
                 timeBonusSeconds: dto.timeBonusSeconds,
                 regionOrigin: dto.hasRegionOrigin ? FromDto(dto.regionOrigin) : (Coord?)null);
         }

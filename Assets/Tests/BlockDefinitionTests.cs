@@ -27,7 +27,6 @@ namespace GateRush.Tests
                 lockId: lockId,
                 requiredKeyCount: requiredKeyCount,
                 keyTargetLockId: keyTargetLockId,
-                keyEffect: KeyEffect.UnlockMovement,
                 timeBonusSeconds: timeBonusSeconds);
         }
 

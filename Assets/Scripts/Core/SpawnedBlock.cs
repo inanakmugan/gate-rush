@@ -38,7 +38,6 @@ namespace GateRush.Core
         public int? LockId { get; }
         public int RequiredKeyCount { get; }
         public int? KeyTargetLockId { get; }
-        public KeyEffect KeyEffect { get; }
         public int TimeBonusSeconds { get; }
 
         /// <summary>
@@ -56,7 +55,6 @@ namespace GateRush.Core
             int? lockId,
             int requiredKeyCount,
             int? keyTargetLockId,
-            KeyEffect keyEffect,
             int timeBonusSeconds,
             Coord? regionOrigin = null)
         {
@@ -82,7 +80,6 @@ namespace GateRush.Core
             LockId = lockId;
             RequiredKeyCount = requiredKeyCount;
             KeyTargetLockId = keyTargetLockId;
-            KeyEffect = keyEffect;
             TimeBonusSeconds = timeBonusSeconds;
             RegionOrigin = regionOrigin.HasValue ? regionOrigin.Value + minCorner : (Coord?)null;
         }

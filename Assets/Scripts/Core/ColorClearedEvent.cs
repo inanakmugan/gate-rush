@@ -4,8 +4,8 @@ namespace GateRush.Core
 {
     /// <summary>
     /// The one event every removal in the game emits — a block pushed into a
-    /// matching gate, a key effect, a rocket, a broom (see <c>DECISIONS.md</c>
-    /// D7). Every progress counter and, from phase 1.7, every unlock condition
+    /// matching gate, a rocket, a broom (see <c>DECISIONS.md</c> D7). A key
+    /// never emits it: keys only unlock (D45). Every progress counter and, from phase 1.7, every unlock condition
     /// listens to this and nothing else.
     /// </summary>
     /// <remarks>

@@ -33,8 +33,11 @@ namespace GateRush.Serialization
     // undo, which Core never reads (it addresses spawned blocks by flat index).
     // Both fields, and formatVersion 3, arrived with D34.
     //
+    // formatVersion 4 removed "keyEffect" from every block: a key only unlocks
+    // (D45), so there is nothing left for it to say.
+    //
     // {
-    //   "formatVersion": 3,
+    //   "formatVersion": 4,
     //   "levelId": 42,
     //   "width": 5,
     //   "height": 5,
@@ -50,7 +53,6 @@ namespace GateRush.Serialization
     //       "lockId": -1,                       // absent: this block has no lock
     //       "requiredKeyCount": 0,
     //       "keyTargetLockId": -1,              // absent: this block has no key
-    //       "keyEffect": "UnlockMovement",
     //       "timeBonusSeconds": 0
     //     }
     //   ],
@@ -66,8 +68,7 @@ namespace GateRush.Serialization
     //     { "id": 1, "edge": "Top", "offset": 0, "width": 1,
     //       "queue": [ { "id": 1, "cells": [ { "x": 0, "y": 0 } ], "colorStack": [ "Red" ],
     //                    "axis": "Free", "unfreezeAtClearCount": -1, "lockId": -1,
-    //                    "requiredKeyCount": 0, "keyTargetLockId": -1,
-    //                    "keyEffect": "UnlockMovement", "timeBonusSeconds": 0,
+    //                    "requiredKeyCount": 0, "keyTargetLockId": -1, "timeBonusSeconds": 0,
     //                    "hasRegionOrigin": false, "regionOrigin": { "x": 0, "y": 0 } } ] }
     //   ],
     //   "elevators": [
@@ -144,7 +145,6 @@ namespace GateRush.Serialization
         public int lockId;
         public int requiredKeyCount;
         public int keyTargetLockId;
-        public string keyEffect;
         public int timeBonusSeconds;
     }
 
@@ -241,7 +241,6 @@ namespace GateRush.Serialization
         public int lockId;
         public int requiredKeyCount;
         public int keyTargetLockId;
-        public string keyEffect;
         public int timeBonusSeconds;
 
         /// <summary>

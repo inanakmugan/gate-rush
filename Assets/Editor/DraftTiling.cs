@@ -50,7 +50,6 @@ namespace GateRush.Editor
                     lockId: draft.LockId,
                     requiredKeyCount: draft.RequiredKeyCount,
                     keyTargetLockId: draft.KeyTargetLockId,
-                    keyEffect: draft.KeyEffect,
                     timeBonusSeconds: draft.TimeBonusSeconds,
                     regionOrigin: draft.RegionOrigin);
                 return true;
