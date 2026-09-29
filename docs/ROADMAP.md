@@ -118,9 +118,8 @@ except jokers (Phase 5). `ClearOuterColor` is therefore removed from
 `KeyEffect`, `MoveResolver`, the A\* heuristic, serialization, the editor and
 their tests, and from M8, D41 and D42. No authored level uses it.
 
-*Spec: `Modules/14-keys-only-unlock.md` (D45). Status: next.* `KeyEffect`
-goes entirely, the waiting effect goes with it, and the level format moves
-to version 4.
+*Spec: `Modules/14-keys-only-unlock.md` (D45). Status: done.* `KeyEffect`
+is gone, the waiting effect with it, and the level format is version 4.
 
 Watch the zero-distance move here: a drag with a determined direction but no
 displacement must still clear a block at a gate. This is the first move of

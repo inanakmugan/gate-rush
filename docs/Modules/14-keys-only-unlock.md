@@ -173,3 +173,34 @@ is. Rename it (for example `ClearCurrentColor`) so that no identifier named
 **By hand (owner)**
 - Each of the six levels opens in the Level Editor and validates as before.
 - Each plays in the Level scene.
+
+---
+
+## Resolved during implementation
+
+- **`ApplyKeyEffects`** keeps its order: consume the key, count the lock's
+  consumed keys, return if the lock is already open (a later key is spent
+  and changes nothing), return if the owner was destroyed, otherwise unlock.
+  `SuccessorBuilder.ShutterOpen` went with the waiting branches, its only
+  readers.
+- **The clear step** is `ClearCurrentColor`. With no key clear left, no path
+  clears one block twice in a resolution, so its doc no longer gives an
+  example; it states the mechanism instead — the colour is read from the
+  successor's pending count, not the source state's.
+- **Tests.** A key arriving after its lock opened is still covered by its
+  own test, replacing the D41 "later key" test. The version-3 refusal test
+  injects `"keyEffect": "ClearOuterColor"` into its fixture: the silent
+  misread D45 names. `RandomBoards` dropped the effect draw with no
+  discarded draw left behind; every seeded property test still passes on
+  the new boards, floors unchanged.
+- **Search corpus.** Five boards that relied on a key clear were deleted,
+  since without one several become unsolvable. The mixed-effect lock board
+  became a two-key lock board, and the generator board that released a
+  waiting effect gained a gate and became a lock completed before its block
+  spawns; its optimum is now 3, and the pipeline test follows. Every
+  remaining lock board's optimum equals `C`.
+- **Level files.** Only `formatVersion` and the `keyEffect` lines changed:
+  89 lines in all, every one `UnlockMovement`. Each file keeps its line
+  endings (`level-5.json` is CRLF, the others LF). All six validate as
+  before; level-2 and level-3 are still settled by nearest-next-clear after
+  the quick A\* stage.
