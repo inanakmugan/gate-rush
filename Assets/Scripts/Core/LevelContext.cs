@@ -858,12 +858,25 @@ namespace GateRush.Core
             }
         }
 
+        /// <summary>
+        /// Checks every lock and key in the level — top-level blocks, generator
+        /// queues and elevator waves alike: lock ids are unique, no two locked
+        /// blocks share an outer colour, every key targets an existing lock, and
+        /// every lock has at least as many keys as it requires.
+        /// </summary>
+        /// <remarks>
+        /// D47: the player pairs a key with its lock by colour — the outer
+        /// colour of the locked block at level start — so two locked blocks of
+        /// one colour would make that colour's keys ambiguous. The rule covers
+        /// the whole level, not only the blocks on the board at one time.
+        /// </remarks>
         private void ValidateLocksAndKeys()
         {
             var requiredKeyCountByLockId = new Dictionary<int, int>();
             var keyCountByTargetLockId = new Dictionary<int, int>();
+            var lockedBlockByColor = new Dictionary<BlockColor, string>();
 
-            void RegisterLock(int? lockId, int requiredKeyCount)
+            void RegisterLock(int? lockId, int requiredKeyCount, IReadOnlyList<BlockColor> colorStack, string label)
             {
                 if (lockId.HasValue)
                 {
@@ -875,6 +888,17 @@ namespace GateRush.Core
                     }
 
                     requiredKeyCountByLockId[lockId.Value] = requiredKeyCount;
+
+                    // A lock sits on the outermost colour at level start (M8).
+                    var outer = colorStack[0];
+                    if (lockedBlockByColor.TryGetValue(outer, out var first))
+                    {
+                        throw new ArgumentException(
+                            $"{first} and {label} are both locked blocks with outer colour {outer}; a level may " +
+                            "hold one locked block per colour, since a key is known by its lock's colour.");
+                    }
+
+                    lockedBlockByColor[outer] = label;
                 }
             }
 
@@ -889,26 +913,33 @@ namespace GateRush.Core
 
             foreach (var block in Blocks)
             {
-                RegisterLock(block.LockId, block.RequiredKeyCount);
+                RegisterLock(block.LockId, block.RequiredKeyCount, block.ColorStack, $"Block {block.Id}");
                 RegisterKey(block.KeyTargetLockId);
             }
 
             foreach (var generator in Generators)
             {
-                foreach (var spawned in generator.Queue)
+                for (var q = 0; q < generator.Queue.Count; q++)
                 {
-                    RegisterLock(spawned.LockId, spawned.RequiredKeyCount);
+                    var spawned = generator.Queue[q];
+                    RegisterLock(
+                        spawned.LockId, spawned.RequiredKeyCount, spawned.ColorStack,
+                        $"Generator {generator.Id}'s queue entry {q}");
                     RegisterKey(spawned.KeyTargetLockId);
                 }
             }
 
             foreach (var elevator in Elevators)
             {
-                foreach (var wave in elevator.Waves)
+                for (var w = 0; w < elevator.Waves.Count; w++)
                 {
-                    foreach (var spawned in wave)
+                    var wave = elevator.Waves[w];
+                    for (var b = 0; b < wave.Count; b++)
                     {
-                        RegisterLock(spawned.LockId, spawned.RequiredKeyCount);
+                        var spawned = wave[b];
+                        RegisterLock(
+                            spawned.LockId, spawned.RequiredKeyCount, spawned.ColorStack,
+                            $"Elevator {elevator.Id}'s wave {w}, block {b}");
                         RegisterKey(spawned.KeyTargetLockId);
                     }
                 }

@@ -285,7 +285,8 @@ namespace GateRush.Tests
         {
             // Format 4: a lock and a key are an id, a required count and a
             // target, with no key effect (D45) — in top-level blocks, a
-            // generator queue and elevator waves alike.
+            // generator queue and elevator waves alike. Each locked block has
+            // its own outer colour (D47).
             var ctx = Ctx(4, 4,
                 blocks: new[]
                 {
@@ -297,13 +298,13 @@ namespace GateRush.Tests
                 {
                     Spawner(1, BoardEdge.Top, 0, 1,
                         Spawned(keyTarget: 1),
-                        Spawned(lockId: 2, requiredKeys: 1)),
+                        Spawned(colors: new[] { BlockColor.Blue }, lockId: 2, requiredKeys: 1)),
                 },
                 elevators: new[]
                 {
                     Elevator(1, new Coord(3, 0), new Coord(3, 0),
                         new[] { Spawned(keyTarget: 1, regionOrigin: new Coord(0, 0)) },
-                        new[] { Spawned(lockId: 3, requiredKeys: 1, regionOrigin: new Coord(0, 0)) }),
+                        new[] { Spawned(colors: new[] { BlockColor.Green }, lockId: 3, requiredKeys: 1, regionOrigin: new Coord(0, 0)) }),
                 });
 
             var json = LevelSerializer.ToJson(ctx);

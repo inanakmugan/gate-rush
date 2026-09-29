@@ -1555,8 +1555,8 @@ namespace GateRush.Tests
                 new[]
                 {
                     Block(1, new Coord(0, 0), colors: new[] { BlockColor.Green }, lockId: 1, requiredKeys: 1),
-                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Green }, lockId: 2, requiredKeys: 1),
-                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Green }, lockId: 3, requiredKeys: 1),
+                    Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }, lockId: 2, requiredKeys: 1),
+                    Block(3, new Coord(2, 0), colors: new[] { BlockColor.Yellow }, lockId: 3, requiredKeys: 1),
                     Block(4, new Coord(3, 0), colors: new[] { BlockColor.Red }, keyTarget: 1),
                     Block(5, new Coord(4, 0), colors: new[] { BlockColor.Red }, keyTarget: 2),
                     Block(6, new Coord(5, 0), colors: new[] { BlockColor.Red }, keyTarget: 3)
