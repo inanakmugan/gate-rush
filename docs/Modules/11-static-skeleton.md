@@ -126,6 +126,11 @@ index stays bound to the same block.
 - **Instant.** The block snaps from cell to cell. Smoothing is 2.2's DOTween
   work, layered on top of the same stepping.
 
+*Later (D44, Module 13).* The drag no longer steps: the block floats under
+the finger at a continuous position that is legal only when every whole-cell
+origin it overlaps is, and settles into the nearest cell on release. The
+push and "Core is the only authority" are unchanged.
+
 ### Release decides the move
 
 - **The block moved.** Release applies `Move(block, displayed origin)`. A

@@ -519,6 +519,11 @@ are consistent because reachability is exactly the set of places a finger could
 carry the block — anywhere unreachable, the block would simply stop on the way.
 Blocks occupy whole cells only.
 
+*Later (D44).* The drag is now drawn continuously: the block floats between
+cells under the finger and settles into a whole cell on release. The rule
+above is unchanged; a continuous position is legal only when every whole-cell
+origin it overlaps is.
+
 **Consequences.**
 - Path validation in `MoveResolver` becomes a flood fill over legal positions,
   not a straight-line scan. For multi-cell blocks the whole footprint must be
@@ -1186,5 +1191,56 @@ layer emits is therefore legal, and a rejected one is a bug (Module 11).
 whichever gate matches: simpler, but a corner block would clear through the
 wrong edge. Adding a direction to `Move`: it would change the solver's move
 identity and every search for a distinction only the input layer needs.
+
+---
+
+## D44 — The drag is continuous; the rules stay on the grid
+
+**Decision.** While a block is dragged it is drawn at a continuous position
+that follows the finger, not at whole cells. It moves freely between cells,
+stops flush against whatever is in its way, and when released settles into
+the nearest cell; that cell is the move. The rule layer is unchanged: `Move`
+names a whole-cell origin, `MoveResolver` and the solver see only whole
+cells, and gates behave exactly as before — a block clears when it is
+released flush and aligned with a compatible open gate (D25), and a push in
+place still needs a push toward the gate (D43).
+
+**Why.** Feedback on the first gameplay video: the blocks felt magnetised to
+the grid. They were. Module 11's drag held a whole-cell origin and Module 12
+only tweened from cell to cell, so a block was never shown between two
+cells. In the reference game the block floats under the finger and snaps
+into a cell only when let go. Its rules are still cell-based: every block
+comes to rest on the grid.
+
+**Legality stays in Core.** A continuous position overlaps at most two cells
+per axis, so at most four whole-cell origins, and it is legal only when
+every one of them is legal by `BlockReachability.IsFootprintLegal`. The
+drawn block never covers anything a whole-cell block could not stand on,
+and the drag still decides nothing on its own. D27 holds without a special
+case: passing diagonally means overlapping both orthogonal neighbours on the
+way, so a block whose only free neighbour is diagonal still cannot reach it.
+
+**The released move is reachable by construction.** The nearest cell is one
+of the origins the final position overlaps, so it is legal. A continuous
+path through legal positions changes its set of overlapped origins only by
+origins adjacent to ones already in it, so it implies a path of legal
+single-cell steps. A move the resolver rejects is still a bug (Module 11).
+
+**Smoothing is on the pointer, not the block.** The slight lag that softens
+the drag is applied to the pointer before the collision sweep. Easing the
+drawn block after the sweep could carry it straight across the corner of a
+wall between two legal positions.
+
+**Consequence.** Module 12's whole-cell step playback (`StepPlayback`,
+`DragController.Stepped`) is replaced; Module 13 specifies the drag.
+MECHANICS' presentation convention now says the block follows the pointer
+continuously.
+
+**Rejected.** Physics colliders (`Rigidbody2D`): a second authority on
+collision that can disagree with Core, with Physics 2D in Script mode for a
+reason. Longer, eased tweens between whole cells: softer, but the block
+still never rests between cells, which is the feel being asked for.
+Continuous positions in the rules: the reference game rests every block on
+the grid, and the solver's state space depends on it.
 
 ---

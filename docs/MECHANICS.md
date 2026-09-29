@@ -47,7 +47,10 @@ started and where it ended.
   route around. In play the intermediate steps pass instantly, so the motion
   reads as diagonal even though the rule is not.
 - **Blocks never rotate.** A vertical 1×2 block is vertical for the whole level.
-- Blocks occupy whole cells only; there are no intermediate positions.
+- Blocks occupy whole cells only; there are no intermediate positions. While
+  dragged, a block is drawn floating between cells under the finger, but
+  every position it passes is one a whole-cell block could occupy, and it
+  settles into the nearest cell on release (D44).
 - Corridors one cell wide therefore admit only blocks one cell thin in the
   relevant axis. This follows from the rules above; it is not a separate rule.
 
@@ -382,10 +385,12 @@ Not runtime rules, but properties the Level Editor should measure and report.
 - **A ready opening move.** At least one block should start flush against a
   matching open gate, cleared by a zero-distance move. A fully packed board is
   not deadlocked as long as this holds — clearing consumes no space.
-- **Presentation must not teleport.** The block follows the pointer cell by cell
-  and halts against obstacles; the player can steer around a blockage without
-  releasing. Snapping straight to the destination would misrepresent the rule
-  and hide why some destinations are unreachable.
+- **Presentation must not teleport.** The block follows the pointer
+  continuously, halts flush against obstacles and never passes through
+  one; the player can steer around a blockage without releasing, and the
+  block settles into the nearest cell on release (D44). Snapping straight to
+  the destination would misrepresent the rule and hide why some destinations
+  are unreachable.
 
 ### Editor warnings
 

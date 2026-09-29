@@ -82,6 +82,11 @@ is not.
   released block does not jump.
 - Durations, the catch-up limit and easing come from `RuntimeConfig`.
 
+*Later (D44, Module 13).* Replaced: the dragged block floats under the finger
+and settles into the nearest cell on release, so `StepPlayback` and
+`DragController.Stepped` are removed. The clear effects, countdown and result
+panel below are unchanged.
+
 ### A cleared block leaves visibly
 
 - After a resolution, `ResolutionDiff` compares the states before and after

@@ -62,7 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: done.* Levels chain through Next rather than one hardcoded level.
+*Status: done up to 2.2; 2.3 (free drag) is next.* Levels chain through Next
+rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
 menus, one hardcoded level.
@@ -78,10 +79,11 @@ synthetic corpus; this is the first time the editor, the solver, and
 serialization run against a real, non-trivial level. Cheaper to find an
 editor or data-model gap here than after 2.1 depends on the level format.
 
-*Status: done.* level-0 to level-4 are authored, validate, and carry their own
+*Status: done.* level-0 to level-5 are authored, validate, and carry their own
 id, a placeholder gold reward and a solver-suggested time budget, all set in
-the editor. level-3 is for now a copy of level-2. None starts with a ready
-opening move, which D16 allows: it is a guideline, not a rule.
+the editor. level-3 is for now a copy of level-2. level-1 starts with a ready
+opening move; the others need not, which D16 allows: it is a guideline, not a
+rule.
 
 **2.1 — Static skeleton.** Render the board, wire pointer input straight to
 `MoveResolver`, apply moves instantly — no animation, no countdown, no
@@ -100,6 +102,13 @@ of 2.1 once the core loop is confirmed correct.
 *Spec: `Modules/12-polish.md`. Status: done.* Blocks glide cell by cell,
 a cleared block leaves through its gate, the level runs against a countdown
 with M10 bonuses, and a result panel offers Restart and Next.
+
+**2.3 — Free drag.** Mentor feedback on the gameplay video: blocks feel
+magnetised to the grid. In the reference game a dragged block floats under
+the finger and settles into a cell only on release. Presentation and input
+only; the rules, the solver and gate behaviour are unchanged (D44).
+
+*Spec: `Modules/13-free-drag.md`. Status: next.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
