@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using GateRush.Core;
 using DG.Tweening;
 using TMPro;
@@ -11,10 +12,12 @@ namespace GateRush.Runtime
     /// <summary>
     /// Every tunable value the board's presentation and input read: the
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
-    /// settings, label settings, settle and clear-effect timings, and the
-    /// result panel's titles. Nothing in <c>GateRush.Runtime</c> hardcodes one
-    /// of these at a call site. Sizes are in cells unless named otherwise, so
-    /// the board keeps its proportions whatever <see cref="CellSize"/> is.
+    /// settings, label settings, settle and clear-effect timings, the HUD and
+    /// the result panel. Nothing in <c>GateRush.Runtime</c> hardcodes one of
+    /// these at a call site. Board sizes are in cells unless named otherwise,
+    /// so the board keeps its proportions whatever <see cref="CellSize"/> is;
+    /// HUD and panel sizes are in canvas units of a 1080 × 1920 portrait
+    /// screen, the canvas's reference resolution.
     /// </summary>
     /// <remarks>
     /// <para>The art sprites are generated in greyscale from the
@@ -66,7 +69,7 @@ namespace GateRush.Runtime
         [Tooltip("Sprite-Unlit-Default. Under the 2D Renderer a lit sprite renders black with no Light 2D.")]
         [SerializeField] private Material spriteMaterial;
 
-        [Tooltip("TextMeshPro font for every label. Leave empty to use the TMP Settings default font.")]
+        [Tooltip("TextMeshPro font asset for every label: the board's counts, the HUD and the result panel. Lilita One (D46), created from Assets/Art/Fonts.")]
         [SerializeField] private TMP_FontAsset labelFont;
 
         [Header("Generated art (Assets/Art/Generated)")]
@@ -90,6 +93,8 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite keyGemSprite;
         [SerializeField] private Sprite shutterSlatsSprite;
         [SerializeField] private Sprite doorPanelSprite;
+        [SerializeField] private Sprite clockSprite;
+        [SerializeField] private Sprite restartSprite;
 
         [Header("Board")]
         [Tooltip("World units per cell.")]
@@ -222,9 +227,83 @@ namespace GateRush.Runtime
 
         [SerializeField] private Ease peelEase = Ease.InQuad;
 
-        [Header("Result panel")]
+        [Header("HUD (canvas units of a 1080 × 1920 portrait screen)")]
+        [Tooltip("Space between the safe area's left and right edges and the restart button and level pill, and the least space kept between them and the timer.")]
+        [SerializeField] private float hudSidePaddingUnits = 40f;
+
+        [Tooltip("Side of the square restart button. It is tinted the frame's colour.")]
+        [SerializeField] private float hudRestartSizeUnits = 120f;
+
+        [Tooltip("Corner radius of the restart button.")]
+        [SerializeField] private float hudRestartCornerUnits = 30f;
+
+        [Tooltip("Size of the restart icon on the button. At most the button's size.")]
+        [SerializeField] private float hudRestartIconSizeUnits = 72f;
+
+        [Tooltip("Height of the timer and level pills; their corners are half of it.")]
+        [SerializeField] private float hudPillHeightUnits = 96f;
+
+        [SerializeField] private float timerPillWidthUnits = 280f;
+        [SerializeField] private float levelPillWidthUnits = 260f;
+
+        [Tooltip("Size of the clock icon in the timer pill. At most the pill's height.")]
+        [SerializeField] private float hudClockIconSizeUnits = 60f;
+
+        [Tooltip("Space between the clock icon and the digits.")]
+        [SerializeField] private float hudIconGapUnits = 12f;
+
+        [Tooltip("Font size of the timer's digits and the level pill's text.")]
+        [SerializeField] private float hudFontSize = 56f;
+
+        [Tooltip("The timer's digits turn Timer Warning Color once the displayed second is at most this. 0 turns them red only at 00:00.")]
+        [SerializeField] private int timerWarningSeconds = 10;
+
+        [SerializeField] private Color hudPillColor = new Color(0.08f, 0.08f, 0.16f, 0.9f);
+        [SerializeField] private Color hudTextColor = Color.white;
+
+        [Tooltip("Tint of the clock and restart icons.")]
+        [SerializeField] private Color hudIconColor = Color.white;
+
+        [SerializeField] private Color timerWarningColor = new Color(1f, 0.32f, 0.32f);
+
+        [Tooltip("Text of the level pill; {0} is the level's 1-based position in level id order.")]
+        [SerializeField] private string levelLabelFormat = "Level {0}";
+
+        [Header("Result panel (canvas units; the panel is tinted the frame's colour)")]
         [SerializeField] private string winTitle = "Level Complete";
         [SerializeField] private string lossTitle = "Time's Up";
+
+        [Tooltip("The full-screen backdrop behind the panel; it covers the board and the HUD and swallows presses on them.")]
+        [SerializeField] private Color resultBackdropColor = new Color(0f, 0f, 0f, 0.6f);
+
+        [SerializeField] private Vector2 resultPanelSizeUnits = new Vector2(860f, 620f);
+        [SerializeField] private float resultPanelCornerUnits = 60f;
+
+        [Tooltip("Space inside the panel's edges, and between the title and the buttons.")]
+        [SerializeField] private float resultPaddingUnits = 60f;
+
+        [SerializeField] private float resultTitleFontSize = 110f;
+        [SerializeField] private Color resultTitleColor = Color.white;
+        [SerializeField] private Vector2 resultButtonSizeUnits = new Vector2(340f, 130f);
+        [SerializeField] private float resultButtonCornerUnits = 40f;
+
+        [Tooltip("Space between Next and Restart.")]
+        [SerializeField] private float resultButtonGapUnits = 40f;
+
+        [SerializeField] private float resultButtonFontSize = 64f;
+        [SerializeField] private Color resultButtonTextColor = Color.white;
+        [SerializeField] private Color nextButtonColor = new Color(0.30f, 0.78f, 0.32f);
+        [SerializeField] private Color restartButtonColor = new Color(1.0f, 0.58f, 0.15f);
+        [SerializeField] private string nextLabel = "Next";
+        [SerializeField] private string restartLabel = "Restart";
+
+        [Tooltip("Seconds the panel's opening pop takes: it fades in and grows from Result Pop Start Scale. Runs on unscaled time.")]
+        [SerializeField] private float resultPopSeconds = 0.25f;
+
+        [SerializeField] private Ease resultPopEase = Ease.OutBack;
+
+        [Tooltip("The panel's scale when the pop starts; it ends at 1.")]
+        [SerializeField] private float resultPopStartScale = 0.8f;
 
         [Header("Colours")]
         [Tooltip("One colour per BlockColor, in enum order: Red, Blue, Green, Yellow, Purple, Orange, Pink, Cyan.")]
@@ -360,7 +439,7 @@ namespace GateRush.Runtime
         /// <summary>The material every sprite uses: <c>Sprite-Unlit-Default</c>.</summary>
         public Material SpriteMaterial => spriteMaterial;
 
-        /// <summary>Label font; null means the TMP Settings default.</summary>
+        /// <summary>The font of every label, on the board and in the HUD and result panel: Lilita One.</summary>
         public TMP_FontAsset LabelFont => labelFont;
 
         /// <summary>A block's 2×2 studs for one cell, tinted with its colour.</summary>
@@ -410,6 +489,12 @@ namespace GateRush.Runtime
 
         /// <summary>One cell of lift door, tiled over an elevator's region.</summary>
         public Sprite DoorPanelSprite => doorPanelSprite;
+
+        /// <summary>The HUD's white clock icon, tinted <see cref="HudIconColor"/>.</summary>
+        public Sprite ClockSprite => clockSprite;
+
+        /// <summary>The HUD's white restart arrow, tinted <see cref="HudIconColor"/>.</summary>
+        public Sprite RestartSprite => restartSprite;
 
         /// <summary>World units per cell.</summary>
         public float CellSize => cellSize;
@@ -521,6 +606,108 @@ namespace GateRush.Runtime
 
         /// <summary>Result panel title after the countdown runs out.</summary>
         public string LossTitle => lossTitle;
+
+        /// <summary>Space from the safe area's sides to the HUD's outer elements, and the least space beside the timer, in canvas units.</summary>
+        public float HudSidePaddingUnits => hudSidePaddingUnits;
+
+        /// <summary>Side of the square restart button, in canvas units.</summary>
+        public float HudRestartSizeUnits => hudRestartSizeUnits;
+
+        /// <summary>Corner radius of the restart button, in canvas units.</summary>
+        public float HudRestartCornerUnits => hudRestartCornerUnits;
+
+        /// <summary>Size of the restart icon, in canvas units.</summary>
+        public float HudRestartIconSizeUnits => hudRestartIconSizeUnits;
+
+        /// <summary>Height of the timer and level pills, in canvas units.</summary>
+        public float HudPillHeightUnits => hudPillHeightUnits;
+
+        /// <summary>Width of the timer pill, in canvas units.</summary>
+        public float TimerPillWidthUnits => timerPillWidthUnits;
+
+        /// <summary>Width of the level pill, in canvas units.</summary>
+        public float LevelPillWidthUnits => levelPillWidthUnits;
+
+        /// <summary>Size of the clock icon, in canvas units.</summary>
+        public float HudClockIconSizeUnits => hudClockIconSizeUnits;
+
+        /// <summary>Space between the clock icon and the digits, in canvas units.</summary>
+        public float HudIconGapUnits => hudIconGapUnits;
+
+        /// <summary>Font size of the HUD's text.</summary>
+        public float HudFontSize => hudFontSize;
+
+        /// <summary>The displayed second at or below which the timer turns <see cref="TimerWarningColor"/> (<see cref="TimeFormat.IsWarning"/>).</summary>
+        public int TimerWarningSeconds => timerWarningSeconds;
+
+        /// <summary>Tint of the timer and level pills.</summary>
+        public Color HudPillColor => hudPillColor;
+
+        /// <summary>Colour of the HUD's text.</summary>
+        public Color HudTextColor => hudTextColor;
+
+        /// <summary>Tint of the HUD's icons.</summary>
+        public Color HudIconColor => hudIconColor;
+
+        /// <summary>Colour of the timer's digits near the end.</summary>
+        public Color TimerWarningColor => timerWarningColor;
+
+        /// <summary>Composite format of the level pill; <c>{0}</c> is the level number.</summary>
+        public string LevelLabelFormat => levelLabelFormat;
+
+        /// <summary>Colour of the full-screen backdrop behind the result panel.</summary>
+        public Color ResultBackdropColor => resultBackdropColor;
+
+        /// <summary>Size of the result panel, in canvas units.</summary>
+        public Vector2 ResultPanelSizeUnits => resultPanelSizeUnits;
+
+        /// <summary>Corner radius of the result panel, in canvas units.</summary>
+        public float ResultPanelCornerUnits => resultPanelCornerUnits;
+
+        /// <summary>Space inside the panel's edges and between title and buttons, in canvas units.</summary>
+        public float ResultPaddingUnits => resultPaddingUnits;
+
+        /// <summary>Font size of the result panel's title.</summary>
+        public float ResultTitleFontSize => resultTitleFontSize;
+
+        /// <summary>Colour of the result panel's title.</summary>
+        public Color ResultTitleColor => resultTitleColor;
+
+        /// <summary>Size of each result panel button, in canvas units.</summary>
+        public Vector2 ResultButtonSizeUnits => resultButtonSizeUnits;
+
+        /// <summary>Corner radius of the result panel's buttons, in canvas units.</summary>
+        public float ResultButtonCornerUnits => resultButtonCornerUnits;
+
+        /// <summary>Space between the result panel's buttons, in canvas units.</summary>
+        public float ResultButtonGapUnits => resultButtonGapUnits;
+
+        /// <summary>Font size of the result panel's button labels.</summary>
+        public float ResultButtonFontSize => resultButtonFontSize;
+
+        /// <summary>Colour of the result panel's button labels.</summary>
+        public Color ResultButtonTextColor => resultButtonTextColor;
+
+        /// <summary>Tint of the Next button.</summary>
+        public Color NextButtonColor => nextButtonColor;
+
+        /// <summary>Tint of the result panel's Restart button.</summary>
+        public Color RestartButtonColor => restartButtonColor;
+
+        /// <summary>Label of the Next button.</summary>
+        public string NextLabel => nextLabel;
+
+        /// <summary>Label of the result panel's Restart button.</summary>
+        public string RestartLabel => restartLabel;
+
+        /// <summary>Seconds the result panel's opening pop takes.</summary>
+        public float ResultPopSeconds => resultPopSeconds;
+
+        /// <summary>Easing of the result panel's opening pop.</summary>
+        public Ease ResultPopEase => resultPopEase;
+
+        /// <summary>The result panel's scale when its pop starts.</summary>
+        public float ResultPopStartScale => resultPopStartScale;
 
         /// <summary>Top of the background gradient.</summary>
         public Color BackgroundTop => backgroundTop;
@@ -751,6 +938,11 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Sprite Material is not assigned (use Sprite-Unlit-Default).");
             }
 
+            if (labelFont == null)
+            {
+                problems.Add($"{name}: Label Font is not assigned; create the Lilita One font asset from Assets/Art/Fonts and assign it.");
+            }
+
             AddIfUnassigned(problems, quarterOuterSprite, "Quarter Outer Sprite");
             AddIfUnassigned(problems, quarterEdgeSprite, "Quarter Edge Sprite");
             AddIfUnassigned(problems, quarterFillSprite, "Quarter Fill Sprite");
@@ -771,6 +963,8 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, keyGemSprite, "Key Gem Sprite");
             AddIfUnassigned(problems, shutterSlatsSprite, "Shutter Slats Sprite");
             AddIfUnassigned(problems, doorPanelSprite, "Door Panel Sprite");
+            AddIfUnassigned(problems, clockSprite, "Clock Sprite");
+            AddIfUnassigned(problems, restartSprite, "Restart Sprite");
 
             if (!(cellSize > 0f))
             {
@@ -884,7 +1078,90 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Block Palette needs {colourCount} entries, one per BlockColor.");
             }
 
+            AddHudProblems(problems);
+            AddResultPanelProblems(problems);
             return problems;
+        }
+
+        /// <summary>The constraints on the HUD's values, each message naming its field.</summary>
+        private void AddHudProblems(List<string> problems)
+        {
+            if (!(hudRestartSizeUnits > 0f && hudRestartCornerUnits > 0f && hudRestartIconSizeUnits > 0f
+                  && hudRestartIconSizeUnits <= hudRestartSizeUnits))
+            {
+                problems.Add($"{name}: Hud Restart Size Units, Hud Restart Corner Units and Hud Restart Icon Size Units must be positive, and the icon at most the button's size.");
+            }
+
+            if (!(hudPillHeightUnits > 0f && timerPillWidthUnits > 0f && levelPillWidthUnits > 0f))
+            {
+                problems.Add($"{name}: Hud Pill Height Units, Timer Pill Width Units and Level Pill Width Units must be positive.");
+            }
+
+            if (!(hudClockIconSizeUnits > 0f && hudClockIconSizeUnits <= hudPillHeightUnits && hudIconGapUnits >= 0f
+                  && hudClockIconSizeUnits + hudIconGapUnits + (hudPillHeightUnits - hudClockIconSizeUnits) < timerPillWidthUnits))
+            {
+                problems.Add($"{name}: Hud Clock Icon Size Units must be positive and at most Hud Pill Height Units, Hud Icon Gap Units at least 0, and together they must leave room for the digits in Timer Pill Width Units.");
+            }
+
+            if (!(hudSidePaddingUnits >= 0f && hudFontSize > 0f))
+            {
+                problems.Add($"{name}: Hud Side Padding Units must be at least 0 and Hud Font Size positive.");
+            }
+
+            if (timerWarningSeconds < 0)
+            {
+                problems.Add($"{name}: Timer Warning Seconds may not be negative.");
+            }
+
+            if (!IsUsableFormat(levelLabelFormat))
+            {
+                problems.Add($"{name}: Level Label Format must be a format with at most one placeholder, {{0}}, for the level number.");
+            }
+        }
+
+        /// <summary>The constraints on the result panel's values, each message naming its field.</summary>
+        private void AddResultPanelProblems(List<string> problems)
+        {
+            if (!(resultPanelSizeUnits.x > 0f && resultPanelSizeUnits.y > 0f && resultPanelCornerUnits > 0f
+                  && resultButtonSizeUnits.x > 0f && resultButtonSizeUnits.y > 0f && resultButtonCornerUnits > 0f))
+            {
+                problems.Add($"{name}: Result Panel Size Units, Result Panel Corner Units, Result Button Size Units and Result Button Corner Units must be positive.");
+            }
+
+            if (!(resultPaddingUnits >= 0f && resultButtonGapUnits >= 0f
+                  && 2f * resultButtonSizeUnits.x + resultButtonGapUnits <= resultPanelSizeUnits.x - 2f * resultPaddingUnits
+                  && resultButtonSizeUnits.y + 3f * resultPaddingUnits < resultPanelSizeUnits.y))
+            {
+                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side with Result Button Gap Units between them, and leave room for the title, inside Result Padding Units.");
+            }
+
+            if (!(resultTitleFontSize > 0f && resultButtonFontSize > 0f))
+            {
+                problems.Add($"{name}: Result Title Font Size and Result Button Font Size must be positive.");
+            }
+
+            if (!(resultPopSeconds > 0f && resultPopStartScale > 0f))
+            {
+                problems.Add($"{name}: Result Pop Seconds and Result Pop Start Scale must be positive.");
+            }
+        }
+
+        private static bool IsUsableFormat(string format)
+        {
+            if (format == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                string.Format(CultureInfo.InvariantCulture, format, 1);
+                return true;
+            }
+            catch (FormatException)
+            {
+                return false;
+            }
         }
 
         /// <summary>

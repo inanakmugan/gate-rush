@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.RuntimeConfig
   cellSprite: {fileID: 7482667652216324306, guid: 11ae25fa028900843b7335ef0991e270, type: 3}
   spriteMaterial: {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
-  labelFont: {fileID: 0}
+  labelFont: {fileID: 11400000, guid: 9bd0b4fb6c61e6c49aff7f5e7c6ef52e, type: 2}
   quarterOuterSprite: {fileID: 21300000, guid: b29f3da1aa4f7b44387f2f72cf96c017, type: 3}
   quarterEdgeSprite: {fileID: 21300000, guid: 97b3def5b3c7ae7458d9d385a69a40f4, type: 3}
   quarterFillSprite: {fileID: 21300000, guid: 7405c1a7af3ad7f46b0d2754c31ce09c, type: 3}
@@ -35,6 +35,8 @@ MonoBehaviour:
   keyGemSprite: {fileID: 21300000, guid: c30ffc22fc1e5dc439123155839799d3, type: 3}
   shutterSlatsSprite: {fileID: 21300000, guid: 18041f29213268c43a9bf2f689c5a938, type: 3}
   doorPanelSprite: {fileID: 21300000, guid: 40868de770378ac49b71f39dcc429d56, type: 3}
+  clockSprite: {fileID: 21300000, guid: dd8716c6174b2bc4d981bce0856be4fc, type: 3}
+  restartSprite: {fileID: 21300000, guid: 89364eb0db9befd4c91a7efbf80332cb, type: 3}
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.14
@@ -77,8 +79,42 @@ MonoBehaviour:
   clearTravelCells: 0.6
   peelSeconds: 0.2
   peelEase: 5
+  hudSidePaddingUnits: 40
+  hudRestartSizeUnits: 120
+  hudRestartCornerUnits: 30
+  hudRestartIconSizeUnits: 72
+  hudPillHeightUnits: 96
+  timerPillWidthUnits: 280
+  levelPillWidthUnits: 260
+  hudClockIconSizeUnits: 60
+  hudIconGapUnits: 12
+  hudFontSize: 56
+  timerWarningSeconds: 10
+  hudPillColor: {r: 0.08, g: 0.08, b: 0.16, a: 0.9}
+  hudTextColor: {r: 1, g: 1, b: 1, a: 1}
+  hudIconColor: {r: 1, g: 1, b: 1, a: 1}
+  timerWarningColor: {r: 1, g: 0.32, b: 0.32, a: 1}
+  levelLabelFormat: Level {0}
   winTitle: Level Complete
   lossTitle: Time's Up
+  resultBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
+  resultPanelSizeUnits: {x: 860, y: 620}
+  resultPanelCornerUnits: 60
+  resultPaddingUnits: 60
+  resultTitleFontSize: 110
+  resultTitleColor: {r: 1, g: 1, b: 1, a: 1}
+  resultButtonSizeUnits: {x: 340, y: 130}
+  resultButtonCornerUnits: 40
+  resultButtonGapUnits: 40
+  resultButtonFontSize: 64
+  resultButtonTextColor: {r: 1, g: 1, b: 1, a: 1}
+  nextButtonColor: {r: 0.3, g: 0.78, b: 0.32, a: 1}
+  restartButtonColor: {r: 1, g: 0.58, b: 0.15, a: 1}
+  nextLabel: Next
+  restartLabel: Restart
+  resultPopSeconds: 0.25
+  resultPopEase: 27
+  resultPopStartScale: 0.8
   blockPalette:
   - {r: 0.93, g: 0.2, b: 0.25, a: 1}
   - {r: 0.16, g: 0.47, b: 0.98, a: 1}

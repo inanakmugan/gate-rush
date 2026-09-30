@@ -11,7 +11,9 @@ namespace GateRush.Tests
     /// bytes (D46), and the quarter pieces carry the same pixels on both sides
     /// of every seam a tiling can put them at, so a block reads as one piece.
     /// The state sprites (Module 16) stretch only straight profile when sliced,
-    /// tile without seams, and keep frost on a block's face.
+    /// tile without seams, and keep frost on a block's face. The HUD icons
+    /// (Module 17) are white, unsliced, and have their shapes where the recipe
+    /// puts them.
     /// </summary>
     /// <remarks>
     /// Seams are checked against one profile: the edge piece's left column,
@@ -54,7 +56,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(20, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(22, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -211,6 +213,60 @@ namespace GateRush.Tests
             Assert.AreEqual(0, body.Pixels[center * body.Width + center].a, "the bow's hole");
             Assert.AreEqual(255, gem.Pixels[center * gem.Width + center].a, "filled by the gem");
         }
+
+        [TestCase(ArtSprite.Clock)]
+        [TestCase(ArtSprite.Restart)]
+        public void Paint_Icon_IsWhiteAndUnsliced(ArtSprite sprite)
+        {
+            var icon = ArtPainter.Paint(recipe, sprite);
+
+            Assert.AreEqual(Vector4.zero, icon.Border);
+            Assert.IsTrue(icon.Pixels.All(p => p.r == 255 && p.g == 255 && p.b == 255), "tinted where placed, so painted white");
+            Assert.IsTrue(icon.Pixels.Any(p => p.a == 255), "and drawn somewhere");
+        }
+
+        [Test]
+        public void Paint_Clock_HasHandsAtTheCentreARimAndAClearFace()
+        {
+            var clock = ArtPainter.Paint(recipe, ArtSprite.Clock);
+            var size = clock.Width;
+            var middleRow = Row(clock, size / 2);
+
+            // Lower left, halfway to the rim: away from both hands, which
+            // point up and right.
+            var face = size / 2 - size / 5;
+
+            Assert.AreEqual(255, clock.Pixels[size / 2 * size + size / 2].a, "the hands meet at the centre");
+            Assert.AreEqual(0, clock.Pixels[face * size + face].a, "the face between the hands");
+            Assert.AreEqual(0, middleRow[0].a, "outside the rim");
+            Assert.IsTrue(middleRow.Take(size / 4).Any(p => p.a == 255), "the rim, on the left of the middle row");
+        }
+
+        [Test]
+        public void Paint_Restart_HasAnArcWithAGapAndAHeadAtItsEnd()
+        {
+            var restart = ArtPainter.Paint(recipe, ArtSprite.Restart);
+            var size = restart.Width;
+            var center = size / 2.0;
+            var radius = recipe.RestartRadius * size;
+
+            // On the ring's middle line in the cut-away upper-right quarter,
+            // low enough and far enough right to miss the head.
+            var gap = Pixel(restart, center + 0.92 * radius, center + 0.38 * radius);
+
+            // On the ring's middle line at 6 o'clock.
+            var bottom = Pixel(restart, center, center - radius);
+
+            // Just past the arc's end at 12 o'clock, inside the head.
+            var head = Pixel(restart, center + recipe.RestartHeadLength * size / 3.0, center + radius);
+
+            Assert.AreEqual(0, gap.a, "the gap");
+            Assert.AreEqual(255, bottom.a, "the arc");
+            Assert.AreEqual(255, head.a, "the head");
+        }
+
+        private static Color32 Pixel(ArtImage image, double x, double y) =>
+            image.Pixels[(int)System.Math.Floor(y) * image.Width + (int)System.Math.Floor(x)];
 
         private static List<Color32> Column(ArtImage image, int x) =>
             Enumerable.Range(0, image.Height).Select(y => image.Pixels[y * image.Width + x]).ToList();

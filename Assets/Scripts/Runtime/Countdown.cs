@@ -43,9 +43,10 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The remaining time in whole seconds, rounded up: the display reads 1
-        /// until the time is truly gone, and 0 only once it has expired.
+        /// until the time is truly gone, and 0 only once it has expired. The
+        /// same rounding as the HUD's (<see cref="TimeFormat.WholeSeconds"/>).
         /// </summary>
-        public int WholeSecondsRemaining => (int)Math.Ceiling(RemainingSeconds);
+        public int WholeSecondsRemaining => TimeFormat.WholeSeconds(RemainingSeconds);
 
         /// <summary>True between <see cref="Start"/> and <see cref="Stop"/> or expiry.</summary>
         public bool IsRunning { get; private set; }

@@ -4,9 +4,9 @@ using System.Collections.Generic;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// The playable levels by <c>levelId</c>, answering one question: which
-    /// level comes after this one. The order is by id, not by file name, and
-    /// ids need not be contiguous.
+    /// The playable levels by <c>levelId</c>, answering two questions: which
+    /// level comes after this one, and what number the player sees for it.
+    /// The order is by id, not by file name, and ids need not be contiguous.
     /// </summary>
     public sealed class LevelCatalog
     {
@@ -60,6 +60,35 @@ namespace GateRush.Runtime
             }
 
             name = null;
+            return false;
+        }
+
+        /// <summary>
+        /// The level number of the file <paramref name="name"/>: its 1-based
+        /// position in id order, so with ids 0, 1, 3 and 4 the level with id 3
+        /// is number 3. False for a name the catalog does not hold — not an
+        /// error, since the level being played need not be one of the
+        /// catalog's files.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="name"/> is null.</exception>
+        public bool TryGetNumber(string name, out int number)
+        {
+            if (name == null)
+            {
+                throw new ArgumentNullException(nameof(name));
+            }
+
+            var names = namesById.Values;
+            for (var i = 0; i < names.Count; i++)
+            {
+                if (string.Equals(names[i], name, StringComparison.Ordinal))
+                {
+                    number = i + 1;
+                    return true;
+                }
+            }
+
+            number = 0;
             return false;
         }
     }

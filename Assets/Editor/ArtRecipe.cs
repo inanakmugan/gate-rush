@@ -6,8 +6,8 @@ namespace GateRush.Editor
 {
     /// <summary>
     /// Every parameter of the generated art (D46): the board and blocks of
-    /// Module 15 and the state visuals of Module 16 —
-    /// sizes, radii, stud size and spacing, tones, arrow shapes. The look is
+    /// Module 15, the state visuals of Module 16 and the HUD icons of Module
+    /// 17 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
     /// tuned here, never in code; <see cref="ArtGenerator"/> reads nothing
     /// else. All sizes are in pixels of the generated textures, and tones are
     /// greyscale values from 0 (black) to 1 (white) that the runtime tints.
@@ -209,6 +209,34 @@ namespace GateRush.Editor
         [SerializeField] private float doorLineWidthPixels = 2f;
         [SerializeField, Range(0f, 1f)] private float doorTone = 0.85f;
         [SerializeField, Range(0f, 1f)] private float doorLineTone = 1f;
+
+        [Header("Clock icon (white; sizes as fractions of the sprite)")]
+        [SerializeField] private int clockPixels = 128;
+
+        [Tooltip("Thickness of the round rim.")]
+        [SerializeField, Range(0f, 0.5f)] private float clockRimThickness = 0.09f;
+
+        [SerializeField, Range(0f, 0.5f)] private float clockHandThickness = 0.09f;
+
+        [Tooltip("From the centre to the minute hand's tip; it points to 12.")]
+        [SerializeField, Range(0f, 0.5f)] private float clockMinuteHandLength = 0.28f;
+
+        [Tooltip("From the centre to the hour hand's tip; it points to 3.")]
+        [SerializeField, Range(0f, 0.5f)] private float clockHourHandLength = 0.2f;
+
+        [Header("Restart icon (white, clockwise; sizes as fractions of the sprite)")]
+        [SerializeField] private int restartPixels = 128;
+
+        [Tooltip("Radius of the arc, to the middle of its stroke. The arc runs three quarters of the way round, from 3 o'clock through 6 and 9 to 12.")]
+        [SerializeField, Range(0f, 0.5f)] private float restartRadius = 0.3f;
+
+        [SerializeField, Range(0f, 0.5f)] private float restartThickness = 0.11f;
+
+        [Tooltip("Width of the arrow head's base, across the arc at 12 o'clock.")]
+        [SerializeField, Range(0f, 1f)] private float restartHeadWidth = 0.32f;
+
+        [Tooltip("Length of the arrow head, from the arc's end at 12 o'clock to its tip, pointing right.")]
+        [SerializeField, Range(0f, 0.5f)] private float restartHeadLength = 0.2f;
 
         /// <summary>Pixels per cell, and the sprites' pixels per unit.</summary>
         public int CellPixels => cellPixels;
@@ -447,6 +475,36 @@ namespace GateRush.Editor
         /// <summary>Tone of a door line.</summary>
         public float DoorLineTone => doorLineTone;
 
+        /// <summary>Side of the clock icon, in pixels.</summary>
+        public int ClockPixels => clockPixels;
+
+        /// <summary>Thickness of the clock's rim, as a fraction of the sprite.</summary>
+        public float ClockRimThickness => clockRimThickness;
+
+        /// <summary>Thickness of the clock's hands, as a fraction of the sprite.</summary>
+        public float ClockHandThickness => clockHandThickness;
+
+        /// <summary>Length of the minute hand, as a fraction of the sprite.</summary>
+        public float ClockMinuteHandLength => clockMinuteHandLength;
+
+        /// <summary>Length of the hour hand, as a fraction of the sprite.</summary>
+        public float ClockHourHandLength => clockHourHandLength;
+
+        /// <summary>Side of the restart icon, in pixels.</summary>
+        public int RestartPixels => restartPixels;
+
+        /// <summary>Radius of the restart arc to the middle of its stroke, as a fraction of the sprite.</summary>
+        public float RestartRadius => restartRadius;
+
+        /// <summary>Thickness of the restart arc, as a fraction of the sprite.</summary>
+        public float RestartThickness => restartThickness;
+
+        /// <summary>Width of the restart arrow's head, as a fraction of the sprite.</summary>
+        public float RestartHeadWidth => restartHeadWidth;
+
+        /// <summary>Length of the restart arrow's head, as a fraction of the sprite.</summary>
+        public float RestartHeadLength => restartHeadLength;
+
         /// <summary>
         /// The rounded box's 9-slice border, in pixels, on every side: its
         /// corner and its outline-and-rim bevel both fit inside it, so the
@@ -570,7 +628,42 @@ namespace GateRush.Editor
             }
 
             AddStateProblems(problems);
+            AddIconProblems(problems);
             return problems;
+        }
+
+        /// <summary>The constraints on Module 17's icons, each message naming its field.</summary>
+        private void AddIconProblems(List<string> problems)
+        {
+            if (clockPixels < 16 || restartPixels < 16)
+            {
+                problems.Add($"{name}: Clock Pixels and Restart Pixels must be at least 16.");
+            }
+
+            if (!(clockRimThickness > 0f && clockRimThickness < 0.5f))
+            {
+                problems.Add($"{name}: Clock Rim Thickness must be above 0 and below 0.5, so the rim leaves a face.");
+            }
+
+            // A hand's round end reaches half its thickness past its length.
+            var handReach = Math.Max(clockMinuteHandLength, clockHourHandLength) + clockHandThickness / 2f;
+            if (!(clockHandThickness > 0f && clockMinuteHandLength > 0f && clockHourHandLength > 0f
+                  && handReach <= 0.5f - clockRimThickness))
+            {
+                problems.Add($"{name}: Clock Hand Thickness, Clock Minute Hand Length and Clock Hour Hand Length must be positive, and each hand with its round end must stay inside the rim.");
+            }
+
+            if (!(restartThickness > 0f && restartThickness < 2f * restartRadius && restartRadius + restartThickness / 2f < 0.5f))
+            {
+                problems.Add($"{name}: Restart Thickness must be positive and below twice Restart Radius, and Restart Radius plus half the thickness below 0.5, so the arc has a hole and stays in the sprite.");
+            }
+
+            if (!(restartHeadWidth > restartThickness && restartHeadWidth / 2f < restartRadius
+                  && restartRadius + restartHeadWidth / 2f < 0.5f
+                  && restartHeadLength > 0f && restartHeadLength <= restartRadius))
+            {
+                problems.Add($"{name}: Restart Head Width must be wider than Restart Thickness, below twice Restart Radius, and with Restart Radius plus half of it below 0.5, so the head stays in the sprite; Restart Head Length must be positive and at most Restart Radius.");
+            }
         }
 
         /// <summary>The constraints on Module 16's sprites, each message naming its field.</summary>

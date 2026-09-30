@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Core;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace GateRush.Runtime
@@ -19,11 +21,22 @@ namespace GateRush.Runtime
     /// construction — so it is logged as an error, never swallowed.</para>
     /// <para>No drag starts while the view is busy — a block settling, or a
     /// move being presented — or once the level has ended.</para>
+    /// <para><b>UI first.</b> A press on the HUD or the result panel belongs to
+    /// the UI and never also starts a drag. On the frame of a press the
+    /// pointer's position is raycast against the UI directly, rather than asked
+    /// of the input module, whose state on the first frame of a touch may still
+    /// be the previous frame's, depending on script order. With no
+    /// EventSystem, nothing is UI.</para>
     /// <para>The drag advances on <see cref="Time.unscaledDeltaTime"/>, the
     /// clock the countdown runs on.</para>
     /// </remarks>
     public sealed class InputController : MonoBehaviour
     {
+        private readonly List<RaycastResult> uiHits = new List<RaycastResult>();
+
+        private PointerEventData uiPointer;
+        private EventSystem uiPointerSystem;
+
         private LevelRun run;
         private DragController drag;
         private BoardLayout layout;
@@ -102,10 +115,12 @@ namespace GateRush.Runtime
                 return;
             }
 
-            var grid = PointerGridPosition(pointer);
+            var screen = pointer.position.ReadValue();
+            var grid = ScreenToGrid(screen);
 
             if (pointer.press.wasPressedThisFrame
                 && !view.IsBusy
+                && !IsOverUi(screen)
                 && drag.TryBegin(run.Session.Context, run.Session.State, grid))
             {
                 view.BeginDrag(drag.BlockIndex);
@@ -157,12 +172,38 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The pointer's fractional grid position. The board is centred on the
-        /// view's transform, so the world point is taken relative to it.
+        /// True when a raycast target of the UI — a HUD element, the result
+        /// panel's backdrop or buttons — lies under <paramref name="screen"/>.
         /// </summary>
-        private Vector2 PointerGridPosition(Pointer pointer)
+        private bool IsOverUi(Vector2 screen)
         {
-            var screen = pointer.position.ReadValue();
+            var eventSystem = EventSystem.current;
+            if (eventSystem == null)
+            {
+                return false;
+            }
+
+            if (uiPointerSystem != eventSystem)
+            {
+                uiPointer = new PointerEventData(eventSystem);
+                uiPointerSystem = eventSystem;
+            }
+
+            uiPointer.position = screen;
+            uiHits.Clear();
+            eventSystem.RaycastAll(uiPointer, uiHits);
+            var isOverUi = uiHits.Count > 0;
+            uiHits.Clear();
+            return isOverUi;
+        }
+
+        /// <summary>
+        /// The fractional grid position under a screen point. The board is
+        /// centred on the view's transform, so the world point is taken
+        /// relative to it.
+        /// </summary>
+        private Vector2 ScreenToGrid(Vector2 screen)
+        {
             var world = boardCamera.ScreenToWorldPoint(new Vector3(screen.x, screen.y, 0f));
             var local = (Vector2)(world - view.transform.position);
             return layout.WorldToGrid(local);

@@ -49,6 +49,13 @@ namespace GateRush.Tests
         [TestCase("keyGemDiameterPixels", 40f, "gem inside hole")]
         [TestCase("slatGapPixels", 40f, "Slat Gap Pixels")]
         [TestCase("doorLineWidthPixels", 70f, "Door Line Width Pixels")]
+        [TestCase("clockRimThickness", 0.6f, "Clock Rim Thickness")]
+        [TestCase("clockMinuteHandLength", 0.45f, "Clock Minute Hand Length")]
+        [TestCase("clockHandThickness", 0f, "Clock Hand Thickness")]
+        [TestCase("restartThickness", 0f, "Restart Thickness")]
+        [TestCase("restartRadius", 0.45f, "Restart Radius")]
+        [TestCase("restartHeadWidth", 0.05f, "Restart Head Width")]
+        [TestCase("restartHeadLength", 0.4f, "Restart Head Length")]
         public void Problems_FloatOutOfRange_IsReportedByName(string field, float value, string label)
         {
             // Some fields feed more than one constraint — frost's inset depends
@@ -74,6 +81,19 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains("Cell Pixels"), string.Join(" | ", problems));
+        }
+
+        [TestCase("clockPixels", "Clock Pixels")]
+        [TestCase("restartPixels", "Restart Pixels")]
+        public void Problems_IconPixelsTooSmall_IsReported(string field, string label)
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty(field).intValue = 8;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
         }
 
         private void SetFloat(string field, float value)
