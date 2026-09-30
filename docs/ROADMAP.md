@@ -123,7 +123,7 @@ steps, each its own spec and PR:
   locks with chains and a padlock, keys, shutters, generators as machines
   showing their next block, elevators as lift doors. Keys and locks pair
   by the locked block's colour, one locked block per colour in a level
-  (D47, D48). *Spec: `Modules/16-state-visuals.md`. Status: next.*
+  (D47, D48). *Spec: `Modules/16-state-visuals.md`. Status: done.*
 - **2.4c — HUD and feedback.** Timer in minutes and seconds, level number,
   restart button, font, and animations for exits, ice breaking, shutters
   lifting, chains falling and the key flying to its lock, elevator doors
@@ -143,6 +143,24 @@ is gone, the waiting effect with it, and the level format is version 4.
 Watch the zero-distance move here: a drag with a determined direction but no
 displacement must still clear a block at a gate. This is the first move of
 most levels and is easy to lose in input handling.
+
+**Known debt.** Small items found along the way, none blocking; each is
+taken when its area is next touched.
+
+- *Level Editor:* a frozen block does not look frozen on the editor grid;
+  the "Empty cells / Fill" metric ignores blocks spawned at level start;
+  magic numbers remain in the window's drawing code; a lock-free block
+  keeps a stale `RequiredKeyCount`; the solver line shows the "not run"
+  colour after a search error; `DraftValidator`'s summary says two checks
+  read outside inputs where there are now three; the shutter-threshold
+  warning has no test.
+- *Solver:* `SolveStatus`, `ISearchStrategy` and `SearchBudget` XML
+  comments are out of date; `ExitCandidates`' Dijkstra is slower than it
+  needs to be; two floors in `NearestNextClearStrategyTests` now count the
+  same boards; a joker test's message still says "effect clear"; a
+  `<summary>` in `SearchCorpus` sits above the wrong board.
+- *Presentation:* on a 1×1 layered locked block the layer numeral overlaps
+  the padlock.
 
 ---
 

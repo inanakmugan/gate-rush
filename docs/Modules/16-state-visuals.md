@@ -89,9 +89,9 @@ grows with the number of digits. The font stays TMP's default until 2.4c.
 
 ### Locks and keys (M8, D47)
 
-- **Locked block:** drawn normally in its colour, with two chain strips
-  crossing it (a chain sprite tiled along its length, clipped to the
-  footprint's bounding box), and a padlock at the centre of the footprint
+- **Locked block:** drawn normally in its colour, with chains across it
+  (a chain sprite tiled along its length, one strip per row run of the
+  footprint; see below), and a padlock at the centre of the footprint
   with the number of keys still required on it. The padlock is gold;
   it carries no colour of its own.
 - **Key-carrying block:** drawn normally in its colour, with a key icon at
@@ -199,3 +199,48 @@ error like every other level data error; no new warning.
   the block that then arrives.
 - Drag, settle, clear and peel still look right on blocks with the new
   marks.
+
+---
+
+## Resolved during implementation
+
+- **Chains follow the footprint.** An X across the bounding box of a T or
+  L would cross its empty corners and, sorted above block faces, draw over
+  a neighbour there. `MarkLayout.ChainStrips` gives one horizontal strip per
+  contiguous run of cells in each row, through the row's middle and inset
+  at its ends, so a chain never leaves its block and no mask is needed. On
+  a tall block that is one short strip per row; it reads as chain wrapped
+  round the block and was kept.
+- **Anchor.** Marks sit at the centre of the footprint's bounding box when
+  every cell touching that point belongs to the block (T blocks included);
+  otherwise at the nearest cell centre, ties to the lowest row and then the
+  leftmost cell, which on an L is the bend. A frozen block's badge stays at
+  the anchor and a padlock or key on it is raised by a configured offset.
+- **Badge.** A full-size rounded box behind a smaller fill forms the rim, so
+  it follows the badge's pill shape and a colour-bound shutter just
+  recolours the back box. Width grows with the number of digits.
+- **Generator machine.** It sits behind the frame, so the frame stays
+  continuous over the generator's span, and its screen starts at the
+  frame's outer edge. Its reach beyond the frame, for the camera fit, uses
+  the badge width at the starting queue length — the widest it will show —
+  so the camera never moves mid-level. The miniature is drawn in ice when
+  the queued block would spawn frozen at the current counts, using the
+  resolver's own check, and carries no chains or key.
+- **`RandomBoards`** needed no change: a board it builds holds at most one
+  lock. Four test fixtures with two locks of one colour were recoloured.
+- **Recipe checks** that depend on each other (frost inset on the corner
+  radius, the panel on the face's outline and rim) may report together; the
+  range tests assert the named problem is present, not that it is alone.
+  Tiled sprites' stripes must divide a cell exactly, so tiles meet cleanly.
+- **Config.** Sorting orders are renumbered; their defaults are constants
+  shared with a *Reset Sorting Orders* context menu on `RuntimeConfig`.
+  Gate arrow and gate frost share one order, and block frost and the axis
+  arrow reuse the stud and gloss orders, since a frozen or arrowed block
+  has no studs. `frozenTint` became `iceColor` (kept through
+  `FormerlySerializedAs`); `shutterColor` became `shutterSlatColor`, so the
+  old grey could not override the new purple. `machineCornerCells` was
+  added. The lock badge palette, placeholder bars and their fields are
+  gone.
+- **Showcase.** level-6 holds every mechanic with a state visual and was
+  used for the check; the Level scene starts on it until the build's level
+  set exists.
