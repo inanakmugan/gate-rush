@@ -8,6 +8,8 @@ namespace GateRush.Tests
     /// Covers Module 12's <see cref="LevelCatalog"/>: the next level is the one
     /// with the smallest greater id — not the next file name — ids may skip,
     /// the highest id has no next, and two files sharing an id are refused.
+    /// Module 17: a level's number is its 1-based position in id order, and a
+    /// file the catalog does not hold has none.
     /// </summary>
     public class LevelCatalogTests
     {
@@ -54,6 +56,48 @@ namespace GateRush.Tests
 
             StringAssert.Contains("level-b", error.Message);
             StringAssert.Contains("level-c", error.Message);
+        }
+
+        [Test]
+        public void TryGetNumber_IdsZeroOneThreeFour_IdThreeIsNumberThree()
+        {
+            // Given out of id order, so the number cannot come from the input's order.
+            var catalog = new LevelCatalog(new[] { ("level-4", 4), ("level-1", 1), ("level-3", 3), ("level-0", 0) });
+
+            var found = catalog.TryGetNumber("level-3", out var number);
+
+            Assert.IsTrue(found);
+            Assert.AreEqual(3, number);
+        }
+
+        [Test]
+        public void TryGetNumber_LowestId_IsNumberOne()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-a", 5), ("level-b", 2) });
+
+            var found = catalog.TryGetNumber("level-b", out var number);
+
+            Assert.IsTrue(found);
+            Assert.AreEqual(1, number);
+        }
+
+        [Test]
+        public void TryGetNumber_UnknownName_HasNoNumber()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-0", 0), ("level-1", 1) });
+
+            var found = catalog.TryGetNumber("level-9", out var number);
+
+            Assert.IsFalse(found);
+            Assert.AreEqual(0, number);
+        }
+
+        [Test]
+        public void TryGetNumber_NullName_Throws()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-0", 0) });
+
+            Assert.Throws<ArgumentNullException>(() => catalog.TryGetNumber(null, out _));
         }
     }
 }
