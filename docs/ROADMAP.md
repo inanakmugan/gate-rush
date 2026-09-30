@@ -127,12 +127,13 @@ steps, each its own spec and PR:
 - **2.4c — HUD and feedback**, in two PRs:
   - *Part 1 — HUD and result panel.* Timer in minutes and seconds, level
     number, restart button, the Lilita One font, a styled result panel.
-    *Spec: `Modules/17-hud.md`. Status: next.*
+    *Spec: `Modules/17-hud.md`. Status: done.*
   - *Part 2 — feedback animations.* Exits breaking into cubes, the grabbed
     block lifting with a white outline, ice breaking, shutters lifting,
     spawns from generators, elevator doors opening as a wave rises, and the
     "+N s" time bonus. The key flying to its lock and chains falling are
     left for later; a lock simply updates its count and opens.
+    *Spec: `Modules/18-feedback-animations.md`. Status: next.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no

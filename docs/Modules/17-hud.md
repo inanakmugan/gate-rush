@@ -156,3 +156,37 @@ Edit Mode, against the plain classes. The look is checked by hand.
 - The win and loss panels open with the pop; Next and Restart work; the
   board cannot be dragged behind the panel.
 - Every count on the board uses Lilita One.
+
+---
+
+## Resolved during implementation
+
+- **One rounding rule for text and colour.** `TimeFormat.WholeSeconds`
+  rounds up and never goes below zero; `MinutesSeconds` writes it with the
+  invariant culture, and `IsWarning` compares the displayed second against
+  an integer threshold, so the digits turn red exactly when the number
+  shown reaches it. The countdown's own expiry uses the same whole seconds.
+- **Level number.** `LevelCatalog.TryGetNumber` instead of `NumberOf`: an
+  unknown name has no number, and the HUD hides its level pill
+  (`HideLevel`) with a warning that names the reason. `HideTime` does the
+  same for a level with no countdown.
+- **Canvas.** One canvas; its scaler uses a 1080×1920 reference and
+  *Expand*. The HUD is the canvas's first child and the result panel its
+  last, so the panel always covers the HUD. `LevelBootstrap` reports a
+  missing canvas (`MissingCanvas`) rather than missing references.
+- **Placement.** `HudView` places itself in `LateUpdate`: it anchors to the
+  top band from `ScreenBands` and the safe area when the screen or safe area
+  changes, and scales its row to the band when the band's size changes. The
+  camera fit adds the safe-area insets to the HUD bands, so the board never
+  slides under a notch.
+- **Result panel.** A full-screen backdrop swallows input; the buttons sit
+  in a `HorizontalLayoutGroup`; the title wraps; the pop uses one configured
+  ease for scale and fade. The restart button and the panel reuse
+  `FrameColor`.
+- **UI before the board.** `InputController` raycasts the pointer against
+  the UI on the frame of a press (`EventSystem.RaycastAll`) and starts no
+  drag over a UI element. Buttons use `Navigation.Mode.None`, so the
+  keyboard never moves a selection between them.
+- **Configuration.** `RuntimeConfig.Problems()` checks the new fields,
+  corner sizes above zero among them; the label font is required.
+- **Icons.** The restart arrow runs clockwise with a quarter-turn gap.
