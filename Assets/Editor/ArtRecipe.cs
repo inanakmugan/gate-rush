@@ -6,8 +6,8 @@ namespace GateRush.Editor
 {
     /// <summary>
     /// Every parameter of the generated art (D46): the board and blocks of
-    /// Module 15, the state visuals of Module 16 and the HUD icons of Module
-    /// 17 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
+    /// Module 15, the state visuals of Module 16, the HUD icons of Module 17
+    /// and the exit cube, ice shard and gate glow of Module 18 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
     /// tuned here, never in code; <see cref="ArtGenerator"/> reads nothing
     /// else. All sizes are in pixels of the generated textures, and tones are
     /// greyscale values from 0 (black) to 1 (white) that the runtime tints.
@@ -237,6 +237,54 @@ namespace GateRush.Editor
 
         [Tooltip("Length of the arrow head, from the arc's end at 12 o'clock to its tip, pointing right.")]
         [SerializeField, Range(0f, 0.5f)] private float restartHeadLength = 0.2f;
+
+        [Header("Exit cube (tinted the block's colour)")]
+        [Tooltip("Side of the cube sprite. At least 8.")]
+        [SerializeField] private int cubePixels = 48;
+
+        [Tooltip("Corner radius of the cube.")]
+        [SerializeField] private float cubeCornerPixels = 10f;
+
+        [Tooltip("Width of the light bevel just inside the cube's edge.")]
+        [SerializeField] private float cubeRimPixels = 5f;
+
+        [SerializeField, Range(0f, 1f)] private float cubeRimTone = 1f;
+        [SerializeField, Range(0f, 1f)] private float cubeFaceTone = 0.85f;
+
+        [Tooltip("Diameter of the soft highlight on the cube, like a stud's gloss.")]
+        [SerializeField] private float cubeHighlightDiameterPixels = 12f;
+
+        [Tooltip("Where the highlight sits, from the cube's centre.")]
+        [SerializeField] private Vector2 cubeHighlightOffsetPixels = new Vector2(-8f, 8f);
+
+        [Tooltip("How far the highlight's edge fades, in pixels.")]
+        [SerializeField] private float cubeHighlightSoftnessPixels = 3f;
+
+        [SerializeField, Range(0f, 1f)] private float cubeHighlightTone = 1f;
+
+        [Header("Ice shard (tinted the ice colour)")]
+        [Tooltip("Side of the shard sprite. At least 8.")]
+        [SerializeField] private int shardPixels = 48;
+
+        [Tooltip("The shard's four corners as fractions of the sprite, counter-clockwise, forming a convex shape. The frost streak runs from the first to the third.")]
+        [SerializeField] private Vector2[] shardPoints =
+        {
+            new Vector2(0.5f, 0.95f), new Vector2(0.1f, 0.45f), new Vector2(0.45f, 0.05f), new Vector2(0.9f, 0.55f)
+        };
+
+        [SerializeField, Range(0f, 1f)] private float shardFaceTone = 0.8f;
+
+        [Tooltip("Width of the frost streak across the shard.")]
+        [SerializeField] private float shardStreakWidthPixels = 4f;
+
+        [SerializeField, Range(0f, 1f)] private float shardStreakTone = 1f;
+
+        [Header("Gate glow (white, strongest along its bottom edge; tinted the gate's colour)")]
+        [Tooltip("Height of the glow's gradient, from the gate into the board. At least 8.")]
+        [SerializeField] private int gateGlowPixels = 64;
+
+        [Tooltip("The fraction of the height, from the gate, held at full strength before the glow fades: at least 0, below 1.")]
+        [SerializeField] private float gateGlowHold = 0.1f;
 
         /// <summary>Pixels per cell, and the sprites' pixels per unit.</summary>
         public int CellPixels => cellPixels;
@@ -505,6 +553,54 @@ namespace GateRush.Editor
         /// <summary>Length of the restart arrow's head, as a fraction of the sprite.</summary>
         public float RestartHeadLength => restartHeadLength;
 
+        /// <summary>Side of the cube sprite, in pixels.</summary>
+        public int CubePixels => cubePixels;
+
+        /// <summary>Corner radius of the cube, in pixels.</summary>
+        public float CubeCornerPixels => cubeCornerPixels;
+
+        /// <summary>Width of the cube's light bevel, in pixels.</summary>
+        public float CubeRimPixels => cubeRimPixels;
+
+        /// <summary>Tone of the cube's bevel.</summary>
+        public float CubeRimTone => cubeRimTone;
+
+        /// <summary>Tone of the cube's face.</summary>
+        public float CubeFaceTone => cubeFaceTone;
+
+        /// <summary>Diameter of the cube's highlight, in pixels.</summary>
+        public float CubeHighlightDiameterPixels => cubeHighlightDiameterPixels;
+
+        /// <summary>Offset of the cube's highlight from its centre, in pixels.</summary>
+        public Vector2 CubeHighlightOffsetPixels => cubeHighlightOffsetPixels;
+
+        /// <summary>How far the cube's highlight fades at its edge, in pixels.</summary>
+        public float CubeHighlightSoftnessPixels => cubeHighlightSoftnessPixels;
+
+        /// <summary>Tone of the cube's highlight.</summary>
+        public float CubeHighlightTone => cubeHighlightTone;
+
+        /// <summary>Side of the shard sprite, in pixels.</summary>
+        public int ShardPixels => shardPixels;
+
+        /// <summary>The shard's corners as fractions of the sprite, counter-clockwise.</summary>
+        public IReadOnlyList<Vector2> ShardPoints => shardPoints;
+
+        /// <summary>Tone of the shard's face.</summary>
+        public float ShardFaceTone => shardFaceTone;
+
+        /// <summary>Width of the shard's frost streak, in pixels.</summary>
+        public float ShardStreakWidthPixels => shardStreakWidthPixels;
+
+        /// <summary>Tone of the shard's frost streak.</summary>
+        public float ShardStreakTone => shardStreakTone;
+
+        /// <summary>Height of the gate glow's gradient, in pixels.</summary>
+        public int GateGlowPixels => gateGlowPixels;
+
+        /// <summary>The fraction of the gate glow held at full strength before it fades.</summary>
+        public float GateGlowHold => gateGlowHold;
+
         /// <summary>
         /// The rounded box's 9-slice border, in pixels, on every side: its
         /// corner and its outline-and-rim bevel both fit inside it, so the
@@ -629,7 +725,88 @@ namespace GateRush.Editor
 
             AddStateProblems(problems);
             AddIconProblems(problems);
+            AddFeedbackProblems(problems);
             return problems;
+        }
+
+        /// <summary>The constraints on Module 18's cube, shard and gate glow, each message naming its field.</summary>
+        private void AddFeedbackProblems(List<string> problems)
+        {
+            var cubeHalf = cubePixels / 2f - antiAliasPixels;
+
+            if (cubePixels < 8)
+            {
+                problems.Add($"{name}: Cube Pixels must be at least 8.");
+            }
+
+            if (!(cubeCornerPixels >= 0f && cubeCornerPixels < cubeHalf && cubeRimPixels >= 0f && cubeRimPixels < cubeHalf))
+            {
+                problems.Add($"{name}: Cube Corner Pixels and Cube Rim Pixels must be at least 0 and below half the cube.");
+            }
+
+            var highlightReach = Math.Max(Math.Abs(cubeHighlightOffsetPixels.x), Math.Abs(cubeHighlightOffsetPixels.y))
+                                 + cubeHighlightDiameterPixels / 2f;
+            if (!(cubeHighlightDiameterPixels > 0f && cubeHighlightSoftnessPixels >= 0f && highlightReach <= cubeHalf))
+            {
+                problems.Add($"{name}: Cube Highlight Diameter Pixels must be positive, Cube Highlight Softness Pixels at least 0, and the highlight at Cube Highlight Offset Pixels must stay inside the cube.");
+            }
+
+            if (shardPixels < 8)
+            {
+                problems.Add($"{name}: Shard Pixels must be at least 8.");
+            }
+
+            if (!IsConvexCounterClockwiseInUnitSquare(shardPoints))
+            {
+                problems.Add($"{name}: Shard Points must be four points from 0 to 1, counter-clockwise, forming a convex shape.");
+            }
+
+            if (!(shardStreakWidthPixels > 0f))
+            {
+                problems.Add($"{name}: Shard Streak Width Pixels must be positive.");
+            }
+
+            if (gateGlowPixels < 8)
+            {
+                problems.Add($"{name}: Gate Glow Pixels must be at least 8.");
+            }
+
+            if (!(gateGlowHold >= 0f && gateGlowHold < 1f))
+            {
+                problems.Add($"{name}: Gate Glow Hold must be at least 0 and below 1, so the glow fades.");
+            }
+        }
+
+        /// <summary>
+        /// True for exactly four points inside the unit square whose every turn
+        /// is to the left: a convex shape listed counter-clockwise, as the
+        /// shard's signed distance needs.
+        /// </summary>
+        private static bool IsConvexCounterClockwiseInUnitSquare(IReadOnlyList<Vector2> points)
+        {
+            if (points == null || points.Count != 4)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < points.Count; i++)
+            {
+                var a = points[i];
+                var b = points[(i + 1) % points.Count];
+                var c = points[(i + 2) % points.Count];
+                if (!(a.x >= 0f && a.x <= 1f && a.y >= 0f && a.y <= 1f))
+                {
+                    return false;
+                }
+
+                var cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+                if (!(cross > 0f))
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         /// <summary>The constraints on Module 17's icons, each message naming its field.</summary>

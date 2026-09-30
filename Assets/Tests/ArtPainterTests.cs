@@ -56,7 +56,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(22, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(25, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -263,6 +263,60 @@ namespace GateRush.Tests
             Assert.AreEqual(0, gap.a, "the gap");
             Assert.AreEqual(255, bottom.a, "the arc");
             Assert.AreEqual(255, head.a, "the head");
+        }
+
+        [Test]
+        public void Paint_Cube_IsOpaqueAtTheCentreAndClearAtTheCorners()
+        {
+            var cube = ArtPainter.Paint(recipe, ArtSprite.Cube);
+            var last = cube.Width - 1;
+
+            Assert.AreEqual(Vector4.zero, cube.Border);
+            Assert.AreEqual(255, Pixel(cube, cube.Width / 2.0, cube.Height / 2.0).a, "the centre");
+            Assert.AreEqual(0, cube.Pixels[0].a, "bottom-left corner");
+            Assert.AreEqual(0, cube.Pixels[last].a, "bottom-right corner");
+            Assert.AreEqual(0, cube.Pixels[last * cube.Width].a, "top-left corner");
+            Assert.AreEqual(0, cube.Pixels[last * cube.Width + last].a, "top-right corner");
+        }
+
+        [Test]
+        public void Paint_Shard_IsClearOutsideItsPointsAndOpaqueInside()
+        {
+            var shard = ArtPainter.Paint(recipe, ArtSprite.Shard);
+            var points = recipe.ShardPoints;
+            var size = recipe.ShardPixels;
+            var centreX = 0.0;
+            var centreY = 0.0;
+            for (var i = 0; i < points.Count; i++)
+            {
+                centreX += points[i].x * size / points.Count;
+                centreY += points[i].y * size / points.Count;
+            }
+
+            // The default shard reaches none of the sprite's four corners.
+            var last = shard.Width - 1;
+
+            Assert.AreEqual(255, Pixel(shard, centreX, centreY).a, "the middle of its corners");
+            Assert.AreEqual(0, shard.Pixels[0].a, "bottom-left corner");
+            Assert.AreEqual(0, shard.Pixels[last].a, "bottom-right corner");
+            Assert.AreEqual(0, shard.Pixels[last * shard.Width].a, "top-left corner");
+            Assert.AreEqual(0, shard.Pixels[last * shard.Width + last].a, "top-right corner");
+        }
+
+        [Test]
+        public void Paint_GateGlow_IsOpaqueAtTheGateAndClearAtTheFarEnd()
+        {
+            var glow = ArtPainter.Paint(recipe, ArtSprite.GateGlow);
+            var column = Column(glow, 0);
+
+            Assert.AreEqual(Vector4.zero, glow.Border);
+            Assert.IsTrue(glow.Pixels.All(p => p.r == 255 && p.g == 255 && p.b == 255), "tinted where placed, so painted white");
+            Assert.AreEqual(255, column[0].a, "full strength at the gate");
+            Assert.AreEqual(0, column[column.Count - 1].a, "nothing at the far end");
+            for (var y = 1; y < column.Count; y++)
+            {
+                Assert.LessOrEqual(column[y].a, column[y - 1].a, $"row {y}: fades away from the gate, never back");
+            }
         }
 
         private static Color32 Pixel(ArtImage image, double x, double y) =>

@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -25,6 +26,11 @@ namespace GateRush.Runtime
     /// size in canvas units; when the band is too small for it, the row is
     /// scaled down uniformly (<see cref="ScreenBands.ContentScale"/>), so no
     /// tuning can make the HUD reach the board.</para>
+    /// <para><b>Time bonus (Module 18).</b> A move that earns seconds (M10)
+    /// shows "+N s" beside the timer pill, rising and fading, while the pill
+    /// pulses once. Its tweens run on unscaled time with this view as their
+    /// id, and are killed when it is disabled, destroyed or rebuilt, when the
+    /// timer is hidden, and by <see cref="CancelTimeBonus"/>.</para>
     /// <para><b>Timer.</b> The text and its colour change only when the
     /// displayed second does, so a frame allocates nothing; the colour follows
     /// the displayed second (<see cref="TimeFormat.IsWarning"/>).</para>
@@ -43,6 +49,10 @@ namespace GateRush.Runtime
         private TMP_Text timerDigits;
         private GameObject levelPill;
         private TMP_Text levelLabel;
+        private RectTransform timerRect;
+        private RectTransform bonusRect;
+        private TMP_Text bonusLabel;
+        private Vector2 bonusRestPosition;
         private bool isSubscribed;
         private int shownSeconds = -1;
 
@@ -74,6 +84,7 @@ namespace GateRush.Runtime
         {
             this.config = config ?? throw new ArgumentNullException(nameof(config));
 
+            CancelTimeBonus();
             Unsubscribe();
             if (band != null)
             {
@@ -90,6 +101,7 @@ namespace GateRush.Runtime
             BuildRestart(referencePixelsPerUnit);
             BuildTimer(referencePixelsPerUnit);
             BuildLevel(referencePixelsPerUnit);
+            BuildTimeBonus();
 
             // The timer is centred, so each side must hold the wider of the
             // two outer elements with padding at the edge and next to it.
@@ -150,6 +162,7 @@ namespace GateRush.Runtime
         /// <summary>Hides the timer pill, for a level without a countdown.</summary>
         public void HideTime()
         {
+            CancelTimeBonus();
             timerPill.SetActive(false);
             shownSeconds = -1;
         }
@@ -159,8 +172,76 @@ namespace GateRush.Runtime
             Subscribe();
         }
 
+        /// <summary>
+        /// Shows "+<paramref name="seconds"/> s" beside the timer pill, rising
+        /// and fading, and pulses the pill once — for a move that earned a time
+        /// bonus (M10). A bonus still showing is replaced. Does nothing before
+        /// <see cref="Initialize"/>.
+        /// </summary>
+        public void ShowTimeBonus(int seconds)
+        {
+            if (bonusRect == null)
+            {
+                return;
+            }
+
+            CancelTimeBonus();
+            bonusLabel.text = string.Format(CultureInfo.InvariantCulture, config.TimeBonusFormat, seconds);
+            bonusRect.gameObject.SetActive(true);
+
+            var color = config.TimeBonusColor;
+            var rise = new Vector2(0f, config.TimeBonusRiseUnits);
+            DOVirtual.Float(0f, 1f, config.TimeBonusSeconds, t =>
+                {
+                    bonusRect.anchoredPosition = bonusRestPosition + rise * t;
+                    var faded = color;
+                    faded.a *= 1f - t;
+                    bonusLabel.color = faded;
+                })
+                .SetEase(config.TimeBonusEase)
+                .SetUpdate(true)
+                .SetId(this)
+                .OnComplete(() => bonusRect.gameObject.SetActive(false));
+
+            // Linear time: the sine is the pulse's whole shape.
+            DOVirtual.Float(0f, 1f, config.TimerPulseSeconds, t =>
+                {
+                    var scale = 1f + (config.TimerPulseScale - 1f) * Mathf.Sin(Mathf.PI * t);
+                    timerRect.localScale = new Vector3(scale, scale, 1f);
+                })
+                .SetEase(Ease.Linear)
+                .SetUpdate(true)
+                .SetId(this)
+                .OnComplete(() => timerRect.localScale = Vector3.one);
+        }
+
+        /// <summary>
+        /// Stops a time bonus that is showing and hides it, leaving the timer
+        /// pill at rest — for a restart or a new level.
+        /// </summary>
+        public void CancelTimeBonus()
+        {
+            DOTween.Kill(this);
+            if (bonusRect != null)
+            {
+                bonusRect.anchoredPosition = bonusRestPosition;
+                bonusRect.gameObject.SetActive(false);
+            }
+
+            if (timerRect != null)
+            {
+                timerRect.localScale = Vector3.one;
+            }
+        }
+
+        private void OnDestroy()
+        {
+            DOTween.Kill(this);
+        }
+
         private void OnDisable()
         {
+            CancelTimeBonus();
             Unsubscribe();
         }
 
@@ -229,6 +310,7 @@ namespace GateRush.Runtime
             UiBuilder.PlaceCentered(rect, size);
             UiBuilder.AddRoundedBox(rect, size, config.RoundedRectSprite, config.HudPillColor, height * 0.5f, referencePixelsPerUnit);
             timerPill = rect.gameObject;
+            timerRect = rect;
 
             // The icon sits as far in from the pill's left end as from its top
             // and bottom; the digits are centred in the rest.
@@ -257,6 +339,25 @@ namespace GateRush.Runtime
             var label = UiBuilder.CreateRect("Label", rect);
             UiBuilder.Stretch(label);
             levelLabel = UiBuilder.AddLabel(label, config.LabelFont, config.HudFontSize, config.HudTextColor, false);
+        }
+
+        /// <summary>
+        /// The hidden "+N s" label, its left end
+        /// <see cref="RuntimeConfig.TimeBonusGapUnits"/> right of the centred
+        /// timer pill. Built last in the row, so it draws over the level pill
+        /// if it reaches it.
+        /// </summary>
+        private void BuildTimeBonus()
+        {
+            bonusRect = UiBuilder.CreateRect("Time bonus", row);
+            bonusRect.anchorMin = bonusRect.anchorMax = new Vector2(0.5f, 0.5f);
+            bonusRect.pivot = LeftMiddle;
+            bonusRestPosition = new Vector2(config.TimerPillWidthUnits * 0.5f + config.TimeBonusGapUnits, 0f);
+            bonusRect.anchoredPosition = bonusRestPosition;
+            bonusRect.sizeDelta = new Vector2(config.LevelPillWidthUnits, config.HudPillHeightUnits);
+            bonusLabel = UiBuilder.AddLabel(bonusRect, config.LabelFont, config.TimeBonusFontSize, config.TimeBonusColor, false);
+            bonusLabel.alignment = TextAlignmentOptions.Left;
+            bonusRect.gameObject.SetActive(false);
         }
 
         /// <summary>

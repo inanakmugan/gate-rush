@@ -56,6 +56,12 @@ namespace GateRush.Tests
         [TestCase("restartRadius", 0.45f, "Restart Radius")]
         [TestCase("restartHeadWidth", 0.05f, "Restart Head Width")]
         [TestCase("restartHeadLength", 0.4f, "Restart Head Length")]
+        [TestCase("cubeCornerPixels", 30f, "Cube Corner Pixels")]
+        [TestCase("cubeRimPixels", -1f, "Cube Rim Pixels")]
+        [TestCase("cubeHighlightDiameterPixels", 40f, "Cube Highlight Diameter Pixels")]
+        [TestCase("shardStreakWidthPixels", 0f, "Shard Streak Width Pixels")]
+        [TestCase("gateGlowHold", 1f, "Gate Glow Hold")]
+        [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
         public void Problems_FloatOutOfRange_IsReportedByName(string field, float value, string label)
         {
             // Some fields feed more than one constraint — frost's inset depends
@@ -94,6 +100,35 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
+        }
+
+        [TestCase("cubePixels", "Cube Pixels")]
+        [TestCase("shardPixels", "Shard Pixels")]
+        [TestCase("gateGlowPixels", "Gate Glow Pixels")]
+        public void Problems_EffectPixelsTooSmall_IsReported(string field, string label)
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty(field).intValue = 4;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ShardPointsClockwise_IsReported()
+        {
+            var serialized = new SerializedObject(recipe);
+            var points = serialized.FindProperty("shardPoints");
+            var first = points.GetArrayElementAtIndex(1).vector2Value;
+            points.GetArrayElementAtIndex(1).vector2Value = points.GetArrayElementAtIndex(3).vector2Value;
+            points.GetArrayElementAtIndex(3).vector2Value = first;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Shard Points"), string.Join(" | ", problems));
         }
 
         private void SetFloat(string field, float value)

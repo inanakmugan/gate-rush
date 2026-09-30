@@ -37,6 +37,9 @@ MonoBehaviour:
   doorPanelSprite: {fileID: 21300000, guid: 40868de770378ac49b71f39dcc429d56, type: 3}
   clockSprite: {fileID: 21300000, guid: dd8716c6174b2bc4d981bce0856be4fc, type: 3}
   restartSprite: {fileID: 21300000, guid: 89364eb0db9befd4c91a7efbf80332cb, type: 3}
+  cubeSprite: {fileID: 21300000, guid: 37dd6b6b58c871e4b9a8596eb9eb91ab, type: 3}
+  shardSprite: {fileID: 21300000, guid: f9efff3a6a10d7e4d8e4c4e166140569, type: 3}
+  gateGlowSprite: {fileID: 21300000, guid: 5c6de48fd20565048a09c934e317d494, type: 3}
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.14
@@ -74,11 +77,57 @@ MonoBehaviour:
   cornerAssistCells: 0.3
   settleSeconds: 0.08
   settleEase: 6
-  clearSeconds: 0.25
-  clearEase: 5
-  clearTravelCells: 0.6
+  liftScale: 1.06
+  liftSeconds: 0.08
+  liftEase: 6
+  outlineWidthCells: 0.07
+  outlineColor: {r: 1, g: 1, b: 1, a: 1}
+  exitSecondsPerCell: 0.12
+  exitEase: 1
   peelSeconds: 0.2
   peelEase: 5
+  cubeCountPerCell: 8
+  cubeCap: 40
+  cubeSizeCells: {x: 0.16, y: 0.26}
+  cubeTravelCells: {x: 0.8, y: 2}
+  cubeSpreadDegrees: 35
+  cubeSpinDegrees: 270
+  cubeEndScale: 0.3
+  cubeSeconds: 0.4
+  cubeEase: 6
+  gateGlowDepthCells: 0.6
+  gateGlowWhiten: 0.5
+  gateGlowAlpha: 0.8
+  gateGlowFadeInSeconds: 0.06
+  gateGlowFadeOutSeconds: 0.15
+  gateGlowEase: 6
+  shardCountPerCell: 2
+  shardCap: 8
+  shardSizeCells: {x: 0.12, y: 0.22}
+  shardTravelCells: {x: 0.3, y: 0.6}
+  shardSpreadDegrees: 30
+  shardSpinDegrees: 180
+  shardFallCells: 0.3
+  shardEndScale: 0.6
+  shardSeconds: 0.35
+  shardMaxDelaySeconds: 0.03
+  shardEase: 6
+  shutterLiftSeconds: 0.3
+  shutterLiftEase: 5
+  lockOpenSeconds: 0.25
+  lockOpenScale: 1.25
+  lockOpenEase: 6
+  badgePopScale: 1.3
+  badgePopSeconds: 0.2
+  generatorSpawnSeconds: 0.25
+  generatorSpawnEase: 6
+  doorsOpenSeconds: 0.12
+  doorsCloseSeconds: 0.1
+  doorsEase: 7
+  riseSeconds: 0.25
+  riseStartScale: 0.85
+  riseDropCells: 0.2
+  riseEase: 27
   hudSidePaddingUnits: 40
   hudRestartSizeUnits: 120
   hudRestartCornerUnits: 30
@@ -95,7 +144,17 @@ MonoBehaviour:
   hudIconColor: {r: 1, g: 1, b: 1, a: 1}
   timerWarningColor: {r: 1, g: 0.32, b: 0.32, a: 1}
   levelLabelFormat: Level {0}
+  timeBonusFormat: +{0} s
+  timeBonusColor: {r: 0.45, g: 1, b: 0.45, a: 1}
+  timeBonusFontSize: 56
+  timeBonusGapUnits: 16
+  timeBonusRiseUnits: 60
+  timeBonusSeconds: 0.9
+  timeBonusEase: 6
+  timerPulseScale: 1.15
+  timerPulseSeconds: 0.25
   winTitle: Level Complete
+  allDoneTitle: All Levels Complete
   lossTitle: Time's Up
   resultBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
   resultPanelSizeUnits: {x: 860, y: 620}
@@ -179,3 +238,6 @@ MonoBehaviour:
   badgeRimOrder: 23
   badgeOrder: 24
   labelOrder: 25
+  outlineOrder: 11
+  liftedBlockOrder: 26
+  effectOrder: 27

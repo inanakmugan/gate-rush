@@ -47,8 +47,8 @@ namespace GateRush.Runtime
     /// <remarks>
     /// Only the moved block is examined. In play the only clear a move makes
     /// is the moved block's, at the gate it was pushed into or arrived at;
-    /// every other change in the state — unlocks, spawns, openings — simply
-    /// appears when the board is redrawn. The gate is found by
+    /// every other change in the state — unlocks, spawns, openings — is
+    /// <see cref="MoveChanges"/>'s, which takes its clears from here. The gate is found by
     /// <see cref="BlockReachability.FindExitGate"/>, the same scan the resolver
     /// clears by, evaluated on the state the move started from.
     /// </remarks>

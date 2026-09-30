@@ -61,6 +61,13 @@ namespace GateRush.Runtime
         private bool isUsable;
         private LevelCatalog catalog;
         private LevelRun run;
+
+        // The session whose time bonuses the HUD shows; null while not
+        // listening, so a subscription is never made twice or left behind.
+        private LevelSession listenedSession;
+
+        // Moves applied in this attempt at the level; seeds the bursts.
+        private int moveNumber;
         private BoardLayout layout;
         private string levelName;
         private int fittedScreenWidth;
@@ -97,6 +104,7 @@ namespace GateRush.Runtime
             hudView.RestartRequested += Restart;
             resultPanel.RestartRequested += Restart;
             resultPanel.NextRequested += Next;
+            ListenForTimeBonus();
         }
 
         private void OnDisable()
@@ -111,6 +119,7 @@ namespace GateRush.Runtime
             hudView.RestartRequested -= Restart;
             resultPanel.RestartRequested -= Restart;
             resultPanel.NextRequested -= Next;
+            StopListeningForTimeBonus();
         }
 
         private void Update()
@@ -162,8 +171,16 @@ namespace GateRush.Runtime
             }
 
             var session = new LevelSession(ctx);
+            StopListeningForTimeBonus();
             run = new LevelRun(session, countdown);
             levelName = asset.name;
+            moveNumber = 0;
+            hudView.CancelTimeBonus();
+            if (isActiveAndEnabled)
+            {
+                ListenForTimeBonus();
+            }
+
             // One machine rule for the fit's room and for where BoardView draws
             // each machine (D48).
             var machine = config.CreateGeneratorMachine();
@@ -207,6 +224,8 @@ namespace GateRush.Runtime
 
             inputController.CancelDrag();
             run.Restart();
+            moveNumber = 0;
+            hudView.CancelTimeBonus();
             boardView.Rebuild(run.Session.State);
             resultPanel.Hide();
             ShowRemainingTime();
@@ -222,29 +241,93 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Presents the state a move produced. The session has already
-        /// changed, so the view must be handed the new state whatever happens:
-        /// a diff that fails — a bug, since the resolver cleared the block at a
-        /// gate the diff cannot find — is logged and the board is redrawn
-        /// without a clear effect rather than left showing the old picture.
+        /// changed, so the view must be handed the new state whatever happens.
+        /// What changed is worked out by <see cref="MoveChanges"/>; when that
+        /// fails — a bug, since the states and the move came from the resolver —
+        /// it is logged, and the board is presented with what could still be
+        /// worked out: every change but the clear when only the clear's gate is
+        /// missing, nothing at all otherwise. Either way the board ends on the
+        /// new state rather than the old picture.
         /// </summary>
         private void OnMoveApplied(BoardState before, Move move, Direction? push)
         {
             var session = run.Session;
-            IReadOnlyList<ClearedBlock> clears;
+            var ctx = session.Context;
+            var after = session.State;
+            moveNumber++;
+
+            MoveChanges changes;
             try
             {
-                clears = ResolutionDiff.Between(session.Context, before, session.State, move, push);
+                changes = MoveChanges.Between(ctx, before, after, move, push);
             }
             catch (InvalidOperationException e)
             {
+                changes = FallbackChanges(ctx, before, after);
+                var shown = changes.HasArrivals
+                    ? "the other changes play, without the clear effect"
+                    : "the board is redrawn from the new state with no effects";
                 Debug.LogError(
-                    $"Level '{levelName}': the clear effect for {move} (push {push?.ToString() ?? "none"}) could not be worked out; " +
-                    $"the board is redrawn from the new state without it. {e.Message}",
+                    $"Level '{levelName}': what {move} (push {push?.ToString() ?? "none"}) changed could not be worked out; " +
+                    $"{shown}. {e.Message}",
                     this);
-                clears = Array.Empty<ClearedBlock>();
             }
 
-            boardView.Present(session.State, clears, OnPresentationDone);
+            boardView.Present(after, changes, moveNumber, OnPresentationDone);
+        }
+
+        /// <summary>
+        /// Every change but the clear, or none when even those cannot be worked
+        /// out; the second failure is logged on its own.
+        /// </summary>
+        private MoveChanges FallbackChanges(LevelContext ctx, BoardState before, BoardState after)
+        {
+            try
+            {
+                return MoveChanges.WithoutClears(ctx, before, after);
+            }
+            catch (InvalidOperationException e)
+            {
+                Debug.LogError($"Level '{levelName}': no change of this move can be animated. {e.Message}", this);
+                return MoveChanges.None;
+            }
+        }
+
+        private void ListenForTimeBonus()
+        {
+            var session = run?.Session;
+            if (session == null || session == listenedSession)
+            {
+                return;
+            }
+
+            StopListeningForTimeBonus();
+            session.TimeBonusEarned += OnTimeBonusEarned;
+            listenedSession = session;
+        }
+
+        private void StopListeningForTimeBonus()
+        {
+            if (listenedSession == null)
+            {
+                return;
+            }
+
+            listenedSession.TimeBonusEarned -= OnTimeBonusEarned;
+            listenedSession = null;
+        }
+
+        /// <summary>
+        /// Shows a time bonus beside the timer (M10), as the countdown takes it.
+        /// The run subscribed first, so the countdown has already risen; a
+        /// level without a countdown, or one already ended, shows nothing.
+        /// </summary>
+        private void OnTimeBonusEarned(int seconds)
+        {
+            if (run.Countdown != null && run.Outcome == LevelOutcome.None)
+            {
+                hudView.ShowTimeBonus(seconds);
+            }
         }
 
         /// <summary>
@@ -260,7 +343,9 @@ namespace GateRush.Runtime
             }
 
             Debug.Log($"Level '{levelName}' solved.", this);
-            resultPanel.ShowWin(config.WinTitle, TryGetNextLevel(out _));
+            var title = ResultTitle.ForWin(
+                catalog, levelName, run.Session.Context.LevelId, config.WinTitle, config.AllDoneTitle);
+            resultPanel.ShowWin(title, TryGetNextLevel(out _));
         }
 
         /// <summary>The HUD skips the work when the displayed second has not changed, so this runs every frame.</summary>

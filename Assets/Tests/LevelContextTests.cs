@@ -824,5 +824,80 @@ namespace GateRush.Tests
             Assert.DoesNotThrow(() =>
                 Fixture.Ctx(2, 1, generators: new[] { generator }, elevators: new[] { elevator }));
         }
+
+        [Test]
+        public void TryGetSpawner_TopLevelBlock_HasNone()
+        {
+            var ctx = SpawnerLayoutLevel();
+
+            var hasSpawner = ctx.TryGetSpawner(1, out _, out var spawnerIndex);
+
+            Assert.IsFalse(hasSpawner);
+            Assert.AreEqual(-1, spawnerIndex);
+        }
+
+        [Test]
+        public void TryGetSpawner_GeneratorQueueSlots_NameTheirGenerator()
+        {
+            var ctx = SpawnerLayoutLevel();
+            var found = new List<(int slot, SpawnerKind kind, int index)>();
+
+            for (var slot = 2; slot < 6; slot++)
+            {
+                Assert.IsTrue(ctx.TryGetSpawner(slot, out var kind, out var index), $"slot {slot}");
+                found.Add((slot, kind, index));
+            }
+
+            CollectionAssert.AreEqual(
+                new[]
+                {
+                    (2, SpawnerKind.Generator, 0), (3, SpawnerKind.Generator, 0),
+                    (4, SpawnerKind.Generator, 1), (5, SpawnerKind.Generator, 1)
+                },
+                found);
+        }
+
+        [Test]
+        public void TryGetSpawner_ElevatorWaveSlots_NameTheirElevator()
+        {
+            var ctx = SpawnerLayoutLevel();
+            var found = new List<(int slot, SpawnerKind kind, int index)>();
+
+            for (var slot = 6; slot < ctx.TotalBlockCapacity; slot++)
+            {
+                Assert.IsTrue(ctx.TryGetSpawner(slot, out var kind, out var index), $"slot {slot}");
+                found.Add((slot, kind, index));
+            }
+
+            CollectionAssert.AreEqual(
+                new[] { (6, SpawnerKind.Elevator, 0), (7, SpawnerKind.Elevator, 0), (8, SpawnerKind.Elevator, 1) },
+                found);
+        }
+
+        /// <summary>
+        /// Slots 0–1 top-level; 2–3 generator 0's queue; 4–5 generator 1's;
+        /// 6–7 elevator 0's two waves; 8 elevator 1's only wave.
+        /// </summary>
+        private static LevelContext SpawnerLayoutLevel()
+        {
+            var blocks = new[] { Fixture.Block(1, new Coord(1, 1)), Fixture.Block(2, new Coord(2, 1)) };
+            var generators = new[]
+            {
+                Fixture.Spawner(1, BoardEdge.Bottom, 0, 1, Fixture.Spawned(), Fixture.Spawned()),
+                Fixture.Spawner(2, BoardEdge.Top, 0, 1, Fixture.Spawned(), Fixture.Spawned())
+            };
+            var elevators = new[]
+            {
+                Fixture.Elevator(
+                    1, new Coord(3, 3), new Coord(3, 3),
+                    new[] { Fixture.Spawned(regionOrigin: new Coord(0, 0)) },
+                    new[] { Fixture.Spawned(regionOrigin: new Coord(0, 0)) }),
+                Fixture.Elevator(
+                    2, new Coord(3, 0), new Coord(3, 0),
+                    new[] { Fixture.Spawned(regionOrigin: new Coord(0, 0)) })
+            };
+
+            return Fixture.Ctx(4, 4, blocks, generators: generators, elevators: elevators);
+        }
     }
 }
