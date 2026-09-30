@@ -27,7 +27,9 @@ namespace GateRush.Editor
         KeyBody,
         KeyGem,
         ShutterSlats,
-        DoorPanel
+        DoorPanel,
+        Clock,
+        Restart
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -61,7 +63,7 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Modules 15 and 16 from an
+    /// Paints every generated sprite of Modules 15, 16 and 17 from an
     /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
     /// to tint (D46).
     /// </summary>
@@ -144,6 +146,10 @@ namespace GateRush.Editor
                     return PaintKeyGem(recipe);
                 case ArtSprite.ShutterSlats:
                     return PaintSlats(recipe);
+                case ArtSprite.Clock:
+                    return PaintClock(recipe);
+                case ArtSprite.Restart:
+                    return PaintRestart(recipe);
                 default:
                     return PaintDoorPanel(recipe);
             }
@@ -536,6 +542,64 @@ namespace GateRush.Editor
             });
         }
 
+        /// <summary>
+        /// The HUD's clock, in white: a round rim, its outer edge half the
+        /// anti-aliased edge inside the sprite, and two round-ended hands from
+        /// the centre — the minute hand to 12 o'clock, the hour hand to 3.
+        /// Both hands lie on the axes, so no angle is ever computed.
+        /// </summary>
+        private static ArtImage PaintClock(ArtRecipe recipe)
+        {
+            double size = recipe.ClockPixels;
+            var center = size / 2.0;
+            var rimHalf = recipe.ClockRimThickness * size / 2.0;
+            var rimMiddle = center - recipe.AntiAliasPixels - rimHalf;
+            var handHalf = recipe.ClockHandThickness * size / 2.0;
+            var minute = recipe.ClockMinuteHandLength * size;
+            var hour = recipe.ClockHourHandLength * size;
+
+            return Paint(recipe.ClockPixels, recipe.ClockPixels, Vector4.zero, (x, y) =>
+            {
+                var dx = x - center;
+                var dy = y - center;
+                var rim = Math.Abs(Length(dx, dy) - rimMiddle) - rimHalf;
+
+                // Each hand is a segment from the centre along one axis,
+                // thickened into a capsule.
+                var minuteHand = Length(dx, dy - Clamp(dy, 0.0, minute)) - handHalf;
+                var hourHand = Length(dx - Clamp(dx, 0.0, hour), dy) - handHalf;
+
+                var sd = Math.Min(rim, Math.Min(minuteHand, hourHand));
+                return (1.0, Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// The HUD's restart arrow, in white, turning clockwise: a ring with its
+        /// upper-right quarter cut away, so it runs from 3 o'clock through 6
+        /// and 9 to 12, and a triangular head at the 12 o'clock end pointing
+        /// right, along the direction of travel. The cut lies on the axes, so
+        /// no angle is ever computed.
+        /// </summary>
+        private static ArtImage PaintRestart(ArtRecipe recipe)
+        {
+            double size = recipe.RestartPixels;
+            var center = size / 2.0;
+            var radius = recipe.RestartRadius * size;
+            var strokeHalf = recipe.RestartThickness * size / 2.0;
+            var headHalf = recipe.RestartHeadWidth * size / 2.0;
+            var headLength = recipe.RestartHeadLength * size;
+
+            return Paint(recipe.RestartPixels, recipe.RestartPixels, Vector4.zero, (x, y) =>
+            {
+                var ring = Math.Abs(Length(x - center, y - center) - radius) - strokeHalf;
+                var arc = Math.Max(ring, -SdUpperQuadrant(x, y, center, center));
+                var head = SdTriangle(x - center, y - (center + radius), 0.0, headLength, headHalf);
+
+                return (1.0, Coverage(recipe, Math.Min(arc, head)));
+            });
+        }
+
         /// <summary>The centre of the key's bow, in pixels: as far in from the left edge as the key is half high.</summary>
         private static (double x, double y) KeyBowCenter(ArtRecipe recipe)
         {
@@ -655,7 +719,9 @@ namespace GateRush.Editor
 
         private static double Lerp(double a, double b, double t) => a + (b - a) * t;
 
-        private static double Clamp01(double value) => value < 0.0 ? 0.0 : value > 1.0 ? 1.0 : value;
+        private static double Clamp01(double value) => Clamp(value, 0.0, 1.0);
+
+        private static double Clamp(double value, double min, double max) => value < min ? min : value > max ? max : value;
 
         /// <summary>Smoothstep on <c>[0, 1]</c>.</summary>
         private static double Smooth(double t) => t * t * (3.0 - 2.0 * t);
