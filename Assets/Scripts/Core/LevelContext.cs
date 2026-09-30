@@ -118,6 +118,19 @@ namespace GateRush.Core
         /// <summary>Per elevator, per wave, the flat index of that wave's block 0.</summary>
         private readonly int[][] elevatorWaveFirstSlot;
 
+        /// <summary>
+        /// Per flat block index, the kind of spawner that slot belongs to;
+        /// meaningful only where <see cref="spawnerIndexBySlot"/> is not −1.
+        /// </summary>
+        private readonly SpawnerKind[] spawnerKindBySlot;
+
+        /// <summary>
+        /// Per flat block index, the position in <see cref="Generators"/> or
+        /// <see cref="Elevators"/> of the spawner that slot belongs to; −1 for a
+        /// top-level block.
+        /// </summary>
+        private readonly int[] spawnerIndexBySlot;
+
         /// <summary>Per elevator, every cell of its region relative to <see cref="ElevatorDefinition.Min"/>.</summary>
         private readonly Coord[][] elevatorRegionCells;
 
@@ -175,6 +188,8 @@ namespace GateRush.Core
             TotalBlockCapacity = specByIndex.Length;
             generatorFirstSlot = new int[Generators.Count];
             elevatorWaveFirstSlot = new int[Elevators.Count][];
+            spawnerKindBySlot = new SpawnerKind[TotalBlockCapacity];
+            spawnerIndexBySlot = new int[TotalBlockCapacity];
             spawnOriginBySlot = BuildSpawnLayout();
             elevatorRegionCells = BuildElevatorRegionCells(Elevators);
             ValidateGeneratorSpawnFootprints();
@@ -260,6 +275,31 @@ namespace GateRush.Core
             }
 
             return specByIndex[blockIndex];
+        }
+
+        /// <summary>
+        /// The spawner block slot <paramref name="blockIndex"/> comes from: a
+        /// generator for a queue slot, an elevator for a wave slot, with its
+        /// position in <see cref="Generators"/> or <see cref="Elevators"/>.
+        /// False for a top-level block, which never spawns. Read from the slot
+        /// layout <see cref="BuildSpawnLayout"/> records, so a caller outside
+        /// <c>Core</c> never re-derives the order in which slots are assigned.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">
+        /// <paramref name="blockIndex"/> is outside <c>[0, TotalBlockCapacity)</c>.
+        /// </exception>
+        public bool TryGetSpawner(int blockIndex, out SpawnerKind kind, out int spawnerIndex)
+        {
+            if (blockIndex < 0 || blockIndex >= specByIndex.Length)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(blockIndex), blockIndex,
+                    $"Block index must be within [0, {specByIndex.Length}) — this level's TotalBlockCapacity.");
+            }
+
+            spawnerIndex = spawnerIndexBySlot[blockIndex];
+            kind = spawnerKindBySlot[blockIndex];
+            return spawnerIndex >= 0;
         }
 
         /// <summary>
@@ -537,6 +577,7 @@ namespace GateRush.Core
             for (; slot < Blocks.Count; slot++)
             {
                 origins[slot] = BoardState.UnspawnedOrigin;
+                spawnerIndexBySlot[slot] = -1;
             }
 
             for (var g = 0; g < Generators.Count; g++)
@@ -545,6 +586,8 @@ namespace GateRush.Core
                 generatorFirstSlot[g] = slot;
                 foreach (var spawned in generator.Queue)
                 {
+                    spawnerKindBySlot[slot] = SpawnerKind.Generator;
+                    spawnerIndexBySlot[slot] = g;
                     origins[slot++] = GeneratorPlacement(generator, spawned.Cells);
                 }
             }
@@ -560,6 +603,8 @@ namespace GateRush.Core
                     {
                         // ElevatorDefinition has already required a RegionOrigin
                         // on every wave block (its tiling check).
+                        spawnerKindBySlot[slot] = SpawnerKind.Elevator;
+                        spawnerIndexBySlot[slot] = e;
                         origins[slot++] = elevator.Min + spawned.RegionOrigin.Value;
                     }
                 }
