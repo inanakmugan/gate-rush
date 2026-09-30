@@ -1344,6 +1344,10 @@ nothing records how a sprite was made. A shader drawing shapes at runtime:
 more flexible, but harder to review and to keep identical across WebGL and
 Android than committed textures.
 
+**Later (Module 17).** The font is Lilita One (Google Fonts, SIL Open Font
+License): a single heavy, rounded weight closest to the reference game's
+digits. Its TTF and licence file live under `Assets/Art/Fonts/`.
+
 ---
 
 ## D47 — A lock is known by its block's colour

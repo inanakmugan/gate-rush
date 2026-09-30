@@ -124,11 +124,15 @@ steps, each its own spec and PR:
   showing their next block, elevators as lift doors. Keys and locks pair
   by the locked block's colour, one locked block per colour in a level
   (D47, D48). *Spec: `Modules/16-state-visuals.md`. Status: done.*
-- **2.4c — HUD and feedback.** Timer in minutes and seconds, level number,
-  restart button, font, and animations for exits, ice breaking, shutters
-  lifting, chains falling and the key flying to its lock, elevator doors
-  opening as a wave rises, spawns and time bonuses; the grabbed block
-  lifts slightly with a white outline.
+- **2.4c — HUD and feedback**, in two PRs:
+  - *Part 1 — HUD and result panel.* Timer in minutes and seconds, level
+    number, restart button, the Lilita One font, a styled result panel.
+    *Spec: `Modules/17-hud.md`. Status: next.*
+  - *Part 2 — feedback animations.* Exits breaking into cubes, the grabbed
+    block lifting with a white outline, ice breaking, shutters lifting,
+    spawns from generators, elevator doors opening as a wave rises, and the
+    "+N s" time bonus. The key flying to its lock and chains falling are
+    left for later; a lock simply updates its count and opens.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
