@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using GateRush.Core;
 using GateRush.Serialization;
-using TMPro;
 using UnityEngine;
 
 namespace GateRush.Runtime
@@ -12,10 +10,11 @@ namespace GateRush.Runtime
     /// Builds one playable level from a JSON <see cref="TextAsset"/>: the
     /// <see cref="LevelSession"/> and its <see cref="LevelRun"/> with the
     /// countdown, the plain helpers they need, and the views that draw them.
-    /// Runs the countdown, shows the result panel, and handles Restart and
-    /// Next. The first level is <see cref="level"/>; swap it by dragging a
-    /// different JSON onto it. Holds all per-play state on this instance —
-    /// Enter Play Mode runs without a domain reload, so nothing here is static.
+    /// Runs the countdown, feeds the HUD, shows the result panel, and handles
+    /// Restart and Next. The first level is <see cref="level"/>; swap it by
+    /// dragging a different JSON onto it. Holds all per-play state on this
+    /// instance — Enter Play Mode runs without a domain reload, so nothing here
+    /// is static.
     /// </summary>
     /// <remarks>
     /// <para>A level or config that cannot be used logs the reason and draws
@@ -25,7 +24,12 @@ namespace GateRush.Runtime
     /// <c>Resources/Levels</c>, loaded once at start. A file there that fails
     /// to load is logged and left out; two files sharing a level id are
     /// logged and hide Next altogether. Neither stops the current level from
-    /// playing.</para>
+    /// playing. The HUD's level number comes from the same catalog; a level
+    /// without one plays with the level pill hidden.</para>
+    /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
+    /// from the safe area's edges: each band plus the unsafe strip on its side
+    /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
+    /// screen's size or safe area changes.</para>
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
@@ -37,7 +41,7 @@ namespace GateRush.Runtime
 
         [SerializeField] private RuntimeConfig config;
 
-        [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, and re-fitted when the screen size changes.")]
+        [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
         [SerializeField] private Camera boardCamera;
 
         [SerializeField] private BoardView boardView;
@@ -46,9 +50,10 @@ namespace GateRush.Runtime
         [SerializeField] private BackgroundView backgroundView;
         [SerializeField] private InputController inputController;
 
-        [Tooltip("Shows the remaining time in whole seconds at the top of the screen. Hidden for a level without a countdown.")]
-        [SerializeField] private TMP_Text timerLabel;
+        [Tooltip("The HUD on the canvas: restart button, timer and level number in the top band.")]
+        [SerializeField] private HudView hudView;
 
+        [Tooltip("The result panel on the canvas.")]
         [SerializeField] private ResultPanel resultPanel;
 
         private readonly Dictionary<string, TextAsset> levelAssets = new Dictionary<string, TextAsset>();
@@ -58,9 +63,10 @@ namespace GateRush.Runtime
         private LevelRun run;
         private BoardLayout layout;
         private string levelName;
-        private int shownSeconds = -1;
         private int fittedScreenWidth;
         private int fittedScreenHeight;
+        private Rect fittedSafeArea;
+        private bool hasReportedInsetFallback;
 
         private void Awake()
         {
@@ -71,8 +77,10 @@ namespace GateRush.Runtime
 
             isUsable = true;
             backgroundView.Initialize(config);
-            resultPanel.Hide();
-            timerLabel.gameObject.SetActive(false);
+            hudView.Initialize(config);
+            hudView.HideTime();
+            hudView.HideLevel();
+            resultPanel.Initialize(config);
             BuildCatalog();
             Load(level);
         }
@@ -86,6 +94,7 @@ namespace GateRush.Runtime
 
             inputController.MoveApplied += OnMoveApplied;
             inputController.RestartRequested += Restart;
+            hudView.RestartRequested += Restart;
             resultPanel.RestartRequested += Restart;
             resultPanel.NextRequested += Next;
         }
@@ -99,6 +108,7 @@ namespace GateRush.Runtime
 
             inputController.MoveApplied -= OnMoveApplied;
             inputController.RestartRequested -= Restart;
+            hudView.RestartRequested -= Restart;
             resultPanel.RestartRequested -= Restart;
             resultPanel.NextRequested -= Next;
         }
@@ -177,8 +187,12 @@ namespace GateRush.Runtime
             FitCameraToScreen();
 
             resultPanel.Hide();
-            timerLabel.gameObject.SetActive(countdown != null);
-            shownSeconds = -1;
+            if (countdown == null)
+            {
+                hudView.HideTime();
+            }
+
+            ShowLevelNumber(asset.name);
 
             run.Start();
             ShowRemainingTime();
@@ -249,34 +263,64 @@ namespace GateRush.Runtime
             resultPanel.ShowWin(config.WinTitle, TryGetNextLevel(out _));
         }
 
+        /// <summary>The HUD skips the work when the displayed second has not changed, so this runs every frame.</summary>
         private void ShowRemainingTime()
         {
             var countdown = run.Countdown;
-            if (countdown == null || countdown.WholeSecondsRemaining == shownSeconds)
+            if (countdown != null)
             {
+                hudView.ShowTime(countdown.RemainingSeconds);
+            }
+        }
+
+        /// <summary>
+        /// Shows the level number of the file <paramref name="levelFile"/>, or
+        /// hides the level pill with a warning saying why it has none.
+        /// </summary>
+        private void ShowLevelNumber(string levelFile)
+        {
+            if (catalog != null && catalog.TryGetNumber(levelFile, out var number))
+            {
+                hudView.ShowLevel(number);
                 return;
             }
 
-            shownSeconds = countdown.WholeSecondsRemaining;
-            timerLabel.text = shownSeconds.ToString(CultureInfo.InvariantCulture);
+            hudView.HideLevel();
+            var reason = catalog == null
+                ? "the level order is unusable"
+                : $"it is not one of the levels in Resources/{LevelsResourcePath}";
+            Debug.LogWarning($"Level '{levelFile}' has no level number because {reason}; the HUD hides the level pill.", this);
         }
 
         private void FitCameraToScreen()
         {
-            if (Screen.width == fittedScreenWidth && Screen.height == fittedScreenHeight)
+            var safeArea = Screen.safeArea;
+            if (Screen.width == fittedScreenWidth && Screen.height == fittedScreenHeight && safeArea == fittedSafeArea)
             {
                 return;
             }
 
             fittedScreenWidth = Screen.width;
             fittedScreenHeight = Screen.height;
+            fittedSafeArea = safeArea;
             if (fittedScreenWidth <= 0 || fittedScreenHeight <= 0)
             {
                 return;
             }
 
-            var top = config.TopBandScreenFraction;
-            var bottom = config.BottomBandScreenFraction;
+            if (!ScreenBands.TryAddInsets(
+                    config.TopBandScreenFraction, config.BottomBandScreenFraction, safeArea, fittedScreenHeight,
+                    out var top, out var bottom)
+                && !hasReportedInsetFallback)
+            {
+                hasReportedInsetFallback = true;
+                Debug.LogError(
+                    $"The safe area {safeArea} on a {fittedScreenWidth}x{fittedScreenHeight} screen, added to the HUD bands, " +
+                    "would leave no room for the board; the camera is fitted to the bands alone, so the board may reach " +
+                    "under the unsafe edges and the HUD. Reported once.",
+                    this);
+            }
+
             var size = layout.FitOrthographicSize(
                 (float)fittedScreenWidth / fittedScreenHeight, config.SideMarginCells, top, bottom);
             boardCamera.orthographicSize = size;
@@ -384,16 +428,23 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || timerLabel == null || resultPanel == null)
+                || hudView == null || resultPanel == null)
             {
                 Debug.LogError(
-                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Timer Label and Result Panel " +
+                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View and Result Panel " +
                     "must all be assigned; nothing is drawn.",
                     this);
                 return false;
             }
 
-            var panelProblem = resultPanel.MissingReferences();
+            var hudProblem = hudView.MissingCanvas();
+            if (hudProblem.Length > 0)
+            {
+                Debug.LogError($"{hudProblem} Nothing is drawn.", hudView);
+                isAssigned = false;
+            }
+
+            var panelProblem = resultPanel.MissingCanvas();
             if (panelProblem.Length > 0)
             {
                 Debug.LogError($"{panelProblem} Nothing is drawn.", resultPanel);

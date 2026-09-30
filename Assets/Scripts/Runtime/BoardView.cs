@@ -999,11 +999,7 @@ namespace GateRush.Runtime
             go.transform.localPosition = localCenter;
 
             var label = go.AddComponent<TextMeshPro>();
-            if (config.LabelFont != null)
-            {
-                label.font = config.LabelFont;
-            }
-
+            label.font = config.LabelFont;
             label.text = value.ToString(CultureInfo.InvariantCulture);
             label.fontSize = fontSize;
             label.color = color;
