@@ -12,7 +12,8 @@ namespace GateRush.Runtime
     /// <summary>
     /// Every tunable value the board's presentation and input read: the
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
-    /// settings, label settings, settle and clear-effect timings, the HUD and
+    /// settings, label settings, the settle, the lift and every feedback
+    /// animation (Module 18), the HUD and
     /// the result panel. Nothing in <c>GateRush.Runtime</c> hardcodes one of
     /// these at a call site. Board sizes are in cells unless named otherwise,
     /// so the board keeps its proportions whatever <see cref="CellSize"/> is;
@@ -62,6 +63,21 @@ namespace GateRush.Runtime
         private const int DefaultBadgeOrder = 24;
         private const int DefaultLabelOrder = 25;
 
+        // Compared only inside a lifted block's sorting group, where it has to
+        // sort below the block's lip and nothing else. Sharing a value with
+        // another board layer (the gate marks) is harmless: nothing outside
+        // the group is compared with it.
+        private const int DefaultOutlineOrder = DefaultBlockLipOrder - 1;
+
+        /// <summary>
+        /// The cube burst's maximum delay. Not a tunable: a stream spreads its
+        /// cubes' starts over the block's pass and never reads it.
+        /// </summary>
+        private const float CubeStreamSetsItsOwnDelays = 0f;
+
+        private const int DefaultLiftedBlockOrder = 26;
+        private const int DefaultEffectOrder = 27;
+
         [Header("Assets")]
         [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing and a layered block's beneath-colour squares.")]
         [SerializeField] private Sprite cellSprite;
@@ -95,6 +111,9 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite doorPanelSprite;
         [SerializeField] private Sprite clockSprite;
         [SerializeField] private Sprite restartSprite;
+        [SerializeField] private Sprite cubeSprite;
+        [SerializeField] private Sprite shardSprite;
+        [SerializeField] private Sprite gateGlowSprite;
 
         [Header("Board")]
         [Tooltip("World units per cell.")]
@@ -213,19 +232,155 @@ namespace GateRush.Runtime
 
         [SerializeField] private Ease settleEase = Ease.OutQuad;
 
-        [Header("Clear effect")]
-        [Tooltip("Seconds a destroyed block takes to shrink and fade toward its gate.")]
-        [SerializeField] private float clearSeconds = 0.25f;
+        [Header("Grab lift")]
+        [Tooltip("How much a grabbed block grows about its centre while it is held: at least 1.")]
+        [SerializeField] private float liftScale = 1.06f;
 
-        [SerializeField] private Ease clearEase = Ease.InQuad;
+        [Tooltip("Seconds a grabbed block takes to lift, and to drop back when released.")]
+        [SerializeField] private float liftSeconds = 0.08f;
 
-        [Tooltip("How far a destroyed block travels toward and through its gate while it shrinks, in cells.")]
-        [SerializeField] private float clearTravelCells = 0.6f;
+        [SerializeField] private Ease liftEase = Ease.OutQuad;
+
+        [Tooltip("How far a grabbed block's outline reaches past its face, in cells: above 0, below 0.5. On release it retracts to nothing.")]
+        [SerializeField] private float outlineWidthCells = 0.07f;
+
+        [SerializeField] private Color outlineColor = Color.white;
+
+        [Header("Exit and peel")]
+        [Tooltip("Seconds a destroyed block takes to pass one cell of its depth through its gate. Input never waits for it.")]
+        [SerializeField] private float exitSecondsPerCell = 0.12f;
+
+        [Tooltip("Linear passes the block through at a steady speed.")]
+        [SerializeField] private Ease exitEase = Ease.Linear;
 
         [Tooltip("Seconds a surviving layered block takes to peel its removed outer colour.")]
         [SerializeField] private float peelSeconds = 0.2f;
 
         [SerializeField] private Ease peelEase = Ease.InQuad;
+
+        [Header("Exit cubes (stream out beneath the gate while a destroyed block passes through it)")]
+        [Tooltip("Cubes per cell of the block, before the cap.")]
+        [SerializeField] private int cubeCountPerCell = 8;
+
+        [Tooltip("The most cubes one block streams out.")]
+        [SerializeField] private int cubeCap = 40;
+
+        [Tooltip("Side of a cube in cells: x the smallest, y the largest.")]
+        [SerializeField] private Vector2 cubeSizeCells = new Vector2(0.12f, 0.22f);
+
+        [Tooltip("How far a cube flies, in cells: x the shortest, y the longest.")]
+        [SerializeField] private Vector2 cubeTravelCells = new Vector2(0.6f, 2f);
+
+        [Tooltip("How far a cube's direction may turn from straight out through the gate, in degrees either way: at least 0, below 90.")]
+        [SerializeField] private float cubeSpreadDegrees = 35f;
+
+        [Tooltip("The most a cube turns over its flight, in degrees either way.")]
+        [SerializeField] private float cubeSpinDegrees = 270f;
+
+        [Tooltip("A cube's scale at the end of its flight, from 0 to 1.")]
+        [SerializeField] private float cubeEndScale = 0.3f;
+
+        [Tooltip("Seconds one cube's flight takes. The stream spreads the cubes' starts over the block's pass.")]
+        [SerializeField] private float cubeSeconds = 0.45f;
+
+        [SerializeField] private Ease cubeEase = Ease.OutQuad;
+
+        [Header("Gate glow (inside a gate while a destroyed block passes through it)")]
+        [Tooltip("How far the glow reaches into the board from the gate, in cells.")]
+        [SerializeField] private float gateGlowDepthCells = 0.6f;
+
+        [Tooltip("How far the glow's colour moves from the gate's colour toward white, from 0 to 1.")]
+        [SerializeField] private float gateGlowWhiten = 0.5f;
+
+        [Tooltip("The glow's opacity at the gate while it holds, from 0 to 1.")]
+        [SerializeField] private float gateGlowAlpha = 0.8f;
+
+        [Tooltip("Seconds the glow takes to fade in once the block starts passing.")]
+        [SerializeField] private float gateGlowFadeInSeconds = 0.06f;
+
+        [Tooltip("Seconds the glow takes to fade out once the block is through.")]
+        [SerializeField] private float gateGlowFadeOutSeconds = 0.15f;
+
+        [SerializeField] private Ease gateGlowEase = Ease.OutQuad;
+
+        [Header("Ice shards (a thawing block's or an opening gate's ice breaks into these)")]
+        [Tooltip("Shards per cell of the block or of the gate, before the cap.")]
+        [SerializeField] private int shardCountPerCell = 2;
+
+        [Tooltip("The most shards one block or gate breaks into.")]
+        [SerializeField] private int shardCap = 8;
+
+        [Tooltip("Side of a shard in cells: x the smallest, y the largest.")]
+        [SerializeField] private Vector2 shardSizeCells = new Vector2(0.12f, 0.22f);
+
+        [Tooltip("How far a shard flies out from the centre, in cells: x the shortest, y the longest.")]
+        [SerializeField] private Vector2 shardTravelCells = new Vector2(0.3f, 0.6f);
+
+        [Tooltip("How far a shard's direction may turn from straight out from the centre, in degrees either way: at least 0, below 90.")]
+        [SerializeField] private float shardSpreadDegrees = 30f;
+
+        [Tooltip("The most a shard turns over its flight, in degrees either way.")]
+        [SerializeField] private float shardSpinDegrees = 180f;
+
+        [Tooltip("How far a shard falls over its flight on top of flying out, in cells.")]
+        [SerializeField] private float shardFallCells = 0.3f;
+
+        [Tooltip("A shard's scale at the end of its flight, from 0 to 1.")]
+        [SerializeField] private float shardEndScale = 0.6f;
+
+        [Tooltip("Seconds one shard's flight takes.")]
+        [SerializeField] private float shardSeconds = 0.35f;
+
+        [Tooltip("The latest a shard starts after the burst does, in seconds.")]
+        [SerializeField] private float shardMaxDelaySeconds = 0.03f;
+
+        [SerializeField] private Ease shardEase = Ease.OutQuad;
+
+        [Header("Shutters, locks and badges")]
+        [Tooltip("Seconds an opening shutter's panel takes to lift off: it shrinks toward its top edge while fading.")]
+        [SerializeField] private float shutterLiftSeconds = 0.3f;
+
+        [SerializeField] private Ease shutterLiftEase = Ease.InQuad;
+
+        [Tooltip("Seconds an opening lock's padlock and chains take to fade out.")]
+        [SerializeField] private float lockOpenSeconds = 0.25f;
+
+        [Tooltip("The scale an opening lock's padlock and chains reach as they fade: at least 1.")]
+        [SerializeField] private float lockOpenScale = 1.25f;
+
+        [SerializeField] private Ease lockOpenEase = Ease.OutQuad;
+
+        [Tooltip("The scale a badge pops to when its count goes down: above 1.")]
+        [SerializeField] private float badgePopScale = 1.3f;
+
+        [Tooltip("Seconds a badge's pop takes, up and back.")]
+        [SerializeField] private float badgePopSeconds = 0.2f;
+
+        [Header("Spawns")]
+        [Tooltip("Seconds a generated block takes to grow from the machine's screen into its cells.")]
+        [SerializeField] private float generatorSpawnSeconds = 0.25f;
+
+        [SerializeField] private Ease generatorSpawnEase = Ease.OutQuad;
+
+        [Tooltip("Seconds an elevator's doors take to slide apart before a wave rises.")]
+        [SerializeField] private float doorsOpenSeconds = 0.12f;
+
+        [Tooltip("Seconds an elevator's doors take to close again beneath the risen wave.")]
+        [SerializeField] private float doorsCloseSeconds = 0.1f;
+
+        [SerializeField] private Ease doorsEase = Ease.InOutQuad;
+
+        [Tooltip("Seconds a wave takes to rise.")]
+        [SerializeField] private float riseSeconds = 0.25f;
+
+        [Tooltip("A rising block's scale when it starts: above 0, at most 1.")]
+        [SerializeField] private float riseStartScale = 0.85f;
+
+        [Tooltip("How far below its cells a rising block starts, in cells.")]
+        [SerializeField] private float riseDropCells = 0.2f;
+
+        [Tooltip("An easing with an overshoot, such as OutBack, settles the wave with a small bounce.")]
+        [SerializeField] private Ease riseEase = Ease.OutBack;
 
         [Header("HUD (canvas units of a 1080 × 1920 portrait screen)")]
         [Tooltip("Space between the safe area's left and right edges and the restart button and level pill, and the least space kept between them and the timer.")]
@@ -269,8 +424,34 @@ namespace GateRush.Runtime
         [Tooltip("Text of the level pill; {0} is the level's 1-based position in level id order.")]
         [SerializeField] private string levelLabelFormat = "Level {0}";
 
+        [Tooltip("Text shown next to the timer when a move earns a time bonus (M10); {0} is the seconds earned.")]
+        [SerializeField] private string timeBonusFormat = "+{0} s";
+
+        [SerializeField] private Color timeBonusColor = new Color(0.45f, 1f, 0.45f);
+        [SerializeField] private float timeBonusFontSize = 56f;
+
+        [Tooltip("Space between the timer pill's right end and the time bonus text.")]
+        [SerializeField] private float timeBonusGapUnits = 16f;
+
+        [Tooltip("How far the time bonus text rises while it fades.")]
+        [SerializeField] private float timeBonusRiseUnits = 60f;
+
+        [Tooltip("Seconds the time bonus text takes to rise and fade. Runs on unscaled time.")]
+        [SerializeField] private float timeBonusSeconds = 0.9f;
+
+        [SerializeField] private Ease timeBonusEase = Ease.OutQuad;
+
+        [Tooltip("The scale the timer pill pulses to when a bonus is earned: at least 1.")]
+        [SerializeField] private float timerPulseScale = 1.15f;
+
+        [Tooltip("Seconds the timer pill's pulse takes, up and back.")]
+        [SerializeField] private float timerPulseSeconds = 0.25f;
+
         [Header("Result panel (canvas units; the panel is tinted the frame's colour)")]
         [SerializeField] private string winTitle = "Level Complete";
+
+        [Tooltip("The win title after the last level in the level order, in place of Win Title.")]
+        [SerializeField] private string allDoneTitle = "All Levels Complete";
         [SerializeField] private string lossTitle = "Time's Up";
 
         [Tooltip("The full-screen backdrop behind the panel; it covers the board and the HUD and swallows presses on them.")]
@@ -430,8 +611,17 @@ namespace GateRush.Runtime
 
         [SerializeField] private int badgeOrder = DefaultBadgeOrder;
 
-        [Tooltip("Every label: badge numbers and layer numerals, in front of everything else.")]
+        [Tooltip("Every label: badge numbers and layer numerals, in front of every other board layer.")]
         [SerializeField] private int labelOrder = DefaultLabelOrder;
+
+        [Tooltip("A grabbed block's outline. Compared only inside the lifted block's sorting group, where it must sort below Block Lip Order; equal to another board layer's order is fine.")]
+        [SerializeField] private int outlineOrder = DefaultOutlineOrder;
+
+        [Tooltip("Sorting group order of a grabbed block, lifted above every other board layer.")]
+        [SerializeField] private int liftedBlockOrder = DefaultLiftedBlockOrder;
+
+        [Tooltip("Cubes and ice shards, above everything else on the board.")]
+        [SerializeField] private int effectOrder = DefaultEffectOrder;
 
         /// <summary>The white square the floor's backing and beneath squares are drawn with.</summary>
         public Sprite CellSprite => cellSprite;
@@ -495,6 +685,15 @@ namespace GateRush.Runtime
 
         /// <summary>The HUD's white restart arrow, tinted <see cref="HudIconColor"/>.</summary>
         public Sprite RestartSprite => restartSprite;
+
+        /// <summary>One cube of a destroyed block's burst, tinted the block's colour.</summary>
+        public Sprite CubeSprite => cubeSprite;
+
+        /// <summary>One ice shard, tinted <see cref="IceColor"/>.</summary>
+        public Sprite ShardSprite => shardSprite;
+
+        /// <summary>A soft white gradient, strongest along its bottom edge: the glow inside a gate a block is passing.</summary>
+        public Sprite GateGlowSprite => gateGlowSprite;
 
         /// <summary>World units per cell.</summary>
         public float CellSize => cellSize;
@@ -586,14 +785,113 @@ namespace GateRush.Runtime
         /// <summary>Easing of the settle.</summary>
         public Ease SettleEase => settleEase;
 
-        /// <summary>Seconds a destroyed block's exit takes.</summary>
-        public float ClearSeconds => clearSeconds;
+        /// <summary>How much a grabbed block grows while held.</summary>
+        public float LiftScale => liftScale;
 
-        /// <summary>Easing of a destroyed block's exit.</summary>
-        public Ease ClearEase => clearEase;
+        /// <summary>Seconds a grabbed block takes to lift or drop.</summary>
+        public float LiftSeconds => liftSeconds;
 
-        /// <summary>How far a destroyed block travels toward its gate, in cells.</summary>
-        public float ClearTravelCells => clearTravelCells;
+        /// <summary>Easing of the lift and the drop.</summary>
+        public Ease LiftEase => liftEase;
+
+        /// <summary>How far a grabbed block's outline reaches past its face, in cells.</summary>
+        public float OutlineWidthCells => outlineWidthCells;
+
+        /// <summary>Colour of a grabbed block's outline.</summary>
+        public Color OutlineColor => outlineColor;
+
+        /// <summary>Seconds a destroyed block takes to pass one cell of its depth through its gate.</summary>
+        public float ExitSecondsPerCell => exitSecondsPerCell;
+
+        /// <summary>Easing of a destroyed block's pass through its gate.</summary>
+        public Ease ExitEase => exitEase;
+
+        /// <summary>How far the gate glow reaches into the board, in cells.</summary>
+        public float GateGlowDepthCells => gateGlowDepthCells;
+
+        /// <summary>How far the gate glow's colour moves toward white.</summary>
+        public float GateGlowWhiten => gateGlowWhiten;
+
+        /// <summary>The gate glow's opacity while it holds.</summary>
+        public float GateGlowAlpha => gateGlowAlpha;
+
+        /// <summary>Seconds the gate glow takes to fade in.</summary>
+        public float GateGlowFadeInSeconds => gateGlowFadeInSeconds;
+
+        /// <summary>Seconds the gate glow takes to fade out.</summary>
+        public float GateGlowFadeOutSeconds => gateGlowFadeOutSeconds;
+
+        /// <summary>Easing of the gate glow's fades.</summary>
+        public Ease GateGlowEase => gateGlowEase;
+
+        /// <summary>A cube's scale at the end of its flight.</summary>
+        public float CubeEndScale => cubeEndScale;
+
+        /// <summary>Seconds one cube's flight takes.</summary>
+        public float CubeSeconds => cubeSeconds;
+
+        /// <summary>Easing of a cube's flight.</summary>
+        public Ease CubeEase => cubeEase;
+
+        /// <summary>How far a shard falls over its flight, in cells.</summary>
+        public float ShardFallCells => shardFallCells;
+
+        /// <summary>A shard's scale at the end of its flight.</summary>
+        public float ShardEndScale => shardEndScale;
+
+        /// <summary>Seconds one shard's flight takes.</summary>
+        public float ShardSeconds => shardSeconds;
+
+        /// <summary>Easing of a shard's flight.</summary>
+        public Ease ShardEase => shardEase;
+
+        /// <summary>Seconds an opening shutter's lift takes.</summary>
+        public float ShutterLiftSeconds => shutterLiftSeconds;
+
+        /// <summary>Easing of an opening shutter's lift.</summary>
+        public Ease ShutterLiftEase => shutterLiftEase;
+
+        /// <summary>Seconds an opening lock takes to fade out.</summary>
+        public float LockOpenSeconds => lockOpenSeconds;
+
+        /// <summary>The scale an opening lock reaches as it fades.</summary>
+        public float LockOpenScale => lockOpenScale;
+
+        /// <summary>Easing of an opening lock.</summary>
+        public Ease LockOpenEase => lockOpenEase;
+
+        /// <summary>The scale a badge pops to.</summary>
+        public float BadgePopScale => badgePopScale;
+
+        /// <summary>Seconds a badge's pop takes, up and back.</summary>
+        public float BadgePopSeconds => badgePopSeconds;
+
+        /// <summary>Seconds a generated block takes to arrive from its machine.</summary>
+        public float GeneratorSpawnSeconds => generatorSpawnSeconds;
+
+        /// <summary>Easing of a generated block's arrival.</summary>
+        public Ease GeneratorSpawnEase => generatorSpawnEase;
+
+        /// <summary>Seconds an elevator's doors take to open.</summary>
+        public float DoorsOpenSeconds => doorsOpenSeconds;
+
+        /// <summary>Seconds an elevator's doors take to close.</summary>
+        public float DoorsCloseSeconds => doorsCloseSeconds;
+
+        /// <summary>Easing of an elevator's doors.</summary>
+        public Ease DoorsEase => doorsEase;
+
+        /// <summary>Seconds a wave takes to rise.</summary>
+        public float RiseSeconds => riseSeconds;
+
+        /// <summary>A rising block's starting scale.</summary>
+        public float RiseStartScale => riseStartScale;
+
+        /// <summary>How far below its cells a rising block starts, in cells.</summary>
+        public float RiseDropCells => riseDropCells;
+
+        /// <summary>Easing of a wave's rise.</summary>
+        public Ease RiseEase => riseEase;
 
         /// <summary>Seconds a surviving layered block's peel takes.</summary>
         public float PeelSeconds => peelSeconds;
@@ -603,6 +901,9 @@ namespace GateRush.Runtime
 
         /// <summary>Result panel title after a win.</summary>
         public string WinTitle => winTitle;
+
+        /// <summary>Result panel title after winning the last level (<see cref="ResultTitle"/>).</summary>
+        public string AllDoneTitle => allDoneTitle;
 
         /// <summary>Result panel title after the countdown runs out.</summary>
         public string LossTitle => lossTitle;
@@ -654,6 +955,33 @@ namespace GateRush.Runtime
 
         /// <summary>Composite format of the level pill; <c>{0}</c> is the level number.</summary>
         public string LevelLabelFormat => levelLabelFormat;
+
+        /// <summary>Composite format of the time bonus text; <c>{0}</c> is the seconds earned.</summary>
+        public string TimeBonusFormat => timeBonusFormat;
+
+        /// <summary>Colour of the time bonus text.</summary>
+        public Color TimeBonusColor => timeBonusColor;
+
+        /// <summary>Font size of the time bonus text.</summary>
+        public float TimeBonusFontSize => timeBonusFontSize;
+
+        /// <summary>Space between the timer pill and the time bonus text, in canvas units.</summary>
+        public float TimeBonusGapUnits => timeBonusGapUnits;
+
+        /// <summary>How far the time bonus text rises, in canvas units.</summary>
+        public float TimeBonusRiseUnits => timeBonusRiseUnits;
+
+        /// <summary>Seconds the time bonus text takes to rise and fade.</summary>
+        public float TimeBonusSeconds => timeBonusSeconds;
+
+        /// <summary>Easing of the time bonus text.</summary>
+        public Ease TimeBonusEase => timeBonusEase;
+
+        /// <summary>The scale the timer pill pulses to on a bonus.</summary>
+        public float TimerPulseScale => timerPulseScale;
+
+        /// <summary>Seconds the timer pill's pulse takes, up and back.</summary>
+        public float TimerPulseSeconds => timerPulseSeconds;
 
         /// <summary>Colour of the full-screen backdrop behind the result panel.</summary>
         public Color ResultBackdropColor => resultBackdropColor;
@@ -871,8 +1199,17 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of a badge's fill, inset by the rim's thickness.</summary>
         public int BadgeOrder => badgeOrder;
 
-        /// <summary>Sorting order of every label, in front of everything else.</summary>
+        /// <summary>Sorting order of every label, in front of every other board layer.</summary>
         public int LabelOrder => labelOrder;
+
+        /// <summary>Sorting order of a grabbed block's outline, compared only inside its lifted sorting group.</summary>
+        public int OutlineOrder => outlineOrder;
+
+        /// <summary>Sorting group order of a grabbed block.</summary>
+        public int LiftedBlockOrder => liftedBlockOrder;
+
+        /// <summary>Sorting order of cubes and ice shards.</summary>
+        public int EffectOrder => effectOrder;
 
         /// <summary>The generated sprite for one of the four quarter pieces.</summary>
         public Sprite QuarterSprite(QuarterSpriteKind kind)
@@ -911,6 +1248,25 @@ namespace GateRush.Runtime
         /// <summary>The width, in cells, of the badge showing <paramref name="value"/>.</summary>
         public float BadgeWidthCells(int value) =>
             MarkLayout.BadgeWidth(value, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells);
+
+        /// <summary>
+        /// The layout of the cubes a destroyed block streams out. Its maximum
+        /// delay is <see cref="CubeStreamSetsItsOwnDelays"/>: a stream spreads
+        /// its cubes' starts over the block's pass (<see cref="BurstLayout.Stream"/>),
+        /// so no delay is configured.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A cube value is out of range; see <see cref="Problems"/>.</exception>
+        public BurstSettings CreateCubeBurst() =>
+            new BurstSettings(
+                cubeCountPerCell, cubeCap, cubeSizeCells.x, cubeSizeCells.y, cubeTravelCells.x, cubeTravelCells.y,
+                cubeSpreadDegrees, cubeSpinDegrees, CubeStreamSetsItsOwnDelays);
+
+        /// <summary>The layout of the ice shards of a thaw or a gate opening.</summary>
+        /// <exception cref="ArgumentOutOfRangeException">A shard value is out of range; see <see cref="Problems"/>.</exception>
+        public BurstSettings CreateShardBurst() =>
+            new BurstSettings(
+                shardCountPerCell, shardCap, shardSizeCells.x, shardSizeCells.y, shardTravelCells.x, shardTravelCells.y,
+                shardSpreadDegrees, shardSpinDegrees, shardMaxDelaySeconds);
 
         /// <summary>The generator machine placement rule these values describe.</summary>
         /// <exception cref="ArgumentOutOfRangeException">A machine size is out of range; see <see cref="Problems"/>.</exception>
@@ -965,6 +1321,9 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, doorPanelSprite, "Door Panel Sprite");
             AddIfUnassigned(problems, clockSprite, "Clock Sprite");
             AddIfUnassigned(problems, restartSprite, "Restart Sprite");
+            AddIfUnassigned(problems, cubeSprite, "Cube Sprite");
+            AddIfUnassigned(problems, shardSprite, "Shard Sprite");
+            AddIfUnassigned(problems, gateGlowSprite, "Gate Glow Sprite");
 
             if (!(cellSize > 0f))
             {
@@ -1058,20 +1417,12 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Settle Seconds must be positive.");
             }
 
-            if (!(clearSeconds > 0f))
-            {
-                problems.Add($"{name}: Clear Seconds must be positive.");
-            }
-
-            if (clearTravelCells < 0f)
-            {
-                problems.Add($"{name}: Clear Travel Cells may not be negative.");
-            }
-
             if (!(peelSeconds > 0f))
             {
                 problems.Add($"{name}: Peel Seconds must be positive.");
             }
+
+            AddFeedbackProblems(problems);
 
             if (blockPalette == null || blockPalette.Length < colourCount)
             {
@@ -1081,6 +1432,89 @@ namespace GateRush.Runtime
             AddHudProblems(problems);
             AddResultPanelProblems(problems);
             return problems;
+        }
+
+        /// <summary>The constraints on the feedback animations' values (Module 18), each message naming its field.</summary>
+        private void AddFeedbackProblems(List<string> problems)
+        {
+            if (!(liftScale >= 1f) || float.IsInfinity(liftScale))
+            {
+                problems.Add($"{name}: Lift Scale must be at least 1 and finite.");
+            }
+
+            if (!(outlineWidthCells > 0f && outlineWidthCells < 0.5f))
+            {
+                problems.Add($"{name}: Outline Width Cells must be above 0 and below 0.5.");
+            }
+
+            if (!(gateGlowWhiten >= 0f && gateGlowWhiten <= 1f && gateGlowAlpha >= 0f && gateGlowAlpha <= 1f))
+            {
+                problems.Add($"{name}: Gate Glow Whiten and Gate Glow Alpha must be from 0 to 1.");
+            }
+
+            foreach (var problem in BurstSettings.Problems(
+                         "Cube", cubeCountPerCell, cubeCap, cubeSizeCells.x, cubeSizeCells.y, cubeTravelCells.x,
+                         cubeTravelCells.y, cubeSpreadDegrees, cubeSpinDegrees, CubeStreamSetsItsOwnDelays))
+            {
+                problems.Add($"{name}: {problem}");
+            }
+
+            foreach (var problem in BurstSettings.Problems(
+                         "Shard", shardCountPerCell, shardCap, shardSizeCells.x, shardSizeCells.y, shardTravelCells.x,
+                         shardTravelCells.y, shardSpreadDegrees, shardSpinDegrees, shardMaxDelaySeconds))
+            {
+                problems.Add($"{name}: {problem}");
+            }
+
+            if (!(cubeEndScale >= 0f && cubeEndScale <= 1f && shardEndScale >= 0f && shardEndScale <= 1f))
+            {
+                problems.Add($"{name}: Cube End Scale and Shard End Scale must be from 0 to 1.");
+            }
+
+            if (!(shardFallCells >= 0f) || float.IsInfinity(shardFallCells))
+            {
+                problems.Add($"{name}: Shard Fall Cells must be at least 0 and finite.");
+            }
+
+            if (!(lockOpenScale >= 1f) || float.IsInfinity(lockOpenScale))
+            {
+                problems.Add($"{name}: Lock Open Scale must be at least 1 and finite.");
+            }
+
+            if (!(badgePopScale > 1f) || float.IsInfinity(badgePopScale))
+            {
+                problems.Add($"{name}: Badge Pop Scale must be above 1 and finite.");
+            }
+
+            if (!(riseStartScale > 0f && riseStartScale <= 1f))
+            {
+                problems.Add($"{name}: Rise Start Scale must be above 0 and at most 1.");
+            }
+
+            if (!(riseDropCells >= 0f) || float.IsInfinity(riseDropCells))
+            {
+                problems.Add($"{name}: Rise Drop Cells must be at least 0 and finite.");
+            }
+
+            AddIfNotPositive(problems, liftSeconds, "Lift Seconds");
+            AddIfNotPositive(problems, exitSecondsPerCell, "Exit Seconds Per Cell");
+            AddIfNotPositive(problems, gateGlowDepthCells, "Gate Glow Depth Cells");
+            AddIfNotPositive(problems, gateGlowFadeInSeconds, "Gate Glow Fade In Seconds");
+            AddIfNotPositive(problems, gateGlowFadeOutSeconds, "Gate Glow Fade Out Seconds");
+            AddIfNotPositive(problems, cubeSeconds, "Cube Seconds");
+            AddIfNotPositive(problems, shardSeconds, "Shard Seconds");
+            AddIfNotPositive(problems, shutterLiftSeconds, "Shutter Lift Seconds");
+            AddIfNotPositive(problems, lockOpenSeconds, "Lock Open Seconds");
+            AddIfNotPositive(problems, badgePopSeconds, "Badge Pop Seconds");
+            AddIfNotPositive(problems, generatorSpawnSeconds, "Generator Spawn Seconds");
+            AddIfNotPositive(problems, doorsOpenSeconds, "Doors Open Seconds");
+            AddIfNotPositive(problems, doorsCloseSeconds, "Doors Close Seconds");
+            AddIfNotPositive(problems, riseSeconds, "Rise Seconds");
+
+            if (!(outlineOrder < blockLipOrder))
+            {
+                problems.Add($"{name}: Outline Order must be below Block Lip Order, so the outline sits under the lip.");
+            }
         }
 
         /// <summary>The constraints on the HUD's values, each message naming its field.</summary>
@@ -1117,6 +1551,24 @@ namespace GateRush.Runtime
             {
                 problems.Add($"{name}: Level Label Format must be a format with at most one placeholder, {{0}}, for the level number.");
             }
+
+            if (!IsUsableFormat(timeBonusFormat))
+            {
+                problems.Add($"{name}: Time Bonus Format must be a format with at most one placeholder, {{0}}, for the seconds earned.");
+            }
+
+            if (!(timeBonusFontSize > 0f && timeBonusGapUnits >= 0f && timeBonusRiseUnits >= 0f))
+            {
+                problems.Add($"{name}: Time Bonus Font Size must be positive, and Time Bonus Gap Units and Time Bonus Rise Units at least 0.");
+            }
+
+            if (!(timerPulseScale >= 1f) || float.IsInfinity(timerPulseScale))
+            {
+                problems.Add($"{name}: Timer Pulse Scale must be at least 1 and finite.");
+            }
+
+            AddIfNotPositive(problems, timeBonusSeconds, "Time Bonus Seconds");
+            AddIfNotPositive(problems, timerPulseSeconds, "Timer Pulse Seconds");
         }
 
         /// <summary>The constraints on the result panel's values, each message naming its field.</summary>
@@ -1204,9 +1656,20 @@ namespace GateRush.Runtime
             badgeOrder = DefaultBadgeOrder;
             badgeRimOrder = DefaultBadgeRimOrder;
             labelOrder = DefaultLabelOrder;
+            outlineOrder = DefaultOutlineOrder;
+            liftedBlockOrder = DefaultLiftedBlockOrder;
+            effectOrder = DefaultEffectOrder;
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);
 #endif
+        }
+
+        private void AddIfNotPositive(List<string> problems, float value, string field)
+        {
+            if (!(value > 0f) || float.IsInfinity(value))
+            {
+                problems.Add($"{name}: {field} must be positive and finite.");
+            }
         }
 
         private void AddIfUnassigned(List<string> problems, Sprite sprite, string field)
