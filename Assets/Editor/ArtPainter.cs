@@ -29,7 +29,10 @@ namespace GateRush.Editor
         ShutterSlats,
         DoorPanel,
         Clock,
-        Restart
+        Restart,
+        Cube,
+        Shard,
+        GateGlow
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -63,7 +66,7 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Modules 15, 16 and 17 from an
+    /// Paints every generated sprite of Modules 15, 16, 17 and 18 from an
     /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
     /// to tint (D46).
     /// </summary>
@@ -150,6 +153,12 @@ namespace GateRush.Editor
                     return PaintClock(recipe);
                 case ArtSprite.Restart:
                     return PaintRestart(recipe);
+                case ArtSprite.Cube:
+                    return PaintCube(recipe);
+                case ArtSprite.Shard:
+                    return PaintShard(recipe);
+                case ArtSprite.GateGlow:
+                    return PaintGateGlow(recipe);
                 default:
                     return PaintDoorPanel(recipe);
             }
@@ -598,6 +607,96 @@ namespace GateRush.Editor
 
                 return (1.0, Coverage(recipe, Math.Min(arc, head)));
             });
+        }
+
+        /// <summary>
+        /// One cube of a destroyed block's burst: a rounded box with a light
+        /// bevel inside its edge, easing into the face, and a soft highlight
+        /// toward its top left, like a stud's gloss.
+        /// </summary>
+        private static ArtImage PaintCube(ArtRecipe recipe)
+        {
+            var half = recipe.CubePixels / 2.0;
+            var extent = half - recipe.AntiAliasPixels;
+            var highlightX = half + recipe.CubeHighlightOffsetPixels.x;
+            var highlightY = half + recipe.CubeHighlightOffsetPixels.y;
+            var highlightRadius = recipe.CubeHighlightDiameterPixels / 2.0;
+            var softness = Math.Max(recipe.CubeHighlightSoftnessPixels, recipe.AntiAliasPixels);
+
+            return Paint(recipe.CubePixels, recipe.CubePixels, Vector4.zero, (x, y) =>
+            {
+                var sd = SdRoundedBox(x - half, y - half, extent, extent, recipe.CubeCornerPixels);
+                var intoFace = recipe.CubeRimPixels > 0.0 ? Clamp01(-sd / recipe.CubeRimPixels) : 1.0;
+                var tone = Lerp(recipe.CubeRimTone, recipe.CubeFaceTone, Smooth(intoFace));
+                var highlight = Clamp01(0.5 + (highlightRadius - Length(x - highlightX, y - highlightY)) / softness);
+                return (Lerp(tone, recipe.CubeHighlightTone, highlight), Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// One ice shard: a convex four-cornered splinter with a lighter frost
+        /// streak from its first corner to its third. Its signed distance is the
+        /// largest distance past any of its edges — exact along the edges,
+        /// which is all anti-aliasing reads.
+        /// </summary>
+        private static ArtImage PaintShard(ArtRecipe recipe)
+        {
+            double size = recipe.ShardPixels;
+            var points = recipe.ShardPoints;
+            var xs = new double[points.Count];
+            var ys = new double[points.Count];
+            for (var i = 0; i < points.Count; i++)
+            {
+                xs[i] = points[i].x * size;
+                ys[i] = points[i].y * size;
+            }
+
+            var halfStreak = recipe.ShardStreakWidthPixels / 2.0;
+
+            return Paint(recipe.ShardPixels, recipe.ShardPixels, Vector4.zero, (x, y) =>
+            {
+                var sd = double.NegativeInfinity;
+                for (var i = 0; i < xs.Length; i++)
+                {
+                    var j = (i + 1) % xs.Length;
+                    var dx = xs[j] - xs[i];
+                    var dy = ys[j] - ys[i];
+
+                    // Counter-clockwise, so the outward normal is (dy, −dx).
+                    sd = Math.Max(sd, ((x - xs[i]) * dy - (y - ys[i]) * dx) / Length(dx, dy));
+                }
+
+                var toStreak = DistanceToSegment(x, y, xs[0], ys[0], xs[2], ys[2]);
+                var streak = Clamp01(halfStreak - toStreak + 0.5);
+                return (Lerp(recipe.ShardFaceTone, recipe.ShardStreakTone, streak), Coverage(recipe, sd));
+            });
+        }
+
+        /// <summary>
+        /// The glow inside a gate a block is passing: white, opaque along its
+        /// bottom rows for the held fraction of its height, then easing to
+        /// nothing at its top. Only the height varies, so it is as narrow as the
+        /// background ramp and stretched along the gate.
+        /// </summary>
+        private static ArtImage PaintGateGlow(ArtRecipe recipe)
+        {
+            double height = recipe.GateGlowPixels;
+            double hold = recipe.GateGlowHold;
+            return Paint(RampWidthPixels, recipe.GateGlowPixels, Vector4.zero, (x, y) =>
+            {
+                var intoFade = Clamp01((y / height - hold) / (1.0 - hold));
+                return (1.0, 1.0 - Smooth(intoFade));
+            });
+        }
+
+        /// <summary>The distance from <c>(x, y)</c> to the segment from <c>(ax, ay)</c> to <c>(bx, by)</c>.</summary>
+        private static double DistanceToSegment(double x, double y, double ax, double ay, double bx, double by)
+        {
+            var dx = bx - ax;
+            var dy = by - ay;
+            var lengthSquared = dx * dx + dy * dy;
+            var t = lengthSquared > 0.0 ? Clamp01(((x - ax) * dx + (y - ay) * dy) / lengthSquared) : 0.0;
+            return Length(x - (ax + t * dx), y - (ay + t * dy));
         }
 
         /// <summary>The centre of the key's bow, in pixels: as far in from the left edge as the key is half high.</summary>
