@@ -113,7 +113,7 @@ under the finger, stops flush against obstacles, slides into corridors
 through a corner assist, and settles into the nearest cell on release.
 
 **2.4 — Visual polish before the first shared build (D46).** The first
-build goes to a mentor, so the prototype look is replaced first, in three
+build goes to a mentor, so the prototype look is replaced first, in four
 steps, each its own spec and PR:
 
 - **2.4a — Board and blocks.** Background, frame and walls, studded
@@ -134,6 +134,12 @@ steps, each its own spec and PR:
     "+N s" time bonus. The key flying to its lock and chains falling are
     left for later; a lock simply updates its count and opens.
     *Spec: `Modules/18-feedback-animations.md`. Status: next.*
+- **2.4d — Mechanic introductions.** A card over the board the first time
+  each mechanic appears, as the reference game does, plus How to Play on
+  the first level. Which level introduces what is derived from the levels'
+  content, so reordering levels moves the cards with them. The countdown
+  waits for the last card. Time-bonus blocks gain a board mark.
+  *Spec: `Modules/19-mechanic-introductions.md`.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
