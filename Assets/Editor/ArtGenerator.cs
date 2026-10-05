@@ -8,7 +8,7 @@ using UnityEngine;
 namespace GateRush.Editor
 {
     /// <summary>
-    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15, 16, 17 and 18 from
+    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15, 16, 17, 18 and 19 from
     /// the project's <see cref="ArtRecipe"/> and writes it as a PNG under
     /// <see cref="OutputFolder"/>, with its import settings (D46). The PNGs are
     /// committed; the build never runs this.

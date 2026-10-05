@@ -56,7 +56,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(25, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(26, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -216,6 +216,7 @@ namespace GateRush.Tests
 
         [TestCase(ArtSprite.Clock)]
         [TestCase(ArtSprite.Restart)]
+        [TestCase(ArtSprite.Sparkle)]
         public void Paint_Icon_IsWhiteAndUnsliced(ArtSprite sprite)
         {
             var icon = ArtPainter.Paint(recipe, sprite);
@@ -317,6 +318,28 @@ namespace GateRush.Tests
             {
                 Assert.LessOrEqual(column[y].a, column[y - 1].a, $"row {y}: fades away from the gate, never back");
             }
+        }
+
+        [Test]
+        public void Paint_Sparkle_HasTipsOnTheAxesAndIsClearOnTheDiagonals()
+        {
+            var sparkle = ArtPainter.Paint(recipe, ArtSprite.Sparkle);
+            var center = sparkle.Width / 2.0;
+
+            // Most of the way to a tip along each axis, and as far out along
+            // each diagonal, where a four-point star has drawn in its sides.
+            var reach = 0.7 * center;
+            var diagonal = reach / System.Math.Sqrt(2.0);
+
+            Assert.AreEqual(255, Pixel(sparkle, center, center).a, "the centre");
+            Assert.AreEqual(255, Pixel(sparkle, center + reach, center).a, "toward the right tip");
+            Assert.AreEqual(255, Pixel(sparkle, center - reach, center).a, "toward the left tip");
+            Assert.AreEqual(255, Pixel(sparkle, center, center + reach).a, "toward the top tip");
+            Assert.AreEqual(255, Pixel(sparkle, center, center - reach).a, "toward the bottom tip");
+            Assert.AreEqual(0, Pixel(sparkle, center + diagonal, center + diagonal).a, "between the top and right tips");
+            Assert.AreEqual(0, Pixel(sparkle, center - diagonal, center + diagonal).a, "between the top and left tips");
+            Assert.AreEqual(0, Pixel(sparkle, center + diagonal, center - diagonal).a, "between the bottom and right tips");
+            Assert.AreEqual(0, Pixel(sparkle, center - diagonal, center - diagonal).a, "between the bottom and left tips");
         }
 
         private static Color32 Pixel(ArtImage image, double x, double y) =>

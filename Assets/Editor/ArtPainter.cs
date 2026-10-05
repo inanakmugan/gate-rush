@@ -32,7 +32,8 @@ namespace GateRush.Editor
         Restart,
         Cube,
         Shard,
-        GateGlow
+        GateGlow,
+        Sparkle
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -66,7 +67,7 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Modules 15, 16, 17 and 18 from an
+    /// Paints every generated sprite of Modules 15, 16, 17, 18 and 19 from an
     /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
     /// to tint (D46).
     /// </summary>
@@ -159,6 +160,8 @@ namespace GateRush.Editor
                     return PaintShard(recipe);
                 case ArtSprite.GateGlow:
                     return PaintGateGlow(recipe);
+                case ArtSprite.Sparkle:
+                    return PaintSparkle(recipe);
                 default:
                     return PaintDoorPanel(recipe);
             }
@@ -686,6 +689,35 @@ namespace GateRush.Editor
             {
                 var intoFade = Clamp01((y / height - hold) / (1.0 - hold));
                 return (1.0, 1.0 - Smooth(intoFade));
+            });
+        }
+
+        /// <summary>
+        /// A sparkle, in white: a four-point star with its tips on the axes,
+        /// the anti-aliased edge inside the sprite, and its inner corners on
+        /// the diagonals. The star is the same in all eight octants, so a
+        /// pixel is folded into the one below the diagonal on the right, where
+        /// the star's outline is a single edge from a tip to an inner corner;
+        /// the distance past that edge's line is exact along the outline,
+        /// which is all anti-aliasing reads.
+        /// </summary>
+        private static ArtImage PaintSparkle(ArtRecipe recipe)
+        {
+            double size = recipe.SparklePixels;
+            var center = size / 2.0;
+            var tip = center - recipe.AntiAliasPixels;
+            var waist = recipe.SparkleWaist * size;
+            var edgeLength = Length(waist, tip - waist);
+
+            return Paint(recipe.SparklePixels, recipe.SparklePixels, Vector4.zero, (x, y) =>
+            {
+                var along = Math.Max(Math.Abs(x - center), Math.Abs(y - center));
+                var across = Math.Min(Math.Abs(x - center), Math.Abs(y - center));
+
+                // The edge runs from (tip, 0) to (waist, waist); its outward
+                // normal is (waist, tip − waist).
+                var sd = ((along - tip) * waist + across * (tip - waist)) / edgeLength;
+                return (1.0, Coverage(recipe, sd));
             });
         }
 

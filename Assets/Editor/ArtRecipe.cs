@@ -6,8 +6,9 @@ namespace GateRush.Editor
 {
     /// <summary>
     /// Every parameter of the generated art (D46): the board and blocks of
-    /// Module 15, the state visuals of Module 16, the HUD icons of Module 17
-    /// and the exit cube, ice shard and gate glow of Module 18 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
+    /// Module 15, the state visuals of Module 16, the HUD icons of Module 17,
+    /// the exit cube, ice shard and gate glow of Module 18 and the sparkle of
+    /// Module 19 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
     /// tuned here, never in code; <see cref="ArtGenerator"/> reads nothing
     /// else. All sizes are in pixels of the generated textures, and tones are
     /// greyscale values from 0 (black) to 1 (white) that the runtime tints.
@@ -285,6 +286,13 @@ namespace GateRush.Editor
 
         [Tooltip("The fraction of the height, from the gate, held at full strength before the glow fades: at least 0, below 1.")]
         [SerializeField] private float gateGlowHold = 0.1f;
+
+        [Header("Sparkle (white four-point star; tinted where placed)")]
+        [Tooltip("Side of the sparkle sprite. At least 8.")]
+        [SerializeField] private int sparklePixels = 64;
+
+        [Tooltip("How far the star's four inner corners sit from its centre along each axis, as a fraction of the sprite: above 0 and below a quarter, so its sides bend inward.")]
+        [SerializeField] private float sparkleWaist = 0.09f;
 
         /// <summary>Pixels per cell, and the sprites' pixels per unit.</summary>
         public int CellPixels => cellPixels;
@@ -601,6 +609,12 @@ namespace GateRush.Editor
         /// <summary>The fraction of the gate glow held at full strength before it fades.</summary>
         public float GateGlowHold => gateGlowHold;
 
+        /// <summary>Side of the sparkle sprite, in pixels.</summary>
+        public int SparklePixels => sparklePixels;
+
+        /// <summary>How far the sparkle's inner corners sit from its centre along each axis, as a fraction of the sprite.</summary>
+        public float SparkleWaist => sparkleWaist;
+
         /// <summary>
         /// The rounded box's 9-slice border, in pixels, on every side: its
         /// corner and its outline-and-rim bevel both fit inside it, so the
@@ -726,7 +740,26 @@ namespace GateRush.Editor
             AddStateProblems(problems);
             AddIconProblems(problems);
             AddFeedbackProblems(problems);
+            AddIntroductionProblems(problems);
             return problems;
+        }
+
+        /// <summary>The constraints on Module 19's sparkle, each message naming its field.</summary>
+        private void AddIntroductionProblems(List<string> problems)
+        {
+            if (sparklePixels < 8)
+            {
+                problems.Add($"{name}: Sparkle Pixels must be at least 8.");
+            }
+
+            // The star's tips sit the anti-aliased edge inside the sprite; an
+            // inner corner at half a tip's reach or beyond would make a
+            // diamond or a square, not a star.
+            var tip = sparklePixels / 2f - antiAliasPixels;
+            if (!(sparkleWaist > 0f && sparkleWaist * sparklePixels < tip / 2f))
+            {
+                problems.Add($"{name}: Sparkle Waist must be above 0 and below a quarter, so the star's sides bend inward.");
+            }
         }
 
         /// <summary>The constraints on Module 18's cube, shard and gate glow, each message naming its field.</summary>
