@@ -235,3 +235,56 @@ Edit Mode, against the plain classes. The look is checked by hand.
 - Restart during each animation leaves a clean board.
 - A move with no side effects feels as quick as before.
 - The last level's win panel reads the all-done title.
+
+---
+
+## Resolved during implementation
+
+- **What changed.** `MoveChanges` sits beside an unchanged
+  `ResolutionDiff` and takes its clears from it. A spawned block's source
+  comes from `LevelContext.TryGetSpawner` (with `SpawnerKind`), backed by
+  per-slot arrays built with the spawn layout; the slot helpers stay
+  internal to Core. A block that appears under a shutter opening in the
+  same move is revealed, not spawned.
+- **Structure.** `BoardView` draws into a `Board` group and keeps
+  temporary pieces and debris under `Effects/Stage` and `Effects/Debris`.
+  Each block has a `Body` under its `Root`: the drag and settle move the
+  root; the lift, spawns and rises scale the body about the footprint's
+  centre. The effects live in `BoardView.Effects.cs`.
+- **Debris.** Cubes, shards, the passing block and the gate glow carry
+  their own tween id. The redraw between the stages kills only the
+  view's id and replaces only `Board`, so debris keeps running through it
+  and through later moves' redraws; restart, level change, disable and
+  destroy remove it. Debris never holds `IsBusy`.
+- **Lift.** The lifted block gets a `SortingGroup` at `liftedBlockOrder`.
+  The outline is the block's own quarters drawn again in white, each grown
+  only on its outward sides (`LiftOutline`); it retracts to zero width
+  rather than fading, which would show seams. `outlineOrder` sits just
+  below the block lip and is compared only inside the lifted group, so no
+  existing sorting order moved.
+- **Exit, reworked against the reference.** A destroyed block is handed to
+  debris and slides through its gate at `exitSecondsPerCell`, clipped by
+  a `SpriteMask` inside its own sorting group: exactly on the gate's inner
+  line on the exit side, and past the grid by a margin derived from the
+  lift scale, outline width and lip offset on the other three
+  (`GateExit`). Cubes stream from the gate's outer line for the whole
+  pass (`BurstLayout.Stream`), and a soft glow (`GateGlow` sprite) lights
+  the gate's inner edge. The nudge fields are retired.
+- **Win panel.** `BoardView` counts the passes still running; a
+  presentation that ends during one reports done when the last pass
+  finishes, so the win panel waits for the block without holding input.
+- **Randomness.** Bursts use `System.Random` seeded from the burst kind,
+  the block or gate index and the move number of the attempt, never
+  `UnityEngine.Random`.
+- **Time bonus.** "+N s" shows when the bonus is earned, with the digits'
+  jump; on a winning move the result panel shows instead. The badge pop
+  and the timer pulse are one half-sine each, with no ease field.
+- **All-done title.** `ResultTitle` decides "last level" with the catalog
+  query that hides Next (`TryGetNext`).
+- **Elevator.** The door divider hides while the temporary doors open and
+  returns with the real doors.
+- **Plain moves.** On a move with no clear and nothing arriving, the
+  redraw can end the lift's drop a frame or two early.
+- **Assets.** An existing `RuntimeConfig.asset` keeps its stored values,
+  so raised defaults (the cube stream's count, cap, size, travel and
+  duration) were set by hand.

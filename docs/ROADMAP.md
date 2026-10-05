@@ -62,7 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) in progress.* Levels chain through Next
+*Status: playable; visual polish (2.4) done. Next: the owner's level set
+for the first build, then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -133,13 +134,16 @@ steps, each its own spec and PR:
     spawns from generators, elevator doors opening as a wave rises, and the
     "+N s" time bonus. The key flying to its lock and chains falling are
     left for later; a lock simply updates its count and opens.
-    *Spec: `Modules/18-feedback-animations.md`. Status: next.*
+    *Spec: `Modules/18-feedback-animations.md`. Status: done.* The exit was
+    reworked against the reference: the block slides through its gate,
+    clipped at the gate's inner line, while cubes stream out beneath it and
+    the gate glows inward.
 - **2.4d — Mechanic introductions.** A card over the board the first time
   each mechanic appears, as the reference game does, plus How to Play on
   the first level. Which level introduces what is derived from the levels'
   content, so reordering levels moves the cards with them. The countdown
   waits for the last card. Time-bonus blocks gain a board mark.
-  *Spec: `Modules/19-mechanic-introductions.md`.*
+  *Spec: `Modules/19-mechanic-introductions.md`. Status: done.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
@@ -171,7 +175,9 @@ taken when its area is next touched.
   same boards; a joker test's message still says "effect clear"; a
   `<summary>` in `SearchCorpus` sits above the wrong board.
 - *Presentation:* on a 1×1 layered locked block the layer numeral overlaps
-  the padlock.
+  the padlock; `MechanicIllustration` mirrors `BoardView`'s drawing
+  recipes, so the two must change together; the time-bonus mark's overlap
+  check covers bonuses up to two digits.
 
 ---
 

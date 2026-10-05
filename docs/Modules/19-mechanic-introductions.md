@@ -202,3 +202,44 @@ Edit Mode, against the plain classes. The look is checked by hand.
 - While a card is open, no drag, no restart button, no R.
 - Every card reads well on a portrait phone and a landscape desktop.
 - Time-bonus blocks carry their mark on the board.
+
+---
+
+## Resolved during implementation
+
+- **Detection.** One pass over `LevelContext`'s flat slot space sees
+  top-level blocks, generator queues and elevator waves alike. A feature
+  that never shows does not count: a block, gate or shutter whose
+  threshold is met at zero clears (asked of Core's own checks), a
+  generator with an empty queue, an elevator with no waves.
+- **Reading levels.** `BuildCatalog` already parses every level once; it
+  keeps each level's mechanics too, laid out in `LevelCatalog.Names`
+  order. A level that fails to load keeps its existing error, which now
+  says it introduces no mechanic.
+- **Holding.** `Load` does not start the run while cards are open; the
+  last card's close starts it. `LevelRun` and `Countdown` are unchanged:
+  an unstarted countdown ignores ticks. One query, `IntroductionCard.IsOpen`,
+  holds the pointer, R and the HUD restart button. `Load` hides the card
+  first, dropping its callback, so a run started is always the one the
+  cards were shown for.
+- **Card.** Built from code between the HUD and the result panel. The
+  close button sits in its own row above the title, so a long title never
+  runs under it; a tap anywhere also closes. It opens with the result
+  panel's pop and closes with a fade.
+- **Title.** White, outlined in the frame colour darkened as a lip is
+  (`LipFill(FrameColor)`), on the title's own material copy, so no other
+  label's material changes.
+- **Illustrations.** `MechanicIllustration` draws with UI images over the
+  board's sprites, layout rules and cell-relative config; its composing
+  recipes mirror `BoardView`'s and must change with them (known debt).
+  The Lock & Key card shows one key on the padlock. The How to Play arrow
+  has its own size (`introHowToPlayArrowCells`).
+- **Sparkles.** Positions, sizes and phases are authored in config;
+  nothing is random.
+- **Time-bonus mark.** The count badge's shape in bonus colours, the clock
+  at its left and "+N". With a key or padlock on the same block the two
+  sit side by side (`MarkLayout.PairedMarks`), at a crowded scale where
+  the footprint has no room; the opening-lock effect uses the same
+  position. `Problems()` checks overlap up to a two-digit bonus.
+- **Badge padding.** `RuntimeConfig` first lacked a public
+  `BadgePaddingCells` getter, which the new mark needs; added.
