@@ -8,11 +8,25 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Where the marks on a block go (Module 16): the point its icons and
-    /// count sit on, the chains across a locked block, and how wide a count's
+    /// count sit on, where two marks sharing a block go (Module 19), the
+    /// chains across a locked block, and how wide a count's or a time bonus's
     /// badge is. Plain rules in cell units, so they are tested without a scene.
     /// </summary>
     public static class MarkLayout
     {
+        /// <summary>
+        /// How far either side of the anchor two crowded marks sit, in cells: a
+        /// quarter, so each has half a cell and neither leaves the anchor's
+        /// cells. Geometry, not a tunable.
+        /// </summary>
+        public const float CrowdedOffsetCells = 0.25f;
+
+        /// <summary>
+        /// How far either side of the anchor two marks with room sit, in cells:
+        /// half a cell, so each has a whole cell's width.
+        /// </summary>
+        public const float RoomyOffsetCells = 0.5f;
+
         /// <summary>
         /// The centre of <paramref name="cells"/>, in cell units relative to the
         /// footprint's origin: the centre of its bounding box when that point
@@ -26,6 +40,58 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
         public static Vector2 Anchor(IReadOnlyList<Coord> cells)
         {
+            DoubledAnchor(cells, out var doubleX, out var doubleY, out _);
+            return new Vector2(doubleX * 0.5f, doubleY * 0.5f);
+        }
+
+        /// <summary>
+        /// Where two marks sharing one block go — a padlock or a key, and the
+        /// time-bonus mark (M10) — in cell units relative to the footprint's
+        /// origin. They sit half a cell either side of <see cref="Anchor"/>,
+        /// along the longer side of the footprint's bounding box (horizontal on
+        /// a tie), when both of those points lie on the footprint: a 1×2 then
+        /// carries one mark in each cell, at full size. Otherwise — a 1×1, an
+        /// L, a T — they sit a quarter cell either side of the anchor,
+        /// horizontally, which is always on the footprint, and are
+        /// <see cref="PairedMarkLayout.IsCrowded"/>: the caller draws them
+        /// smaller.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        public static PairedMarkLayout PairedMarks(IReadOnlyList<Coord> cells)
+        {
+            DoubledAnchor(cells, out var doubleX, out var doubleY, out var members);
+            Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+
+            // One step in doubled coordinates is half a cell.
+            var isHorizontal = maxX - minX >= maxY - minY;
+            var stepX = isHorizontal ? 1 : 0;
+            var stepY = isHorizontal ? 0 : 1;
+            if (AreAllTouchingCellsMembers(members, doubleX - stepX, doubleY - stepY)
+                && AreAllTouchingCellsMembers(members, doubleX + stepX, doubleY + stepY))
+            {
+                return new PairedMarkLayout(
+                    new Vector2((doubleX - stepX) * 0.5f, (doubleY - stepY) * 0.5f),
+                    new Vector2((doubleX + stepX) * 0.5f, (doubleY + stepY) * 0.5f),
+                    isCrowded: false);
+            }
+
+            // A quarter cell along x stays inside the anchor's own cell when
+            // the anchor is a cell's middle on x, and inside the two cells
+            // either side of it — both the block's — when it is on a seam.
+            var anchor = new Vector2(doubleX * 0.5f, doubleY * 0.5f);
+            var quarter = new Vector2(CrowdedOffsetCells, 0f);
+            return new PairedMarkLayout(anchor - quarter, anchor + quarter, isCrowded: true);
+        }
+
+        /// <summary>
+        /// The anchor of <paramref name="cells"/> in doubled coordinates, which
+        /// keep it whole: an odd value is a cell's middle on that axis, an even
+        /// one a line between cells. Every cell touching the anchor is in the
+        /// footprint.
+        /// </summary>
+        private static void DoubledAnchor(
+            IReadOnlyList<Coord> cells, out int doubleX, out int doubleY, out HashSet<Coord> members)
+        {
             if (cells == null || cells.Count == 0)
             {
                 throw new ArgumentException("A footprint has at least one cell.", nameof(cells));
@@ -33,14 +99,12 @@ namespace GateRush.Runtime
 
             Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
 
-            // Doubled coordinates keep the centre whole: an odd value is a
-            // cell's middle on that axis, an even one a line between cells.
-            var doubleX = minX + maxX + 1;
-            var doubleY = minY + maxY + 1;
-            var members = new HashSet<Coord>(cells);
+            doubleX = minX + maxX + 1;
+            doubleY = minY + maxY + 1;
+            members = new HashSet<Coord>(cells);
             if (AreAllTouchingCellsMembers(members, doubleX, doubleY))
             {
-                return new Vector2(doubleX * 0.5f, doubleY * 0.5f);
+                return;
             }
 
             var best = cells[0];
@@ -59,7 +123,8 @@ namespace GateRush.Runtime
                 }
             }
 
-            return new Vector2(best.X + 0.5f, best.Y + 0.5f);
+            doubleX = 2 * best.X + 1;
+            doubleY = 2 * best.Y + 1;
         }
 
         /// <summary>
@@ -134,6 +199,17 @@ namespace GateRush.Runtime
             return Math.Max(height, digits * digitWidth + 2f * padding);
         }
 
+        /// <summary>
+        /// The width of a time-bonus mark (M10) showing a text of
+        /// <paramref name="characters"/> characters: the clock icon, the gap
+        /// after it, the characters at <paramref name="digitWidth"/> each, and
+        /// <paramref name="padding"/> on each side; never narrower than it is
+        /// tall.
+        /// </summary>
+        public static float BonusBadgeWidth(
+            int characters, float height, float digitWidth, float padding, float iconWidth, float iconGap) =>
+            Math.Max(height, iconWidth + iconGap + characters * digitWidth + 2f * padding);
+
         /// <summary>The lowest and highest cell coordinates of a footprint on each axis.</summary>
         internal static void Bounds(IReadOnlyList<Coord> cells, out int minX, out int maxX, out int minY, out int maxY)
         {
@@ -177,5 +253,26 @@ namespace GateRush.Runtime
         /// <summary>The cell indices on one axis a doubled coordinate touches: its own when odd, both neighbours when even.</summary>
         private static int[] TouchingIndices(int doubled) =>
             doubled % 2 != 0 ? new[] { (doubled - 1) / 2 } : new[] { doubled / 2 - 1, doubled / 2 };
+    }
+
+    /// <summary>Where two marks sharing one block go (<see cref="MarkLayout.PairedMarks"/>).</summary>
+    public readonly struct PairedMarkLayout
+    {
+        /// <summary>A layout for two marks.</summary>
+        public PairedMarkLayout(Vector2 first, Vector2 second, bool isCrowded)
+        {
+            First = first;
+            Second = second;
+            IsCrowded = isCrowded;
+        }
+
+        /// <summary>The mark on the left, or the lower one of a vertical pair: the padlock or key.</summary>
+        public Vector2 First { get; }
+
+        /// <summary>The mark on the right, or the upper one of a vertical pair: the time bonus.</summary>
+        public Vector2 Second { get; }
+
+        /// <summary>True when the two share half a cell each and must be drawn smaller.</summary>
+        public bool IsCrowded { get; }
     }
 }

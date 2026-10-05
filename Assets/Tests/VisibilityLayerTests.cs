@@ -9,7 +9,8 @@ namespace GateRush.Tests
     /// Covers Module 11's <see cref="VisibilityLayer"/> (D13): remaining counts
     /// are <c>threshold − current count</c> and vanish once met; a frozen block
     /// hides its colours and a closed shutter hides its blocks, while
-    /// <see cref="BoardState"/> keeps the whole truth.
+    /// <see cref="BoardState"/> keeps the whole truth. Module 19: a shown
+    /// block reports its time bonus.
     /// </summary>
     public class VisibilityLayerTests
     {
@@ -234,6 +235,33 @@ namespace GateRush.Tests
             Assert.AreEqual(BlockColor.Blue, key.KeyMarkColor);
             Assert.IsNull(plain.KeyMarkColor);
             Assert.IsNull(locked.KeyMarkColor);
+        }
+
+        [Test]
+        public void Block_WithATimeBonus_ReportsItsSeconds()
+        {
+            const int bonus = 7;
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0), timeBonusSeconds: bonus) });
+            var state = BoardState.CreateInitial(ctx);
+            var visibility = new VisibilityLayer(ctx);
+
+            var visual = visibility.Block(state, 0);
+
+            Assert.IsTrue(visual.IsShown);
+            Assert.AreEqual(bonus, visual.TimeBonusSeconds);
+        }
+
+        [Test]
+        public void Block_WithoutATimeBonus_ReportsNone()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)) });
+            var state = BoardState.CreateInitial(ctx);
+            var visibility = new VisibilityLayer(ctx);
+
+            var visual = visibility.Block(state, 0);
+
+            Assert.IsTrue(visual.IsShown);
+            Assert.AreEqual(0, visual.TimeBonusSeconds);
         }
 
         /// <summary>
