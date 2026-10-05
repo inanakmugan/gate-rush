@@ -62,6 +62,8 @@ namespace GateRush.Tests
         [TestCase("shardStreakWidthPixels", 0f, "Shard Streak Width Pixels")]
         [TestCase("gateGlowHold", 1f, "Gate Glow Hold")]
         [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
+        [TestCase("sparkleWaist", 0f, "Sparkle Waist")]
+        [TestCase("sparkleWaist", 0.25f, "Sparkle Waist")]
         public void Problems_FloatOutOfRange_IsReportedByName(string field, float value, string label)
         {
             // Some fields feed more than one constraint — frost's inset depends
@@ -105,6 +107,7 @@ namespace GateRush.Tests
         [TestCase("cubePixels", "Cube Pixels")]
         [TestCase("shardPixels", "Shard Pixels")]
         [TestCase("gateGlowPixels", "Gate Glow Pixels")]
+        [TestCase("sparklePixels", "Sparkle Pixels")]
         public void Problems_EffectPixelsTooSmall_IsReported(string field, string label)
         {
             var serialized = new SerializedObject(recipe);

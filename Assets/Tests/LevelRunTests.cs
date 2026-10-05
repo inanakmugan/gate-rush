@@ -86,6 +86,33 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Tick_BeforeStart_LeavesTheBudgetWhole()
+        {
+            // Module 19 holds a level behind its introduction cards by not
+            // starting its run; the frames that pass meanwhile must cost nothing.
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+
+            run.Tick(Tick);
+
+            Assert.AreEqual(Budget, run.Countdown.RemainingSeconds);
+            Assert.IsFalse(run.Countdown.IsRunning);
+            Assert.AreEqual(LevelOutcome.None, run.Outcome);
+        }
+
+        [Test]
+        public void Start_AfterTicksBeforeIt_RunsTheWholeBudgetDown()
+        {
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+            run.Tick(Tick);
+
+            run.Start();
+            run.Tick(Tick);
+
+            Assert.AreEqual(Budget - Tick, run.Countdown.RemainingSeconds, 1e-5f);
+            Assert.IsTrue(run.Countdown.IsRunning);
+        }
+
+        [Test]
         public void TryApply_SolvingMoveWithoutACountdown_Wins()
         {
             var run = new LevelRun(new LevelSession(OneBlockLevel()), countdown: null);

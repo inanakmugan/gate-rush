@@ -4,9 +4,10 @@ using System.Collections.Generic;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// The playable levels by <c>levelId</c>, answering two questions: which
-    /// level comes after this one, and what number the player sees for it.
-    /// The order is by id, not by file name, and ids need not be contiguous.
+    /// The playable levels by <c>levelId</c>, answering three questions: which
+    /// level comes after this one, what number the player sees for it, and in
+    /// what order the levels are played. The order is by id, not by file name,
+    /// and ids need not be contiguous.
     /// </summary>
     public sealed class LevelCatalog
     {
@@ -40,7 +41,15 @@ namespace GateRush.Runtime
 
                 namesById.Add(levelId, name);
             }
+
+            Names = new List<string>(namesById.Values).AsReadOnly();
         }
+
+        /// <summary>
+        /// Every level's file name in id order: the name at index <c>i</c> is
+        /// the level <see cref="TryGetNumber"/> numbers <c>i + 1</c>.
+        /// </summary>
+        public IReadOnlyList<string> Names { get; }
 
         /// <summary>
         /// The name of the level with the smallest id greater than

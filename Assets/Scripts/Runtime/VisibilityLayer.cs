@@ -38,10 +38,10 @@ namespace GateRush.Runtime
         /// What the player sees of block <paramref name="blockIndex"/>. A dead or
         /// not-yet-spawned block, or one under a closed shutter, is not shown at
         /// all. A frozen block shows its shape and its remaining count, never
-        /// its colours or layer numeral. Locks and keys show on any shown
-        /// block, frozen included: a lock is known by its block's colour at
-        /// level start and a key is marked with that colour (D47), whatever the
-        /// colour of the block carrying it.
+        /// its colours or layer numeral. Locks, keys and a time bonus (M10)
+        /// show on any shown block, frozen included: a lock is known by its
+        /// block's colour at level start and a key is marked with that colour
+        /// (D47), whatever the colour of the block carrying it.
         /// </summary>
         public BlockVisual Block(BoardState state, int blockIndex)
         {
@@ -106,7 +106,8 @@ namespace GateRush.Runtime
                 layerNumeral: layerNumeral,
                 lockColor: lockColor,
                 keysStillRequired: keysStillRequired,
-                keyMarkColor: keyMarkColor);
+                keyMarkColor: keyMarkColor,
+                timeBonusSeconds: spec.TimeBonusSeconds);
         }
 
         /// <summary>
@@ -236,7 +237,7 @@ namespace GateRush.Runtime
         public BlockVisual(
             bool isShown, bool isFrozen, int frozenRemaining,
             BlockColor? outerColor, BlockColor? beneathColor, int? layerNumeral,
-            BlockColor? lockColor, int keysStillRequired, BlockColor? keyMarkColor)
+            BlockColor? lockColor, int keysStillRequired, BlockColor? keyMarkColor, int timeBonusSeconds)
         {
             IsShown = isShown;
             IsFrozen = isFrozen;
@@ -247,6 +248,7 @@ namespace GateRush.Runtime
             LockColor = lockColor;
             KeysStillRequired = keysStillRequired;
             KeyMarkColor = keyMarkColor;
+            TimeBonusSeconds = timeBonusSeconds;
         }
 
         /// <summary>False for a dead or unspawned block, or one under a closed shutter.</summary>
@@ -285,6 +287,12 @@ namespace GateRush.Runtime
         /// (D47), whatever this block's own colour. Null when it carries no key.
         /// </summary>
         public BlockColor? KeyMarkColor { get; }
+
+        /// <summary>
+        /// The seconds this block adds to the countdown when it is destroyed
+        /// (M10), shown on its time-bonus mark; 0 when it carries no bonus.
+        /// </summary>
+        public int TimeBonusSeconds { get; }
     }
 
     /// <summary>

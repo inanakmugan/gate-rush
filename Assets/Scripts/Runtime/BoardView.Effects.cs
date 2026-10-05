@@ -774,11 +774,15 @@ namespace GateRush.Runtime
         private Tween OpenLock(int blockIndex, Coord origin, BoardState before)
         {
             var cells = ctx.SpecAt(blockIndex).Cells;
-            var wasFrozen = before != null && visibility.Block(before, blockIndex).IsFrozen;
-            var icon = IconPosition(cells, wasFrozen);
+
+            // The marks as the old drawing had them: the block was locked, so
+            // it had its padlock, beside a time-bonus mark if it carries one.
+            var shown = before != null ? visibility.Block(before, blockIndex) : default;
+            var marks = MarksOf(cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0);
+            var icon = marks.Icon;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);
-            DrawLock(frame, cells, icon, null);
+            DrawLock(frame, cells, marks, null);
             var fade = new Fade(pivot);
 
             return DOVirtual.Float(0f, 1f, config.LockOpenSeconds, t =>

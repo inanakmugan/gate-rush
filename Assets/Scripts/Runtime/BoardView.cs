@@ -548,7 +548,7 @@ namespace GateRush.Runtime
         /// box in cells. The one fit for the miniature and for a spawned block
         /// growing out of it.
         /// </summary>
-        private static float MiniatureFit(IReadOnlyList<Coord> cells, Rect screen, out Vector2 shapeCenter)
+        internal static float MiniatureFit(IReadOnlyList<Coord> cells, Rect screen, out Vector2 shapeCenter)
         {
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
             var spanX = maxX + 1 - minX;
@@ -678,13 +678,15 @@ namespace GateRush.Runtime
         /// footprint's anchor (<see cref="MarkLayout.Anchor"/>);</item>
         /// <item>locked (M8): chains and a padlock with the keys still required
         /// (<see cref="DrawLock"/>);</item>
-        /// <item>carrying a key: a gold key at the anchor whose gem is its
-        /// lock's colour (D47);</item>
+        /// <item>carrying a key: a gold key whose gem is its lock's colour
+        /// (D47);</item>
+        /// <item>carrying a time bonus (M10): the clock and "+N" on a badge in
+        /// the bonus colours (<see cref="DrawTimeBonusMark"/>);</item>
         /// <item>layered (M4): the remaining-colour numeral on its first cell,
         /// as before.</item>
         /// </list>
-        /// A frozen block's padlock or key is raised above its frozen badge so
-        /// the two do not overlap.
+        /// Where the padlock or key and the time-bonus mark go, alone or
+        /// sharing the block, is <see cref="MarksOf"/>'s.
         /// </summary>
         private void DrawBlockMarks(int blockIndex, Transform body, IReadOnlyList<Coord> cells, BlockVisual visual)
         {
@@ -695,51 +697,117 @@ namespace GateRush.Runtime
                     DrawBadge(body, anchor, visual.FrozenRemaining, config.BadgeRimColor);
             }
 
-            var icon = IconPosition(cells, visual.IsFrozen);
+            var marks = MarksOf(
+                cells, visual.IsFrozen, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds > 0);
 
             if (visual.IsLocked)
             {
                 badges[new CountPop(CountKind.Padlock, blockIndex)] =
-                    DrawLock(body, cells, icon, visual.KeysStillRequired);
+                    DrawLock(body, cells, marks, visual.KeysStillRequired);
             }
 
             if (visual.KeyMarkColor.HasValue)
             {
+                var key = AddMarkGroup(body, "Key", marks.Icon, marks.Scale);
                 var bounds = config.KeyBodySprite.bounds.size;
                 var length = CellsToWorld(config.KeySizeCells);
                 var size = new Vector2(length, length * bounds.y / bounds.x);
-                AddSprite(body, "Key", config.KeyBodySprite, icon, size, config.KeyColor, config.IconOrder, config.KeyRotationDegrees);
+                AddSprite(key, "Body", config.KeyBodySprite, Vector2.zero, size, config.KeyColor, config.IconOrder, config.KeyRotationDegrees);
                 AddSprite(
-                    body, "Key gem", config.KeyGemSprite, icon, size, config.BlockFill(visual.KeyMarkColor.Value),
+                    key, "Gem", config.KeyGemSprite, Vector2.zero, size, config.BlockFill(visual.KeyMarkColor.Value),
                     config.KeyGemOrder, config.KeyRotationDegrees);
+            }
+
+            if (visual.TimeBonusSeconds > 0)
+            {
+                DrawTimeBonusMark(body, marks, visual.TimeBonusSeconds);
             }
 
             if (visual.LayerNumeral.HasValue)
             {
-                AddLabel(body, "Layer count", CellCenterInBlock(cells[0]), visual.LayerNumeral.Value, config.LabelFontSize, config.LabelColor);
+                AddLabel(
+                    body, "Layer count", CellCenterInBlock(cells[0]),
+                    visual.LayerNumeral.Value.ToString(CultureInfo.InvariantCulture), config.LabelFontSize, config.LabelColor);
             }
         }
 
         /// <summary>
-        /// Where a block's padlock or key sits, relative to its body: the
-        /// footprint's anchor, raised above the frozen badge on a frozen block.
+        /// Where a block's padlock or key and its time-bonus mark sit, relative
+        /// to its body, and how large. One of them alone sits at the
+        /// footprint's anchor at full size; the two together follow
+        /// <see cref="MarkLayout.PairedMarks"/> and, where that is crowded,
+        /// shrink to <see cref="RuntimeConfig.CrowdedMarkScale"/>. On a frozen
+        /// block both are raised above the frozen badge. The one rule for a
+        /// block's drawing and for the lock that fades away when it opens, so
+        /// the fading padlock is where the drawn one was.
         /// </summary>
-        private Vector2 IconPosition(IReadOnlyList<Coord> cells, bool isFrozen)
+        private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool isFrozen, bool hasIcon, bool hasBonus)
         {
-            var anchor = MarkLayout.Anchor(cells) * layout.CellSize;
-            return isFrozen ? anchor + new Vector2(0f, CellsToWorld(config.FrozenMarkRaiseCells)) : anchor;
+            var raise = isFrozen ? new Vector2(0f, CellsToWorld(config.FrozenMarkRaiseCells)) : Vector2.zero;
+            if (hasIcon && hasBonus)
+            {
+                var pair = MarkLayout.PairedMarks(cells);
+                return new BlockMarks(
+                    pair.First * layout.CellSize + raise,
+                    pair.Second * layout.CellSize + raise,
+                    pair.IsCrowded ? config.CrowdedMarkScale : 1f);
+            }
+
+            var anchor = MarkLayout.Anchor(cells) * layout.CellSize + raise;
+            return new BlockMarks(anchor, anchor, 1f);
+        }
+
+        /// <summary>A group at <paramref name="center"/> scaled by <paramref name="scale"/>: a mark drawn about its own centre.</summary>
+        private static Transform AddMarkGroup(Transform parent, string name, Vector2 center, float scale)
+        {
+            var group = AddGroup(parent, name, center);
+            group.localScale = new Vector3(scale, scale, 1f);
+            return group;
+        }
+
+        /// <summary>
+        /// A time-bonus block's mark (M10) under <paramref name="parent"/>, a
+        /// block's body: the count badge's shape in the bonus colours, the
+        /// clock icon at its left and the seconds through
+        /// <see cref="RuntimeConfig.TimeBonusMarkText"/> beside it. It widens
+        /// with the text (<see cref="MarkLayout.BonusBadgeWidth"/>).
+        /// </summary>
+        private void DrawTimeBonusMark(Transform parent, BlockMarks marks, int seconds)
+        {
+            var text = config.TimeBonusMarkText(seconds);
+            var height = CellsToWorld(config.BadgeHeightCells);
+            var width = CellsToWorld(config.TimeBonusMarkWidthCells(text));
+            var rim = CellsToWorld(config.BadgeRimCells);
+            var inner = new Vector2(width - 2f * rim, height - 2f * rim);
+            var icon = CellsToWorld(config.TimeBonusMarkIconCells);
+            var padding = CellsToWorld(config.BadgePaddingCells);
+
+            // The icon sits inside the left padding; the text is centred in
+            // what is left between the icon's gap and the right padding.
+            var iconCenter = -width * 0.5f + padding + icon * 0.5f;
+            var textLeft = iconCenter + icon * 0.5f + CellsToWorld(config.TimeBonusMarkIconGapCells);
+            var textRight = width * 0.5f - padding;
+
+            var mark = AddMarkGroup(parent, "Time bonus", marks.Bonus, marks.Scale);
+            AddSliced(mark, "Rim", config.RoundedRectSprite, Vector2.zero, new Vector2(width, height), height * 0.5f, config.TimeBonusMarkRimColor, config.BadgeRimOrder);
+            AddSliced(mark, "Fill", config.RoundedRectSprite, Vector2.zero, inner, inner.y * 0.5f, config.TimeBonusMarkColor, config.BadgeOrder);
+            AddSprite(
+                mark, "Clock", config.ClockSprite, new Vector2(iconCenter, 0f), new Vector2(icon, icon),
+                config.TimeBonusMarkIconColor, config.LabelOrder);
+            AddLabel(mark, "Seconds", new Vector2((textLeft + textRight) * 0.5f, 0f), text, config.BadgeLabelFontSize, config.BadgeTextColor);
         }
 
         /// <summary>
         /// A lock (M8) under <paramref name="parent"/>, whose frame is a block
         /// body's: a chain along each row of <paramref name="cells"/>, and a
-        /// gold padlock at <paramref name="icon"/> with
-        /// <paramref name="keysStillRequired"/> on a badge on its body, or no
-        /// badge when that is null. The one drawing of a lock, for a locked
-        /// block and for the lock that fades away when it opens.
+        /// gold padlock where <paramref name="marks"/> puts the block's icon,
+        /// at their scale, with <paramref name="keysStillRequired"/> on a badge
+        /// on its body, or no badge when that is null. The one drawing of a
+        /// lock, for a locked block and for the lock that fades away when it
+        /// opens.
         /// </summary>
         /// <returns>The badge, or null when none was drawn.</returns>
-        private Transform DrawLock(Transform parent, IReadOnlyList<Coord> cells, Vector2 icon, int? keysStillRequired)
+        private Transform DrawLock(Transform parent, IReadOnlyList<Coord> cells, BlockMarks marks, int? keysStillRequired)
         {
             var chains = AddGroup(parent, "Chains", Vector2.zero);
             var strips = MarkLayout.ChainStrips(cells, config.ChainThicknessCells, config.ChainEndInsetCells);
@@ -751,15 +819,16 @@ namespace GateRush.Runtime
                 AddTiled(chains, $"Chain {s}", sprite, strip.center, strip.size, scale, config.ChainColor, config.ChainOrder);
             }
 
+            var mark = AddMarkGroup(parent, "Padlock", marks.Icon, marks.Scale);
             var padlock = CellsToWorld(config.PadlockSizeCells);
-            AddSprite(parent, "Padlock", config.PadlockSprite, icon, new Vector2(padlock, padlock), config.PadlockColor, config.IconOrder);
+            AddSprite(mark, "Body", config.PadlockSprite, Vector2.zero, new Vector2(padlock, padlock), config.PadlockColor, config.IconOrder);
             if (!keysStillRequired.HasValue)
             {
                 return null;
             }
 
             return DrawBadge(
-                parent, icon - new Vector2(0f, CellsToWorld(config.PadlockBadgeDropCells)),
+                mark, new Vector2(0f, -CellsToWorld(config.PadlockBadgeDropCells)),
                 keysStillRequired.Value, config.BadgeRimColor);
         }
 
@@ -871,7 +940,9 @@ namespace GateRush.Runtime
             var badge = AddGroup(parent, "Badge", center);
             AddSliced(badge, "Rim", config.RoundedRectSprite, Vector2.zero, new Vector2(width, height), height * 0.5f, rim, config.BadgeRimOrder);
             AddSliced(badge, "Fill", config.RoundedRectSprite, Vector2.zero, inner, inner.y * 0.5f, config.BadgeColor, config.BadgeOrder);
-            AddLabel(badge, "Count", Vector2.zero, value, config.BadgeLabelFontSize, config.BadgeTextColor);
+            AddLabel(
+                badge, "Count", Vector2.zero, value.ToString(CultureInfo.InvariantCulture),
+                config.BadgeLabelFontSize, config.BadgeTextColor);
             return badge;
         }
 
@@ -1057,7 +1128,7 @@ namespace GateRush.Runtime
             return renderer;
         }
 
-        private void AddLabel(Transform parent, string name, Vector2 localCenter, int value, float fontSize, Color color)
+        private void AddLabel(Transform parent, string name, Vector2 localCenter, string text, float fontSize, Color color)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -1065,13 +1136,33 @@ namespace GateRush.Runtime
 
             var label = go.AddComponent<TextMeshPro>();
             label.font = config.LabelFont;
-            label.text = value.ToString(CultureInfo.InvariantCulture);
+            label.text = text;
             label.fontSize = fontSize;
             label.color = color;
             label.alignment = TextAlignmentOptions.Center;
             label.overflowMode = TextOverflowModes.Overflow;
             label.rectTransform.sizeDelta = new Vector2(layout.CellSize, layout.CellSize);
             label.sortingOrder = config.LabelOrder;
+        }
+
+        /// <summary>Where a block's padlock or key and its time-bonus mark sit, relative to its body, and their scale.</summary>
+        private readonly struct BlockMarks
+        {
+            public BlockMarks(Vector2 icon, Vector2 bonus, float scale)
+            {
+                Icon = icon;
+                Bonus = bonus;
+                Scale = scale;
+            }
+
+            /// <summary>The centre of the padlock or key.</summary>
+            public Vector2 Icon { get; }
+
+            /// <summary>The centre of the time-bonus mark.</summary>
+            public Vector2 Bonus { get; }
+
+            /// <summary>1, or the crowded scale when the two share a block without room for both.</summary>
+            public float Scale { get; }
         }
 
         /// <summary>A drawn block: its root, its body, and the parts its effects animate.</summary>

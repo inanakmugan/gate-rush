@@ -13,8 +13,8 @@ namespace GateRush.Runtime
     /// Every tunable value the board's presentation and input read: the
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
     /// settings, label settings, the settle, the lift and every feedback
-    /// animation (Module 18), the HUD and
-    /// the result panel. Nothing in <c>GateRush.Runtime</c> hardcodes one of
+    /// animation (Module 18), the HUD, the result panel and the introduction
+    /// cards with their texts (Module 19). Nothing in <c>GateRush.Runtime</c> hardcodes one of
     /// these at a call site. Board sizes are in cells unless named otherwise,
     /// so the board keeps its proportions whatever <see cref="CellSize"/> is;
     /// HUD and panel sizes are in canvas units of a 1080 × 1920 portrait
@@ -75,6 +75,14 @@ namespace GateRush.Runtime
         /// </summary>
         private const float CubeStreamSetsItsOwnDelays = 0f;
 
+        /// <summary>
+        /// The longest time bonus <see cref="Problems"/> sizes a time-bonus
+        /// mark for when it checks that two marks sharing a block cannot
+        /// overlap: two digits. Not a tunable; a longer bonus widens its mark
+        /// past what was checked.
+        /// </summary>
+        private const int WidestBonusSecondsChecked = 99;
+
         private const int DefaultLiftedBlockOrder = 26;
         private const int DefaultEffectOrder = 27;
 
@@ -114,6 +122,7 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite cubeSprite;
         [SerializeField] private Sprite shardSprite;
         [SerializeField] private Sprite gateGlowSprite;
+        [SerializeField] private Sprite sparkleSprite;
 
         [Header("Board")]
         [Tooltip("World units per cell.")]
@@ -189,6 +198,23 @@ namespace GateRush.Runtime
 
         [Tooltip("How far a frozen block's padlock or key is raised above its frozen count, in cells, so the two do not overlap.")]
         [SerializeField] private float frozenMarkRaiseCells = 0.3f;
+
+        [Header("Time-bonus mark (M10; the count badge's height, padding, digit width, rim thickness and text)")]
+        [Tooltip("Text on a time-bonus block's mark; {0} is the seconds it adds.")]
+        [SerializeField] private string timeBonusMarkFormat = "+{0}";
+
+        [Tooltip("Size of the clock icon on the mark, in cells.")]
+        [SerializeField] private float timeBonusMarkIconCells = 0.24f;
+
+        [Tooltip("Space between the clock icon and the text, in cells.")]
+        [SerializeField] private float timeBonusMarkIconGapCells = 0.03f;
+
+        [SerializeField] private Color timeBonusMarkColor = new Color(0.20f, 0.62f, 0.30f);
+        [SerializeField] private Color timeBonusMarkRimColor = new Color(0.62f, 0.95f, 0.62f);
+        [SerializeField] private Color timeBonusMarkIconColor = Color.white;
+
+        [Tooltip("The scale of a padlock or key and a time-bonus mark that share a block with no room for both at full size (a 1×1, an L, a T): above 0, at most 1.")]
+        [SerializeField] private float crowdedMarkScale = 0.6f;
 
         [Header("Shutters and elevators")]
         [Tooltip("Thickness of a closed shutter's border, in cells.")]
@@ -486,6 +512,124 @@ namespace GateRush.Runtime
         [Tooltip("The panel's scale when the pop starts; it ends at 1.")]
         [SerializeField] private float resultPopStartScale = 0.8f;
 
+        [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
+        [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
+        [SerializeField] private MechanicIntroduction[] mechanicIntroductions =
+        {
+            new MechanicIntroduction(LevelMechanic.HowToPlay, "How to Play", "Drag each block out through a gate of its colour!"),
+            new MechanicIntroduction(LevelMechanic.IceBlock, "Ice Block!", "Clear blocks to melt the ice. The number shows how many."),
+            new MechanicIntroduction(LevelMechanic.IceDoor, "Ice Door!", "Clear blocks to crack open the Ice Door!"),
+            new MechanicIntroduction(LevelMechanic.LayeredBlock, "Layered Block!", "Each exit peels one layer. The colour beneath goes next."),
+            new MechanicIntroduction(LevelMechanic.OneWayBlock, "One-Way Block!", "This block only slides along its arrow."),
+            new MechanicIntroduction(LevelMechanic.LockAndKey, "Lock & Key!", "Clear the block with the key to open the lock of its colour."),
+            new MechanicIntroduction(LevelMechanic.Shutter, "Shutter!", "Clear blocks to lift the shutter and see what is beneath."),
+            new MechanicIntroduction(LevelMechanic.Generator, "Generator!", "The machine sends its next block when there is room. Its screen shows what comes next."),
+            new MechanicIntroduction(LevelMechanic.Elevator, "Elevator!", "Clear every block on the lift to bring up the next wave."),
+            new MechanicIntroduction(LevelMechanic.TimeBonus, "Time Bonus!", "Clear this block to win extra seconds.")
+        };
+
+        [Tooltip("The line under every card's title but How to Play's.")]
+        [SerializeField] private string introSubtitle = "New Item Unlocked!";
+
+        [Tooltip("The line under the How to Play card's title.")]
+        [SerializeField] private string howToPlaySubtitle = "Welcome!";
+
+        [SerializeField] private float introTitleFontSize = 120f;
+
+        [Tooltip("Height of the title's row.")]
+        [SerializeField] private float introTitleHeightUnits = 160f;
+
+        [Tooltip("Fill of the title. Its outline is the frame's lip colour: Frame Color darkened by Lip Darken.")]
+        [SerializeField] private Color introTitleColor = Color.white;
+
+        [Tooltip("Thickness of the title's outline, as TextMeshPro measures it: above 0, at most 1. It is set on the title's own material, so no other label changes.")]
+        [SerializeField] private float introTitleOutlineWidth = 0.2f;
+
+        [SerializeField] private float introSubtitleFontSize = 56f;
+
+        [Tooltip("Height of the subtitle's row.")]
+        [SerializeField] private float introSubtitleHeightUnits = 80f;
+
+        [SerializeField] private Color introSubtitleColor = Color.white;
+
+        [Tooltip("The area the illustration is centred in, and scaled down to when it is larger.")]
+        [SerializeField] private Vector2 introIllustrationSizeUnits = new Vector2(640f, 480f);
+
+        [Tooltip("Canvas units one board cell is drawn at in an illustration. Every other size in it is the board's own, in cells.")]
+        [SerializeField] private float introCellUnits = 170f;
+
+        [Tooltip("Size of the arrow between the block and its gate on the How to Play card, in cells.")]
+        [SerializeField] private float introHowToPlayArrowCells = 0.6f;
+
+        [Tooltip("The block's colour in every illustration, and the lock's.")]
+        [SerializeField] private BlockColor introBlockColor = BlockColor.Blue;
+
+        [Tooltip("The colour beneath on the Layered Block card and the key carrier's on the Lock & Key card. Not Intro Block Color.")]
+        [SerializeField] private BlockColor introSecondColor = BlockColor.Yellow;
+
+        [Tooltip("The number on every count badge in an illustration, and the blocks the Generator card's machine has queued: at least 1.")]
+        [SerializeField] private int introCount = 3;
+
+        [Tooltip("The seconds on the Time Bonus card's mark: at least 1.")]
+        [SerializeField] private int introBonusSeconds = 5;
+
+        [SerializeField] private Vector2 introTextBoxSizeUnits = new Vector2(900f, 260f);
+        [SerializeField] private float introTextBoxCornerUnits = 48f;
+
+        [Tooltip("Thickness of the text box's border, which is the frame's colour. Below the corner and below half the box's height.")]
+        [SerializeField] private float introTextBoxBorderUnits = 10f;
+
+        [SerializeField] private Color introTextBoxColor = new Color(1.00f, 0.95f, 0.82f);
+
+        [Tooltip("Space between the text box's edges and its text.")]
+        [SerializeField] private float introTextPaddingUnits = 40f;
+
+        [SerializeField] private float introTextFontSize = 52f;
+        [SerializeField] private Color introTextColor = new Color(0.20f, 0.14f, 0.30f);
+
+        [Tooltip("Space between the card's rows: close button, title, subtitle, illustration, text box.")]
+        [SerializeField] private float introSpacingUnits = 36f;
+
+        [Tooltip("Diameter of the round close button at the card's top right.")]
+        [SerializeField] private float introCloseSizeUnits = 110f;
+
+        [SerializeField] private Color introCloseColor = new Color(0.90f, 0.22f, 0.25f);
+
+        [Tooltip("Length of each stroke of the close button's cross. At most the button's diameter.")]
+        [SerializeField] private float introCloseCrossSizeUnits = 56f;
+
+        [Tooltip("Thickness of each stroke of the cross. At most its length.")]
+        [SerializeField] private float introCloseCrossThicknessUnits = 14f;
+
+        [SerializeField] private Color introCloseCrossColor = Color.white;
+
+        [Tooltip("Seconds a closing card takes to fade out. Runs on unscaled time.")]
+        [SerializeField] private float introCloseSeconds = 0.15f;
+
+        [SerializeField] private Ease introCloseEase = Ease.OutQuad;
+
+        [Header("Sparkles (around a card's illustration)")]
+        [Tooltip("One entry per sparkle: where it sits, from the illustration area's centre, as a fraction of the area's size; its size in canvas units; and where in the twinkle it starts, from 0 to below 1.")]
+        [SerializeField] private SparklePlacement[] introSparkles =
+        {
+            new SparklePlacement(new Vector2(-0.52f, 0.40f), 64f, 0f),
+            new SparklePlacement(new Vector2(0.50f, 0.46f), 44f, 0.35f),
+            new SparklePlacement(new Vector2(0.56f, -0.20f), 56f, 0.6f),
+            new SparklePlacement(new Vector2(-0.46f, -0.42f), 40f, 0.8f),
+            new SparklePlacement(new Vector2(0.05f, 0.58f), 36f, 0.2f)
+        };
+
+        [SerializeField] private Color sparkleColor = new Color(1f, 1f, 0.85f);
+
+        [Tooltip("Seconds one twinkle takes, from small and faint to full and back. Runs on unscaled time.")]
+        [SerializeField] private float sparkleTwinkleSeconds = 1.2f;
+
+        [Tooltip("A sparkle's scale at the faint end of its twinkle, from 0 to 1.")]
+        [SerializeField] private float sparkleMinScale = 0.45f;
+
+        [Tooltip("A sparkle's opacity at the faint end of its twinkle, from 0 to 1.")]
+        [SerializeField] private float sparkleMinAlpha = 0.2f;
+
         [Header("Colours")]
         [Tooltip("One colour per BlockColor, in enum order: Red, Blue, Green, Yellow, Purple, Orange, Pink, Cyan.")]
         [SerializeField] private Color[] blockPalette =
@@ -611,7 +755,7 @@ namespace GateRush.Runtime
 
         [SerializeField] private int badgeOrder = DefaultBadgeOrder;
 
-        [Tooltip("Every label: badge numbers and layer numerals, in front of every other board layer.")]
+        [Tooltip("Every label: badge numbers and layer numerals, in front of every other board layer. A time-bonus mark's clock icon shares it.")]
         [SerializeField] private int labelOrder = DefaultLabelOrder;
 
         [Tooltip("A grabbed block's outline. Compared only inside the lifted block's sorting group, where it must sort below Block Lip Order; equal to another board layer's order is fine.")]
@@ -695,6 +839,9 @@ namespace GateRush.Runtime
         /// <summary>A soft white gradient, strongest along its bottom edge: the glow inside a gate a block is passing.</summary>
         public Sprite GateGlowSprite => gateGlowSprite;
 
+        /// <summary>A white four-point star: the sparkles around an introduction card's illustration, tinted <see cref="SparkleColor"/>.</summary>
+        public Sprite SparkleSprite => sparkleSprite;
+
         /// <summary>World units per cell.</summary>
         public float CellSize => cellSize;
 
@@ -734,6 +881,9 @@ namespace GateRush.Runtime
         /// <summary>Height of a count badge, in cells.</summary>
         public float BadgeHeightCells => badgeHeightCells;
 
+        /// <summary>Space either side of a badge's digits, in cells.</summary>
+        public float BadgePaddingCells => badgePaddingCells;
+
         /// <summary>Thickness of a badge's rim, in cells.</summary>
         public float BadgeRimCells => badgeRimCells;
 
@@ -757,6 +907,24 @@ namespace GateRush.Runtime
 
         /// <summary>How far a frozen block's padlock or key is raised above its frozen count, in cells.</summary>
         public float FrozenMarkRaiseCells => frozenMarkRaiseCells;
+
+        /// <summary>Size of the clock icon on a time-bonus mark, in cells.</summary>
+        public float TimeBonusMarkIconCells => timeBonusMarkIconCells;
+
+        /// <summary>Space between a time-bonus mark's clock icon and its text, in cells.</summary>
+        public float TimeBonusMarkIconGapCells => timeBonusMarkIconGapCells;
+
+        /// <summary>Fill of a time-bonus mark.</summary>
+        public Color TimeBonusMarkColor => timeBonusMarkColor;
+
+        /// <summary>Rim of a time-bonus mark.</summary>
+        public Color TimeBonusMarkRimColor => timeBonusMarkRimColor;
+
+        /// <summary>Tint of a time-bonus mark's clock icon.</summary>
+        public Color TimeBonusMarkIconColor => timeBonusMarkIconColor;
+
+        /// <summary>The scale of two marks sharing a block without room for both at full size (<see cref="MarkLayout.PairedMarks"/>).</summary>
+        public float CrowdedMarkScale => crowdedMarkScale;
 
         /// <summary>Thickness of a shutter's border, in cells.</summary>
         public float ShutterBorderCells => shutterBorderCells;
@@ -1037,6 +1205,115 @@ namespace GateRush.Runtime
         /// <summary>The result panel's scale when its pop starts.</summary>
         public float ResultPopStartScale => resultPopStartScale;
 
+        /// <summary>Font size of an introduction card's title.</summary>
+        public float IntroTitleFontSize => introTitleFontSize;
+
+        /// <summary>Height of an introduction card's title row, in canvas units.</summary>
+        public float IntroTitleHeightUnits => introTitleHeightUnits;
+
+        /// <summary>Fill of an introduction card's title.</summary>
+        public Color IntroTitleColor => introTitleColor;
+
+        /// <summary>
+        /// Outline of an introduction card's title: the frame's lip colour —
+        /// <see cref="FrameColor"/> darkened as every lip is — so the title is
+        /// edged in the frame's own purple, deep enough to hold white.
+        /// </summary>
+        public Color IntroTitleOutlineColor => LipFill(frameColor);
+
+        /// <summary>Thickness of the title's outline, as TextMeshPro measures it.</summary>
+        public float IntroTitleOutlineWidth => introTitleOutlineWidth;
+
+        /// <summary>Font size of an introduction card's subtitle.</summary>
+        public float IntroSubtitleFontSize => introSubtitleFontSize;
+
+        /// <summary>Height of an introduction card's subtitle row, in canvas units.</summary>
+        public float IntroSubtitleHeightUnits => introSubtitleHeightUnits;
+
+        /// <summary>Colour of an introduction card's subtitle.</summary>
+        public Color IntroSubtitleColor => introSubtitleColor;
+
+        /// <summary>The area an illustration is centred in and fitted to, in canvas units.</summary>
+        public Vector2 IntroIllustrationSizeUnits => introIllustrationSizeUnits;
+
+        /// <summary>Canvas units one board cell is drawn at in an illustration.</summary>
+        public float IntroCellUnits => introCellUnits;
+
+        /// <summary>Size of the arrow between block and gate on the How to Play card, in cells.</summary>
+        public float IntroHowToPlayArrowCells => introHowToPlayArrowCells;
+
+        /// <summary>The block's colour in every illustration.</summary>
+        public BlockColor IntroBlockColor => introBlockColor;
+
+        /// <summary>The second colour in an illustration: the colour beneath, and the key carrier's.</summary>
+        public BlockColor IntroSecondColor => introSecondColor;
+
+        /// <summary>The number on an illustration's count badges.</summary>
+        public int IntroCount => introCount;
+
+        /// <summary>The seconds on the Time Bonus card's mark.</summary>
+        public int IntroBonusSeconds => introBonusSeconds;
+
+        /// <summary>Size of an introduction card's text box, in canvas units.</summary>
+        public Vector2 IntroTextBoxSizeUnits => introTextBoxSizeUnits;
+
+        /// <summary>Corner radius of the text box, in canvas units.</summary>
+        public float IntroTextBoxCornerUnits => introTextBoxCornerUnits;
+
+        /// <summary>Thickness of the text box's border, in canvas units.</summary>
+        public float IntroTextBoxBorderUnits => introTextBoxBorderUnits;
+
+        /// <summary>Fill of the text box.</summary>
+        public Color IntroTextBoxColor => introTextBoxColor;
+
+        /// <summary>Space between the text box's edges and its text, in canvas units.</summary>
+        public float IntroTextPaddingUnits => introTextPaddingUnits;
+
+        /// <summary>Font size of the text in the text box.</summary>
+        public float IntroTextFontSize => introTextFontSize;
+
+        /// <summary>Colour of the text in the text box.</summary>
+        public Color IntroTextColor => introTextColor;
+
+        /// <summary>Space between an introduction card's rows, in canvas units.</summary>
+        public float IntroSpacingUnits => introSpacingUnits;
+
+        /// <summary>Diameter of the close button, in canvas units.</summary>
+        public float IntroCloseSizeUnits => introCloseSizeUnits;
+
+        /// <summary>Tint of the close button.</summary>
+        public Color IntroCloseColor => introCloseColor;
+
+        /// <summary>Length of each stroke of the close button's cross, in canvas units.</summary>
+        public float IntroCloseCrossSizeUnits => introCloseCrossSizeUnits;
+
+        /// <summary>Thickness of each stroke of the cross, in canvas units.</summary>
+        public float IntroCloseCrossThicknessUnits => introCloseCrossThicknessUnits;
+
+        /// <summary>Colour of the close button's cross.</summary>
+        public Color IntroCloseCrossColor => introCloseCrossColor;
+
+        /// <summary>Seconds a closing card takes to fade out.</summary>
+        public float IntroCloseSeconds => introCloseSeconds;
+
+        /// <summary>Easing of a closing card's fade.</summary>
+        public Ease IntroCloseEase => introCloseEase;
+
+        /// <summary>The sparkles around a card's illustration.</summary>
+        public IReadOnlyList<SparklePlacement> IntroSparkles => introSparkles;
+
+        /// <summary>Tint of the sparkles.</summary>
+        public Color SparkleColor => sparkleColor;
+
+        /// <summary>Seconds one twinkle takes.</summary>
+        public float SparkleTwinkleSeconds => sparkleTwinkleSeconds;
+
+        /// <summary>A sparkle's scale at the faint end of its twinkle.</summary>
+        public float SparkleMinScale => sparkleMinScale;
+
+        /// <summary>A sparkle's opacity at the faint end of its twinkle.</summary>
+        public float SparkleMinAlpha => sparkleMinAlpha;
+
         /// <summary>Top of the background gradient.</summary>
         public Color BackgroundTop => backgroundTop;
 
@@ -1249,6 +1526,45 @@ namespace GateRush.Runtime
         public float BadgeWidthCells(int value) =>
             MarkLayout.BadgeWidth(value, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells);
 
+        /// <summary>The text on the time-bonus mark of a block that adds <paramref name="seconds"/> (M10).</summary>
+        public string TimeBonusMarkText(int seconds) =>
+            string.Format(CultureInfo.InvariantCulture, timeBonusMarkFormat, seconds);
+
+        /// <summary>The width, in cells, of the time-bonus mark reading <paramref name="text"/>.</summary>
+        public float TimeBonusMarkWidthCells(string text) =>
+            MarkLayout.BonusBadgeWidth(
+                text.Length, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells,
+                timeBonusMarkIconCells, timeBonusMarkIconGapCells);
+
+        /// <summary>The title of <paramref name="mechanic"/>'s introduction card.</summary>
+        /// <exception cref="InvalidOperationException">No entry introduces it; see <see cref="Problems"/>.</exception>
+        public string IntroductionTitle(LevelMechanic mechanic) => IntroductionOf(mechanic).Title;
+
+        /// <summary>The text in the text box of <paramref name="mechanic"/>'s introduction card.</summary>
+        /// <exception cref="InvalidOperationException">No entry introduces it; see <see cref="Problems"/>.</exception>
+        public string IntroductionText(LevelMechanic mechanic) => IntroductionOf(mechanic).Text;
+
+        /// <summary>The line under the title of <paramref name="mechanic"/>'s card: How to Play has its own.</summary>
+        public string IntroductionSubtitle(LevelMechanic mechanic) =>
+            mechanic == LevelMechanic.HowToPlay ? howToPlaySubtitle : introSubtitle;
+
+        /// <summary>The first entry for <paramref name="mechanic"/>.</summary>
+        private MechanicIntroduction IntroductionOf(LevelMechanic mechanic)
+        {
+            if (mechanicIntroductions != null)
+            {
+                for (var i = 0; i < mechanicIntroductions.Length; i++)
+                {
+                    if (mechanicIntroductions[i] != null && mechanicIntroductions[i].Mechanic == mechanic)
+                    {
+                        return mechanicIntroductions[i];
+                    }
+                }
+            }
+
+            throw new InvalidOperationException($"{name}: Mechanic Introductions has no entry for {mechanic}.");
+        }
+
         /// <summary>
         /// The layout of the cubes a destroyed block streams out. Its maximum
         /// delay is <see cref="CubeStreamSetsItsOwnDelays"/>: a stream spreads
@@ -1324,6 +1640,7 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, cubeSprite, "Cube Sprite");
             AddIfUnassigned(problems, shardSprite, "Shard Sprite");
             AddIfUnassigned(problems, gateGlowSprite, "Gate Glow Sprite");
+            AddIfUnassigned(problems, sparkleSprite, "Sparkle Sprite");
 
             if (!(cellSize > 0f))
             {
@@ -1431,7 +1748,173 @@ namespace GateRush.Runtime
 
             AddHudProblems(problems);
             AddResultPanelProblems(problems);
+            AddMarkProblems(problems);
+            AddIntroductionProblems(problems);
             return problems;
+        }
+
+        /// <summary>
+        /// The constraints on the time-bonus mark (M10) and on two marks
+        /// sharing a block, each message naming its field. The overlap bounds
+        /// measure a key by its length and a time-bonus mark at
+        /// <see cref="WidestBonusSecondsChecked"/> seconds.
+        /// </summary>
+        private void AddMarkProblems(List<string> problems)
+        {
+            var isFormatUsable = IsUsableFormat(timeBonusMarkFormat);
+            if (!isFormatUsable)
+            {
+                problems.Add($"{name}: Time Bonus Mark Format must be a format with at most one placeholder, {{0}}, for the seconds.");
+            }
+
+            if (!(timeBonusMarkIconCells > 0f && timeBonusMarkIconCells <= badgeHeightCells && timeBonusMarkIconGapCells >= 0f))
+            {
+                problems.Add($"{name}: Time Bonus Mark Icon Cells must be positive and at most Badge Height Cells, and Time Bonus Mark Icon Gap Cells at least 0.");
+            }
+
+            if (!(crowdedMarkScale > 0f && crowdedMarkScale <= 1f))
+            {
+                problems.Add($"{name}: Crowded Mark Scale must be above 0 and at most 1.");
+                return;
+            }
+
+            if (!isFormatUsable)
+            {
+                return;
+            }
+
+            // Two marks with room sit a whole cell apart, so each may be a
+            // cell wide; crowded ones sit half a cell apart at the crowded
+            // scale, so together they may be a cell wide before scaling.
+            var icon = Math.Max(padlockSizeCells, keySizeCells);
+            var bonus = TimeBonusMarkWidthCells(TimeBonusMarkText(WidestBonusSecondsChecked));
+            var roomyWidth = 2f * MarkLayout.RoomyOffsetCells;
+            var crowdedWidth = 4f * MarkLayout.CrowdedOffsetCells;
+            if (!(icon <= roomyWidth && bonus <= roomyWidth && crowdedMarkScale * (icon + bonus) <= crowdedWidth))
+            {
+                problems.Add(
+                    $"{name}: a padlock or key and a time-bonus mark sharing a block would overlap. Padlock Size Cells, Key Size Cells and the " +
+                    $"mark's width for a two-digit bonus ({bonus:0.##} cells, from Time Bonus Mark Icon Cells, the badge's digit width and padding) " +
+                    $"must each be at most {roomyWidth:0.##}, and Crowded Mark Scale times the icon plus the mark at most {crowdedWidth:0.##}.");
+            }
+        }
+
+        /// <summary>The constraints on the introduction cards' values (Module 19), each message naming its field or mechanic.</summary>
+        private void AddIntroductionProblems(List<string> problems)
+        {
+            foreach (var mechanic in LevelMechanics.All)
+            {
+                var entries = 0;
+                MechanicIntroduction first = null;
+                for (var i = 0; mechanicIntroductions != null && i < mechanicIntroductions.Length; i++)
+                {
+                    if (mechanicIntroductions[i] != null && mechanicIntroductions[i].Mechanic == mechanic)
+                    {
+                        first = first ?? mechanicIntroductions[i];
+                        entries++;
+                    }
+                }
+
+                if (entries == 0)
+                {
+                    problems.Add($"{name}: Mechanic Introductions has no entry for {mechanic}.");
+                    continue;
+                }
+
+                if (entries > 1)
+                {
+                    problems.Add($"{name}: Mechanic Introductions has {entries} entries for {mechanic}; it needs exactly one.");
+                }
+
+                if (string.IsNullOrWhiteSpace(first.Title))
+                {
+                    problems.Add($"{name}: Mechanic Introductions' entry for {mechanic} has no title.");
+                }
+
+                if (string.IsNullOrWhiteSpace(first.Text))
+                {
+                    problems.Add($"{name}: Mechanic Introductions' entry for {mechanic} has no text.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(introSubtitle) || string.IsNullOrWhiteSpace(howToPlaySubtitle))
+            {
+                problems.Add($"{name}: Intro Subtitle and How To Play Subtitle may not be empty.");
+            }
+
+            if (!(introTitleFontSize > 0f && introTitleHeightUnits > 0f && introSubtitleFontSize > 0f
+                  && introSubtitleHeightUnits > 0f && introTextFontSize > 0f))
+            {
+                problems.Add($"{name}: Intro Title Font Size, Intro Title Height Units, Intro Subtitle Font Size, Intro Subtitle Height Units and Intro Text Font Size must be positive.");
+            }
+
+            if (!(introTitleOutlineWidth > 0f && introTitleOutlineWidth <= 1f))
+            {
+                problems.Add($"{name}: Intro Title Outline Width must be above 0 and at most 1.");
+            }
+
+            if (!(introIllustrationSizeUnits.x > 0f && introIllustrationSizeUnits.y > 0f))
+            {
+                problems.Add($"{name}: Intro Illustration Size Units must be positive.");
+            }
+
+            AddIfNotPositive(problems, introCellUnits, "Intro Cell Units");
+            AddIfNotPositive(problems, introHowToPlayArrowCells, "Intro How To Play Arrow Cells");
+
+            if (introBlockColor == introSecondColor)
+            {
+                problems.Add($"{name}: Intro Second Color must differ from Intro Block Color: adjacent layers differ (M4), and a key's gem must stand out from its carrier.");
+            }
+
+            if (introCount < 1 || introBonusSeconds < 1)
+            {
+                problems.Add($"{name}: Intro Count and Intro Bonus Seconds must be at least 1.");
+            }
+
+            if (!(introTextBoxSizeUnits.x > 0f && introTextBoxSizeUnits.y > 0f && introTextBoxCornerUnits > 0f))
+            {
+                problems.Add($"{name}: Intro Text Box Size Units and Intro Text Box Corner Units must be positive.");
+            }
+
+            if (!(introTextBoxBorderUnits > 0f && introTextBoxBorderUnits < introTextBoxCornerUnits
+                  && introTextBoxBorderUnits < introTextBoxSizeUnits.y * 0.5f))
+            {
+                problems.Add($"{name}: Intro Text Box Border Units must be positive, below Intro Text Box Corner Units and below half the box's height.");
+            }
+
+            if (!(introTextPaddingUnits >= 0f && 2f * introTextPaddingUnits < introTextBoxSizeUnits.x
+                  && 2f * introTextPaddingUnits < introTextBoxSizeUnits.y))
+            {
+                problems.Add($"{name}: Intro Text Padding Units must be at least 0 and leave room for the text in Intro Text Box Size Units.");
+            }
+
+            if (!(introSpacingUnits >= 0f) || float.IsInfinity(introSpacingUnits))
+            {
+                problems.Add($"{name}: Intro Spacing Units must be at least 0 and finite.");
+            }
+
+            if (!(introCloseSizeUnits > 0f && introCloseCrossSizeUnits > 0f && introCloseCrossSizeUnits <= introCloseSizeUnits
+                  && introCloseCrossThicknessUnits > 0f && introCloseCrossThicknessUnits <= introCloseCrossSizeUnits))
+            {
+                problems.Add($"{name}: Intro Close Size Units must be positive, Intro Close Cross Size Units positive and at most it, and Intro Close Cross Thickness Units positive and at most the cross's size.");
+            }
+
+            AddIfNotPositive(problems, introCloseSeconds, "Intro Close Seconds");
+            AddIfNotPositive(problems, sparkleTwinkleSeconds, "Sparkle Twinkle Seconds");
+
+            if (!(sparkleMinScale >= 0f && sparkleMinScale <= 1f && sparkleMinAlpha >= 0f && sparkleMinAlpha <= 1f))
+            {
+                problems.Add($"{name}: Sparkle Min Scale and Sparkle Min Alpha must be from 0 to 1.");
+            }
+
+            for (var i = 0; introSparkles != null && i < introSparkles.Length; i++)
+            {
+                var sparkle = introSparkles[i];
+                if (sparkle == null || !(sparkle.SizeUnits > 0f && sparkle.Phase >= 0f && sparkle.Phase < 1f))
+                {
+                    problems.Add($"{name}: Intro Sparkles' entry {i} must have a positive size and a phase from 0 to below 1.");
+                }
+            }
         }
 
         /// <summary>The constraints on the feedback animations' values (Module 18), each message naming its field.</summary>
@@ -1678,6 +2161,59 @@ namespace GateRush.Runtime
             {
                 problems.Add($"{name}: {field} is not assigned; run Gate Rush → Generate Art and assign it from Assets/Art/Generated.");
             }
+        }
+
+        /// <summary>One sparkle around an introduction card's illustration.</summary>
+        [Serializable]
+        public sealed class SparklePlacement
+        {
+            [Tooltip("Where the sparkle sits, from the illustration area's centre, as a fraction of the area's size: (0.5, 0.5) is its top right corner.")]
+            [SerializeField] private Vector2 position;
+
+            [Tooltip("The sparkle's size at the full end of its twinkle, in canvas units.")]
+            [SerializeField] private float sizeUnits;
+
+            [Tooltip("Where in the twinkle this sparkle starts, from 0 to below 1, so the sparkles do not pulse together.")]
+            [SerializeField] private float phase;
+
+            /// <summary>A sparkle.</summary>
+            public SparklePlacement(Vector2 position, float sizeUnits, float phase)
+            {
+                this.position = position;
+                this.sizeUnits = sizeUnits;
+                this.phase = phase;
+            }
+
+            /// <summary>Where it sits, from the illustration area's centre, as a fraction of the area's size.</summary>
+            public Vector2 Position => position;
+
+            /// <summary>Its size at the full end of its twinkle, in canvas units.</summary>
+            public float SizeUnits => sizeUnits;
+
+            /// <summary>Where in the twinkle it starts, from 0 to below 1.</summary>
+            public float Phase => phase;
+        }
+
+        /// <summary>One mechanic's introduction card: its title and its text.</summary>
+        [Serializable]
+        private sealed class MechanicIntroduction
+        {
+            [SerializeField] private LevelMechanic mechanic;
+            [SerializeField] private string title;
+            [SerializeField, TextArea] private string text;
+
+            public MechanicIntroduction(LevelMechanic mechanic, string title, string text)
+            {
+                this.mechanic = mechanic;
+                this.title = title;
+                this.text = text;
+            }
+
+            public LevelMechanic Mechanic => mechanic;
+
+            public string Title => title;
+
+            public string Text => text;
         }
     }
 }

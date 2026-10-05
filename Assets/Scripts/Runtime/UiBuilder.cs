@@ -6,10 +6,10 @@ using UnityEngine.UI;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Builds the uGUI parts the HUD and the result panel are made of, one way
-    /// for both: rects, rounded boxes cut from the generated rounded-box
-    /// sprite, icons, labels in the label font, and buttons. Sizes are in
-    /// canvas units.
+    /// Builds the uGUI parts the HUD, the result panel and the introduction
+    /// card are made of, one way for all: rects, rounded boxes cut from the
+    /// generated rounded-box sprite, icons, labels in the label font, and
+    /// buttons. Sizes are in canvas units.
     /// </summary>
     public static class UiBuilder
     {
@@ -110,6 +110,34 @@ namespace GateRush.Runtime
             }
 
             return borderPixels * referencePixelsPerUnit / (spritePixelsPerUnit * drawn);
+        }
+
+        /// <summary>
+        /// The <see cref="Image.pixelsPerUnitMultiplier"/> at which
+        /// <paramref name="spritePixels"/> pixels of a sprite draw
+        /// <paramref name="tileUnits"/> canvas units long: one tile of a tiled
+        /// image at the size asked for, or a sliced image's unstretched side.
+        /// uGUI draws a sprite's pixels at
+        /// <c>referencePixelsPerUnit / (spritePixelsPerUnit × multiplier)</c>
+        /// units each; this solves that for the multiplier.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A value is not positive.</exception>
+        public static float TiledPixelsPerUnitMultiplier(
+            float spritePixels, float spritePixelsPerUnit, float referencePixelsPerUnit, float tileUnits)
+        {
+            if (!(spritePixelsPerUnit > 0f && referencePixelsPerUnit > 0f))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(spritePixelsPerUnit), spritePixelsPerUnit, "Pixels per unit must be positive.");
+            }
+
+            if (!(spritePixels > 0f && tileUnits > 0f))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(tileUnits), tileUnits, "The sprite's pixels and the tile's size must be positive.");
+            }
+
+            return spritePixels * referencePixelsPerUnit / (spritePixelsPerUnit * tileUnits);
         }
 
         /// <summary>A white icon sprite on <paramref name="rect"/>, tinted <paramref name="color"/>, keeping its aspect. Not a raycast target.</summary>

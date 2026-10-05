@@ -12,7 +12,9 @@ namespace GateRush.Tests
     /// Covers <see cref="MarkLayout"/> (Module 16): a block's marks sit on its
     /// footprint, never over a neighbour in an empty corner of its bounding
     /// box; a locked block's chains run along each row of its cells and stay
-    /// on them; and a badge widens with its number's digits.
+    /// on them; and a badge widens with its number's digits. Module 19: two
+    /// marks sharing a block both sit on its footprint, a cell apart where it
+    /// has room and half a cell apart, crowded, where it has not.
     /// </summary>
     public class MarkLayoutTests
     {
@@ -21,7 +23,9 @@ namespace GateRush.Tests
         private const float Tolerance = 1e-5f;
 
         private static readonly Coord[] Single = { new Coord(0, 0) };
-        private static readonly Coord[] Horizontal3 = { new Coord(0, 0), new Coord(1, 0), new Coord(2, 0) };
+        private static readonly Coord[] Horizontal2 = { new Coord(0, 0), new Coord(1, 0) };
+        private static readonly Coord[] Vertical2 = { new Coord(0, 0), new Coord(0, 1) };
+        private static readonly Coord[] Horizontal3 ={ new Coord(0, 0), new Coord(1, 0), new Coord(2, 0) };
         private static readonly Coord[] Vertical3 = { new Coord(0, 0), new Coord(0, 1), new Coord(0, 2) };
         private static readonly Coord[] Square = { new Coord(0, 0), new Coord(1, 0), new Coord(0, 1), new Coord(1, 1) };
         private static readonly Coord[] L = { new Coord(0, 0), new Coord(1, 0), new Coord(0, 1) };
@@ -136,6 +140,109 @@ namespace GateRush.Tests
             Assert.Greater(three, two);
             Assert.GreaterOrEqual(two, one);
             Assert.AreEqual(3 * digit + 2 * padding, three, Tolerance);
+        }
+
+        private static IEnumerable<TestCaseData> PairFootprints()
+        {
+            yield return new TestCaseData((object)Single).SetName("PairedMarks_1x1_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)Horizontal2).SetName("PairedMarks_Horizontal1x2_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)Vertical2).SetName("PairedMarks_Vertical1x2_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)Horizontal3).SetName("PairedMarks_Horizontal1x3_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)Vertical3).SetName("PairedMarks_Vertical1x3_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)Square).SetName("PairedMarks_2x2_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)L).SetName("PairedMarks_L_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)T).SetName("PairedMarks_T_BothPointsLieOnTheFootprint");
+            yield return new TestCaseData((object)U).SetName("PairedMarks_U_BothPointsLieOnTheFootprint");
+        }
+
+        [Test]
+        public void PairedMarks_OnA1x2_SitInItsTwoCellsAtFullSize()
+        {
+            var pair = MarkLayout.PairedMarks(Horizontal2);
+
+            AssertPoint(new Vector2(0.5f, 0.5f), pair.First);
+            AssertPoint(new Vector2(1.5f, 0.5f), pair.Second);
+            Assert.IsFalse(pair.IsCrowded);
+        }
+
+        [Test]
+        public void PairedMarks_OnAVertical1x2_SitOneAboveTheOtherAtFullSize()
+        {
+            var pair = MarkLayout.PairedMarks(Vertical2);
+
+            AssertPoint(new Vector2(0.5f, 0.5f), pair.First);
+            AssertPoint(new Vector2(0.5f, 1.5f), pair.Second);
+            Assert.IsFalse(pair.IsCrowded);
+        }
+
+        [Test]
+        public void PairedMarks_OnA1x1_ShareTheCellAtTheCrowdedScale()
+        {
+            var pair = MarkLayout.PairedMarks(Single);
+
+            AssertPoint(new Vector2(0.5f - MarkLayout.CrowdedOffsetCells, 0.5f), pair.First);
+            AssertPoint(new Vector2(0.5f + MarkLayout.CrowdedOffsetCells, 0.5f), pair.Second);
+            Assert.IsTrue(pair.IsCrowded);
+        }
+
+        [Test]
+        public void PairedMarks_OnAnL_StayOnTheBendCell()
+        {
+            var anchor = MarkLayout.Anchor(L);
+            var bend = new Coord(Mathf.FloorToInt(anchor.x), Mathf.FloorToInt(anchor.y));
+
+            var pair = MarkLayout.PairedMarks(L);
+
+            Assert.IsTrue(pair.IsCrowded, "the L's bounding box has an empty corner beside the bend");
+            Assert.AreEqual(bend, new Coord(Mathf.FloorToInt(pair.First.x), Mathf.FloorToInt(pair.First.y)));
+            Assert.AreEqual(bend, new Coord(Mathf.FloorToInt(pair.Second.x), Mathf.FloorToInt(pair.Second.y)));
+        }
+
+        [TestCaseSource(nameof(PairFootprints))]
+        public void PairedMarks_EveryFootprint_BothPointsLieOnTheFootprint(Coord[] cells)
+        {
+            var pair = MarkLayout.PairedMarks(cells);
+
+            AssertOnFootprint(cells, pair.First, "first");
+            AssertOnFootprint(cells, pair.Second, "second");
+
+            // With room each mark has a whole cell; crowded, half of one.
+            var apart = 2f * (pair.IsCrowded ? MarkLayout.CrowdedOffsetCells : MarkLayout.RoomyOffsetCells);
+            Assert.AreEqual(apart, Vector2.Distance(pair.First, pair.Second), Tolerance);
+        }
+
+        [Test]
+        public void BonusBadgeWidth_MoreDigits_WidenIt()
+        {
+            const float height = 0.34f;
+            const float digit = 0.15f;
+            const float padding = 0.08f;
+            const float icon = 0.24f;
+            const float gap = 0.03f;
+
+            var two = MarkLayout.BonusBadgeWidth(2, height, digit, padding, icon, gap);
+            var three = MarkLayout.BonusBadgeWidth(3, height, digit, padding, icon, gap);
+
+            Assert.AreEqual(icon + gap + 2 * digit + 2 * padding, two, Tolerance);
+            Assert.AreEqual(digit, three - two, Tolerance, "each character adds a digit's width");
+        }
+
+        /// <summary>
+        /// Asserts that every cell touching <paramref name="point"/> — one, two
+        /// across a seam, or four round a corner — belongs to
+        /// <paramref name="cells"/>.
+        /// </summary>
+        private static void AssertOnFootprint(Coord[] cells, Vector2 point, string label)
+        {
+            const float nudge = 0.01f;
+            foreach (var dx in new[] { -nudge, nudge })
+            {
+                foreach (var dy in new[] { -nudge, nudge })
+                {
+                    var cell = new Coord(Mathf.FloorToInt(point.x + dx), Mathf.FloorToInt(point.y + dy));
+                    CollectionAssert.Contains(cells, cell, $"the {label} mark at {point} touches {cell}");
+                }
+            }
         }
 
         private static void AssertPoint(Vector2 expected, Vector2 actual)
