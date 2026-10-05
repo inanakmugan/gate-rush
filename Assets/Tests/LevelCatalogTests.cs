@@ -9,7 +9,8 @@ namespace GateRush.Tests
     /// with the smallest greater id — not the next file name — ids may skip,
     /// the highest id has no next, and two files sharing an id are refused.
     /// Module 17: a level's number is its 1-based position in id order, and a
-    /// file the catalog does not hold has none.
+    /// file the catalog does not hold has none. Module 19: the names come out
+    /// in id order.
     /// </summary>
     public class LevelCatalogTests
     {
@@ -90,6 +91,17 @@ namespace GateRush.Tests
 
             Assert.IsFalse(found);
             Assert.AreEqual(0, number);
+        }
+
+        [Test]
+        public void Names_AreInIdOrder()
+        {
+            // Given out of id order, and with names whose own order differs from their ids'.
+            var catalog = new LevelCatalog(new[] { ("level-b", 4), ("level-d", 1), ("level-a", 3), ("level-c", 0) });
+
+            var names = catalog.Names;
+
+            CollectionAssert.AreEqual(new[] { "level-c", "level-d", "level-a", "level-b" }, names);
         }
 
         [Test]

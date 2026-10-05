@@ -20,7 +20,9 @@ namespace GateRush.Runtime
     /// session rejects is a bug — every drag produces a legal move by
     /// construction — so it is logged as an error, never swallowed.</para>
     /// <para>No drag starts while the view is busy — a block settling, or a
-    /// move being presented — or once the level has ended.</para>
+    /// move being presented — or once the level has ended. While the level is
+    /// held for an introduction card (Module 19) no input is read at all,
+    /// <b>R</b> included.</para>
     /// <para><b>UI first.</b> A press on the HUD or the result panel belongs to
     /// the UI and never also starts a drag. On the frame of a press the
     /// pointer's position is raycast against the UI directly, rather than asked
@@ -42,6 +44,7 @@ namespace GateRush.Runtime
         private BoardLayout layout;
         private BoardView view;
         private Camera boardCamera;
+        private Func<bool> isHeld;
 
         /// <summary>
         /// Raised after a move from a drag has been applied, with the state it
@@ -58,9 +61,17 @@ namespace GateRush.Runtime
         /// Binds the controller to one level, replacing any earlier binding.
         /// Until this is called it ignores input.
         /// </summary>
+        /// <param name="isHeld">
+        /// Asked every frame: while it answers true — an introduction card is
+        /// open (Module 19) — neither <b>R</b> nor the pointer is read. The
+        /// caller must not start holding during a drag; it cancels any drag
+        /// first.
+        /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
         public void Initialize(
-            LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera)
+            LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera, Func<bool> isHeld)
         {
+            this.isHeld = isHeld ?? throw new ArgumentNullException(nameof(isHeld));
             this.run = run;
             this.drag = drag;
             this.layout = layout;
@@ -91,7 +102,7 @@ namespace GateRush.Runtime
 
         private void Update()
         {
-            if (run == null)
+            if (run == null || isHeld())
             {
                 return;
             }

@@ -26,6 +26,14 @@ namespace GateRush.Runtime
     /// logged and hide Next altogether. Neither stops the current level from
     /// playing. The HUD's level number comes from the same catalog; a level
     /// without one plays with the level pill hidden.</para>
+    /// <para><b>Introductions (Module 19).</b> The same pass over the level
+    /// files records which mechanics each level contains
+    /// (<see cref="LevelMechanics.Of"/>), in the catalog's order. A level that
+    /// loads — first load or Next — shows a card for every mechanic no earlier
+    /// level contains, and its countdown starts when the last card closes;
+    /// until then input is held. A restart shows none. A level outside the
+    /// level order, or any level while that order is unusable, shows none
+    /// either.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
@@ -53,10 +61,19 @@ namespace GateRush.Runtime
         [Tooltip("The HUD on the canvas: restart button, timer and level number in the top band.")]
         [SerializeField] private HudView hudView;
 
+        [Tooltip("The introduction card on the canvas: shown over the HUD and under the result panel when a level introduces a mechanic.")]
+        [SerializeField] private IntroductionCard introductionCard;
+
         [Tooltip("The result panel on the canvas.")]
         [SerializeField] private ResultPanel resultPanel;
 
         private readonly Dictionary<string, TextAsset> levelAssets = new Dictionary<string, TextAsset>();
+
+        // What each level in the catalog contains, in the catalog's order:
+        // entry i belongs to the level the catalog numbers i + 1. Empty while
+        // there is no catalog.
+        private readonly List<IReadOnlyCollection<LevelMechanic>> mechanicsInOrder =
+            new List<IReadOnlyCollection<LevelMechanic>>();
 
         private bool isUsable;
         private LevelCatalog catalog;
@@ -87,6 +104,11 @@ namespace GateRush.Runtime
             hudView.Initialize(config);
             hudView.HideTime();
             hudView.HideLevel();
+
+            // Each puts what it builds last among the canvas's children, so
+            // this order — after the HUD, which puts itself first — leaves the
+            // card over the HUD and the result panel over the card.
+            introductionCard.Initialize(config);
             resultPanel.Initialize(config);
             BuildCatalog();
             Load(level);
@@ -144,8 +166,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Replaces whatever is being played with <paramref name="asset"/>,
-        /// started afresh with its countdown running. A level that fails to
-        /// load logs the reason and changes nothing.
+        /// started afresh. Its countdown starts at once, or — when the level
+        /// introduces mechanics — when the last introduction card closes. A
+        /// level that fails to load logs the reason and changes nothing.
         /// </summary>
         private void Load(TextAsset asset)
         {
@@ -156,6 +179,9 @@ namespace GateRush.Runtime
             }
 
             inputController.CancelDrag();
+
+            // Cards of the level being left go, without starting its run.
+            introductionCard.Hide();
 
             Countdown countdown = null;
             if (ctx.SuggestedTimeBudgetSeconds > 0)
@@ -193,7 +219,8 @@ namespace GateRush.Runtime
                 new DragController(new DragSettings(config.PushThresholdCells, config.FollowRate, config.CornerAssistCells)),
                 layout,
                 boardView,
-                boardCamera);
+                boardCamera,
+                IsIntroducing);
 
             boardCamera.orthographic = true;
             boardCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -210,14 +237,62 @@ namespace GateRush.Runtime
             }
 
             ShowLevelNumber(asset.name);
+            ShowRemainingTime();
 
+            // The run is not started while a card is open: an unstarted
+            // countdown ignores every tick, so the timer stands at the whole
+            // budget until the last card closes.
+            var introductions = IntroductionsOf(asset.name);
+            if (introductions.Count > 0)
+            {
+                introductionCard.Show(introductions, StartRun);
+            }
+            else
+            {
+                StartRun();
+            }
+        }
+
+        /// <summary>
+        /// Starts the countdown of the level just loaded. Called at once for a
+        /// level with no cards, otherwise by the last card closing — and only
+        /// then: <see cref="Load"/> hides the card, dropping this callback,
+        /// before it replaces <see cref="run"/>, so the run started is always
+        /// the one the cards were shown for.
+        /// </summary>
+        private void StartRun()
+        {
             run.Start();
             ShowRemainingTime();
         }
 
+        /// <summary>
+        /// True while an introduction card is open: the one query that holds
+        /// the pointer and <b>R</b> (<see cref="InputController"/>) and the HUD's
+        /// restart button (<see cref="Restart"/>).
+        /// </summary>
+        private bool IsIntroducing() => introductionCard.IsOpen;
+
+        /// <summary>
+        /// The mechanics the level in the file <paramref name="levelFile"/>
+        /// introduces: those it contains and no earlier level in the catalog's
+        /// order does, plus How to Play on the first. None for a level the
+        /// catalog does not hold, or when there is no catalog;
+        /// <see cref="ShowLevelNumber"/> warns of both.
+        /// </summary>
+        private IReadOnlyList<LevelMechanic> IntroductionsOf(string levelFile)
+        {
+            if (catalog == null || !catalog.TryGetNumber(levelFile, out var number))
+            {
+                return Array.Empty<LevelMechanic>();
+            }
+
+            return LevelMechanics.IntroducedBy(mechanicsInOrder, number - 1);
+        }
+
         private void Restart()
         {
-            if (run == null)
+            if (run == null || IsIntroducing())
             {
                 return;
             }
@@ -360,7 +435,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Shows the level number of the file <paramref name="levelFile"/>, or
-        /// hides the level pill with a warning saying why it has none.
+        /// hides the level pill with a warning saying why it has none. A level
+        /// with no number has no place in the level order either, so the same
+        /// warning says that it shows no introduction cards.
         /// </summary>
         private void ShowLevelNumber(string levelFile)
         {
@@ -374,7 +451,9 @@ namespace GateRush.Runtime
             var reason = catalog == null
                 ? "the level order is unusable"
                 : $"it is not one of the levels in Resources/{LevelsResourcePath}";
-            Debug.LogWarning($"Level '{levelFile}' has no level number because {reason}; the HUD hides the level pill.", this);
+            Debug.LogWarning(
+                $"Level '{levelFile}' has no level number because {reason}; the HUD hides the level pill and the level shows no introduction cards.",
+                this);
         }
 
         private void FitCameraToScreen()
@@ -431,16 +510,22 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Reads every level in <c>Resources/Levels</c> for its id and builds
-        /// the level order. A file that fails to load is logged and left out;
-        /// two files sharing an id are logged and leave no order at all, which
-        /// hides Next. Neither stops the current level from playing.
+        /// Reads every level in <c>Resources/Levels</c> once, for its id and
+        /// for the mechanics it contains, and builds the level order and, in
+        /// that order, what each level contains. A file that fails to load is
+        /// logged and left out: it has no place in the order and introduces
+        /// nothing, so a later level introduces what it would have. Two files
+        /// sharing an id are logged and leave no order at all, which hides
+        /// Next and every introduction card. Neither stops the current level
+        /// from playing.
         /// </summary>
         private void BuildCatalog()
         {
             levelAssets.Clear();
+            mechanicsInOrder.Clear();
             catalog = null;
             var entries = new List<(string name, int levelId)>();
+            var mechanicsByName = new Dictionary<string, IReadOnlyCollection<LevelMechanic>>();
 
             foreach (var asset in Resources.LoadAll<TextAsset>(LevelsResourcePath))
             {
@@ -455,13 +540,15 @@ namespace GateRush.Runtime
                 if (!TryParse(asset, out var ctx, out var error))
                 {
                     Debug.LogError(
-                        $"Level '{asset.name}' in Resources/{LevelsResourcePath} failed to load and is left out of the level order. {error}",
+                        $"Level '{asset.name}' in Resources/{LevelsResourcePath} failed to load; it is left out of the level order " +
+                        $"and introduces no mechanic. {error}",
                         this);
                     continue;
                 }
 
                 levelAssets.Add(asset.name, asset);
                 entries.Add((asset.name, ctx.LevelId));
+                mechanicsByName.Add(asset.name, LevelMechanics.Of(ctx));
             }
 
             try
@@ -470,7 +557,18 @@ namespace GateRush.Runtime
             }
             catch (ArgumentException e)
             {
-                Debug.LogError($"{e.Message} The level order is unusable, so Next is hidden; the current level still plays.", this);
+                Debug.LogError(
+                    $"{e.Message} The level order is unusable, so Next is hidden and no introduction card shows; the current level still plays.",
+                    this);
+                return;
+            }
+
+            // Every name in the catalog came from entries, each added together
+            // with its mechanics, so the lookup cannot miss.
+            var names = catalog.Names;
+            for (var i = 0; i < names.Count; i++)
+            {
+                mechanicsInOrder.Add(mechanicsByName[names[i]]);
             }
         }
 
@@ -513,13 +611,20 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || hudView == null || resultPanel == null)
+                || hudView == null || introductionCard == null || resultPanel == null)
             {
                 Debug.LogError(
-                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View and Result Panel " +
-                    "must all be assigned; nothing is drawn.",
+                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card " +
+                    "and Result Panel must all be assigned; nothing is drawn.",
                     this);
                 return false;
+            }
+
+            var cardProblem = introductionCard.MissingCanvas();
+            if (cardProblem.Length > 0)
+            {
+                Debug.LogError($"{cardProblem} Nothing is drawn.", introductionCard);
+                isAssigned = false;
             }
 
             var hudProblem = hudView.MissingCanvas();

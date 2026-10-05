@@ -40,6 +40,7 @@ MonoBehaviour:
   cubeSprite: {fileID: 21300000, guid: 37dd6b6b58c871e4b9a8596eb9eb91ab, type: 3}
   shardSprite: {fileID: 21300000, guid: f9efff3a6a10d7e4d8e4c4e166140569, type: 3}
   gateGlowSprite: {fileID: 21300000, guid: 5c6de48fd20565048a09c934e317d494, type: 3}
+  sparkleSprite: {fileID: 21300000, guid: 955b1f1454c91ff4685f474613823b93, type: 3}
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.14
@@ -64,6 +65,13 @@ MonoBehaviour:
   keySizeCells: 0.72
   keyRotationDegrees: 35
   frozenMarkRaiseCells: 0.3
+  timeBonusMarkFormat: +{0}
+  timeBonusMarkIconCells: 0.24
+  timeBonusMarkIconGapCells: 0.03
+  timeBonusMarkColor: {r: 0.2, g: 0.62, b: 0.3, a: 1}
+  timeBonusMarkRimColor: {r: 0.62, g: 0.95, b: 0.62, a: 1}
+  timeBonusMarkIconColor: {r: 1, g: 1, b: 1, a: 1}
+  crowdedMarkScale: 0.6
   shutterBorderCells: 0.07
   elevatorBorderCells: 0.05
   elevatorDividerCells: 0.07
@@ -174,6 +182,89 @@ MonoBehaviour:
   resultPopSeconds: 0.25
   resultPopEase: 27
   resultPopStartScale: 0.8
+  mechanicIntroductions:
+  - mechanic: 0
+    title: How to Play
+    text: Drag each block out through a gate of its colour!
+  - mechanic: 1
+    title: Ice Block!
+    text: Clear blocks to melt the ice. The number shows how many.
+  - mechanic: 2
+    title: Ice Door!
+    text: Clear blocks to crack open the Ice Door!
+  - mechanic: 3
+    title: Layered Block!
+    text: Each exit peels one layer. The colour beneath goes next.
+  - mechanic: 4
+    title: One-Way Block!
+    text: This block only slides along its arrow.
+  - mechanic: 5
+    title: Lock & Key!
+    text: Clear the block with the key to open the lock of its colour.
+  - mechanic: 6
+    title: Shutter!
+    text: Clear blocks to lift the shutter and see what is beneath.
+  - mechanic: 7
+    title: Generator!
+    text: The machine sends its next block when there is room. Its screen shows what
+      comes next.
+  - mechanic: 8
+    title: Elevator!
+    text: Clear every block on the lift to bring up the next wave.
+  - mechanic: 9
+    title: Time Bonus!
+    text: Clear this block to win extra seconds.
+  introSubtitle: New Item Unlocked!
+  howToPlaySubtitle: Welcome!
+  introTitleFontSize: 120
+  introTitleHeightUnits: 160
+  introTitleColor: {r: 1, g: 1, b: 1, a: 1}
+  introTitleOutlineWidth: 0.2
+  introSubtitleFontSize: 56
+  introSubtitleHeightUnits: 80
+  introSubtitleColor: {r: 1, g: 1, b: 1, a: 1}
+  introIllustrationSizeUnits: {x: 640, y: 480}
+  introCellUnits: 170
+  introHowToPlayArrowCells: 0.6
+  introBlockColor: 1
+  introSecondColor: 3
+  introCount: 3
+  introBonusSeconds: 5
+  introTextBoxSizeUnits: {x: 900, y: 260}
+  introTextBoxCornerUnits: 48
+  introTextBoxBorderUnits: 10
+  introTextBoxColor: {r: 1, g: 0.95, b: 0.82, a: 1}
+  introTextPaddingUnits: 40
+  introTextFontSize: 52
+  introTextColor: {r: 0.2, g: 0.14, b: 0.3, a: 1}
+  introSpacingUnits: 36
+  introCloseSizeUnits: 110
+  introCloseColor: {r: 0.9, g: 0.22, b: 0.25, a: 1}
+  introCloseCrossSizeUnits: 56
+  introCloseCrossThicknessUnits: 14
+  introCloseCrossColor: {r: 1, g: 1, b: 1, a: 1}
+  introCloseSeconds: 0.15
+  introCloseEase: 6
+  introSparkles:
+  - position: {x: -0.52, y: 0.4}
+    sizeUnits: 64
+    phase: 0
+  - position: {x: 0.5, y: 0.46}
+    sizeUnits: 44
+    phase: 0.35
+  - position: {x: 0.56, y: -0.2}
+    sizeUnits: 56
+    phase: 0.6
+  - position: {x: -0.46, y: -0.42}
+    sizeUnits: 40
+    phase: 0.8
+  - position: {x: 0.05, y: 0.58}
+    sizeUnits: 36
+    phase: 0.2
+  sparkleColor: {r: 1, g: 1, b: 0.85, a: 1}
+  sparkleTwinkleSeconds: 1.2
+  sparkleMinScale: 0.45
+  sparkleMinAlpha: 0.2
   blockPalette:
   - {r: 0.93, g: 0.2, b: 0.25, a: 1}
   - {r: 0.16, g: 0.47, b: 0.98, a: 1}
