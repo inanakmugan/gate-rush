@@ -21,9 +21,10 @@ namespace GateRush.Runtime
     {
         /// <summary>
         /// M4: the player sees the outer colour and the one beneath it, and a
-        /// numeral only once more colours remain than those two.
+        /// numeral only once more colours remain than those two. Public so
+        /// the Level Editor marks a block's depth by the same rule.
         /// </summary>
-        private const int ColoursShownWithoutNumeral = 2;
+        public const int ColoursShownWithoutNumeral = 2;
 
         private readonly LevelContext ctx;
 

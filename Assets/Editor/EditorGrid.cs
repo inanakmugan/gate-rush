@@ -118,6 +118,18 @@ namespace GateRush.Editor
             return new Coord(col, Rows - 1 - screenRow);
         }
 
+        /// <summary>
+        /// The cell space of a block whose origin is at grid cell
+        /// <paramref name="origin"/>: where anything measured in cells from
+        /// that origin lands on screen, clipped to the grid. The same row flip
+        /// as <see cref="CellRect"/>, for positions between cells.
+        /// </summary>
+        public EditorCellSpace CellSpaceAt(Coord origin) =>
+            new EditorCellSpace(
+                new Vector2(Area.x + (origin.X * CellSize), Area.y + ((Rows - origin.Y) * CellSize)),
+                CellSize,
+                Area);
+
         public bool TryPick(Vector2 point, out Coord cell)
         {
             cell = default;
@@ -135,6 +147,64 @@ namespace GateRush.Editor
 
             cell = new Coord(col, Rows - 1 - screenRow);
             return true;
+        }
+    }
+
+    /// <summary>
+    /// Where a block's own cell units land on screen: positions measured in
+    /// cells from the block's origin, +Y up, as <c>Core</c> and the board's
+    /// layout rules give them, to GUI pixels, +Y down. It carries positions
+    /// between cells — an inset rectangle, a mark's centre — which
+    /// <see cref="EditorGridLayout.CellRect"/>, whole cells only, cannot. One
+    /// type serves the main grid, a wave's region and a shape preview, so a
+    /// block's marks are drawn by one code path on all three.
+    /// </summary>
+    public readonly struct EditorCellSpace
+    {
+        private readonly Vector2 origin;
+
+        /// <summary>A cell space.</summary>
+        /// <param name="origin">The GUI position of the lower-left corner of cell (0, 0).</param>
+        /// <param name="cellSize">Pixels per cell.</param>
+        /// <param name="clip">The GUI rectangle drawing stays inside.</param>
+        public EditorCellSpace(Vector2 origin, float cellSize, Rect clip)
+        {
+            this.origin = origin;
+            CellSize = cellSize;
+            Clip = clip;
+        }
+
+        /// <summary>Pixels per cell.</summary>
+        public float CellSize { get; }
+
+        /// <summary>The GUI rectangle drawing stays inside: the grid, so a block partly off it draws only its on-grid part.</summary>
+        public Rect Clip { get; }
+
+        /// <summary>The GUI position of <paramref name="cells"/>, a point in cell units.</summary>
+        public Vector2 ToGui(Vector2 cells) =>
+            new Vector2(origin.x + (cells.x * CellSize), origin.y - (cells.y * CellSize));
+
+        /// <summary>
+        /// The GUI rectangle of <paramref name="cells"/>, a rectangle in cell
+        /// units, cut to <see cref="Clip"/> and then snapped to whole pixels;
+        /// false when nothing of it is left inside.
+        /// </summary>
+        /// <remarks>
+        /// Every edge is snapped by the one rule, <see cref="Mathf.Round(float)"/>,
+        /// after the cut. <c>EditorGUI.DrawRect</c> rounds each rectangle on
+        /// its own, so two rectangles sharing an edge at a fractional pixel —
+        /// a half-cell seam on an odd cell size — could round apart and leave
+        /// a one-pixel gap showing what is underneath. Snapped here, a shared
+        /// edge is one value in and so one pixel out, for both rectangles.
+        /// </remarks>
+        public bool TryToGui(Rect cells, out Rect gui)
+        {
+            var xMin = Mathf.Round(Mathf.Max(origin.x + (cells.xMin * CellSize), Clip.xMin));
+            var xMax = Mathf.Round(Mathf.Min(origin.x + (cells.xMax * CellSize), Clip.xMax));
+            var yMin = Mathf.Round(Mathf.Max(origin.y - (cells.yMax * CellSize), Clip.yMin));
+            var yMax = Mathf.Round(Mathf.Min(origin.y - (cells.yMin * CellSize), Clip.yMax));
+            gui = Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+            return xMax > xMin && yMax > yMin;
         }
     }
 
@@ -208,9 +278,34 @@ namespace GateRush.Editor
         /// </summary>
         public static void DrawCellPreview(Rect area, IReadOnlyList<Coord> cells, Color fill)
         {
-            if (cells == null || cells.Count == 0)
+            if (!TryPreviewCellSpace(area, cells, out var space))
             {
                 return;
+            }
+
+            foreach (var c in cells)
+            {
+                if (space.TryToGui(new Rect(c.X, c.Y, 1f, 1f), out var rect))
+                {
+                    EditorGUI.DrawRect(rect, fill);
+                }
+            }
+        }
+
+        /// <summary>
+        /// The cell space <see cref="DrawCellPreview"/> lays
+        /// <paramref name="cells"/> out in: <see cref="PreviewCellSize"/>
+        /// cells, the shape's bounding box centred in <paramref name="area"/>.
+        /// A caller drawing more on a preview than its cells — a block's
+        /// marks — draws through this, so it lands on the cells drawn. False
+        /// for an empty shape, which draws nothing.
+        /// </summary>
+        public static bool TryPreviewCellSpace(Rect area, IReadOnlyList<Coord> cells, out EditorCellSpace space)
+        {
+            space = default;
+            if (cells == null || cells.Count == 0)
+            {
+                return false;
             }
 
             var minX = cells[0].X;
@@ -231,13 +326,16 @@ namespace GateRush.Editor
             var originX = area.x + ((area.width - w) * 0.5f);
             var originY = area.y + ((area.height - h) * 0.5f);
 
-            foreach (var c in cells)
-            {
-                var col = c.X - minX;
-                var row = maxY - c.Y; // +Y up in cell space; GUI space is +Y down — same flip EditorGridLayout.CellRect does
-                var rect = new Rect(originX + (col * PreviewCellSize), originY + (row * PreviewCellSize), PreviewCellSize, PreviewCellSize);
-                EditorGUI.DrawRect(rect, fill);
-            }
+            // +Y up in cell space; GUI space is +Y down — the same flip
+            // EditorGridLayout.CellRect does. The bounding box's top-left is
+            // (originX, originY), so cell (0, 0)'s lower-left corner sits minX
+            // cells to its left and maxY + 1 cells below it. The clip is the
+            // bounding box itself: a preview draws all of its shape.
+            space = new EditorCellSpace(
+                new Vector2(originX - (minX * PreviewCellSize), originY + ((maxY + 1) * PreviewCellSize)),
+                PreviewCellSize,
+                new Rect(originX, originY, w, h));
+            return true;
         }
 
         public static void DrawCells(EditorGridLayout layout, Func<Coord, Color> fillOf)

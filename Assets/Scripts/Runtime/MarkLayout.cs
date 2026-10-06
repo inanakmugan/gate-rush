@@ -8,9 +8,10 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// Where the marks on a block go (Module 16): the point its icons and
-    /// count sit on, where two marks sharing a block go (Module 19), the
-    /// chains across a locked block, and how wide a count's or a time bonus's
-    /// badge is. Plain rules in cell units, so they are tested without a scene.
+    /// count sit on, where two or three marks sharing a block go (Modules 19
+    /// and 20), the chains across a locked block, and how wide a count's or a
+    /// time bonus's badge is. Plain rules in cell units, so they are tested
+    /// without a scene.
     /// </summary>
     public static class MarkLayout
     {
@@ -26,6 +27,16 @@ namespace GateRush.Runtime
         /// half a cell, so each has a whole cell's width.
         /// </summary>
         public const float RoomyOffsetCells = 0.5f;
+
+        /// <summary>
+        /// How far either side of the anchor the outer two of three crowded
+        /// marks sit, in cells: a third, so each has a third of a cell and
+        /// none leaves the anchor's cells. Geometry, not a tunable.
+        /// </summary>
+        public const float CrowdedTripleOffsetCells = 1f / 3f;
+
+        /// <summary>The most marks <see cref="Row"/> places: a padlock or key, a layer count and a time bonus.</summary>
+        public const int MostMarksInARow = 3;
 
         /// <summary>
         /// The centre of <paramref name="cells"/>, in cell units relative to the
@@ -59,28 +70,72 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
         public static PairedMarkLayout PairedMarks(IReadOnlyList<Coord> cells)
         {
+            var row = Row(cells, 2);
+            return new PairedMarkLayout(row[0], row[1], row.IsCrowded);
+        }
+
+        /// <summary>
+        /// Where <paramref name="count"/> marks sharing one block go — a
+        /// padlock or a key, the layer count (M4) and the time-bonus mark
+        /// (M10), in that order — in cell units relative to the footprint's
+        /// origin, from left to right or from the lowest up.
+        /// <list type="bullet">
+        /// <item>One mark sits on <see cref="Anchor"/>.</item>
+        /// <item>Two follow <see cref="PairedMarks"/>' rule: half a cell
+        /// either side of the anchor along the longer side of the bounding
+        /// box where both points lie on the footprint, otherwise a quarter
+        /// cell either side of it, horizontally, crowded.</item>
+        /// <item>Three sit on the anchor and a whole cell either side of it,
+        /// along that longer side (horizontal on a tie), when both of those
+        /// points lie on the footprint: a 1×3 carries one mark in each cell,
+        /// at full size. Otherwise they sit on the anchor and a third of a
+        /// cell either side of it, horizontally, and are
+        /// <see cref="MarkRowLayout.IsCrowded"/>: the caller draws them
+        /// smaller.</item>
+        /// </list>
+        /// Every slot lies on the footprint.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="count"/> is not from 1 to <see cref="MostMarksInARow"/>.</exception>
+        public static MarkRowLayout Row(IReadOnlyList<Coord> cells, int count)
+        {
+            if (count < 1 || count > MostMarksInARow)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count), count, $"A block carries 1 to {MostMarksInARow} marks in a row.");
+            }
+
             DoubledAnchor(cells, out var doubleX, out var doubleY, out var members);
+            var anchor = new Vector2(doubleX * 0.5f, doubleY * 0.5f);
+            if (count == 1)
+            {
+                return new MarkRowLayout(new[] { anchor }, isCrowded: false);
+            }
+
             Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
 
-            // One step in doubled coordinates is half a cell.
+            // One step in doubled coordinates is half a cell: two marks sit
+            // one step either side of the anchor, the outer two of three sit
+            // two steps either side of it.
             var isHorizontal = maxX - minX >= maxY - minY;
-            var stepX = isHorizontal ? 1 : 0;
-            var stepY = isHorizontal ? 0 : 1;
+            var reach = count == 2 ? 1 : 2;
+            var stepX = isHorizontal ? reach : 0;
+            var stepY = isHorizontal ? 0 : reach;
             if (AreAllTouchingCellsMembers(members, doubleX - stepX, doubleY - stepY)
                 && AreAllTouchingCellsMembers(members, doubleX + stepX, doubleY + stepY))
             {
-                return new PairedMarkLayout(
-                    new Vector2((doubleX - stepX) * 0.5f, (doubleY - stepY) * 0.5f),
-                    new Vector2((doubleX + stepX) * 0.5f, (doubleY + stepY) * 0.5f),
-                    isCrowded: false);
+                var low = new Vector2((doubleX - stepX) * 0.5f, (doubleY - stepY) * 0.5f);
+                var high = new Vector2((doubleX + stepX) * 0.5f, (doubleY + stepY) * 0.5f);
+                return new MarkRowLayout(count == 2 ? new[] { low, high } : new[] { low, anchor, high }, isCrowded: false);
             }
 
-            // A quarter cell along x stays inside the anchor's own cell when
-            // the anchor is a cell's middle on x, and inside the two cells
-            // either side of it — both the block's — when it is on a seam.
-            var anchor = new Vector2(doubleX * 0.5f, doubleY * 0.5f);
-            var quarter = new Vector2(CrowdedOffsetCells, 0f);
-            return new PairedMarkLayout(anchor - quarter, anchor + quarter, isCrowded: true);
+            // Less than half a cell along x stays inside the anchor's own cell
+            // when the anchor is a cell's middle on x, and inside the two
+            // cells either side of it — both the block's — when it is on a
+            // seam.
+            var offset = new Vector2(count == 2 ? CrowdedOffsetCells : CrowdedTripleOffsetCells, 0f);
+            return new MarkRowLayout(
+                count == 2 ? new[] { anchor - offset, anchor + offset } : new[] { anchor - offset, anchor, anchor + offset },
+                isCrowded: true);
         }
 
         /// <summary>
@@ -253,6 +308,28 @@ namespace GateRush.Runtime
         /// <summary>The cell indices on one axis a doubled coordinate touches: its own when odd, both neighbours when even.</summary>
         private static int[] TouchingIndices(int doubled) =>
             doubled % 2 != 0 ? new[] { (doubled - 1) / 2 } : new[] { doubled / 2 - 1, doubled / 2 };
+    }
+
+    /// <summary>Where the marks sharing one block go (<see cref="MarkLayout.Row"/>).</summary>
+    public readonly struct MarkRowLayout
+    {
+        private readonly Vector2[] slots;
+
+        /// <summary>A layout for the marks at <paramref name="slots"/>, in order.</summary>
+        public MarkRowLayout(Vector2[] slots, bool isCrowded)
+        {
+            this.slots = slots;
+            IsCrowded = isCrowded;
+        }
+
+        /// <summary>How many marks the row holds.</summary>
+        public int Count => slots.Length;
+
+        /// <summary>The centre of mark <paramref name="index"/>, counted from the left, or from the lowest of a vertical row.</summary>
+        public Vector2 this[int index] => slots[index];
+
+        /// <summary>True when the marks share the anchor's cells and must be drawn smaller.</summary>
+        public bool IsCrowded { get; }
     }
 
     /// <summary>Where two marks sharing one block go (<see cref="MarkLayout.PairedMarks"/>).</summary>

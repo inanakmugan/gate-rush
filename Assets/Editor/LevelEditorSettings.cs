@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using GateRush.Solver;
@@ -71,6 +72,25 @@ namespace GateRush.Editor
 
         [Header("Warnings list: the icon's drawn size in pixels, matched to the mini label's line height")]
         [SerializeField] private float warningIconSize = 12f;
+
+        [Header("Block marks (Module 20): how layered and frozen blocks read on the grid, in a wave's scope and in a generator's queue")]
+        [Tooltip("How far a layered block's second colour sits inside its footprint, in cells: above 0, below 0.5.")]
+        [SerializeField] private float blockInsetCells = 0.2f;
+
+        [Tooltip("Fill of a block that starts frozen (M3), whatever its own colours.")]
+        [SerializeField] private Color frozenBlockColor = new Color(0.80f, 0.91f, 0.98f);
+
+        [Tooltip("Side of the plate behind a block's number (a frozen block's count, a deep stack's depth), in cells: above 0, at most 1. It grows where the smallest font needs more.")]
+        [SerializeField] private float blockNumberPlateCells = 0.5f;
+
+        [Tooltip("The number's font size as a fraction of its plate's side: above 0, at most 1.")]
+        [SerializeField] private float blockNumberSizeRatio = 0.7f;
+
+        [Tooltip("The smallest font a block's number is drawn in, in pixels: at least 1. On small cells the plate grows to hold it.")]
+        [SerializeField] private int blockNumberMinFontSize = 7;
+
+        [SerializeField] private Color blockNumberColor = new Color(0.12f, 0.14f, 0.20f);
+        [SerializeField] private Color blockNumberPlateColor = new Color(1f, 1f, 1f, 0.85f);
 
         /// <summary>
         /// The quick optimal attempt Validate makes first: exhaustive A* at a
@@ -163,6 +183,59 @@ namespace GateRush.Editor
         /// about twice the text's height. Default 12, the mini label's line height.
         /// </summary>
         public float WarningIconSize => warningIconSize;
+
+        /// <summary>How far a layered block's second colour sits inside its footprint, in cells (<see cref="EditorLayerInset"/>). Default 0.2.</summary>
+        public float BlockInsetCells => blockInsetCells;
+
+        /// <summary>The fill of a block that starts frozen (<see cref="EditorBlockLook.IsFrozen"/>).</summary>
+        public Color FrozenBlockColor => frozenBlockColor;
+
+        /// <summary>Side of the plate behind a block's number, in cells. Default 0.5.</summary>
+        public float BlockNumberPlateCells => blockNumberPlateCells;
+
+        /// <summary>A block number's font size as a fraction of its plate's side. Default 0.7.</summary>
+        public float BlockNumberSizeRatio => blockNumberSizeRatio;
+
+        /// <summary>The smallest font a block's number is drawn in, in pixels. Default 7.</summary>
+        public int BlockNumberMinFontSize => blockNumberMinFontSize;
+
+        /// <summary>Colour of a block's number.</summary>
+        public Color BlockNumberColor => blockNumberColor;
+
+        /// <summary>Colour of the plate behind a block's number, which keeps it readable on any block colour.</summary>
+        public Color BlockNumberPlateColor => blockNumberPlateColor;
+
+        /// <summary>
+        /// Every reason the block marks cannot be drawn as configured, as
+        /// messages naming the field; empty when they can. The window shows
+        /// them above the grid.
+        /// </summary>
+        public IReadOnlyList<string> Problems()
+        {
+            var problems = new List<string>();
+
+            if (!(blockInsetCells > 0f && blockInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Block Inset Cells must be above 0 and below 0.5, so a layered block keeps a visible second colour.");
+            }
+
+            if (!(blockNumberPlateCells > 0f && blockNumberPlateCells <= 1f))
+            {
+                problems.Add($"{name}: Block Number Plate Cells must be above 0 and at most 1.");
+            }
+
+            if (!(blockNumberSizeRatio > 0f && blockNumberSizeRatio <= 1f))
+            {
+                problems.Add($"{name}: Block Number Size Ratio must be above 0 and at most 1.");
+            }
+
+            if (blockNumberMinFontSize < 1)
+            {
+                problems.Add($"{name}: Block Number Min Font Size must be at least 1.");
+            }
+
+            return problems;
+        }
 
         private const string AssetPath = "Assets/Editor/LevelEditorSettings.asset";
 
