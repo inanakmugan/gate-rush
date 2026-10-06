@@ -185,8 +185,11 @@ namespace GateRush.Runtime
         /// The leave stage, on the old drawing: every destroyed block is handed
         /// over to debris and starts passing through its gate
         /// (<see cref="PassThroughGate"/>), which never holds the stage; every
-        /// surviving layered block peels. Then the arrive stage, at once when
-        /// there is no peel to wait for.
+        /// surviving layered block peels, bumps into its gate
+        /// (<see cref="PeelBump"/>) and sets off its gate's glow and cubes
+        /// (<see cref="PlayPeelDebris"/>), which do not hold the stage either.
+        /// Then the arrive stage, at once when there is no peel or bump to
+        /// wait for.
         /// </summary>
         private void PlayLeave()
         {
@@ -208,8 +211,24 @@ namespace GateRush.Runtime
                     continue;
                 }
 
-                leave = leave ?? DOTween.Sequence().SetId(this);
-                leave.Insert(0f, PeelEffect(block, clear.ExposedColor.Value));
+                // The glow, the cubes and the bump play for every surviving
+                // clear, also for a block drawn without an inner shape, whose
+                // peel is null.
+                PlayPeelDebris(block, clear);
+
+                var peel = PeelEffect(block, clear.ExposedColor.Value);
+                if (peel != null)
+                {
+                    leave = leave ?? DOTween.Sequence().SetId(this);
+                    leave.Insert(0f, peel);
+                }
+
+                var bump = PeelBump(block, clear.GateEdge);
+                if (bump != null)
+                {
+                    leave = leave ?? DOTween.Sequence().SetId(this);
+                    leave.Insert(0f, bump);
+                }
             }
 
             if (leave == null)
@@ -439,7 +458,6 @@ namespace GateRush.Runtime
         private void PassThroughGate(DrawnBlock block, ClearedBlock clear)
         {
             var edge = clear.GateEdge;
-            var gate = ctx.Gates[clear.GateIndex];
             var root = block.Root;
 
             block.LiftTween?.Kill();
@@ -479,15 +497,92 @@ namespace GateRush.Runtime
                     OnPassEnded();
                 });
 
+            StreamCubes(block, clear, BurstKind.Exit, passSeconds, 1f);
+            PlayGateGlow(clear.GateIndex, passSeconds);
+        }
+
+        /// <summary>
+        /// Cubes in the colour <paramref name="clear"/> removed stream out
+        /// beneath its gate over <paramref name="seconds"/>, as debris:
+        /// <paramref name="countFraction"/> of what a destroyed block of
+        /// <paramref name="block"/>'s footprint streams
+        /// (<see cref="BurstLayout.StreamCount"/>), seeded from
+        /// <paramref name="kind"/>, the block and the move, so an exit's and a
+        /// peel's never share pieces. The one stream for both; only the
+        /// arguments differ.
+        /// </summary>
+        private void StreamCubes(DrawnBlock block, ClearedBlock clear, BurstKind kind, float seconds, float countFraction)
+        {
+            var gate = ctx.Gates[clear.GateIndex];
             var cubes = BurstLayout.Stream(
-                ctx.Width, ctx.Height, edge, gate.Offset, gate.Width, layout.FrameThicknessCells,
-                block.Cells.Count, passSeconds,
-                BurstLayout.Seed(BurstKind.Exit, clear.BlockIndex, presentedMoveNumber), cubeBurst);
+                ctx.Width, ctx.Height, clear.GateEdge, gate.Offset, gate.Width, layout.FrameThicknessCells,
+                block.Cells.Count, seconds,
+                BurstLayout.Seed(kind, clear.BlockIndex, presentedMoveNumber), cubeBurst, countFraction);
+            if (cubes.Count == 0)
+            {
+                return;
+            }
+
             PlayBurst(
                 cubes, GridToLocal, layout.CellSize, config.CubeSprite, config.BlockFill(clear.RemovedColor),
                 config.CubeSeconds, config.CubeEase, config.CubeEndScale, 0f);
+        }
 
-            PlayGateGlow(clear.GateIndex, passSeconds);
+        /// <summary>
+        /// What a peel shows at its gate beside the peel itself (Module 20):
+        /// the gate glows for the peel's duration and cubes of the removed
+        /// colour stream out beneath it, a
+        /// <see cref="RuntimeConfig.PeelCubeFraction"/> of an exit's. Both are
+        /// debris, like an exit's: the redraw between the stages never cuts
+        /// them short and they never hold <see cref="IsBusy"/>. The block
+        /// stays on the board, so this is not counted as a pass.
+        /// </summary>
+        private void PlayPeelDebris(DrawnBlock block, ClearedBlock clear)
+        {
+            StreamCubes(block, clear, BurstKind.Peel, config.PeelSeconds, config.PeelCubeFraction);
+            PlayGateGlow(clear.GateIndex, config.PeelSeconds);
+        }
+
+        /// <summary>
+        /// A peeling block's push into its gate: its root moves toward the
+        /// gate by <see cref="RuntimeConfig.PeelBumpCells"/> over the first
+        /// half of the peel and back over the second, each half shaped by
+        /// <see cref="RuntimeConfig.PeelBumpEase"/>, and ends exactly where it
+        /// started. It draws over the gate's mouth, unclipped, by that much.
+        /// </summary>
+        /// <remarks>
+        /// <para><b>Order.</b> The leave stage starts only once the settle has
+        /// finished or been stopped (<see cref="Present"/>,
+        /// <see cref="OnSettled"/>), so the root is at rest in its cell and
+        /// nothing else moves it while this plays. The lift's drop may still
+        /// be running: it scales the block's body about the footprint's
+        /// centre and never touches the root, so the two do not overwrite
+        /// each other. The bump lasts as long as the peel and runs in the
+        /// leave stage's sequence, so the root is back before the arrive
+        /// stage redraws.</para>
+        /// </remarks>
+        /// <returns>The bump, to run in the leave stage's sequence; or null when the bump is 0, which disables it.</returns>
+        private Tween PeelBump(DrawnBlock block, BoardEdge gateEdge)
+        {
+            if (!(config.PeelBumpCells > 0f))
+            {
+                return null;
+            }
+
+            var root = block.Root;
+            Vector2 rest = root.localPosition;
+            var reach = GateExit.Outward(gateEdge) * CellsToWorld(config.PeelBumpCells);
+            var ease = config.PeelBumpEase;
+
+            // Linear time: the there-and-back is the bump's whole shape. Its
+            // height is 0 at both ends of the peel and 1 at the middle.
+            return DOVirtual.Float(0f, 1f, config.PeelSeconds, t =>
+                {
+                    var height = 1f - Mathf.Abs(2f * t - 1f);
+                    root.localPosition = rest + reach * DOVirtual.EasedValue(0f, 1f, height, ease);
+                })
+                .SetEase(Ease.Linear)
+                .OnComplete(() => root.localPosition = rest);
         }
 
         /// <summary>
@@ -703,46 +798,67 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A surviving layered block peels its removed outer colour: a new face
-        /// in the exposed colour is drawn beneath, the lip takes the exposed
-        /// colour at once, and the old face — lifted above every part of the new
-        /// one by a sorting group, and still below the block's marks — shrinks
-        /// about the footprint's centre and fades away.
+        /// A surviving layered block peels its removed outer colour (Module
+        /// 20), on the renderers it was drawn with: the inner shape grows from
+        /// its inset to the whole footprint, its studs with it, while the
+        /// outer face shrinks inward by that inset and fades, the inner
+        /// shape's edge fades, and the lip turns from the outer colour's to
+        /// <paramref name="exposed"/>'s. It ends as a plain block of the
+        /// exposed colour, which is what the redraw then shows — with a third
+        /// colour's inner shape inside it when the stack goes deeper.
         /// </summary>
+        /// <returns>
+        /// The peel, to run in the leave stage's sequence, which carries this
+        /// view as its id; or null for a block drawn without an inner shape —
+        /// one that was cleared while frozen (M3 hides its colours) — which has
+        /// nothing to peel and is left to the redraw.
+        /// </returns>
         private Tween PeelEffect(DrawnBlock block, BlockColor exposed)
         {
-            for (var i = 0; i < block.BeneathSquares.Count; i++)
+            if (block.LayerQuarters == null)
             {
-                block.BeneathSquares[i].gameObject.SetActive(false);
+                return null;
             }
 
-            var exposedFill = config.BlockFill(exposed);
-            var lipFill = config.LipFill(exposedFill);
-            foreach (var lip in block.Lip.GetComponentsInChildren<SpriteRenderer>())
-            {
-                lip.color = lipFill;
-            }
+            var inset = config.LayerInsetCells;
+            var edgeInset = inset - config.LayerEdgeCells;
 
-            var peeling = block.Face;
-            var group = peeling.gameObject.AddComponent<SortingGroup>();
-            group.sortingOrder = config.PeelOrder;
-            block.Face = DrawFace(block, exposedFill);
+            // A footprint has at least one cell, so each list holds at least
+            // four quarters, all drawn in one colour.
+            var faceColor = block.FaceQuarters[0].color;
+            var edgeColor = block.LayerEdgeQuarters[0].color;
+            var lipFrom = block.LipQuarters[0].color;
+            var lipTo = config.LipFill(config.BlockFill(exposed));
 
-            var center = block.FootprintCenter;
-            var fade = new Fade(peeling);
-
-            // The face group sits at the body's origin; shifting it by
-            // centre · t while it shrinks to 1 − t keeps the footprint's centre
-            // fixed.
             return DOVirtual.Float(0f, 1f, config.PeelSeconds, t =>
                 {
-                    var scale = 1f - t;
-                    peeling.localScale = new Vector3(scale, scale, 1f);
-                    peeling.localPosition = center * t;
-                    fade.Apply(1f - t);
+                    // An easing may overshoot; a size may follow it, an
+                    // opacity may not.
+                    var opacity = 1f - Mathf.Clamp01(t);
+
+                    PoseInset(block.LayerQuarters, block.Tiles, inset * (1f - t));
+                    PoseInset(block.LayerEdgeQuarters, block.Tiles, edgeInset * (1f - t));
+                    PoseInset(block.FaceQuarters, block.Tiles, inset * t);
+                    block.SetStudScale(Mathf.LerpUnclamped(config.LayerStudScale, 1f, t));
+
+                    SetColor(block.FaceQuarters, WithOpacity(faceColor, opacity));
+                    SetColor(block.LayerEdgeQuarters, WithOpacity(edgeColor, opacity));
+                    SetColor(block.LipQuarters, Color.Lerp(lipFrom, lipTo, t));
                 })
                 .SetEase(config.PeelEase);
         }
+
+        private static void SetColor(List<SpriteRenderer> renderers, Color color)
+        {
+            for (var i = 0; i < renderers.Count; i++)
+            {
+                renderers[i].color = color;
+            }
+        }
+
+        /// <summary><paramref name="color"/> at <paramref name="opacity"/> times its own alpha.</summary>
+        private static Color WithOpacity(Color color, float opacity) =>
+            new Color(color.r, color.g, color.b, color.a * opacity);
 
         /// <summary>
         /// An opened shutter's panel, drawn again as a temporary piece, lifts
@@ -776,9 +892,12 @@ namespace GateRush.Runtime
             var cells = ctx.SpecAt(blockIndex).Cells;
 
             // The marks as the old drawing had them: the block was locked, so
-            // it had its padlock, beside a time-bonus mark if it carries one.
+            // it had its padlock, beside a layer badge and a time-bonus mark
+            // if it carried them.
             var shown = before != null ? visibility.Block(before, blockIndex) : default;
-            var marks = MarksOf(cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0);
+            var marks = MarksOf(
+                cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0,
+                hasLayers: shown.LayerNumeral.HasValue);
             var icon = marks.Icon;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);

@@ -53,7 +53,9 @@ MonoBehaviour:
   gateArrowSizeCells: 0.3
   axisArrowThicknessCells: 0.42
   axisArrowEndInsetCells: 0.14
-  beneathColorSize: 0.45
+  layerInsetCells: 0.1
+  layerEdgeCells: 0.02
+  layerStudScale: 0.9
   badgeHeightCells: 0.34
   badgeDigitWidthCells: 0.15
   badgePaddingCells: 0.08
@@ -72,6 +74,7 @@ MonoBehaviour:
   timeBonusMarkRimColor: {r: 0.62, g: 0.95, b: 0.62, a: 1}
   timeBonusMarkIconColor: {r: 1, g: 1, b: 1, a: 1}
   crowdedMarkScale: 0.6
+  crowdedTripleMarkScale: 0.45
   shutterBorderCells: 0.07
   elevatorBorderCells: 0.05
   elevatorDividerCells: 0.07
@@ -297,9 +300,7 @@ MonoBehaviour:
   elevatorDoorColor: {r: 0.22, g: 0.14, b: 0.34, a: 1}
   elevatorDividerColor: {r: 1, g: 0.78, b: 0.3, a: 1}
   elevatorBorderColor: {r: 1, g: 0.66, b: 0.2, a: 1}
-  labelFontSize: 4
   badgeLabelFontSize: 2.5
-  labelColor: {r: 0.08, g: 0.08, b: 0.1, a: 1}
   backgroundOrder: -20
   vignetteOrder: -19
   floorUnderlayOrder: -1
@@ -317,10 +318,10 @@ MonoBehaviour:
   gateMarkOrder: 11
   blockLipOrder: 12
   blockOrder: 13
-  studOrder: 14
-  glossOrder: 15
-  peelOrder: 16
-  beneathColorOrder: 17
+  layerEdgeOrder: 14
+  layerOrder: 15
+  studOrder: 16
+  glossOrder: 17
   chainOrder: 18
   iconOrder: 19
   keyGemOrder: 20

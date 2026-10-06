@@ -10,7 +10,7 @@ namespace GateRush.Runtime
     /// <summary>
     /// Draws a mechanic on the canvas for its introduction card (Module 19),
     /// as it looks on the board: the same generated sprites, placed by the same
-    /// layout rules — <see cref="BlockTiling"/>, <see cref="FrameTiling"/>,
+    /// layout rules — <see cref="BlockTiling"/>, <see cref="LayerInset"/>, <see cref="FrameTiling"/>,
     /// <see cref="GeneratorMachine"/>, <see cref="MarkLayout"/> — and sized by
     /// the board's own cell-relative values in <see cref="RuntimeConfig"/>,
     /// times <see cref="RuntimeConfig.IntroCellUnits"/>. Retuning the board
@@ -21,16 +21,16 @@ namespace GateRush.Runtime
     /// a screen-space overlay, where a <c>SpriteRenderer</c> cannot draw, so
     /// every piece here is a uGUI <see cref="Image"/>. The layout rules and
     /// config values are shared, but the composing recipes — a block's lip,
-    /// face and studs, the count badge, a lock's chains and padlock, a key, the
+    /// face, inner shape and studs, the count badge, a lock's chains and padlock, a key, the
     /// time-bonus mark, a gate, a shutter's panel, a generator's machine and
     /// miniature, an elevator's doors — are written a second time here. They
     /// mirror <c>BoardView.cs</c>'s <c>Draw…</c> methods and <b>must change
     /// with them</b>: a change to how the board draws one of these is not done
     /// until the same change is made here.</para>
     /// <para><b>Order.</b> uGUI draws in hierarchy order, so each piece is
-    /// added in the board's sorting order: lip, face, studs or frost, gloss or
-    /// arrow, beneath squares, chains, padlock or key, gem, badge rim, badge
-    /// fill, label.</para>
+    /// added in the board's sorting order: lip, face, a layered block's
+    /// inner edge and inner shape, studs or frost, gloss or arrow, chains,
+    /// padlock or key, gem, badge rim, badge fill, label.</para>
     /// <para><b>Units.</b> Every position and size in this class is in cells,
     /// in the scene's own frame; <see cref="AddRect"/> alone converts to canvas
     /// units. Nothing here is a raycast target: a tap on an illustration falls
@@ -130,15 +130,9 @@ namespace GateRush.Runtime
 
                 case LevelMechanic.LayeredBlock:
                 {
-                    var body = DrawBlock(root, "Layered block", Vector2.zero, Horizontal2, block, BlockFace.Studs);
-                    var side = config.BeneathColorSize;
-                    for (var c = 0; c < Horizontal2.Count; c++)
-                    {
-                        AddSprite(
-                            body, $"Beneath {Horizontal2[c]}", config.CellSprite, CellCenter(Horizontal2[c]), new Vector2(side, side),
-                            config.BlockFill(config.IntroSecondColor));
-                    }
-
+                    DrawBlock(
+                        root, "Layered block", Vector2.zero, Horizontal2, block, BlockFace.Studs,
+                        config.BlockFill(config.IntroSecondColor));
                     return BlockBounds(Vector2.zero, Horizontal2);
                 }
 
@@ -284,12 +278,17 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A block at <paramref name="origin"/>, as <c>BoardView.DrawBlocks</c>
-        /// and <c>DrawFace</c> draw it: lip, face quarters, then frost on ice,
-        /// studs with gloss on a plain block, or the axis arrow.
+        /// and <c>DrawFace</c> draw it: lip, face quarters, a layered block's
+        /// inner shape in <paramref name="beneath"/> over its darker edge
+        /// (<see cref="LayerInset"/>), then frost on ice, studs with gloss on
+        /// a plain block — on the inner shape, in its colour and at
+        /// <see cref="RuntimeConfig.LayerStudScale"/>, on a layered one — or
+        /// the axis arrow.
         /// </summary>
         /// <returns>The block's body, whose frame is the footprint's: marks go under it.</returns>
         private RectTransform DrawBlock(
-            RectTransform parent, string name, Vector2 origin, IReadOnlyList<Coord> cells, Color fill, BlockFace face)
+            RectTransform parent, string name, Vector2 origin, IReadOnlyList<Coord> cells, Color fill, BlockFace face,
+            Color? beneath = null)
         {
             var body = AddGroup(parent, name, origin);
             var tiles = BlockTiling.Compute(cells);
@@ -297,6 +296,19 @@ namespace GateRush.Runtime
             var lip = AddGroup(body, "Lip", new Vector2(0f, -config.LipOffsetCells));
             AddQuarters(lip, tiles, BlockTiling.QuarterRect, config.LipFill(fill));
             AddQuarters(body, tiles, BlockTiling.QuarterRect, fill);
+
+            var studFill = fill;
+            var studSize = Vector2.one;
+            if (beneath.HasValue)
+            {
+                var inset = config.LayerInsetCells;
+                var edgeInset = inset - config.LayerEdgeCells;
+                var inner = AddGroup(body, "Inner", Vector2.zero);
+                AddQuarters(inner, tiles, tile => LayerInset.QuarterRect(tile, edgeInset), config.LipFill(beneath.Value));
+                AddQuarters(inner, tiles, tile => LayerInset.QuarterRect(tile, inset), beneath.Value);
+                studFill = beneath.Value;
+                studSize = Vector2.one * config.LayerStudScale;
+            }
 
             for (var c = 0; c < cells.Count; c++)
             {
@@ -307,8 +319,8 @@ namespace GateRush.Runtime
                 }
                 else if (face == BlockFace.Studs)
                 {
-                    AddSprite(body, $"Studs {cells[c]}", config.StudsSprite, center, Vector2.one, fill);
-                    AddSprite(body, $"Gloss {cells[c]}", config.StudGlossSprite, center, Vector2.one, config.GlossColor);
+                    AddSprite(body, $"Studs {cells[c]}", config.StudsSprite, center, studSize, studFill);
+                    AddSprite(body, $"Gloss {cells[c]}", config.StudGlossSprite, center, studSize, config.GlossColor);
                 }
             }
 

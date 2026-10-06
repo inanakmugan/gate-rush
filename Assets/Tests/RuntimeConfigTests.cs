@@ -9,12 +9,13 @@ namespace GateRush.Tests
     /// Covers the introduction cards' texts in <see cref="RuntimeConfig"/>
     /// (Module 19): every <see cref="LevelMechanic"/> has one entry with a
     /// title and a text, and a missing, blank or duplicated entry is a problem
-    /// naming the mechanic.
+    /// naming the mechanic. Module 20: the layered-block values and orders
+    /// have their own checks, and the defaults pass them.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
     /// <see cref="RuntimeConfig.Problems"/> is never empty here; each test
-    /// looks for, or rules out, the problems about introductions alone.
+    /// looks for, or rules out, the problems about its own subject alone.
     /// </remarks>
     public class RuntimeConfigTests
     {
@@ -113,6 +114,103 @@ namespace GateRush.Tests
 
             Assert.That(problems, Has.Some.Contains($"2 entries for {LevelMechanic.IceBlock}"), string.Join(" | ", problems));
             Assert.That(problems, Has.Some.Contains($"no entry for {LevelMechanic.IceDoor}"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DefaultLayerValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            // Every layered-block message names a "Layer …" field, and every
+            // mark overlap message says what "would overlap".
+            Assert.That(problems, Has.None.Contains("Layer "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("would overlap"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Crowded"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LayerInsetOfHalfACell_IsReportedByName()
+        {
+            SetFloat("layerInsetCells", 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Layer Inset Cells must be above 0 and below 0.5"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LayerEdgeNotBelowTheInset_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            var inset = serialized.FindProperty("layerInsetCells").floatValue;
+            serialized.FindProperty("layerEdgeCells").floatValue = inset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Layer Edge Cells must be at least 0 and below Layer Inset Cells"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_StudOrderNotAboveLayerOrder_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("studOrder").intValue = serialized.FindProperty("layerOrder").intValue;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Stud Order above Layer Order"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_CrowdedTripleMarkScaleAboveThePairs_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("crowdedTripleMarkScale").floatValue =
+                serialized.FindProperty("crowdedMarkScale").floatValue + 0.1f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Crowded Triple Mark Scale must be above 0 and at most Crowded Mark Scale"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DefaultPeelValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Peel "), string.Join(" | ", problems));
+            Assert.That(config.PeelCubeFraction, Is.InRange(0f, 1f));
+            Assert.That(config.PeelBumpCells, Is.GreaterThanOrEqualTo(0f));
+        }
+
+        [Test]
+        public void Problems_PeelCubeFractionAboveOne_IsReportedByName()
+        {
+            SetFloat("peelCubeFraction", 1.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Peel Cube Fraction must be from 0 to 1"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_PeelBumpOfHalfACell_IsReportedByName()
+        {
+            SetFloat("peelBumpCells", 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Peel Bump Cells must be at least 0 and below 0.5"), string.Join(" | ", problems));
+        }
+
+        private void SetFloat(string field, float value)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         /// <summary>The index of <paramref name="mechanic"/>'s entry in the serialized list.</summary>

@@ -50,10 +50,10 @@ namespace GateRush.Runtime
         private const int DefaultGateMarkOrder = 11;
         private const int DefaultBlockLipOrder = 12;
         private const int DefaultBlockOrder = 13;
-        private const int DefaultStudOrder = 14;
-        private const int DefaultGlossOrder = 15;
-        private const int DefaultPeelOrder = 16;
-        private const int DefaultBeneathColorOrder = 17;
+        private const int DefaultLayerEdgeOrder = 14;
+        private const int DefaultLayerOrder = 15;
+        private const int DefaultStudOrder = 16;
+        private const int DefaultGlossOrder = 17;
         private const int DefaultChainOrder = 18;
         private const int DefaultIconOrder = 19;
         private const int DefaultKeyGemOrder = 20;
@@ -83,11 +83,19 @@ namespace GateRush.Runtime
         /// </summary>
         private const int WidestBonusSecondsChecked = 99;
 
+        /// <summary>
+        /// The deepest layer count <see cref="Problems"/> sizes a layer badge
+        /// for when it checks that marks sharing a block cannot overlap: two
+        /// digits. Not a tunable; a deeper stack widens its badge past what
+        /// was checked.
+        /// </summary>
+        private const int DeepestLayerCountChecked = 99;
+
         private const int DefaultLiftedBlockOrder = 26;
         private const int DefaultEffectOrder = 27;
 
         [Header("Assets")]
-        [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing and a layered block's beneath-colour squares.")]
+        [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing, and the shape of the mask that clips a block passing through its gate.")]
         [SerializeField] private Sprite cellSprite;
 
         [Tooltip("Sprite-Unlit-Default. Under the 2D Renderer a lit sprite renders black with no Light 2D.")]
@@ -161,8 +169,15 @@ namespace GateRush.Runtime
         [Tooltip("How far the axis arrow stops short of each end of the block's bounding box, in cells. Below 0.5.")]
         [SerializeField] private float axisArrowEndInsetCells = 0.14f;
 
-        [Tooltip("Size of the beneath-colour square drawn inside each cell of a layered block, as a fraction of a cell.")]
-        [SerializeField, Range(0f, 1f)] private float beneathColorSize = 0.45f;
+        [Header("Layered blocks (M4)")]
+        [Tooltip("How far the inner shape, in the colour beneath, sits inside a layered block's footprint, in cells: above 0, below 0.5. The outer colour shows as a rim of about this width.")]
+        [SerializeField] private float layerInsetCells = 0.1f;
+
+        [Tooltip("Width of the darker edge round the inner shape, in cells: at least 0, below Layer Inset Cells. Its colour is the colour beneath, darkened as a lip is.")]
+        [SerializeField] private float layerEdgeCells = 0.02f;
+
+        [Tooltip("Scale of a layered block's studs about each cell's centre, so they stay on the inner shape: above 0, at most 1. A peel grows them back to 1.")]
+        [SerializeField] private float layerStudScale = 0.9f;
 
         [Header("Count badge")]
         [Tooltip("Height of the badge every count sits on, in cells.")]
@@ -213,8 +228,11 @@ namespace GateRush.Runtime
         [SerializeField] private Color timeBonusMarkRimColor = new Color(0.62f, 0.95f, 0.62f);
         [SerializeField] private Color timeBonusMarkIconColor = Color.white;
 
-        [Tooltip("The scale of a padlock or key and a time-bonus mark that share a block with no room for both at full size (a 1×1, an L, a T): above 0, at most 1.")]
+        [Tooltip("The scale of two marks — a padlock or key, a layer count, a time-bonus mark — that share a block with no room for both at full size (a 1×1, an L, a T): above 0, at most 1.")]
         [SerializeField] private float crowdedMarkScale = 0.6f;
+
+        [Tooltip("The scale of three marks — a padlock or key, a layer count and a time-bonus mark — that share a block with no room for a cell each: above 0, at most Crowded Mark Scale.")]
+        [SerializeField] private float crowdedTripleMarkScale = 0.45f;
 
         [Header("Shutters and elevators")]
         [Tooltip("Thickness of a closed shutter's border, in cells.")]
@@ -279,10 +297,19 @@ namespace GateRush.Runtime
         [Tooltip("Linear passes the block through at a steady speed.")]
         [SerializeField] private Ease exitEase = Ease.Linear;
 
-        [Tooltip("Seconds a surviving layered block takes to peel its removed outer colour.")]
+        [Tooltip("Seconds a surviving layered block takes to peel its removed outer colour: the rim fades and shrinks while the inner shape grows to the whole block.")]
         [SerializeField] private float peelSeconds = 0.2f;
 
         [SerializeField] private Ease peelEase = Ease.InQuad;
+
+        [Tooltip("The part of a destroyed block's cube stream a peel gives, in the removed colour, from 0 (none) to 1 (as many as an exit). The Exit cubes values below set the rest.")]
+        [SerializeField] private float peelCubeFraction = 0.5f;
+
+        [Tooltip("How far a peeling block pushes into its gate and back within Peel Seconds, in cells: at least 0, below 0.5. 0 turns the bump off.")]
+        [SerializeField] private float peelBumpCells = 0.15f;
+
+        [Tooltip("Easing of the bump's way in, and mirrored, of its way back.")]
+        [SerializeField] private Ease peelBumpEase = Ease.OutQuad;
 
         [Header("Exit cubes (stream out beneath the gate while a destroyed block passes through it)")]
         [Tooltip("Cubes per cell of the block, before the cap.")]
@@ -693,14 +720,8 @@ namespace GateRush.Runtime
         [SerializeField] private Color elevatorBorderColor = new Color(1.00f, 0.66f, 0.20f);
 
         [Header("Labels")]
-        [Tooltip("Font size of a layered block's remaining-colour numeral (M4).")]
-        [SerializeField] private float labelFontSize = 4f;
-
         [Tooltip("Font size of the number on a badge.")]
         [SerializeField] private float badgeLabelFontSize = 2.5f;
-
-        [Tooltip("Colour of a layered block's numeral.")]
-        [SerializeField] private Color labelColor = new Color(0.08f, 0.08f, 0.10f);
 
         [Header("Sorting orders (back to front; context menu → Reset Sorting Orders)")]
         [SerializeField] private int backgroundOrder = DefaultBackgroundOrder;
@@ -731,16 +752,18 @@ namespace GateRush.Runtime
         [SerializeField] private int blockLipOrder = DefaultBlockLipOrder;
         [SerializeField] private int blockOrder = DefaultBlockOrder;
 
+        [Tooltip("The darker edge round a layered block's inner shape: above Block Order, below Layer Order.")]
+        [SerializeField] private int layerEdgeOrder = DefaultLayerEdgeOrder;
+
+        [Tooltip("A layered block's inner shape, in the colour beneath: above Layer Edge Order, below Stud Order.")]
+        [SerializeField] private int layerOrder = DefaultLayerOrder;
+
         [Tooltip("Studs, and a frozen block's frost, which has no studs.")]
         [SerializeField] private int studOrder = DefaultStudOrder;
 
         [Tooltip("Stud gloss, and an axis-restricted block's arrow, which has no studs.")]
         [SerializeField] private int glossOrder = DefaultGlossOrder;
 
-        [Tooltip("Sorting group order of a peeling outer colour: above every part of a block's face, below its marks.")]
-        [SerializeField] private int peelOrder = DefaultPeelOrder;
-
-        [SerializeField] private int beneathColorOrder = DefaultBeneathColorOrder;
         [SerializeField] private int chainOrder = DefaultChainOrder;
 
         [Tooltip("A padlock or a key.")]
@@ -755,7 +778,7 @@ namespace GateRush.Runtime
 
         [SerializeField] private int badgeOrder = DefaultBadgeOrder;
 
-        [Tooltip("Every label: badge numbers and layer numerals, in front of every other board layer. A time-bonus mark's clock icon shares it.")]
+        [Tooltip("Every label: the numbers on badges, in front of every other board layer. A time-bonus mark's clock icon shares it.")]
         [SerializeField] private int labelOrder = DefaultLabelOrder;
 
         [Tooltip("A grabbed block's outline. Compared only inside the lifted block's sorting group, where it must sort below Block Lip Order; equal to another board layer's order is fine.")]
@@ -767,7 +790,7 @@ namespace GateRush.Runtime
         [Tooltip("Cubes and ice shards, above everything else on the board.")]
         [SerializeField] private int effectOrder = DefaultEffectOrder;
 
-        /// <summary>The white square the floor's backing and beneath squares are drawn with.</summary>
+        /// <summary>The white square the floor's backing is drawn with, and the shape of a passing block's clip mask.</summary>
         public Sprite CellSprite => cellSprite;
 
         /// <summary>The material every sprite uses: <c>Sprite-Unlit-Default</c>.</summary>
@@ -875,8 +898,14 @@ namespace GateRush.Runtime
         /// <summary>How far the axis arrow stops short of each end of the block, in cells.</summary>
         public float AxisArrowEndInsetCells => axisArrowEndInsetCells;
 
-        /// <summary>Side of the beneath-colour square, as a fraction of a cell.</summary>
-        public float BeneathColorSize => beneathColorSize;
+        /// <summary>How far a layered block's inner shape sits inside its footprint, in cells (<see cref="LayerInset"/>).</summary>
+        public float LayerInsetCells => layerInsetCells;
+
+        /// <summary>Width of the darker edge round a layered block's inner shape, in cells.</summary>
+        public float LayerEdgeCells => layerEdgeCells;
+
+        /// <summary>Scale of a layered block's studs about each cell's centre.</summary>
+        public float LayerStudScale => layerStudScale;
 
         /// <summary>Height of a count badge, in cells.</summary>
         public float BadgeHeightCells => badgeHeightCells;
@@ -923,8 +952,11 @@ namespace GateRush.Runtime
         /// <summary>Tint of a time-bonus mark's clock icon.</summary>
         public Color TimeBonusMarkIconColor => timeBonusMarkIconColor;
 
-        /// <summary>The scale of two marks sharing a block without room for both at full size (<see cref="MarkLayout.PairedMarks"/>).</summary>
+        /// <summary>The scale of two marks sharing a block without room for both at full size (<see cref="MarkLayout.Row"/>).</summary>
         public float CrowdedMarkScale => crowdedMarkScale;
+
+        /// <summary>The scale of three marks sharing a block without room for a cell each (<see cref="MarkLayout.Row"/>).</summary>
+        public float CrowdedTripleMarkScale => crowdedTripleMarkScale;
 
         /// <summary>Thickness of a shutter's border, in cells.</summary>
         public float ShutterBorderCells => shutterBorderCells;
@@ -1066,6 +1098,15 @@ namespace GateRush.Runtime
 
         /// <summary>Easing of the peel.</summary>
         public Ease PeelEase => peelEase;
+
+        /// <summary>The part of a destroyed block's cube stream a peel gives, from 0 to 1 (<see cref="BurstLayout.StreamCount"/>).</summary>
+        public float PeelCubeFraction => peelCubeFraction;
+
+        /// <summary>How far a peeling block pushes into its gate and back, in cells; 0 for no bump.</summary>
+        public float PeelBumpCells => peelBumpCells;
+
+        /// <summary>Easing of each half of a peeling block's bump.</summary>
+        public Ease PeelBumpEase => peelBumpEase;
 
         /// <summary>Result panel title after a win.</summary>
         public string WinTitle => winTitle;
@@ -1383,14 +1424,8 @@ namespace GateRush.Runtime
         /// <summary>Tint of an elevator's border.</summary>
         public Color ElevatorBorderColor => elevatorBorderColor;
 
-        /// <summary>Font size of a layered block's numeral.</summary>
-        public float LabelFontSize => labelFontSize;
-
         /// <summary>Font size of the number on a badge.</summary>
         public float BadgeLabelFontSize => badgeLabelFontSize;
-
-        /// <summary>Colour of a layered block's numeral.</summary>
-        public Color LabelColor => labelColor;
 
         /// <summary>Sorting order of the background gradient.</summary>
         public int BackgroundOrder => backgroundOrder;
@@ -1443,17 +1478,17 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of a block's face quarters.</summary>
         public int BlockOrder => blockOrder;
 
+        /// <summary>Sorting order of the darker edge round a layered block's inner shape.</summary>
+        public int LayerEdgeOrder => layerEdgeOrder;
+
+        /// <summary>Sorting order of a layered block's inner shape.</summary>
+        public int LayerOrder => layerOrder;
+
         /// <summary>Sorting order of a block's studs, and of a frozen block's frost.</summary>
         public int StudOrder => studOrder;
 
         /// <summary>Sorting order of the stud highlights and of an axis-restricted block's arrow.</summary>
         public int GlossOrder => glossOrder;
-
-        /// <summary>Sorting group order of a peeling outer colour.</summary>
-        public int PeelOrder => peelOrder;
-
-        /// <summary>Sorting order of the beneath-colour squares.</summary>
-        public int BeneathColorOrder => beneathColorOrder;
 
         /// <summary>Sorting order of a locked block's chains.</summary>
         public int ChainOrder => chainOrder;
@@ -1739,6 +1774,7 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Peel Seconds must be positive.");
             }
 
+            AddLayerProblems(problems);
             AddFeedbackProblems(problems);
 
             if (blockPalette == null || blockPalette.Length < colourCount)
@@ -1754,10 +1790,41 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The constraints on the time-bonus mark (M10) and on two marks
-        /// sharing a block, each message naming its field. The overlap bounds
-        /// measure a key by its length and a time-bonus mark at
-        /// <see cref="WidestBonusSecondsChecked"/> seconds.
+        /// The constraints on a layered block's inner shape (Module 20), each
+        /// message naming its field. The inset is bounded by half a cell: an
+        /// outer corner's quarter is pulled in on both sides and scales as a
+        /// whole, its rounding with it, so the inner shape stays visible for
+        /// every inset below that.
+        /// </summary>
+        private void AddLayerProblems(List<string> problems)
+        {
+            if (!(layerInsetCells > 0f && layerInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Layer Inset Cells must be above 0 and below 0.5, so a layered block keeps a visible inner shape.");
+            }
+
+            if (!(layerEdgeCells >= 0f && layerEdgeCells < layerInsetCells))
+            {
+                problems.Add($"{name}: Layer Edge Cells must be at least 0 and below Layer Inset Cells.");
+            }
+
+            if (!(layerStudScale > 0f && layerStudScale <= 1f))
+            {
+                problems.Add($"{name}: Layer Stud Scale must be above 0 and at most 1.");
+            }
+
+            if (!(blockOrder < layerEdgeOrder && layerEdgeOrder < layerOrder && layerOrder < studOrder))
+            {
+                problems.Add($"{name}: Layer Edge Order must be above Block Order, Layer Order above Layer Edge Order and Stud Order above Layer Order, so the inner shape sits on the face and under the studs.");
+            }
+        }
+
+        /// <summary>
+        /// The constraints on the time-bonus mark (M10) and on marks sharing a
+        /// block, each message naming its field. The overlap bounds measure a
+        /// key by its length, a time-bonus mark at
+        /// <see cref="WidestBonusSecondsChecked"/> seconds and a layer badge at
+        /// <see cref="DeepestLayerCountChecked"/> colours.
         /// </summary>
         private void AddMarkProblems(List<string> problems)
         {
@@ -1775,6 +1842,12 @@ namespace GateRush.Runtime
             if (!(crowdedMarkScale > 0f && crowdedMarkScale <= 1f))
             {
                 problems.Add($"{name}: Crowded Mark Scale must be above 0 and at most 1.");
+                return;
+            }
+
+            if (!(crowdedTripleMarkScale > 0f && crowdedTripleMarkScale <= crowdedMarkScale))
+            {
+                problems.Add($"{name}: Crowded Triple Mark Scale must be above 0 and at most Crowded Mark Scale.");
                 return;
             }
 
@@ -1796,6 +1869,29 @@ namespace GateRush.Runtime
                     $"{name}: a padlock or key and a time-bonus mark sharing a block would overlap. Padlock Size Cells, Key Size Cells and the " +
                     $"mark's width for a two-digit bonus ({bonus:0.##} cells, from Time Bonus Mark Icon Cells, the badge's digit width and padding) " +
                     $"must each be at most {roomyWidth:0.##}, and Crowded Mark Scale times the icon plus the mark at most {crowdedWidth:0.##}.");
+            }
+
+            // The layer badge pairs with either of them by the same two
+            // bounds.
+            var layer = BadgeWidthCells(DeepestLayerCountChecked);
+            if (!(layer <= roomyWidth && crowdedMarkScale * (icon + layer) <= crowdedWidth
+                  && crowdedMarkScale * (layer + bonus) <= crowdedWidth))
+            {
+                problems.Add(
+                    $"{name}: a layer count badge sharing a block with a padlock, key or time-bonus mark would overlap it. The badge's width for a " +
+                    $"two-digit count ({layer:0.##} cells, from the badge's height, digit width and padding) must be at most {roomyWidth:0.##}, and " +
+                    $"Crowded Mark Scale times the badge plus the other mark at most {crowdedWidth:0.##}.");
+            }
+
+            // Three crowded marks sit a third of a cell apart with the layer
+            // badge in the middle, so each neighbouring pair may be, at the
+            // triple scale, two thirds of a cell wide together.
+            var apart = MarkLayout.CrowdedTripleOffsetCells;
+            if (!(crowdedTripleMarkScale * (icon + layer) * 0.5f <= apart && crowdedTripleMarkScale * (layer + bonus) * 0.5f <= apart))
+            {
+                problems.Add(
+                    $"{name}: a padlock or key, a layer count badge and a time-bonus mark sharing a block would overlap. Crowded Triple Mark Scale " +
+                    $"times half the badge plus half its neighbour — the icon, or the time-bonus mark — must be at most {apart:0.##}.");
             }
         }
 
@@ -1957,6 +2053,16 @@ namespace GateRush.Runtime
             if (!(shardFallCells >= 0f) || float.IsInfinity(shardFallCells))
             {
                 problems.Add($"{name}: Shard Fall Cells must be at least 0 and finite.");
+            }
+
+            if (!(peelCubeFraction >= 0f && peelCubeFraction <= 1f))
+            {
+                problems.Add($"{name}: Peel Cube Fraction must be from 0 to 1.");
+            }
+
+            if (!(peelBumpCells >= 0f && peelBumpCells < 0.5f))
+            {
+                problems.Add($"{name}: Peel Bump Cells must be at least 0 and below 0.5.");
             }
 
             if (!(lockOpenScale >= 1f) || float.IsInfinity(lockOpenScale))
@@ -2127,10 +2233,10 @@ namespace GateRush.Runtime
             gateMarkOrder = DefaultGateMarkOrder;
             blockLipOrder = DefaultBlockLipOrder;
             blockOrder = DefaultBlockOrder;
+            layerEdgeOrder = DefaultLayerEdgeOrder;
+            layerOrder = DefaultLayerOrder;
             studOrder = DefaultStudOrder;
             glossOrder = DefaultGlossOrder;
-            peelOrder = DefaultPeelOrder;
-            beneathColorOrder = DefaultBeneathColorOrder;
             chainOrder = DefaultChainOrder;
             iconOrder = DefaultIconOrder;
             keyGemOrder = DefaultKeyGemOrder;

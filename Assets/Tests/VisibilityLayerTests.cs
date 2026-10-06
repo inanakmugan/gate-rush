@@ -123,6 +123,28 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Block_FrozenAndLayered_ReportsNoColourBeneathAndNoLayerCount()
+        {
+            // Module 20: the board draws an inner shape and a layer badge from
+            // these two, so a frozen layered block is ice and nothing else.
+            // One clear thaws the same block, and both then show.
+            var ctx = CountsBoard(unfreezeAt: 1, gateOpensAt: 4, globalShutterAt: 2, redShutterAt: 3);
+            var frozenState = BoardState.CreateInitial(ctx);
+            var thawedState = AfterOneRedClear(ctx);
+            var visibility = new VisibilityLayer(ctx);
+
+            var frozen = visibility.Block(frozenState, FrozenSlot);
+            var thawed = visibility.Block(thawedState, FrozenSlot);
+
+            Assert.IsTrue(frozen.IsFrozen);
+            Assert.IsNull(frozen.BeneathColor);
+            Assert.IsNull(frozen.LayerNumeral);
+            Assert.IsFalse(thawed.IsFrozen);
+            Assert.AreEqual(ThreeLayers[1], thawed.BeneathColor);
+            Assert.AreEqual(ThreeLayers.Length, thawed.LayerNumeral);
+        }
+
+        [Test]
         public void Block_UnderClosedShutter_IsNotShownAndLeavesStateUnchanged()
         {
             var ctx = CountsBoard(unfreezeAt: 3, gateOpensAt: 4, globalShutterAt: 2, redShutterAt: 3);

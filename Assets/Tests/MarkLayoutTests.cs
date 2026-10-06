@@ -14,7 +14,9 @@ namespace GateRush.Tests
     /// box; a locked block's chains run along each row of its cells and stay
     /// on them; and a badge widens with its number's digits. Module 19: two
     /// marks sharing a block both sit on its footprint, a cell apart where it
-    /// has room and half a cell apart, crowded, where it has not.
+    /// has room and half a cell apart, crowded, where it has not. Module 20:
+    /// a row of one, two or three marks — the layer badge among them — stays
+    /// on the footprint, and the badge clears a padlock on a 1×1.
     /// </summary>
     public class MarkLayoutTests
     {
@@ -209,6 +211,119 @@ namespace GateRush.Tests
             // With room each mark has a whole cell; crowded, half of one.
             var apart = 2f * (pair.IsCrowded ? MarkLayout.CrowdedOffsetCells : MarkLayout.RoomyOffsetCells);
             Assert.AreEqual(apart, Vector2.Distance(pair.First, pair.Second), Tolerance);
+        }
+
+        private static IEnumerable<TestCaseData> RowFootprints()
+        {
+            yield return new TestCaseData((object)Single).SetName("Row_1x1_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)Horizontal2).SetName("Row_Horizontal1x2_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)Vertical2).SetName("Row_Vertical1x2_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)Horizontal3).SetName("Row_Horizontal1x3_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)Vertical3).SetName("Row_Vertical1x3_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)Square).SetName("Row_2x2_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)L).SetName("Row_L_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)T).SetName("Row_T_EverySlotLiesOnTheFootprint");
+            yield return new TestCaseData((object)U).SetName("Row_U_EverySlotLiesOnTheFootprint");
+        }
+
+        [Test]
+        public void Row_OneMark_IsTheAnchor()
+        {
+            var row = MarkLayout.Row(L, 1);
+
+            Assert.AreEqual(1, row.Count);
+            AssertPoint(MarkLayout.Anchor(L), row[0]);
+            Assert.IsFalse(row.IsCrowded);
+        }
+
+        [Test]
+        public void Row_ThreeMarksOnA1x3_SitOnePerCellAtFullSize()
+        {
+            var across = MarkLayout.Row(Horizontal3, 3);
+            var up = MarkLayout.Row(Vertical3, 3);
+
+            Assert.IsFalse(across.IsCrowded);
+            AssertPoint(new Vector2(0.5f, 0.5f), across[0]);
+            AssertPoint(new Vector2(1.5f, 0.5f), across[1]);
+            AssertPoint(new Vector2(2.5f, 0.5f), across[2]);
+            Assert.IsFalse(up.IsCrowded);
+            AssertPoint(new Vector2(0.5f, 0.5f), up[0]);
+            AssertPoint(new Vector2(0.5f, 1.5f), up[1]);
+            AssertPoint(new Vector2(0.5f, 2.5f), up[2]);
+        }
+
+        [Test]
+        public void Row_ThreeMarksOnA1x1_ShareTheCell()
+        {
+            var row = MarkLayout.Row(Single, 3);
+
+            Assert.IsTrue(row.IsCrowded);
+            Assert.AreEqual(3, row.Count);
+            AssertPoint(new Vector2(0.5f - MarkLayout.CrowdedTripleOffsetCells, 0.5f), row[0]);
+            AssertPoint(new Vector2(0.5f, 0.5f), row[1]);
+            AssertPoint(new Vector2(0.5f + MarkLayout.CrowdedTripleOffsetCells, 0.5f), row[2]);
+        }
+
+        [TestCaseSource(nameof(RowFootprints))]
+        public void Row_EveryFootprint_EverySlotLiesOnTheFootprint(Coord[] cells)
+        {
+            var slots = 0;
+
+            for (var count = 1; count <= MarkLayout.MostMarksInARow; count++)
+            {
+                var row = MarkLayout.Row(cells, count);
+
+                Assert.AreEqual(count, row.Count);
+                for (var i = 0; i < row.Count; i++)
+                {
+                    AssertOnFootprint(cells, row[i], $"{i + 1} of {count}");
+                    slots++;
+                }
+            }
+
+            Assert.AreEqual(1 + 2 + 3, slots, "one, two and three marks were all placed");
+        }
+
+        [Test]
+        public void Row_TwoMarks_IsWherePairedMarksPutsThem()
+        {
+            var row = MarkLayout.Row(Horizontal2, 2);
+            var pair = MarkLayout.PairedMarks(Horizontal2);
+
+            AssertPoint(pair.First, row[0]);
+            AssertPoint(pair.Second, row[1]);
+            Assert.AreEqual(pair.IsCrowded, row.IsCrowded);
+        }
+
+        [Test]
+        public void Row_NoMarksOrFour_Throws()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => MarkLayout.Row(Single, 0));
+            Assert.Throws<ArgumentOutOfRangeException>(() => MarkLayout.Row(Single, MarkLayout.MostMarksInARow + 1));
+        }
+
+        [Test]
+        public void Row_LayerBadgeAndPadlockOnA1x1_DoNotOverlapAtTheDefaultSizes()
+        {
+            // A 1x1 layered locked block: the padlock takes the first slot
+            // and the layer badge the second, both at the crowded scale. The
+            // padlock's own count badge hangs on its body and is narrower
+            // than it, so the padlock's width is the lock's.
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            const int ThreeColours = 3;
+
+            var row = MarkLayout.Row(Single, 2);
+            var apart = row[1].x - row[0].x;
+            var padlockHalf = config.PadlockSizeCells * 0.5f * config.CrowdedMarkScale;
+            var badgeHalf = config.BadgeWidthCells(ThreeColours) * 0.5f * config.CrowdedMarkScale;
+            var keyCountWidth = config.BadgeWidthCells(1);
+            var padlockWidth = config.PadlockSizeCells;
+            UnityEngine.Object.DestroyImmediate(config);
+
+            Assert.IsTrue(row.IsCrowded, "a 1x1 has no room for a cell each");
+            Assert.AreEqual(row[0].y, row[1].y, Tolerance, "the two sit side by side");
+            Assert.LessOrEqual(keyCountWidth, padlockWidth, "the padlock's own badge stays within the padlock");
+            Assert.LessOrEqual(padlockHalf + badgeHalf, apart, "the padlock's right side stops before the badge's left");
         }
 
         [Test]
