@@ -10,7 +10,9 @@ namespace GateRush.Tests
     /// budgets are D5's numbers, the time-budget formula is
     /// <c>base 10 + 3 per move, rounded to 5</c>, and the window-layout
     /// proportions and floors (docs/Modules/09a follow-up, item 4) match what
-    /// today's window is tuned for.
+    /// today's window is tuned for. Module 20: the block mark values have
+    /// their documented defaults, which <see cref="LevelEditorSettings.Problems"/>
+    /// accepts.
     /// </summary>
     public class LevelEditorSettingsTests
     {
@@ -131,6 +133,47 @@ namespace GateRush.Tests
 
             Assert.AreEqual(120f, settings.ValidateButtonWidth);
             Assert.AreEqual(28f, settings.ValidateButtonHeight);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_BlockMarks_AreTheDocumentedValues()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(0.2f, settings.BlockInsetCells);
+            Assert.AreEqual(0.5f, settings.BlockNumberPlateCells);
+            Assert.AreEqual(0.7f, settings.BlockNumberSizeRatio);
+            Assert.AreEqual(7, settings.BlockNumberMinFontSize);
+            Assert.AreNotEqual(settings.BlockNumberColor, settings.BlockNumberPlateColor, "a number reads on its plate");
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Problems_Defaults_ReportNothing()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            var problems = settings.Problems();
+
+            Assert.IsEmpty(problems, string.Join(" | ", problems));
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Problems_BlockInsetOfHalfACell_IsReportedByName()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("blockInsetCells").floatValue = 0.5f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Block Inset Cells"), string.Join(" | ", problems));
 
             Object.DestroyImmediate(settings);
         }

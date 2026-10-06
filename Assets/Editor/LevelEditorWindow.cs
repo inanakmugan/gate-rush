@@ -403,6 +403,15 @@ namespace GateRush.Editor
             DrawToolRow();
             DrawShapePaletteRow();
 
+            // Block marks are not drawn while their settings are unusable
+            // (DrawBlockLook); say why rather than leave them missing.
+            var settingsProblems = settings.Problems();
+            areBlockMarksUsable = settingsProblems.Count == 0;
+            foreach (var problem in settingsProblems)
+            {
+                EditorGUILayout.HelpBox(problem, MessageType.Warning);
+            }
+
             // Item 4: the canvas below claims whatever height the layout system
             // actually has left after this scroll view's other content — no more
             // guessing the footer's height at the canvas. The footer never
@@ -689,6 +698,7 @@ namespace GateRush.Editor
 
             EditorGrid.DrawCells(layout, FillOf);
             DrawBlockOutlines(layout);
+            DrawBlockLooks(layout);
 
             if (!InWaveScope())
             {
@@ -746,7 +756,7 @@ namespace GateRush.Editor
                 {
                     if (block.RegionOrigin.HasValue && DraftHitTest.Covers(block.RegionOrigin.Value, block.Cells, cell))
                     {
-                        return Palette(FirstColor(block.ColorStack));
+                        return BlockFill(block.ColorStack, block.UnfreezeAtClearCount);
                     }
                 }
 
@@ -762,7 +772,7 @@ namespace GateRush.Editor
             {
                 if (DraftHitTest.Covers(block.StartOrigin, block.Cells, cell))
                 {
-                    return Palette(FirstColor(block.ColorStack));
+                    return BlockFill(block.ColorStack, block.UnfreezeAtClearCount);
                 }
             }
 
@@ -839,7 +849,7 @@ namespace GateRush.Editor
                 {
                     if (block.RegionOrigin.HasValue)
                     {
-                        footprints.Add((block.Cells, block.RegionOrigin.Value, Palette(FirstColor(block.ColorStack))));
+                        footprints.Add((block.Cells, block.RegionOrigin.Value, BlockFill(block.ColorStack, block.UnfreezeAtClearCount)));
                     }
                 }
 
@@ -848,11 +858,136 @@ namespace GateRush.Editor
 
             foreach (var block in draft.Blocks)
             {
-                footprints.Add((block.Cells, block.StartOrigin, Palette(FirstColor(block.ColorStack))));
+                footprints.Add((block.Cells, block.StartOrigin, BlockFill(block.ColorStack, block.UnfreezeAtClearCount)));
             }
 
             return footprints;
         }
+
+        /// <summary>
+        /// A block's cell fill: its outer colour, or the settings' ice colour
+        /// when it starts frozen (M3), whatever its own colours. The one fill
+        /// for <see cref="FillOf"/>, for the seam erasure of
+        /// <see cref="ScopeFootprints"/> and for a queue entry's preview, so a
+        /// frozen block is ice wherever it is drawn.
+        /// </summary>
+        private Color BlockFill(IReadOnlyList<BlockColor> colorStack, int? unfreezeAtClearCount) =>
+            EditorBlockLook.Of(colorStack, unfreezeAtClearCount).IsFrozen
+                ? settings.FrozenBlockColor
+                : Palette(FirstColor(colorStack));
+
+        /// <summary>
+        /// What every block in the current scope shows beyond its fill
+        /// (<see cref="DrawBlockLook"/>), over the fills and the block
+        /// outlines.
+        /// </summary>
+        private void DrawBlockLooks(EditorGridLayout layout)
+        {
+            if (InWaveScope())
+            {
+                foreach (var block in draft.Elevators[scopeElevator].Waves[scopeWave].Blocks)
+                {
+                    if (block.RegionOrigin.HasValue)
+                    {
+                        DrawBlockLook(
+                            layout.CellSpaceAt(block.RegionOrigin.Value), block.Cells, block.ColorStack, block.UnfreezeAtClearCount);
+                    }
+                }
+
+                return;
+            }
+
+            foreach (var block in draft.Blocks)
+            {
+                DrawBlockLook(layout.CellSpaceAt(block.StartOrigin), block.Cells, block.ColorStack, block.UnfreezeAtClearCount);
+            }
+        }
+
+        /// <summary>
+        /// Draws what <see cref="EditorBlockLook"/> says a block shows beyond
+        /// its fill (Module 20): a layered block's second colour, inset as one
+        /// piece over the footprint (<see cref="EditorLayerInset"/>), and its
+        /// number — a frozen block's count, or a deep stack's depth — on a
+        /// plate at the footprint's anchor. The one drawing for the main
+        /// grid, a wave's scope and a generator queue entry's preview and
+        /// free-draw grid; only <paramref name="space"/> differs. Draws
+        /// nothing while the settings' block mark values are unusable, which
+        /// the window reports above the grid.
+        /// </summary>
+        private void DrawBlockLook(
+            EditorCellSpace space, IReadOnlyList<Coord> cells, IReadOnlyList<BlockColor> colorStack, int? unfreezeAtClearCount)
+        {
+            // An empty footprint has no anchor to mark; a queue entry being
+            // free-drawn can be empty for a moment.
+            if (cells.Count == 0 || !areBlockMarksUsable)
+            {
+                return;
+            }
+
+            var look = EditorBlockLook.Of(colorStack, unfreezeAtClearCount);
+            if (look.BeneathColor.HasValue)
+            {
+                var beneath = Palette(look.BeneathColor.Value);
+                foreach (var inset in EditorLayerInset.Rects(cells, colorStack.Count, settings.BlockInsetCells))
+                {
+                    if (space.TryToGui(inset, out var rect))
+                    {
+                        EditorGUI.DrawRect(rect, beneath);
+                    }
+                }
+            }
+
+            if (look.Number.HasValue)
+            {
+                DrawBlockNumber(space, GateRush.Runtime.MarkLayout.Anchor(cells), look.Number.Value);
+            }
+        }
+
+        /// <summary>
+        /// A block's number on its plate, centred on <paramref name="anchor"/>
+        /// (in the block's cell units). The plate is
+        /// <see cref="LevelEditorSettings.BlockNumberPlateCells"/> of a cell,
+        /// and never smaller than the smallest font needs, so on a preview's
+        /// small cells the number stays readable and the plate grows instead.
+        /// </summary>
+        private void DrawBlockNumber(EditorCellSpace space, Vector2 anchor, int number)
+        {
+            if (Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+
+            var ratio = settings.BlockNumberSizeRatio;
+            var minFont = settings.BlockNumberMinFontSize;
+            var side = Mathf.Max(settings.BlockNumberPlateCells * space.CellSize, minFont / ratio);
+            var center = space.ToGui(anchor);
+            var plate = new Rect(center.x - (side * 0.5f), center.y - (side * 0.5f), side, side);
+            EditorGUI.DrawRect(plate, settings.BlockNumberPlateColor);
+
+            // Built lazily: EditorStyles is only available inside a GUI pass.
+            if (blockNumberStyle == null)
+            {
+                blockNumberStyle = new GUIStyle(EditorStyles.miniBoldLabel)
+                {
+                    alignment = TextAnchor.MiddleCenter,
+                    clipping = TextClipping.Overflow,
+                    padding = new RectOffset(0, 0, 0, 0),
+                    margin = new RectOffset(0, 0, 0, 0),
+                };
+            }
+
+            blockNumberStyle.normal.textColor = settings.BlockNumberColor;
+            blockNumberStyle.fontSize = Mathf.Max(minFont, Mathf.RoundToInt(side * ratio));
+            GUI.Label(plate, number.ToString(System.Globalization.CultureInfo.InvariantCulture), blockNumberStyle);
+        }
+
+        // The style of a block's number. An instance field, rebuilt after a
+        // domain reload, so the window keeps no static state for it.
+        [NonSerialized] private GUIStyle blockNumberStyle;
+
+        // Whether the settings' block mark values are usable, worked out once
+        // per GUI pass in OnGUI before anything draws a block.
+        [NonSerialized] private bool areBlockMarksUsable;
 
         /// <summary>
         /// Paints out the grid line at every seam that falls inside one block,
@@ -2328,7 +2463,15 @@ namespace GateRush.Editor
                 // own bounding box, so it need not track the generator's width.
                 var side = Math.Max(1, settings.QueueEntryFreeDrawMaxDepth) * EditorGrid.PreviewCellSize;
                 var rect = GUILayoutUtility.GetRect(side, side, GUILayout.Width(side));
-                EditorGrid.DrawCellPreview(rect, entry.Cells, PreviewFillColor);
+
+                // The entry as the grid would draw it once spawned: its own
+                // fill and marks, not the neutral preview colour, so a
+                // layered or frozen entry reads as one in the queue.
+                EditorGrid.DrawCellPreview(rect, entry.Cells, BlockFill(entry.ColorStack, entry.UnfreezeAtClearCount));
+                if (EditorGrid.TryPreviewCellSpace(rect, entry.Cells, out var space))
+                {
+                    DrawBlockLook(space, entry.Cells, entry.ColorStack, entry.UnfreezeAtClearCount);
+                }
             }
         }
 
@@ -2350,10 +2493,15 @@ namespace GateRush.Editor
             var rect = GUILayoutUtility.GetRect(width, height, GUILayout.Width(width));
             var layout = new EditorGridLayout(rect, bounds.Columns, bounds.Rows);
 
+            var fill = BlockFill(entry.ColorStack, entry.UnfreezeAtClearCount);
             EditorGrid.DrawCells(layout, cell =>
-                entry.Cells.Contains(cell) ? PreviewFillColor
+                entry.Cells.Contains(cell) ? fill
                 : bounds.AllowsNewCell(cell) ? FreeDrawBackground
                 : FreeDrawOutOfBoundsBackground);
+
+            // The entry's cells are in this grid's own coordinates, so its
+            // cell space starts at the grid's origin.
+            DrawBlockLook(layout.CellSpaceAt(new Coord(0, 0)), entry.Cells, entry.ColorStack, entry.UnfreezeAtClearCount);
 
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && layout.TryPick(e.mousePosition, out var clicked))
