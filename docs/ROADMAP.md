@@ -62,8 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) done. Next: the owner's level set
-for the first build, then Phase 3.* Levels chain through Next
+*Status: playable; visual polish (2.4) done. Next: tools to play any level
+(2.5), the owner's level set for the first build, then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -152,6 +152,13 @@ steps, each its own spec and PR:
   frozen blocks. *Spec: `Modules/20-layered-blocks.md`. Status: done.* A peel
   also glows its gate, streams cubes of the removed colour and bumps the
   block into the gate, as an exit does.
+
+**2.5 — Play any level.** Development tooling so the owner can test any
+level without editing the Level scene: a Play button in the Level Editor,
+a Gate Rush → Play Level… window listing every level, a one-shot
+editor-only start-level override, and keys to step between levels during
+Play in the editor and development builds. The scene keeps starting on the
+first level. *Spec: `Modules/21-dev-tools.md`.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
