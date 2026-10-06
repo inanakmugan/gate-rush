@@ -546,6 +546,11 @@ namespace GateRush.Editor
                 SaveAs();
             }
 
+            if (GUILayout.Button(new GUIContent("Play", PlayTooltip()), EditorStyles.toolbarButton, GUILayout.Width(44)))
+            {
+                RequestPlay();
+            }
+
             GUILayout.Space(12);
             GUILayout.Label(Breadcrumb(), EditorStyles.miniBoldLabel);
 
@@ -3252,6 +3257,98 @@ namespace GateRush.Editor
             assetPath = path;
             dirty = false;
             RefreshOtherLevelIds();
+        }
+
+        // -- play (Module 21) ---------------------------------
+
+        private const string CannotPlayTitle = "Cannot play";
+
+        /// <summary>What the Play button would play, or why it cannot (<see cref="PlayableLevelFile"/>).</summary>
+        private string PlayTooltip() =>
+            PlayableLevelFile.TryGetLevelName(assetPath, LevelsFolder, out var levelName, out var reason)
+                ? $"Play '{levelName}' in the Level scene. The game runs the saved file."
+                : reason;
+
+        /// <summary>
+        /// Plays the level file open in the editor. A level never saved, or
+        /// saved outside <see cref="LevelsFolder"/>, cannot be played, and the
+        /// dialog says so. With unsaved changes it asks first: Save and Play,
+        /// Play the saved file, or Cancel. What is played is always the file,
+        /// so the file is what must load as a level; a draft that does not is
+        /// not saved by Save and Play either.
+        /// </summary>
+        private void RequestPlay()
+        {
+            if (!PlayableLevelFile.TryGetLevelName(assetPath, LevelsFolder, out var levelName, out var reason))
+            {
+                EditorUtility.DisplayDialog(CannotPlayTitle, reason, "OK");
+                return;
+            }
+
+            if (dirty)
+            {
+                // DisplayDialogComplex answers 0 for ok, 1 for cancel, 2 for alt.
+                var choice = EditorUtility.DisplayDialogComplex(
+                    "Unsaved changes",
+                    $"'{levelName}' has unsaved changes, and Play runs the saved file.",
+                    "Save and Play", "Cancel", "Play the saved file");
+                if (choice == 1)
+                {
+                    return;
+                }
+
+                if (choice == 0)
+                {
+                    try
+                    {
+                        draft.ToContext();
+                    }
+                    catch (Exception e)
+                    {
+                        EditorUtility.DisplayDialog(
+                            CannotPlayTitle,
+                            $"The draft is not a valid level, so it was neither saved nor played:\n\n{e.Message}",
+                            "OK");
+                        return;
+                    }
+
+                    Save(assetPath);
+                }
+            }
+
+            if (!IsSavedFilePlayable(levelName, out var error))
+            {
+                EditorUtility.DisplayDialog(
+                    CannotPlayTitle,
+                    $"The saved file {Path.GetFileName(assetPath)} is not a valid level, so it was not played:\n\n{error}",
+                    "OK");
+                return;
+            }
+
+            // After this GUI pass: opening a scene and entering Play Mode do
+            // not belong inside one.
+            EditorApplication.delayCall += () => DevPlayLauncher.Play(levelName);
+        }
+
+        /// <summary>
+        /// Whether the file at <see cref="assetPath"/> loads as a level, by the
+        /// game's own rule (<c>LevelRoster.TryParse</c>), read from disk as it
+        /// stands now. The caller has established that there is a path.
+        /// </summary>
+        private bool IsSavedFilePlayable(string levelName, out string error)
+        {
+            string json;
+            try
+            {
+                json = File.ReadAllText(assetPath);
+            }
+            catch (IOException e)
+            {
+                error = e.Message;
+                return false;
+            }
+
+            return GateRush.Runtime.LevelRoster.TryParse(json, levelName, out _, out error);
         }
 
         // -- resize (LevelDraft decides what is lost) ----------
