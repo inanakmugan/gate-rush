@@ -477,7 +477,7 @@
             "offset": 2,
             "width": 1,
             "color": "Yellow",
-            "openAtClearCount": 4
+            "openAtClearCount": -1
         },
         {
             "id": 3,
@@ -485,7 +485,7 @@
             "offset": 3,
             "width": 2,
             "color": "Orange",
-            "openAtClearCount": 9
+            "openAtClearCount": -1
         },
         {
             "id": 4,
@@ -493,7 +493,7 @@
             "offset": 0,
             "width": 2,
             "color": "Purple",
-            "openAtClearCount": 9
+            "openAtClearCount": -1
         }
     ],
     "shutters": [],

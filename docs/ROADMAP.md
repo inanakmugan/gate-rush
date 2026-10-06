@@ -62,8 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) done. Next: the owner's level set
-for the first build, then Phase 3.* Levels chain through Next
+*Status: playable; visual polish (2.4) in its last step (2.4e). Next: the
+owner's level set for the first build, then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -114,7 +114,7 @@ under the finger, stops flush against obstacles, slides into corridors
 through a corner assist, and settles into the nearest cell on release.
 
 **2.4 — Visual polish before the first shared build (D46).** The first
-build goes to a mentor, so the prototype look is replaced first, in four
+build goes to a mentor, so the prototype look is replaced first, in five
 steps, each its own spec and PR:
 
 - **2.4a — Board and blocks.** Background, frame and walls, studded
@@ -144,6 +144,12 @@ steps, each its own spec and PR:
   content, so reordering levels moves the cards with them. The countdown
   waits for the last card. Time-bonus blocks gain a board mark.
   *Spec: `Modules/19-mechanic-introductions.md`. Status: done.*
+- **2.4e — Layered blocks and editor marks.** 2.4a and 2.4b both left
+  layered blocks (M4) on 2.1's placeholder, a small square per cell, so a
+  2×2 layered block reads as four blocks. It becomes one block of the
+  outer colour with one inset block of the colour beneath, with its peel
+  and the depth on the shared badge. The Level Editor shows layered and
+  frozen blocks. *Spec: `Modules/20-layered-blocks.md`.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no

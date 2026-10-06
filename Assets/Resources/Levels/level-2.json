@@ -26,7 +26,8 @@
                 }
             ],
             "colorStack": [
-                "Red"
+                "Red",
+                "Green"
             ],
             "startOrigin": {
                 "x": 0,
@@ -435,7 +436,7 @@
             "offset": 0,
             "width": 2,
             "color": "Purple",
-            "openAtClearCount": 9
+            "openAtClearCount": -1
         },
         {
             "id": 3,
@@ -443,7 +444,15 @@
             "offset": 3,
             "width": 2,
             "color": "Orange",
-            "openAtClearCount": 3
+            "openAtClearCount": -1
+        },
+        {
+            "id": 4,
+            "edge": "Bottom",
+            "offset": 0,
+            "width": 2,
+            "color": "Green",
+            "openAtClearCount": -1
         }
     ],
     "shutters": [],
