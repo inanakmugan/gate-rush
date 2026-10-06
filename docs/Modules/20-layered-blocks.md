@@ -150,3 +150,51 @@ The Layered Block card's illustration (Module 19) follows the new look;
 - The Layered Block card matches the board.
 - In the Level Editor, layered blocks show their second colour and depth,
   and frozen blocks show as ice with their count.
+
+---
+
+## Resolved during implementation
+
+- **Inset rule.** `LayerInset` pulls outer and concave corners in on both
+  outward sides and an edge quarter in on its outward side; an edge
+  quarter also reaches one inset along its run, into the neighbouring
+  quarter of the same block. Without that reach an L's squeezed concave
+  quarter leaves two slits at the bend; with it the inner shape is one
+  piece with an even rim.
+- **Look.** The inner shape is the block's own quarters drawn twice more
+  inside the face: an edge in the lip colour of the colour beneath, then
+  the fill. No new sprites. On a layered block the studs are tinted the
+  colour beneath and scaled by `layerStudScale`, since at full size they
+  overhang the inner shape. Sorting: lip 12, block 13, layer edge 14,
+  layer 15, stud 16, gloss 17; the beneath squares, their fields, the old
+  numeral's label fields and the peel's sorting group are retired.
+  `Problems()` enforces block < layer edge < layer < stud, so an asset
+  that missed Reset Sorting Orders is reported.
+- **Depth badge.** `MarkLayout.Row` places up to three marks (padlock or
+  key, layer badge, time bonus) one per cell where the footprint has room,
+  crowded otherwise; `PairedMarks` is its two-mark case.
+  `VisibilityLayer.ColoursShownWithoutNumeral` is public so the editor
+  shares the "deeper than two" rule.
+- **Peel.** One tween re-poses the existing renderers: the inner shape's
+  inset goes to zero and its studs to full size while the outer face
+  shrinks and fades and the lip blends to the exposed colour. A block
+  drawn without an inner shape (frozen, so far only reachable by a joker)
+  has no peel tween.
+- **Peel feedback.** Added after review: a peel glows its gate for the
+  peel's duration, streams cubes of the removed colour from the gate's
+  outer line (`BurstLayout.StreamCount`, `peelCubeFraction` of an exit's
+  count, a seed kind of its own), and bumps the block toward the gate and
+  back by `peelBumpCells`. Glow and cubes are debris; the bump is part of
+  the leave stage and ends on its start position. A block cleared while
+  frozen gets the glow, cubes and bump without a peel.
+- **Editor.** `GateRush.Editor` now references `GateRush.Runtime`, as
+  ARCHITECTURE lists, so the editor reuses `LayerInset` and `MarkLayout`.
+  `EditorBlockLook` asks Core's `UnlockConditions.IsThresholdMet` at zero
+  clears for "frozen at start". The main grid, a wave's scope and queue
+  previews share one drawing path; queue previews now show the entry's own
+  outer colour. On small preview cells the number's plate grows to fit the
+  smallest font. `EditorCellSpace` snaps rect edges to whole pixels, so
+  neighbouring quarters meet without hairlines.
+- **Inset check.** `0 < layerInsetCells < 0.5`; the corner radius lives in
+  `ArtRecipe`, and the squeezed corner piece scales with it, so no
+  cross-asset check is needed.

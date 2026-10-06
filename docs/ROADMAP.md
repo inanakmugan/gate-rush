@@ -62,8 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) in its last step (2.4e). Next: the
-owner's level set for the first build, then Phase 3.* Levels chain through Next
+*Status: playable; visual polish (2.4) done. Next: the owner's level set
+for the first build, then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -149,7 +149,9 @@ steps, each its own spec and PR:
   2×2 layered block reads as four blocks. It becomes one block of the
   outer colour with one inset block of the colour beneath, with its peel
   and the depth on the shared badge. The Level Editor shows layered and
-  frozen blocks. *Spec: `Modules/20-layered-blocks.md`.*
+  frozen blocks. *Spec: `Modules/20-layered-blocks.md`. Status: done.* A peel
+  also glows its gate, streams cubes of the removed colour and bumps the
+  block into the gate, as an exit does.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
@@ -168,8 +170,7 @@ most levels and is easy to lose in input handling.
 **Known debt.** Small items found along the way, none blocking; each is
 taken when its area is next touched.
 
-- *Level Editor:* a frozen block does not look frozen on the editor grid;
-  the "Empty cells / Fill" metric ignores blocks spawned at level start;
+- *Level Editor:* the "Empty cells / Fill" metric ignores blocks spawned at level start;
   magic numbers remain in the window's drawing code; a lock-free block
   keeps a stale `RequiredKeyCount`; the solver line shows the "not run"
   colour after a search error; `DraftValidator`'s summary says two checks
@@ -180,8 +181,7 @@ taken when its area is next touched.
   needs to be; two floors in `NearestNextClearStrategyTests` now count the
   same boards; a joker test's message still says "effect clear"; a
   `<summary>` in `SearchCorpus` sits above the wrong board.
-- *Presentation:* on a 1×1 layered locked block the layer numeral overlaps
-  the padlock; `MechanicIllustration` mirrors `BoardView`'s drawing
+- *Presentation:* `MechanicIllustration` mirrors `BoardView`'s drawing
   recipes, so the two must change together; the time-bonus mark's overlap
   check covers bonuses up to two digits.
 
