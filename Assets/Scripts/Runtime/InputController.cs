@@ -22,7 +22,8 @@ namespace GateRush.Runtime
     /// <para>No drag starts while the view is busy — a block settling, or a
     /// move being presented — or once the level has ended. While the level is
     /// held for an introduction card (Module 19) no input is read at all,
-    /// <b>R</b> included.</para>
+    /// <b>R</b> included — except, in the editor and development builds, the
+    /// level keys of <c>DevKeys</c> (Module 21).</para>
     /// <para><b>UI first.</b> A press on the HUD or the result panel belongs to
     /// the UI and never also starts a drag. On the frame of a press the
     /// pointer's position is raycast against the UI directly, rather than asked
@@ -56,6 +57,17 @@ namespace GateRush.Runtime
 
         /// <summary>Raised when the player presses <b>R</b>. Any drag in progress has been cancelled.</summary>
         public event Action RestartRequested;
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>
+        /// Raised when a development level key (<see cref="DevKeys"/>) goes
+        /// down, with <see cref="DevKeys.NextStep"/> or
+        /// <see cref="DevKeys.PreviousStep"/> — at any moment a level is
+        /// bound, a card or a result included. Editor and development builds
+        /// only (Module 21).
+        /// </summary>
+        public event Action<int> DevLevelStepRequested;
+#endif
 
         /// <summary>
         /// Binds the controller to one level, replacing any earlier binding.
@@ -102,7 +114,22 @@ namespace GateRush.Runtime
 
         private void Update()
         {
-            if (run == null || isHeld())
+            if (run == null)
+            {
+                return;
+            }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            // Before the hold and the outcome checks below: the level keys
+            // work during a card and after a result too.
+            if (DevKeys.TryReadLevelStep(Keyboard.current, out var levelStep))
+            {
+                DevLevelStepRequested?.Invoke(levelStep);
+                return;
+            }
+#endif
+
+            if (isHeld())
             {
                 return;
             }

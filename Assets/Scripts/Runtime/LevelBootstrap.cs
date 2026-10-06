@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Core;
-using GateRush.Serialization;
 using UnityEngine;
 
 namespace GateRush.Runtime
@@ -34,6 +33,12 @@ namespace GateRush.Runtime
     /// until then input is held. A restart shows none. A level outside the
     /// level order, or any level while that order is unusable, shows none
     /// either.</para>
+    /// <para><b>Development tools (Module 21).</b> In the editor, a level the
+    /// editor tools asked for (<see cref="DevLevelOverride"/>) replaces
+    /// <see cref="level"/> for one Play session; the field itself is never
+    /// written. In the editor and in development builds, Page Down and Page Up
+    /// (<c>DevKeys</c>) go to the next and previous level through the same
+    /// load as Next. A release build has neither.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
@@ -41,10 +46,13 @@ namespace GateRush.Runtime
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
-        /// <summary>The <c>Resources</c> folder the level order is read from.</summary>
-        private const string LevelsResourcePath = "Levels";
+        /// <summary>
+        /// The <c>Resources</c> folder the level order is read from. Public so
+        /// the Play Level window (Module 21) reads the same folder.
+        /// </summary>
+        public const string LevelsResourcePath = "Levels";
 
-        [Tooltip("The first level to play, from Assets/Resources/Levels.")]
+        [Tooltip("The first level to play, from Assets/Resources/Levels. The Level Editor's Play button and Gate Rush > Play Level… start on another level for one Play session without changing this. In the editor and in development builds, Page Down goes to the next level and Page Up to the previous one, in level order, at any moment; at the last or first level the key only logs a line. A release build has neither.")]
         [SerializeField] private TextAsset level;
 
         [SerializeField] private RuntimeConfig config;
@@ -72,8 +80,8 @@ namespace GateRush.Runtime
         // What each level in the catalog contains, in the catalog's order:
         // entry i belongs to the level the catalog numbers i + 1. Empty while
         // there is no catalog.
-        private readonly List<IReadOnlyCollection<LevelMechanic>> mechanicsInOrder =
-            new List<IReadOnlyCollection<LevelMechanic>>();
+        private IReadOnlyList<IReadOnlyCollection<LevelMechanic>> mechanicsInOrder =
+            Array.Empty<IReadOnlyCollection<LevelMechanic>>();
 
         private bool isUsable;
         private LevelCatalog catalog;
@@ -94,6 +102,11 @@ namespace GateRush.Runtime
 
         private void Awake()
         {
+            // Taken before anything can return: taking clears the override, so
+            // even a scene that draws nothing leaves the next plain Play on
+            // the scene's level.
+            var hasOverride = DevLevelOverride.TryTake(out var overrideName);
+
             if (!HasEverythingAssigned())
             {
                 return;
@@ -111,7 +124,33 @@ namespace GateRush.Runtime
             introductionCard.Initialize(config);
             resultPanel.Initialize(config);
             BuildCatalog();
-            Load(level);
+            Load(StartLevel(hasOverride, overrideName));
+        }
+
+        /// <summary>
+        /// The level this Play session starts on: the one the editor tools
+        /// asked for (<see cref="DevLevelOverride"/>, Module 21) when it is a
+        /// level file that loads, otherwise the scene's <see cref="level"/>.
+        /// An override naming no such file is reported and ignored. The
+        /// serialized field is never written, and outside the editor there is
+        /// never an override.
+        /// </summary>
+        private TextAsset StartLevel(bool hasOverride, string overrideName)
+        {
+#if UNITY_EDITOR
+            if (hasOverride)
+            {
+                if (DevLevelOverride.TryResolve(overrideName, levelAssets.Keys, out var warning))
+                {
+                    return levelAssets[overrideName];
+                }
+
+                Debug.LogWarning(
+                    $"{warning} It must be a level in Resources/{LevelsResourcePath}; the scene's level '{level.name}' is played.",
+                    this);
+            }
+#endif
+            return level;
         }
 
         private void OnEnable()
@@ -126,6 +165,9 @@ namespace GateRush.Runtime
             hudView.RestartRequested += Restart;
             resultPanel.RestartRequested += Restart;
             resultPanel.NextRequested += Next;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            inputController.DevLevelStepRequested += OnDevLevelStep;
+#endif
             ListenForTimeBonus();
         }
 
@@ -141,6 +183,9 @@ namespace GateRush.Runtime
             hudView.RestartRequested -= Restart;
             resultPanel.RestartRequested -= Restart;
             resultPanel.NextRequested -= Next;
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            inputController.DevLevelStepRequested -= OnDevLevelStep;
+#endif
             StopListeningForTimeBonus();
         }
 
@@ -313,6 +358,48 @@ namespace GateRush.Runtime
                 Load(next);
             }
         }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        /// <summary>
+        /// Goes to the next or previous level in catalog order when a
+        /// development level key goes down (<see cref="DevKeys"/>, Module 21),
+        /// through <see cref="Load"/> exactly as <see cref="Next"/> does, so
+        /// cards, countdown and HUD behave as on a real level change. At the
+        /// last or first level, or with no usable level order, it logs a line
+        /// and changes nothing.
+        /// </summary>
+        private void OnDevLevelStep(int step)
+        {
+            if (run == null)
+            {
+                return;
+            }
+
+            var isNext = step == DevKeys.NextStep;
+            var key = isNext ? DevKeys.NextLevel : DevKeys.PreviousLevel;
+            if (catalog == null)
+            {
+                Debug.Log($"{key}: the level order is unusable, so there is no level to go to; nothing changes.", this);
+                return;
+            }
+
+            var levelId = run.Session.Context.LevelId;
+            string neighbour;
+            var hasNeighbour = isNext
+                ? catalog.TryGetNext(levelId, out neighbour)
+                : catalog.TryGetPrevious(levelId, out neighbour);
+            if (!hasNeighbour)
+            {
+                var end = isNext ? "last" : "first";
+                Debug.Log($"{key}: '{levelName}' is the {end} level; nothing changes.", this);
+                return;
+            }
+
+            // Every name in the catalog is a level that loaded, kept in
+            // levelAssets under that name (BuildCatalog), so this cannot miss.
+            Load(levelAssets[neighbour]);
+        }
+#endif
 
         /// <summary>
         /// Presents the state a move produced. The session has already
@@ -519,74 +606,72 @@ namespace GateRush.Runtime
         /// Next and every introduction card. Neither stops the current level
         /// from playing.
         /// </summary>
+        /// <remarks>
+        /// What the files say is decided by <see cref="LevelRoster.Read"/>, the
+        /// reading the Play Level window (Module 21) goes by too; this method
+        /// only fetches the assets, reports what the roster left out, and keeps
+        /// each loaded level's asset by name.
+        /// </remarks>
         private void BuildCatalog()
         {
             levelAssets.Clear();
-            mechanicsInOrder.Clear();
+            mechanicsInOrder = Array.Empty<IReadOnlyCollection<LevelMechanic>>();
             catalog = null;
-            var entries = new List<(string name, int levelId)>();
-            var mechanicsByName = new Dictionary<string, IReadOnlyCollection<LevelMechanic>>();
 
+            // Of two files with one name the roster keeps the first, so the
+            // first is the asset kept for that name here.
+            var firstAssetByName = new Dictionary<string, TextAsset>();
+            var files = new List<(string name, string json)>();
             foreach (var asset in Resources.LoadAll<TextAsset>(LevelsResourcePath))
             {
-                if (levelAssets.ContainsKey(asset.name))
+                if (!firstAssetByName.ContainsKey(asset.name))
                 {
-                    Debug.LogError(
-                        $"Two level files in Resources/{LevelsResourcePath} are named '{asset.name}'; the second is left out of the level order.",
-                        this);
-                    continue;
+                    firstAssetByName.Add(asset.name, asset);
                 }
 
-                if (!TryParse(asset, out var ctx, out var error))
-                {
-                    Debug.LogError(
-                        $"Level '{asset.name}' in Resources/{LevelsResourcePath} failed to load; it is left out of the level order " +
-                        $"and introduces no mechanic. {error}",
-                        this);
-                    continue;
-                }
-
-                levelAssets.Add(asset.name, asset);
-                entries.Add((asset.name, ctx.LevelId));
-                mechanicsByName.Add(asset.name, LevelMechanics.Of(ctx));
+                files.Add((asset.name, asset.text));
             }
 
-            try
+            var roster = LevelRoster.Read(files);
+
+            foreach (var failure in roster.Failed)
             {
-                catalog = new LevelCatalog(entries);
+                if (failure.IsDuplicateName)
+                {
+                    Debug.LogError(
+                        $"Two level files in Resources/{LevelsResourcePath} are named '{failure.Name}'; the second is left out of the level order.",
+                        this);
+                }
+                else
+                {
+                    Debug.LogError(
+                        $"Level '{failure.Name}' in Resources/{LevelsResourcePath} failed to load; it is left out of the level order " +
+                        $"and introduces no mechanic. {failure.Error}",
+                        this);
+                }
             }
-            catch (ArgumentException e)
+
+            // Every loaded name was read from an asset of that name above.
+            var loaded = roster.Loaded;
+            for (var i = 0; i < loaded.Count; i++)
+            {
+                levelAssets.Add(loaded[i], firstAssetByName[loaded[i]]);
+            }
+
+            if (roster.Catalog == null)
             {
                 Debug.LogError(
-                    $"{e.Message} The level order is unusable, so Next is hidden and no introduction card shows; the current level still plays.",
+                    $"{roster.CatalogError} The level order is unusable, so Next is hidden and no introduction card shows; the current level still plays.",
                     this);
                 return;
             }
 
-            // Every name in the catalog came from entries, each added together
-            // with its mechanics, so the lookup cannot miss.
-            var names = catalog.Names;
-            for (var i = 0; i < names.Count; i++)
-            {
-                mechanicsInOrder.Add(mechanicsByName[names[i]]);
-            }
+            catalog = roster.Catalog;
+            mechanicsInOrder = roster.MechanicsInOrder;
         }
 
-        private static bool TryParse(TextAsset asset, out LevelContext ctx, out string error)
-        {
-            try
-            {
-                ctx = LevelSerializer.FromJson(asset.text, asset.name);
-                error = null;
-                return true;
-            }
-            catch (Exception e) when (e is LevelSerializationException || e is ArgumentException)
-            {
-                ctx = null;
-                error = e.Message;
-                return false;
-            }
-        }
+        private static bool TryParse(TextAsset asset, out LevelContext ctx, out string error) =>
+            LevelRoster.TryParse(asset.text, asset.name, out ctx, out error);
 
         private bool HasEverythingAssigned()
         {
