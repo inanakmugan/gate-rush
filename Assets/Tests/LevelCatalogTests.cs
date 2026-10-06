@@ -10,7 +10,8 @@ namespace GateRush.Tests
     /// the highest id has no next, and two files sharing an id are refused.
     /// Module 17: a level's number is its 1-based position in id order, and a
     /// file the catalog does not hold has none. Module 19: the names come out
-    /// in id order.
+    /// in id order. Module 21: the previous level is the one with the largest
+    /// smaller id, and the lowest id has none.
     /// </summary>
     public class LevelCatalogTests
     {
@@ -46,6 +47,40 @@ namespace GateRush.Tests
 
             Assert.IsTrue(found);
             Assert.AreEqual("level-3", name);
+        }
+
+        [Test]
+        public void TryGetPrevious_FileNamesOutOfIdOrder_FollowsTheIds()
+        {
+            // By name, level-b precedes level-c; by id, level-a does.
+            var catalog = new LevelCatalog(new[] { ("level-a", 2), ("level-b", 1), ("level-c", 3) });
+
+            var found = catalog.TryGetPrevious(3, out var name);
+
+            Assert.IsTrue(found);
+            Assert.AreEqual("level-a", name);
+        }
+
+        [Test]
+        public void TryGetPrevious_LowestId_HasNoPrevious()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-0", 0), ("level-1", 1) });
+
+            var found = catalog.TryGetPrevious(0, out var name);
+
+            Assert.IsFalse(found);
+            Assert.IsNull(name);
+        }
+
+        [Test]
+        public void TryGetPrevious_NonContiguousIds_SkipsTheGap()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-0", 0), ("level-1", 1), ("level-3", 3), ("level-4", 4) });
+
+            var found = catalog.TryGetPrevious(3, out var name);
+
+            Assert.IsTrue(found);
+            Assert.AreEqual("level-1", name);
         }
 
         [Test]

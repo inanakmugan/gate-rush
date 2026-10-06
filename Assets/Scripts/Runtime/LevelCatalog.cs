@@ -5,8 +5,8 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The playable levels by <c>levelId</c>, answering three questions: which
-    /// level comes after this one, what number the player sees for it, and in
-    /// what order the levels are played. The order is by id, not by file name,
+    /// level comes after or before this one, what number the player sees for
+    /// it, and in what order the levels are played. The order is by id, not by file name,
     /// and ids need not be contiguous.
     /// </summary>
     public sealed class LevelCatalog
@@ -62,6 +62,27 @@ namespace GateRush.Runtime
             for (var i = 0; i < ids.Count; i++)
             {
                 if (ids[i] > levelId)
+                {
+                    name = namesById.Values[i];
+                    return true;
+                }
+            }
+
+            name = null;
+            return false;
+        }
+
+        /// <summary>
+        /// The name of the level with the largest id smaller than
+        /// <paramref name="levelId"/>; false before the first level.
+        /// <paramref name="levelId"/> need not be in the catalog itself.
+        /// </summary>
+        public bool TryGetPrevious(int levelId, out string name)
+        {
+            var ids = namesById.Keys;
+            for (var i = ids.Count - 1; i >= 0; i--)
+            {
+                if (ids[i] < levelId)
                 {
                     name = namesById.Values[i];
                     return true;
