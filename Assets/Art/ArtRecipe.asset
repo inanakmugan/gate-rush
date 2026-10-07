@@ -14,9 +14,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: GateRush.Editor::GateRush.Editor.ArtRecipe
   cellPixels: 128
   antiAliasPixels: 1
-  blockGapPixels: 10
+  blockGapPixels: 3
   cornerRadiusPixels: 24
-  concaveRadiusPixels: 4
+  concaveRadiusPixels: 1
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10
@@ -47,3 +47,78 @@ MonoBehaviour:
   vignettePixels: 128
   vignetteInner: 0.45
   vignetteOuter: 1
+  frostStreakCount: 3
+  frostStreakWidthPixels: 5
+  frostStreakSpacingPixels: 26
+  frostStreakLengthPixels: 70
+  frostInsetPixels: 22
+  frostAlpha: 0.75
+  panelPixels: 64
+  panelCornerRadiusPixels: 16
+  ringPixels: 32
+  ringWidthPixels: 6
+  chainPeriodPixels: 64
+  chainThicknessPixels: 32
+  chainLinkLengthPixels: 44
+  chainEdgeLinkLengthPixels: 30
+  chainLinkWallPixels: 7
+  chainTone: 1
+  chainShadeTone: 0.6
+  padlockPixels: 128
+  padlockBodyWidth: 0.78
+  padlockBodyHeight: 0.56
+  padlockBodyCornerPixels: 14
+  padlockShackleRadius: 0.24
+  padlockShackleThickness: 0.1
+  padlockShackleTone: 0.8
+  keyWidthPixels: 128
+  keyHeightPixels: 64
+  keyBowDiameterPixels: 56
+  keyHoleDiameterPixels: 32
+  keyGemDiameterPixels: 26
+  keyShaftThicknessPixels: 12
+  keyToothWidthPixels: 10
+  keyToothLengthPixels: 14
+  keyGemTone: 0.95
+  keyGemEdgeTone: 0.55
+  slatsPerCell: 4
+  slatGapPixels: 5
+  slatTone: 1
+  slatShadeTone: 0.7
+  slatGapTone: 0.35
+  doorLinesPerCell: 2
+  doorLineWidthPixels: 2
+  doorTone: 0.85
+  doorLineTone: 1
+  clockPixels: 128
+  clockRimThickness: 0.09
+  clockHandThickness: 0.09
+  clockMinuteHandLength: 0.28
+  clockHourHandLength: 0.2
+  restartPixels: 128
+  restartRadius: 0.3
+  restartThickness: 0.11
+  restartHeadWidth: 0.32
+  restartHeadLength: 0.2
+  cubePixels: 48
+  cubeCornerPixels: 10
+  cubeRimPixels: 5
+  cubeRimTone: 1
+  cubeFaceTone: 0.85
+  cubeHighlightDiameterPixels: 12
+  cubeHighlightOffsetPixels: {x: -8, y: 8}
+  cubeHighlightSoftnessPixels: 3
+  cubeHighlightTone: 1
+  shardPixels: 48
+  shardPoints:
+  - {x: 0.5, y: 0.95}
+  - {x: 0.1, y: 0.45}
+  - {x: 0.45, y: 0.05}
+  - {x: 0.9, y: 0.55}
+  shardFaceTone: 0.8
+  shardStreakWidthPixels: 4
+  shardStreakTone: 1
+  gateGlowPixels: 64
+  gateGlowHold: 0.1
+  sparklePixels: 64
+  sparkleWaist: 0.09

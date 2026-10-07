@@ -19,9 +19,9 @@ namespace GateRush.Runtime
     /// bend), and a fill not at all. Sides that face the block's own cells
     /// never grow, except the concave corner's, whose growth falls under the
     /// neighbouring cells' faces.</para>
-    /// <para>The lip shows below the face, so a bottom side grows by the lip's
-    /// drop as well, and the outline wraps the lip instead of hiding under
-    /// it.</para>
+    /// <para>The lip is the footprint's own quarters (<see cref="FaceShape"/>),
+    /// so the outline grows by the same width on every side and, at zero
+    /// width, lies exactly under the lip.</para>
     /// </remarks>
     public static class LiftOutline
     {
@@ -30,9 +30,8 @@ namespace GateRush.Runtime
         /// in cell units in the frame of its cells.
         /// </summary>
         /// <param name="tile">A quarter of the block's footprint (<see cref="BlockTiling"/>).</param>
-        /// <param name="widthCells">How far the outline reaches past the face, in cells.</param>
-        /// <param name="lipDropCells">How far the lip shows below the face, in cells; added on bottom sides.</param>
-        public static Rect QuarterRect(QuarterTile tile, float widthCells, float lipDropCells)
+        /// <param name="widthCells">How far the outline reaches past the block's drawing, in cells.</param>
+        public static Rect QuarterRect(QuarterTile tile, float widthCells)
         {
             var rect = BlockTiling.QuarterRect(tile);
             var growsX = tile.Piece == QuarterPiece.OuterCorner || tile.Piece == QuarterPiece.EdgeAlongY
@@ -60,7 +59,7 @@ namespace GateRush.Runtime
                 }
                 else
                 {
-                    rect.yMin -= widthCells + lipDropCells;
+                    rect.yMin -= widthCells;
                 }
             }
 

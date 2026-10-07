@@ -9,7 +9,7 @@ namespace GateRush.Tests
     /// <summary>
     /// Covers Module 18's <see cref="GateExit"/>: how far a destroyed block
     /// passes, the clip that cuts it exactly at the gate's inner line and
-    /// nowhere else — a lifted block on a border row keeps its lip and outline
+    /// nowhere else — a lifted block on a border row keeps its outline
     /// on every other side — the glow's band inside the gate, and the gate's
     /// outer line. Grid units; y grows upward.
     /// </summary>
@@ -18,7 +18,6 @@ namespace GateRush.Tests
         private const int Width = 5;
         private const int Height = 4;
         private const float OutlineWidth = 0.07f;
-        private const float Lip = 0.09f;
         private const float LiftScale = 1.06f;
         private const float Tolerance = 1e-5f;
 
@@ -44,17 +43,6 @@ namespace GateRush.Tests
             Assert.AreEqual(1, GateExit.DepthCells(Horizontal1x2, BoardEdge.Bottom));
         }
 
-        [TestCase(BoardEdge.Top, 1f + Lip)]
-        [TestCase(BoardEdge.Bottom, 1f)]
-        [TestCase(BoardEdge.Left, 2f)]
-        [TestCase(BoardEdge.Right, 2f)]
-        public void PassCells_Horizontal1x2_IsItsDepthAndThroughTheTopTheTrailingLipToo(BoardEdge edge, float expected)
-        {
-            var pass = GateExit.PassCells(Horizontal1x2, edge, Lip);
-
-            Assert.AreEqual(expected, pass, Tolerance);
-        }
-
         [TestCase(BoardEdge.Top)]
         [TestCase(BoardEdge.Bottom)]
         [TestCase(BoardEdge.Left)]
@@ -74,19 +62,19 @@ namespace GateRush.Tests
         /// <summary>
         /// Each exit edge with a block on the border row or column beside it:
         /// right and left along the bottom row, top down the right column,
-        /// bottom up the left column. The lifted block — its outline and lip,
-        /// grown by the lift scale — must stay inside the clip on every side
+        /// bottom up the left column. The lifted block — its outline, grown
+        /// by the lift scale — must stay inside the clip on every side
         /// but the exit.
         /// </summary>
         [TestCase(BoardEdge.Right, 3, 0, false)]
         [TestCase(BoardEdge.Left, 0, 0, false)]
         [TestCase(BoardEdge.Top, 4, 2, true)]
         [TestCase(BoardEdge.Bottom, 0, 0, true)]
-        public void MaskRect_LiftedBlockOnAnAdjacentBorderRow_KeepsItsLipAndOutlineInsideOnTheOtherSides(
+        public void MaskRect_LiftedBlockOnAnAdjacentBorderRow_KeepsItsOutlineInsideOnTheOtherSides(
             BoardEdge edge, int originX, int originY, bool isVertical)
         {
             var cells = isVertical ? Vertical1x2 : Horizontal1x2;
-            var margin = GateExit.OverhangCells(cells, LiftScale, OutlineWidth, Lip);
+            var margin = GateExit.OverhangCells(cells, LiftScale, OutlineWidth);
             var lifted = LiftedBounds(cells, new Coord(originX, originY));
 
             var mask = GateExit.MaskRect(Width, Height, edge, margin);
@@ -108,7 +96,7 @@ namespace GateRush.Tests
 
             if (edge != BoardEdge.Bottom)
             {
-                Assert.GreaterOrEqual(lifted.yMin, mask.yMin - Tolerance, "bottom side, with the lip, kept");
+                Assert.GreaterOrEqual(lifted.yMin, mask.yMin - Tolerance, "bottom side kept");
             }
 
             if (edge != BoardEdge.Top)
@@ -157,7 +145,7 @@ namespace GateRush.Tests
 
         /// <summary>
         /// Where a lifted block at <paramref name="origin"/> reaches, in grid
-        /// units: its outline quarters, which cover its face and lip, grown by
+        /// units: its outline quarters, which cover its lip and face, grown by
         /// the lift scale about the footprint's centre.
         /// </summary>
         private static Rect LiftedBounds(IReadOnlyList<Coord> cells, Coord origin)
@@ -168,7 +156,7 @@ namespace GateRush.Tests
             var yMax = float.MinValue;
             foreach (var tile in BlockTiling.Compute(cells))
             {
-                var rect = LiftOutline.QuarterRect(tile, OutlineWidth, Lip);
+                var rect = LiftOutline.QuarterRect(tile, OutlineWidth);
                 xMin = Mathf.Min(xMin, rect.xMin);
                 yMin = Mathf.Min(yMin, rect.yMin);
                 xMax = Mathf.Max(xMax, rect.xMax);
