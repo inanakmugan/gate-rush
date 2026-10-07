@@ -22,7 +22,8 @@
                 }
             ],
             "colorStack": [
-                "Red"
+                "Red",
+                "Blue"
             ],
             "startOrigin": {
                 "x": 0,
@@ -126,7 +127,9 @@
                 }
             ],
             "colorStack": [
-                "Blue"
+                "Blue",
+                "Red",
+                "Orange"
             ],
             "startOrigin": {
                 "x": 4,
@@ -439,6 +442,6 @@
     "shutters": [],
     "generators": [],
     "elevators": [],
-    "suggestedTimeBudgetSeconds": 90,
+    "suggestedTimeBudgetSeconds": 110,
     "goldReward": 30
 }

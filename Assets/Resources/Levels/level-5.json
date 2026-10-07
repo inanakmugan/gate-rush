@@ -2,7 +2,7 @@
     "formatVersion": 4,
     "levelId": 5,
     "width": 6,
-    "height": 10,
+    "height": 6,
     "staticWalls": [],
     "blocks": [
         {
@@ -15,14 +15,22 @@
                 {
                     "x": 0,
                     "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 1
                 }
             ],
             "colorStack": [
-                "Red"
+                "Green"
             ],
             "startOrigin": {
                 "x": 0,
-                "y": 8
+                "y": 4
             },
             "axis": "VerticalOnly",
             "unfreezeAtClearCount": -1,
@@ -33,6 +41,36 @@
         },
         {
             "id": 2,
+            "cells": [
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Cyan"
+            ],
+            "startOrigin": {
+                "x": 0,
+                "y": 2
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 3,
             "cells": [
                 {
                     "x": 0,
@@ -48,41 +86,11 @@
                 }
             ],
             "colorStack": [
-                "Blue"
+                "Purple"
             ],
             "startOrigin": {
-                "x": 3,
-                "y": 6
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 3,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                }
-            ],
-            "colorStack": [
-                "Red"
-            ],
-            "startOrigin": {
-                "x": 4,
-                "y": 7
+                "x": 2,
+                "y": 3
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -100,11 +108,13 @@
                 }
             ],
             "colorStack": [
-                "Blue"
+                "Cyan",
+                "Purple",
+                "Green"
             ],
             "startOrigin": {
-                "x": 5,
-                "y": 8
+                "x": 3,
+                "y": 5
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -117,20 +127,24 @@
             "id": 5,
             "cells": [
                 {
-                    "x": 0,
-                    "y": 0
+                    "x": 1,
+                    "y": 1
                 },
                 {
                     "x": 1,
                     "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 0
                 }
             ],
             "colorStack": [
-                "Yellow"
+                "Blue"
             ],
             "startOrigin": {
-                "x": 4,
-                "y": 6
+                "x": 3,
+                "y": 4
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -149,18 +163,14 @@
                 {
                     "x": 0,
                     "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
                 }
             ],
             "colorStack": [
-                "Red"
+                "Yellow"
             ],
             "startOrigin": {
-                "x": 0,
-                "y": 3
+                "x": 5,
+                "y": 4
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -171,36 +181,6 @@
         },
         {
             "id": 7,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 1,
-                    "y": 1
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                }
-            ],
-            "colorStack": [
-                "Blue"
-            ],
-            "startOrigin": {
-                "x": 1,
-                "y": 3
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 8,
             "cells": [
                 {
                     "x": 0,
@@ -216,11 +196,135 @@
                 }
             ],
             "colorStack": [
+                "Cyan"
+            ],
+            "startOrigin": {
+                "x": 3,
+                "y": 3
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 8,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
                 "Yellow"
             ],
             "startOrigin": {
                 "x": 0,
-                "y": 2
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 9,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 0,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Blue"
+            ],
+            "startOrigin": {
+                "x": 2,
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 10,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Green"
+            ],
+            "startOrigin": {
+                "x": 3,
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 11,
+            "cells": [
+                {
+                    "x": 1,
+                    "y": 2
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Yellow"
+            ],
+            "startOrigin": {
+                "x": 4,
+                "y": 0
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
@@ -236,194 +340,45 @@
             "edge": "Bottom",
             "offset": 0,
             "width": 2,
-            "color": "Red",
+            "color": "Green",
             "openAtClearCount": -1
         },
         {
             "id": 2,
-            "edge": "Bottom",
-            "offset": 4,
-            "width": 2,
-            "color": "Blue",
+            "edge": "Right",
+            "offset": 0,
+            "width": 3,
+            "color": "Purple",
             "openAtClearCount": -1
         },
         {
             "id": 3,
             "edge": "Right",
-            "offset": 1,
-            "width": 1,
+            "offset": 4,
+            "width": 2,
+            "color": "Cyan",
+            "openAtClearCount": -1
+        },
+        {
+            "id": 4,
+            "edge": "Left",
+            "offset": 3,
+            "width": 2,
+            "color": "Blue",
+            "openAtClearCount": -1
+        },
+        {
+            "id": 5,
+            "edge": "Bottom",
+            "offset": 4,
+            "width": 2,
             "color": "Yellow",
             "openAtClearCount": -1
         }
     ],
-    "shutters": [
-        {
-            "id": 1,
-            "min": {
-                "x": 3,
-                "y": 6
-            },
-            "max": {
-                "x": 5,
-                "y": 8
-            },
-            "threshold": 2,
-            "requiredColor": ""
-        }
-    ],
-    "generators": [
-        {
-            "id": 1,
-            "edge": "Top",
-            "offset": 0,
-            "width": 2,
-            "queue": [
-                {
-                    "id": 1,
-                    "cells": [
-                        {
-                            "x": 0,
-                            "y": 1
-                        },
-                        {
-                            "x": 1,
-                            "y": 1
-                        },
-                        {
-                            "x": 1,
-                            "y": 2
-                        }
-                    ],
-                    "colorStack": [
-                        "Red"
-                    ],
-                    "axis": "Free",
-                    "unfreezeAtClearCount": -1,
-                    "lockId": -1,
-                    "requiredKeyCount": 0,
-                    "keyTargetLockId": -1,
-                    "timeBonusSeconds": 0,
-                    "hasRegionOrigin": false,
-                    "regionOrigin": {
-                        "x": 0,
-                        "y": 0
-                    }
-                }
-            ]
-        }
-    ],
-    "elevators": [
-        {
-            "id": 1,
-            "min": {
-                "x": 0,
-                "y": 2
-            },
-            "max": {
-                "x": 2,
-                "y": 4
-            },
-            "waves": [
-                {
-                    "blocks": [
-                        {
-                            "id": 1,
-                            "cells": [
-                                {
-                                    "x": 0,
-                                    "y": 2
-                                },
-                                {
-                                    "x": 0,
-                                    "y": 1
-                                },
-                                {
-                                    "x": 0,
-                                    "y": 0
-                                }
-                            ],
-                            "colorStack": [
-                                "Blue"
-                            ],
-                            "axis": "Free",
-                            "unfreezeAtClearCount": -1,
-                            "lockId": -1,
-                            "requiredKeyCount": 0,
-                            "keyTargetLockId": -1,
-                            "timeBonusSeconds": 0,
-                            "hasRegionOrigin": true,
-                            "regionOrigin": {
-                                "x": 0,
-                                "y": 0
-                            }
-                        },
-                        {
-                            "id": 2,
-                            "cells": [
-                                {
-                                    "x": 0,
-                                    "y": 1
-                                },
-                                {
-                                    "x": 0,
-                                    "y": 0
-                                },
-                                {
-                                    "x": 1,
-                                    "y": 0
-                                },
-                                {
-                                    "x": 1,
-                                    "y": 1
-                                }
-                            ],
-                            "colorStack": [
-                                "Red"
-                            ],
-                            "axis": "Free",
-                            "unfreezeAtClearCount": -1,
-                            "lockId": -1,
-                            "requiredKeyCount": 0,
-                            "keyTargetLockId": -1,
-                            "timeBonusSeconds": 0,
-                            "hasRegionOrigin": true,
-                            "regionOrigin": {
-                                "x": 1,
-                                "y": 1
-                            }
-                        },
-                        {
-                            "id": 3,
-                            "cells": [
-                                {
-                                    "x": 0,
-                                    "y": 0
-                                },
-                                {
-                                    "x": 1,
-                                    "y": 0
-                                }
-                            ],
-                            "colorStack": [
-                                "Yellow"
-                            ],
-                            "axis": "Free",
-                            "unfreezeAtClearCount": -1,
-                            "lockId": -1,
-                            "requiredKeyCount": 0,
-                            "keyTargetLockId": -1,
-                            "timeBonusSeconds": 0,
-                            "hasRegionOrigin": true,
-                            "regionOrigin": {
-                                "x": 1,
-                                "y": 0
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    ],
-    "suggestedTimeBudgetSeconds": 50,
+    "shutters": [],
+    "generators": [],
+    "elevators": [],
+    "suggestedTimeBudgetSeconds": 85,
     "goldReward": 30
 }
