@@ -228,6 +228,70 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("Peel Bump Cells must be at least 0 and below 0.5"), string.Join(" | ", problems));
         }
 
+        [Test]
+        public void Problems_DefaultPullValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Pull "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Capture Range Cells"), string.Join(" | ", problems));
+            Assert.DoesNotThrow(() => config.CreateDragSettings());
+        }
+
+        [Test]
+        public void Problems_PullGlowAlphaAboveOne_IsReportedByName()
+        {
+            SetFloat("pullGlowAlpha", 1.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Pull Glow Alpha must be from 0 to 1"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DefaultNudgeValue_ReportsNothingAboutIt()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Nudge Max Cells"), string.Join(" | ", problems));
+            Assert.That(config.CreateDragSettings().NudgeMaxCells, Is.InRange(0f, DragSettings.MaxNudgeCellsExclusive));
+        }
+
+        [TestCase(-0.1f)]
+        [TestCase(DragSettings.MaxNudgeCellsExclusive)]
+        public void Problems_NudgeMaxCellsOutOfRange_IsReportedByName(float value)
+        {
+            SetFloat("nudgeMaxCells", value);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Nudge Max Cells must be at least 0 and below"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_PullGlowOrderNotBelowTheBlockLip_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("pullGlowOrder").intValue = serialized.FindProperty("blockLipOrder").intValue;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Pull Glow Order must be below Block Lip Order"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_CaptureRangeBeyondThePullRange_IsReportedByName()
+        {
+            SetFloat("captureRangeCells", 0.9f);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems, Has.Some.Contains("Capture Range Cells must be positive and at most Pull Range Cells"),
+                string.Join(" | ", problems));
+        }
+
         private void SetFloat(string field, float value)
         {
             var serialized = new SerializedObject(config);

@@ -88,6 +88,14 @@ MonoBehaviour:
   cornerAssistCells: 0.3
   settleSeconds: 0.08
   settleEase: 6
+  pullRangeCells: 0.8
+  captureRangeCells: 0.6
+  pullAmount: 1
+  pullFollowRate: 25
+  nudgeMaxCells: 0.15
+  pullEase: 4
+  pullGlowAlpha: 0.5
+  pullGlowFadeSeconds: 0.12
   liftScale: 1.06
   liftSeconds: 0.08
   liftEase: 6
@@ -97,6 +105,9 @@ MonoBehaviour:
   exitEase: 1
   peelSeconds: 0.2
   peelEase: 5
+  peelCubeFraction: 0.5
+  peelBumpCells: 0.15
+  peelBumpEase: 6
   cubeCountPerCell: 8
   cubeCap: 40
   cubeSizeCells: {x: 0.16, y: 0.26}
@@ -333,3 +344,4 @@ MonoBehaviour:
   outlineOrder: 11
   liftedBlockOrder: 26
   effectOrder: 27
+  pullGlowOrder: 11

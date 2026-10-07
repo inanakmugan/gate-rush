@@ -169,25 +169,36 @@ namespace GateRush.Runtime
         public void BeginDrag(int blockIndex)
         {
             KillSettle();
+            ReleasePullGlow();
             draggedBlock = blockIndex;
             if (drawnBlocks.TryGetValue(blockIndex, out var block))
             {
+                RemoveGateClip(block);
                 Lift(block);
             }
         }
 
         /// <summary>
         /// Shows the dragged block at the continuous origin
-        /// <paramref name="origin"/>, in cell units — fed every frame from
-        /// <see cref="DragController.Position"/>. Does nothing when the block is
-        /// not drawn.
+        /// <paramref name="position"/>, in cell units, and the pull on it —
+        /// fed every frame from <see cref="DragController.Position"/> and
+        /// <see cref="DragController.Pull"/>. The pull's nudge into the gate's
+        /// mouth is drawn on top of the position, clipped at the gate's inner
+        /// line for as long as the block's footprint crosses it
+        /// (<see cref="ClipDraggedAtGate"/>), and the gate glows
+        /// (<see cref="ShowPullGlow"/>). A block that is not drawn is not
+        /// moved.
         /// </summary>
-        public void ShowDragged(Vector2 origin)
+        public void ShowDragged(Vector2 position, PullTarget? pull)
         {
             if (drawnBlocks.TryGetValue(draggedBlock, out var block))
             {
-                block.Root.localPosition = GridToLocal(origin);
+                var drawn = pull.HasValue ? position + pull.Value.Nudge : position;
+                block.Root.localPosition = GridToLocal(drawn);
+                ClipDraggedAtGate(block, drawn, pull);
             }
+
+            ShowPullGlow(pull);
         }
 
         /// <summary>
@@ -196,11 +207,14 @@ namespace GateRush.Runtime
         /// — a push in place, or a release exactly on a cell — is placed at once
         /// with no tween, so a presentation waiting on the settle starts without
         /// delay. <see cref="IsBusy"/> holds while the tween plays; the drop
-        /// does not hold it.
+        /// does not hold it. The pull's glow, if any, fades out. A block
+        /// released while nudged into its gate's mouth stays clipped at the
+        /// gate's inner line until the settle is over.
         /// </summary>
         public void Settle(Coord origin)
         {
             KillSettle();
+            ReleasePullGlow();
             if (!drawnBlocks.TryGetValue(draggedBlock, out var block))
             {
                 return;
@@ -212,6 +226,7 @@ namespace GateRush.Runtime
             if ((Vector2)block.Root.localPosition == target)
             {
                 block.Root.localPosition = target;
+                RemoveGateClip(block);
                 return;
             }
 
@@ -219,6 +234,7 @@ namespace GateRush.Runtime
                 .DOLocalMove(target, config.SettleSeconds)
                 .SetEase(config.SettleEase)
                 .SetId(this)
+                .OnUpdate(() => HoldGateClip(block))
                 .OnComplete(OnSettled);
         }
 
@@ -231,10 +247,12 @@ namespace GateRush.Runtime
         public void Snap(int blockIndex, Coord origin)
         {
             KillSettle();
+            ReleasePullGlow();
 
             if (drawnBlocks.TryGetValue(blockIndex, out var block))
             {
                 block.Root.localPosition = OriginToLocal(origin);
+                RemoveGateClip(block);
                 Drop(block);
             }
         }
@@ -284,6 +302,7 @@ namespace GateRush.Runtime
             settleTween = null;
             hasStagesStarted = false;
             passesInFlight = 0;
+            ForgetPullGlow();
             DestroyChildren(debris);
             DestroyChildren(stage);
         }
@@ -301,6 +320,7 @@ namespace GateRush.Runtime
             DOTween.Kill(debrisId);
             settleTween = null;
             draggedBlock = -1;
+            ForgetPullGlow();
             ResetPresentation();
 
             // The passes died with their tweens; presentations waiting on them
@@ -325,12 +345,18 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The settle is over, finished or killed: input may resume, and a
-        /// presentation waiting for it starts its stages.
+        /// The settle is over, finished or killed: the settled block's drag
+        /// clip goes, input may resume, and a presentation waiting for it
+        /// starts its stages.
         /// </summary>
         private void OnSettled()
         {
             settleTween = null;
+            if (drawnBlocks.TryGetValue(draggedBlock, out var settled))
+            {
+                RemoveGateClip(settled);
+            }
+
             if (isPresenting && !hasStagesStarted)
             {
                 PlayLeave();
@@ -1343,6 +1369,18 @@ namespace GateRush.Runtime
 
             /// <summary>The outline's quarter renderers, in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> OutlineQuarters { get; set; }
+
+            /// <summary>The mask clipping the block at a gate's inner line (<see cref="ClipAtGate"/>); null when it is not clipped.</summary>
+            public Transform GateClip { get; set; }
+
+            /// <summary>The edge whose inner line <see cref="GateClip"/> cuts at.</summary>
+            public BoardEdge GateClipEdge { get; set; }
+
+            /// <summary>Where <see cref="GateClip"/> stays on the board, in the view's frame, while the block moves.</summary>
+            public Vector2 GateClipCenter { get; set; }
+
+            /// <summary>The labels the clip hid, to show again when it goes.</summary>
+            public List<GameObject> GateClipHiddenLabels { get; } = new List<GameObject>();
         }
 
         /// <summary>

@@ -261,7 +261,7 @@ namespace GateRush.Runtime
             boardView.Rebuild(session.State);
             inputController.Initialize(
                 run,
-                new DragController(new DragSettings(config.PushThresholdCells, config.FollowRate, config.CornerAssistCells)),
+                new DragController(config.CreateDragSettings()),
                 layout,
                 boardView,
                 boardCamera,
