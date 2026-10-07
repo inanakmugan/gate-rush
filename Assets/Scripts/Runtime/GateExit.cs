@@ -86,6 +86,38 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// Whether a block's own footprint, drawn with its origin at
+        /// <paramref name="drawnOrigin"/>, reaches past the inner line of
+        /// <paramref name="edge"/> — the grid's edge on that side: a dragged
+        /// block nudged into its gate's mouth (Module 22). The footprint only:
+        /// a lifted block's outline reaching a little over the frame does not
+        /// count, so a block sliding along an edge keeps its outline there. A
+        /// block exactly flush against the edge does not cross it.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="cells"/> is null.</exception>
+        public static bool FootprintCrossesInnerLine(
+            int width, int height, BoardEdge edge, IReadOnlyList<Coord> cells, Vector2 drawnOrigin)
+        {
+            if (cells == null)
+            {
+                throw new ArgumentNullException(nameof(cells));
+            }
+
+            MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            switch (edge)
+            {
+                case BoardEdge.Top:
+                    return drawnOrigin.y + maxY + 1 > height;
+                case BoardEdge.Bottom:
+                    return drawnOrigin.y + minY < 0f;
+                case BoardEdge.Left:
+                    return drawnOrigin.x + minX < 0f;
+                default:
+                    return drawnOrigin.x + maxX + 1 > width;
+            }
+        }
+
+        /// <summary>
         /// The band just inside a gate the glow covers: the gate's span along
         /// its edge, <paramref name="depthCells"/> into the board from its inner
         /// line.

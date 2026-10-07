@@ -60,6 +60,84 @@ namespace GateRush.Tests
         }
 
         /// <summary>
+        /// The origin at which the L shape — two cells wide and two high —
+        /// stands flush against <paramref name="edge"/>, away from the other
+        /// edges where the grid allows.
+        /// </summary>
+        private static Vector2 FlushOriginOfTheL(BoardEdge edge)
+        {
+            switch (edge)
+            {
+                case BoardEdge.Top:
+                    return new Vector2(1f, Height - 2);
+                case BoardEdge.Bottom:
+                    return new Vector2(1f, 0f);
+                case BoardEdge.Left:
+                    return new Vector2(0f, 1f);
+                default:
+                    return new Vector2(Width - 2, 1f);
+            }
+        }
+
+        [TestCase(BoardEdge.Top)]
+        [TestCase(BoardEdge.Bottom)]
+        [TestCase(BoardEdge.Left)]
+        [TestCase(BoardEdge.Right)]
+        public void FootprintCrossesInnerLine_NudgedIntoTheGatesMouth_Crosses(BoardEdge edge)
+        {
+            const float Nudge = 0.1f;
+            var drawn = FlushOriginOfTheL(edge) + GateExit.Outward(edge) * Nudge;
+
+            var crosses = GateExit.FootprintCrossesInnerLine(Width, Height, edge, LShape, drawn);
+
+            Assert.IsTrue(crosses);
+        }
+
+        [TestCase(BoardEdge.Top)]
+        [TestCase(BoardEdge.Bottom)]
+        [TestCase(BoardEdge.Left)]
+        [TestCase(BoardEdge.Right)]
+        public void FootprintCrossesInnerLine_ExactlyFlush_DoesNotCross(BoardEdge edge)
+        {
+            // A lifted block's outline reaches past the line here; the
+            // footprint does not, and the footprint is what is asked.
+            var drawn = FlushOriginOfTheL(edge);
+
+            var crosses = GateExit.FootprintCrossesInnerLine(Width, Height, edge, LShape, drawn);
+
+            Assert.IsFalse(crosses);
+        }
+
+        [TestCase(BoardEdge.Top)]
+        [TestCase(BoardEdge.Bottom)]
+        [TestCase(BoardEdge.Left)]
+        [TestCase(BoardEdge.Right)]
+        public void FootprintCrossesInnerLine_ShortOfTheEdge_DoesNotCross(BoardEdge edge)
+        {
+            const float Short = 0.1f;
+            var drawn = FlushOriginOfTheL(edge) - GateExit.Outward(edge) * Short;
+
+            var crosses = GateExit.FootprintCrossesInnerLine(Width, Height, edge, LShape, drawn);
+
+            Assert.IsFalse(crosses);
+        }
+
+        [TestCase(BoardEdge.Left, BoardEdge.Bottom)]
+        [TestCase(BoardEdge.Bottom, BoardEdge.Left)]
+        public void FootprintCrossesInnerLine_NudgedThroughOneEdgeOfACorner_DoesNotCrossTheOther(
+            BoardEdge nudged, BoardEdge other)
+        {
+            const float Nudge = 0.1f;
+            var drawn = GateExit.Outward(nudged) * Nudge;
+
+            var crossesNudged = GateExit.FootprintCrossesInnerLine(Width, Height, nudged, LShape, drawn);
+            var crossesOther = GateExit.FootprintCrossesInnerLine(Width, Height, other, LShape, drawn);
+
+            Assert.IsTrue(crossesNudged);
+            Assert.IsFalse(crossesOther);
+        }
+
+        /// <summary>
         /// Each exit edge with a block on the border row or column beside it:
         /// right and left along the bottom row, top down the right column,
         /// bottom up the left column. The lifted block — its outline, grown
