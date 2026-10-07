@@ -151,7 +151,7 @@ namespace GateRush.Runtime
         [Tooltip("How far the floor's backing reaches past the grid under the frame, in cells, so no background shows between floor and frame. At most the frame thickness.")]
         [SerializeField] private float floorUnderlayCells = 0.2f;
 
-        [Tooltip("How far below a block or the frame its darker copy (the lip) shows, in cells. It reads as thickness.")]
+        [Tooltip("How much of its darker copy (the lip) shows below a face, in cells. It reads as thickness. A block's lip stays inside its cells and its face is shortened by this from below; the frame's, a gate's and a machine's lip hangs below the face by it. At least 0, and with Layer Inset Cells below 0.5.")]
         [SerializeField] private float lipOffsetCells = 0.09f;
 
         [Tooltip("The lip's colour is the face colour with RGB multiplied by this, from 0 (black) to 1 (no darkening).")]
@@ -883,7 +883,11 @@ namespace GateRush.Runtime
         /// <summary>How far the floor's backing reaches under the frame, in cells.</summary>
         public float FloorUnderlayCells => floorUnderlayCells;
 
-        /// <summary>How far below its face a lip shows, in cells.</summary>
+        /// <summary>
+        /// How much of a lip shows below its face, in cells: inside a block's
+        /// cells (<see cref="FaceShape"/>), below the face of the frame, a
+        /// gate and a machine.
+        /// </summary>
         public float LipOffsetCells => lipOffsetCells;
 
         /// <summary>How much each quarter tile is enlarged on every side, in cells.</summary>
@@ -1696,6 +1700,11 @@ namespace GateRush.Runtime
             if (!(lipOffsetCells >= 0f))
             {
                 problems.Add($"{name}: Lip Offset Cells may not be negative.");
+            }
+
+            if (!(lipOffsetCells + layerInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Lip Offset Cells plus Layer Inset Cells must be below 0.5, so the bottom of a block's face, and of a layered block's inner shape, keeps a height.");
             }
 
             if (!(lipDarken >= 0f && lipDarken <= 1f))

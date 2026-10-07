@@ -31,7 +31,12 @@ namespace GateRush.Runtime
     /// and the next block on a generator's screen are drawn from the generated
     /// quarter sprites, laid out by <see cref="BlockTiling"/> and
     /// <see cref="FrameTiling"/> and tinted at runtime. Each is drawn twice: a
-    /// darker copy offset downward (the lip), then the face.</para>
+    /// darker copy (the lip), then the face. The frame's and a gate's lip is
+    /// offset downward. A block's is not: it fills the footprint's quarters,
+    /// and the face over it is raised on its downward sides
+    /// (<see cref="FaceShape"/>), so the lip shows as a strip along the
+    /// block's lower outline and nothing of a resting block is drawn outside
+    /// its cells.</para>
     /// <para><b>State (Module 16, D48).</b> A frozen block and a closed gate are
     /// ice with frost and a count; a locked block carries a chain along each
     /// row of its cells and a gold padlock with the keys still required; a
@@ -50,7 +55,7 @@ namespace GateRush.Runtime
     /// two never overwrite each other.</para>
     /// <para><b>Layered blocks (Module 20, M4).</b> A block with a colour
     /// beneath shows it as one inner shape: its own quarter tiles drawn again
-    /// in that colour, each pulled inward by <see cref="LayerInset"/>, over a
+    /// in that colour, each pulled inward by <see cref="FaceShape"/>, over a
     /// slightly larger copy in the darker lip colour that reads as its edge.
     /// The studs sit on the inner shape, in its colour. A peel re-poses these
     /// same renderers.</para>
@@ -525,9 +530,10 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The next block on a machine's screen: its quarters and lip, scaled
-        /// uniformly to fit <paramref name="screen"/> (<see cref="MiniatureFit"/>)
-        /// and centred on it. Blocks never rotate, so it shows the block as it
+        /// The next block on a machine's screen: its lip and face as a block
+        /// on the board has them (<see cref="FaceShape"/>), scaled uniformly to
+        /// fit <paramref name="screen"/> (<see cref="MiniatureFit"/>) and
+        /// centred on it. Blocks never rotate, so it shows the block as it
         /// will arrive. No studs and no marks: it is a preview of shape and
         /// colour.
         /// </summary>
@@ -535,17 +541,18 @@ namespace GateRush.Runtime
         {
             var perCell = MiniatureFit(cells, screen, out var shapeCenter);
             var tiles = BlockTiling.Compute(cells);
+            var lipCells = config.LipOffsetCells;
 
-            Rect RectOf(QuarterTile tile)
-            {
-                var cellRect = BlockTiling.QuarterRect(tile);
-                return new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
-            }
+            // A rectangle in the block's cell units, on the screen.
+            Rect OnScreen(Rect cellRect) =>
+                new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
 
             var miniature = AddGroup(parent, "Next block", Vector2.zero);
-            var lip = AddGroup(miniature, "Lip", LipOffset() * (perCell / layout.CellSize));
-            AddQuarters(lip, tiles, RectOf, config.LipFill(fill), config.MiniatureLipOrder);
-            AddQuarters(miniature, tiles, RectOf, fill, config.MiniatureOrder);
+            var lip = AddGroup(miniature, "Lip", Vector2.zero);
+            AddQuarters(
+                lip, tiles, tile => OnScreen(BlockTiling.QuarterRect(tile)), config.LipFill(fill), config.MiniatureLipOrder);
+            AddQuarters(
+                miniature, tiles, tile => OnScreen(FaceShape.QuarterRect(tile, 0f, lipCells)), fill, config.MiniatureOrder);
         }
 
         /// <summary>
@@ -583,7 +590,10 @@ namespace GateRush.Runtime
                 // M3: a frozen block is ice, never its colour.
                 var fill = visual.IsFrozen ? config.IceColor : config.BlockFill(visual.OuterColor.Value);
 
-                var lip = AddGroup(body, "Lip", LipOffset());
+                // The lip fills the footprint's own quarters; the face over it
+                // is raised on its downward sides (FaceShape), which leaves
+                // the lip showing inside the block's cells.
+                var lip = AddGroup(body, "Lip", Vector2.zero);
                 var lipQuarters = AddQuarters(lip, tiles, blockQuarterRect, config.LipFill(fill), config.BlockLipOrder);
 
                 var drawn = new DrawnBlock(root, body, FootprintCenterInBlock(cells), lipQuarters, cells, tiles, spec.Axis, visual.IsFrozen);
@@ -601,35 +611,41 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A block's face under its body: the quarter tiles in
-        /// <paramref name="fill"/>; for a layered block (M4) its inner shape
-        /// in <paramref name="beneath"/> — the same tiles pulled inward by
-        /// <see cref="LayerInset"/>, over a copy in the lip colour reaching
-        /// <see cref="RuntimeConfig.LayerEdgeCells"/> further out, its edge;
-        /// then frost on every cell when it is ice, studs with their gloss on
-        /// every cell when it is not, and — for an axis-restricted block (M7),
-        /// ice or not — one double-headed arrow along its axis instead of
-        /// studs. A layered block's studs sit on the inner shape: they take
-        /// its colour and <see cref="RuntimeConfig.LayerStudScale"/>, and the
+        /// <paramref name="fill"/>, raised on their downward sides so the lip
+        /// shows beneath (<see cref="FaceShape"/>); for a layered block (M4)
+        /// its inner shape in <paramref name="beneath"/> — the same tiles
+        /// pulled inward from the face by
+        /// <see cref="RuntimeConfig.LayerInsetCells"/>, over a copy in the lip
+        /// colour reaching <see cref="RuntimeConfig.LayerEdgeCells"/> further
+        /// out, its edge; then frost on every cell when it is ice, studs with
+        /// their gloss on every cell when it is not, and — for an
+        /// axis-restricted block (M7), ice or not — one double-headed arrow
+        /// along its axis instead of studs. Studs and the arrow are raised by
+        /// <see cref="FaceContentRise"/>, which keeps them on the shortened
+        /// face; frost stays on its cell, clear of the lip by its own inset.
+        /// A layered block's studs sit on the inner shape: they take its
+        /// colour and <see cref="RuntimeConfig.LayerStudScale"/>, and the
         /// outer rim carries none.
         /// </summary>
         private void DrawFace(DrawnBlock block, Color fill, Color? beneath)
         {
             var face = AddGroup(block.Body, "Face", Vector2.zero);
-            block.FaceQuarters = AddQuarters(face, block.Tiles, blockQuarterRect, fill, config.BlockOrder);
+            block.FaceQuarters = AddQuarters(face, block.Tiles, FaceQuarterRect(0f), fill, config.BlockOrder);
 
             var studFill = fill;
             if (beneath.HasValue)
             {
                 var inner = AddGroup(face, "Inner", Vector2.zero);
                 block.LayerEdgeQuarters = AddQuarters(
-                    inner, block.Tiles, LayerQuarterRect(config.LayerInsetCells - config.LayerEdgeCells),
+                    inner, block.Tiles, FaceQuarterRect(config.LayerInsetCells - config.LayerEdgeCells),
                     config.LipFill(beneath.Value), config.LayerEdgeOrder);
                 block.LayerQuarters = AddQuarters(
-                    inner, block.Tiles, LayerQuarterRect(config.LayerInsetCells), beneath.Value, config.LayerOrder);
+                    inner, block.Tiles, FaceQuarterRect(config.LayerInsetCells), beneath.Value, config.LayerOrder);
                 studFill = beneath.Value;
             }
 
             var cellSize = new Vector2(layout.CellSize, layout.CellSize);
+            var rise = FaceContentRise();
             for (var c = 0; c < block.Cells.Count; c++)
             {
                 var cell = block.Cells[c];
@@ -640,8 +656,10 @@ namespace GateRush.Runtime
                 }
                 else if (block.Axis == MovementAxis.Free)
                 {
-                    block.AddStuds(AddSprite(face, $"Studs {cell}", config.StudsSprite, center, cellSize, studFill, config.StudOrder));
-                    block.AddStuds(AddSprite(face, $"Gloss {cell}", config.StudGlossSprite, center, cellSize, config.GlossColor, config.GlossOrder));
+                    block.AddStuds(AddSprite(
+                        face, $"Studs {cell}", config.StudsSprite, center + rise, cellSize, studFill, config.StudOrder));
+                    block.AddStuds(AddSprite(
+                        face, $"Gloss {cell}", config.StudGlossSprite, center + rise, cellSize, config.GlossColor, config.GlossOrder));
                 }
             }
 
@@ -657,28 +675,42 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Where a quarter of a block's inner shape goes at
-        /// <paramref name="insetCells"/>, in its body's local world units.
+        /// Where a quarter of a block's face goes — at
+        /// <paramref name="insetCells"/> above 0, of a shape set that far into
+        /// the face — in its body's local world units: the footprint's
+        /// quarter, less the lip on its downward sides (<see cref="FaceShape"/>).
         /// </summary>
-        private Func<QuarterTile, Rect> LayerQuarterRect(float insetCells) =>
-            tile => CellRectToLocal(LayerInset.QuarterRect(tile, insetCells));
+        private Func<QuarterTile, Rect> FaceQuarterRect(float insetCells) =>
+            tile => FaceQuarterRect(tile, insetCells);
+
+        private Rect FaceQuarterRect(QuarterTile tile, float insetCells) =>
+            CellRectToLocal(FaceShape.QuarterRect(tile, insetCells, config.LipOffsetCells));
+
+        /// <summary>
+        /// How far a block's studs and axis arrow sit above its footprint's
+        /// own centres, in its body's local world units
+        /// (<see cref="FaceShape.ContentRise"/>).
+        /// </summary>
+        private Vector2 FaceContentRise() =>
+            new Vector2(0f, CellsToWorld(FaceShape.ContentRise(config.LipOffsetCells)));
 
         /// <summary>
         /// Poses <paramref name="quarters"/> — drawn from <paramref name="tiles"/>,
-        /// in their order — as an inner shape <paramref name="insetCells"/>
-        /// inside the footprint; at 0 they cover the footprint as a face does.
+        /// in their order — as a shape <paramref name="insetCells"/> inside
+        /// the block's face; at 0 they are the face.
         /// </summary>
         private void PoseInset(List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> tiles, float insetCells)
         {
             for (var i = 0; i < tiles.Count; i++)
             {
-                PoseQuarter(quarters[i], tiles[i], CellRectToLocal(LayerInset.QuarterRect(tiles[i], insetCells)));
+                PoseQuarter(quarters[i], tiles[i], FaceQuarterRect(tiles[i], insetCells));
             }
         }
 
         /// <summary>
         /// The M7 arrow: a 9-sliced sprite through the centre of the
-        /// footprint's bounding box, along the block's axis, stopping
+        /// footprint's bounding box, raised with the studs
+        /// (<see cref="FaceContentRise"/>), along the block's axis, stopping
         /// <see cref="RuntimeConfig.AxisArrowEndInsetCells"/> short of each end.
         /// It is scaled uniformly to its thickness and stretched only in its
         /// sliced middle, so the heads keep their shape at any length.
@@ -696,7 +728,7 @@ namespace GateRush.Runtime
 
             var go = new GameObject("Axis arrow");
             go.transform.SetParent(face, false);
-            go.transform.localPosition = block.FootprintCenter;
+            go.transform.localPosition = block.FootprintCenter + FaceContentRise();
             go.transform.localRotation = Quaternion.Euler(
                 0f, 0f, isHorizontal ? 0f : Vector2.SignedAngle(Vector2.right, Vector2.up));
             go.transform.localScale = new Vector3(scale, scale, 1f);
@@ -1044,7 +1076,11 @@ namespace GateRush.Runtime
             return group;
         }
 
-        /// <summary>Where a lip group sits relative to its face: straight down by the lip offset.</summary>
+        /// <summary>
+        /// Where the lip group of the frame, a gate or a machine sits relative
+        /// to its face: straight down by the lip offset. A block's lip is not
+        /// offset (<see cref="FaceShape"/>).
+        /// </summary>
         private Vector2 LipOffset() => new Vector2(0f, -CellsToWorld(config.LipOffsetCells));
 
         private Vector2 GridToLocal(Vector2 grid) => layout.GridToWorld(grid);
@@ -1248,7 +1284,7 @@ namespace GateRush.Runtime
             /// <summary>The centre of the footprint's bounding box, relative to <see cref="Root"/> and <see cref="Body"/>.</summary>
             public Vector2 FootprintCenter { get; }
 
-            /// <summary>The lip's quarter renderers, offset below the face, in <see cref="Tiles"/> order.</summary>
+            /// <summary>The lip's quarter renderers, filling the footprint under the face, in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> LipQuarters { get; }
 
             /// <summary>The face's quarter renderers, in the block's colour, in <see cref="Tiles"/> order.</summary>

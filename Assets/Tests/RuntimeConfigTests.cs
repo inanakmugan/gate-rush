@@ -129,6 +129,28 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Problems_DefaultLipValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Lip Offset Cells"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LipOffsetPlusLayerInsetReachingHalfACell_IsReportedByName()
+        {
+            // Half a cell of lip alone: with any inset above 0, the default's
+            // included, the two together pass it.
+            SetFloat("lipOffsetCells", 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems, Has.Some.Contains("Lip Offset Cells plus Layer Inset Cells must be below 0.5"),
+                string.Join(" | ", problems));
+        }
+
+        [Test]
         public void Problems_LayerInsetOfHalfACell_IsReportedByName()
         {
             SetFloat("layerInsetCells", 0.5f);

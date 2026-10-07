@@ -9,14 +9,13 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers Module 18's <see cref="LiftOutline"/>: each outline quarter grows
-    /// only on the sides that face out of the block — a bottom side by the lip
-    /// too — so the quarters together cover a band round the whole footprint,
+    /// only on the sides that face out of the block, a bottom side no more
+    /// than any other, so the quarters together cover a band round the whole footprint,
     /// the inside of an L's bend included.
     /// </summary>
     public class LiftOutlineTests
     {
         private const float Width = 0.07f;
-        private const float Lip = 0.09f;
 
         private static readonly Coord[] Single = { new Coord(0, 0) };
         private static readonly Coord[] Horizontal1x2 = { new Coord(0, 0), new Coord(1, 0) };
@@ -29,7 +28,7 @@ namespace GateRush.Tests
         {
             var tile = TileAt(Single, new Coord(0, 0), Quarter.TopRight);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.OuterCorner, tile.Piece);
             AssertRect(new Rect(0.5f, 0.5f, 0.5f + Width, 0.5f + Width), rect);
@@ -40,7 +39,7 @@ namespace GateRush.Tests
         {
             var tile = TileAt(Horizontal1x2, new Coord(0, 0), Quarter.TopRight);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.EdgeAlongX, tile.Piece);
             AssertRect(new Rect(0.5f, 0.5f, 0.5f, 0.5f + Width), rect);
@@ -51,7 +50,7 @@ namespace GateRush.Tests
         {
             var tile = TileAt(Vertical1x2, new Coord(0, 0), Quarter.TopLeft);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.EdgeAlongY, tile.Piece);
             AssertRect(new Rect(-Width, 0.5f, 0.5f + Width, 0.5f), rect);
@@ -62,7 +61,7 @@ namespace GateRush.Tests
         {
             var tile = TileAt(Square2x2, new Coord(0, 0), Quarter.TopRight);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.Fill, tile.Piece);
             AssertRect(BlockTiling.QuarterRect(tile), rect);
@@ -73,27 +72,27 @@ namespace GateRush.Tests
         {
             var tile = TileAt(LShape, new Coord(0, 0), Quarter.TopRight);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.ConcaveCorner, tile.Piece);
             AssertRect(new Rect(0.5f, 0.5f, 0.5f + Width, 0.5f + Width), rect);
         }
 
         [Test]
-        public void QuarterRect_BottomSide_GrowsByTheLipToo()
+        public void QuarterRect_BottomSide_GrowsByTheWidthOnly()
         {
             var tile = TileAt(Horizontal1x2, new Coord(1, 0), Quarter.BottomLeft);
 
-            var rect = LiftOutline.QuarterRect(tile, Width, Lip);
+            var rect = LiftOutline.QuarterRect(tile, Width);
 
             Assert.AreEqual(QuarterPiece.EdgeAlongX, tile.Piece);
-            AssertRect(new Rect(1f, -Width - Lip, 0.5f, 0.5f + Width + Lip), rect);
+            AssertRect(new Rect(1f, -Width, 0.5f, 0.5f + Width), rect);
         }
 
         [Test]
         public void QuarterRects_LShape_CoverEveryPointWithinTheWidthOfTheFootprintIncludingTheBend()
         {
-            var rects = BlockTiling.Compute(LShape).Select(t => LiftOutline.QuarterRect(t, Width, 0f)).ToList();
+            var rects = BlockTiling.Compute(LShape).Select(t => LiftOutline.QuarterRect(t, Width)).ToList();
             var cells = LShape.Select(c => new Rect(c.X, c.Y, 1f, 1f)).ToList();
             const int Steps = 120;
             var sampled = 0;

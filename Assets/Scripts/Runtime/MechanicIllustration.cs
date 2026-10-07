@@ -10,7 +10,7 @@ namespace GateRush.Runtime
     /// <summary>
     /// Draws a mechanic on the canvas for its introduction card (Module 19),
     /// as it looks on the board: the same generated sprites, placed by the same
-    /// layout rules — <see cref="BlockTiling"/>, <see cref="LayerInset"/>, <see cref="FrameTiling"/>,
+    /// layout rules — <see cref="BlockTiling"/>, <see cref="FaceShape"/>, <see cref="FrameTiling"/>,
     /// <see cref="GeneratorMachine"/>, <see cref="MarkLayout"/> — and sized by
     /// the board's own cell-relative values in <see cref="RuntimeConfig"/>,
     /// times <see cref="RuntimeConfig.IntroCellUnits"/>. Retuning the board
@@ -180,6 +180,7 @@ namespace GateRush.Runtime
 
             DrawGate(root, ctx, isOpen: true);
 
+            // The gate's lip hangs below its face; the block's is inside its cell.
             var lip = config.LipOffsetCells;
             return Rect.MinMaxRect(0f, -lip, boardWidth + config.FrameThicknessCells, 1f);
         }
@@ -278,12 +279,14 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A block at <paramref name="origin"/>, as <c>BoardView.DrawBlocks</c>
-        /// and <c>DrawFace</c> draw it: lip, face quarters, a layered block's
-        /// inner shape in <paramref name="beneath"/> over its darker edge
-        /// (<see cref="LayerInset"/>), then frost on ice, studs with gloss on
-        /// a plain block — on the inner shape, in its colour and at
-        /// <see cref="RuntimeConfig.LayerStudScale"/>, on a layered one — or
-        /// the axis arrow.
+        /// and <c>DrawFace</c> draw it: the lip over the footprint's quarters,
+        /// the face quarters raised on their downward sides
+        /// (<see cref="FaceShape"/>), a layered block's inner shape in
+        /// <paramref name="beneath"/> over its darker edge, then frost on ice,
+        /// studs with gloss on a plain block — on the inner shape, in its
+        /// colour and at <see cref="RuntimeConfig.LayerStudScale"/>, on a
+        /// layered one — or the axis arrow, studs and arrow raised by
+        /// <see cref="FaceShape.ContentRise"/>.
         /// </summary>
         /// <returns>The block's body, whose frame is the footprint's: marks go under it.</returns>
         private RectTransform DrawBlock(
@@ -293,9 +296,10 @@ namespace GateRush.Runtime
             var body = AddGroup(parent, name, origin);
             var tiles = BlockTiling.Compute(cells);
 
-            var lip = AddGroup(body, "Lip", new Vector2(0f, -config.LipOffsetCells));
+            var lipCells = config.LipOffsetCells;
+            var lip = AddGroup(body, "Lip", Vector2.zero);
             AddQuarters(lip, tiles, BlockTiling.QuarterRect, config.LipFill(fill));
-            AddQuarters(body, tiles, BlockTiling.QuarterRect, fill);
+            AddQuarters(body, tiles, tile => FaceShape.QuarterRect(tile, 0f, lipCells), fill);
 
             var studFill = fill;
             var studSize = Vector2.one;
@@ -304,12 +308,13 @@ namespace GateRush.Runtime
                 var inset = config.LayerInsetCells;
                 var edgeInset = inset - config.LayerEdgeCells;
                 var inner = AddGroup(body, "Inner", Vector2.zero);
-                AddQuarters(inner, tiles, tile => LayerInset.QuarterRect(tile, edgeInset), config.LipFill(beneath.Value));
-                AddQuarters(inner, tiles, tile => LayerInset.QuarterRect(tile, inset), beneath.Value);
+                AddQuarters(inner, tiles, tile => FaceShape.QuarterRect(tile, edgeInset, lipCells), config.LipFill(beneath.Value));
+                AddQuarters(inner, tiles, tile => FaceShape.QuarterRect(tile, inset, lipCells), beneath.Value);
                 studFill = beneath.Value;
                 studSize = Vector2.one * config.LayerStudScale;
             }
 
+            var rise = FaceContentRise();
             for (var c = 0; c < cells.Count; c++)
             {
                 var center = CellCenter(cells[c]);
@@ -319,8 +324,8 @@ namespace GateRush.Runtime
                 }
                 else if (face == BlockFace.Studs)
                 {
-                    AddSprite(body, $"Studs {cells[c]}", config.StudsSprite, center, studSize, studFill);
-                    AddSprite(body, $"Gloss {cells[c]}", config.StudGlossSprite, center, studSize, config.GlossColor);
+                    AddSprite(body, $"Studs {cells[c]}", config.StudsSprite, center + rise, studSize, studFill);
+                    AddSprite(body, $"Gloss {cells[c]}", config.StudGlossSprite, center + rise, studSize, config.GlossColor);
                 }
             }
 
@@ -335,12 +340,12 @@ namespace GateRush.Runtime
         /// <summary>
         /// The M7 arrow along a horizontal block, as <c>BoardView.DrawAxisArrow</c>
         /// draws it: sliced, so only its shaft stretches, its thickness the
-        /// sprite's whole height.
+        /// sprite's whole height, raised with the studs.
         /// </summary>
         private void DrawAxisArrow(RectTransform body, IReadOnlyList<Coord> cells)
         {
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
-            var center = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f);
+            var center = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f) + FaceContentRise();
             var thickness = config.AxisArrowThicknessCells;
             var length = maxX + 1 - minX - 2f * config.AxisArrowEndInsetCells;
 
@@ -466,16 +471,16 @@ namespace GateRush.Runtime
             var perCell = BoardView.MiniatureFit(cells, screen, out var shapeCenter);
             var tiles = BlockTiling.Compute(cells);
 
-            Rect RectOf(QuarterTile tile)
-            {
-                var cellRect = BlockTiling.QuarterRect(tile);
-                return new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
-            }
+            var lipCells = config.LipOffsetCells;
+
+            // A rectangle in the block's cell units, on the screen.
+            Rect OnScreen(Rect cellRect) =>
+                new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
 
             var miniature = AddGroup(parent, "Next block", Vector2.zero);
-            var lip = AddGroup(miniature, "Lip", new Vector2(0f, -config.LipOffsetCells * perCell));
-            AddQuarters(lip, tiles, RectOf, config.LipFill(fill));
-            AddQuarters(miniature, tiles, RectOf, fill);
+            var lip = AddGroup(miniature, "Lip", Vector2.zero);
+            AddQuarters(lip, tiles, tile => OnScreen(BlockTiling.QuarterRect(tile)), config.LipFill(fill));
+            AddQuarters(miniature, tiles, tile => OnScreen(FaceShape.QuarterRect(tile, 0f, lipCells)), fill);
         }
 
         /// <summary>A board holding nothing but <paramref name="gate"/>: what <see cref="FrameTiling"/> needs to place it.</summary>
@@ -489,15 +494,17 @@ namespace GateRush.Runtime
             return FrameTiling.EdgeSpanRect(ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, config.FrameThicknessCells);
         }
 
-        /// <summary>What a block at <paramref name="origin"/> covers: its footprint's bounding box and the lip below it.</summary>
-        private Rect BlockBounds(Vector2 origin, IReadOnlyList<Coord> cells)
+        /// <summary>What a block at <paramref name="origin"/> covers: its footprint's bounding box, which holds its lip too.</summary>
+        private static Rect BlockBounds(Vector2 origin, IReadOnlyList<Coord> cells)
         {
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
-            return Rect.MinMaxRect(
-                origin.x + minX, origin.y + minY - config.LipOffsetCells, origin.x + maxX + 1, origin.y + maxY + 1);
+            return Rect.MinMaxRect(origin.x + minX, origin.y + minY, origin.x + maxX + 1, origin.y + maxY + 1);
         }
 
         private static Vector2 CellCenter(Coord cell) => new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
+
+        /// <summary>How far a block's studs and axis arrow sit above its footprint's own centres, in cells, as on the board.</summary>
+        private Vector2 FaceContentRise() => new Vector2(0f, FaceShape.ContentRise(config.LipOffsetCells));
 
         /// <summary>
         /// One image per quarter, posed as its tile says, as

@@ -393,7 +393,7 @@ namespace GateRush.Runtime
         /// <summary>
         /// Shows <paramref name="block"/> lifted by <paramref name="amount"/>,
         /// from 0 (at rest) to 1 (held): its body's scale, and its outline's
-        /// reach past the face (<see cref="LiftOutline"/>).
+        /// reach past the block's drawing (<see cref="LiftOutline"/>).
         /// </summary>
         private void ApplyLift(DrawnBlock block, float amount)
         {
@@ -409,9 +409,7 @@ namespace GateRush.Runtime
             for (var i = 0; i < block.Tiles.Count; i++)
             {
                 var tile = block.Tiles[i];
-                PoseQuarter(
-                    block.OutlineQuarters[i], tile,
-                    CellRectToLocal(LiftOutline.QuarterRect(tile, width, config.LipOffsetCells)));
+                PoseQuarter(block.OutlineQuarters[i], tile, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
             }
         }
 
@@ -448,7 +446,9 @@ namespace GateRush.Runtime
         /// A destroyed block passes through its gate as debris: it leaves the
         /// drawing for <c>Effects/Debris</c>, is clipped at the gate's inner
         /// line (<see cref="ClipAtGate"/>), and slides out at a steady speed —
-        /// its depth times <see cref="RuntimeConfig.ExitSecondsPerCell"/> — while
+        /// its depth, which takes it wholly through
+        /// (<see cref="GateExit.DepthCells"/>), at
+        /// <see cref="RuntimeConfig.ExitSecondsPerCell"/> — while
         /// its lift drops, cubes stream out beneath the gate
         /// (<see cref="BurstLayout.Stream"/>) and the gate glows inward. Every
         /// tween carries <see cref="debrisId"/>, so the stages and the redraw
@@ -466,8 +466,9 @@ namespace GateRush.Runtime
             root.SetParent(debris, true);
             var mask = ClipAtGate(block, edge, out var maskCenter);
 
-            var passSeconds = GateExit.DepthCells(block.Cells, edge) * config.ExitSecondsPerCell;
-            var travel = GateExit.Outward(edge) * CellsToWorld(GateExit.PassCells(block.Cells, edge, config.LipOffsetCells));
+            var depth = GateExit.DepthCells(block.Cells, edge);
+            var passSeconds = depth * config.ExitSecondsPerCell;
+            var travel = GateExit.Outward(edge) * CellsToWorld(depth);
             Vector2 start = root.localPosition;
 
             Tween drop = null;
@@ -592,8 +593,8 @@ namespace GateRush.Runtime
         /// this block's sprites are set to show inside it. The mask covers
         /// <see cref="GateExit.MaskRect"/>: exactly the inner line on the exit
         /// side, and past the grid by the block's overhang
-        /// (<see cref="GateExit.OverhangCells"/>) on the other three, so a block
-        /// on a border row keeps its lip and outline there. It is the root's
+        /// (<see cref="GateExit.OverhangCells"/>) on the other three, so a
+        /// lifted block on a border row keeps its outline there. It is the root's
         /// child, so the pass keeps it still on the board by moving it against
         /// the root; <paramref name="maskCenter"/> is where it stays, in the
         /// view's frame. Labels ignore sprite masks, and a block a move can
@@ -618,7 +619,7 @@ namespace GateRush.Runtime
                 sprite.maskInteraction = SpriteMaskInteraction.VisibleInsideMask;
             }
 
-            var margin = GateExit.OverhangCells(block.Cells, config.LiftScale, config.OutlineWidthCells, config.LipOffsetCells);
+            var margin = GateExit.OverhangCells(block.Cells, config.LiftScale, config.OutlineWidthCells);
             var area = GridRectToLocal(GateExit.MaskRect(ctx.Width, ctx.Height, edge, margin));
             maskCenter = area.center;
 
@@ -800,7 +801,8 @@ namespace GateRush.Runtime
         /// <summary>
         /// A surviving layered block peels its removed outer colour (Module
         /// 20), on the renderers it was drawn with: the inner shape grows from
-        /// its inset to the whole footprint, its studs with it, while the
+        /// its inset to the whole face (<see cref="FaceShape"/>), its studs
+        /// with it, while the
         /// outer face shrinks inward by that inset and fades, the inner
         /// shape's edge fades, and the lip turns from the outer colour's to
         /// <paramref name="exposed"/>'s. It ends as a plain block of the

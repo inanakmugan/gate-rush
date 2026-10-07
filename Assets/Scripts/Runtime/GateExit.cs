@@ -32,7 +32,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The block's depth along the exit direction: the span of its
-        /// footprint's bounding box on that axis, in cells.
+        /// footprint's bounding box on that axis, in cells. Also how far it
+        /// travels to be wholly through the gate's inner line, on every edge:
+        /// nothing of a block is drawn outside its footprint's cells.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="cells"/> is null.</exception>
         public static int DepthCells(IReadOnlyList<Coord> cells, BoardEdge edge)
@@ -47,23 +49,15 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// How far the block travels to be wholly through the gate's inner line,
-        /// in cells: its depth, and through the top also the lip, which trails
-        /// below the face.
-        /// </summary>
-        public static float PassCells(IReadOnlyList<Coord> cells, BoardEdge edge, float lipOffsetCells) =>
-            DepthCells(cells, edge) + (edge == BoardEdge.Top ? lipOffsetCells : 0f);
-
-        /// <summary>
         /// How far past the footprint a lifted block can reach on any side, in
-        /// cells: its outline and lip — which reach farthest below the face,
-        /// <c>width + lip</c> (<see cref="LiftOutline"/>) — grown by the lift
-        /// scale, plus how far the lift scale pushes the footprint's own edge
-        /// out from its centre, <c>(scale − 1) × half its larger extent</c>.
+        /// cells: its outline's width (<see cref="LiftOutline"/>) grown by the
+        /// lift scale, plus how far the lift scale pushes the footprint's own
+        /// edge out from its centre, <c>(scale − 1) × half its larger
+        /// extent</c>. A block at rest reaches nowhere past its footprint: its
+        /// lip is inside its cells (<see cref="FaceShape"/>).
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="cells"/> is null.</exception>
-        public static float OverhangCells(
-            IReadOnlyList<Coord> cells, float liftScale, float outlineWidthCells, float lipOffsetCells)
+        public static float OverhangCells(IReadOnlyList<Coord> cells, float liftScale, float outlineWidthCells)
         {
             if (cells == null)
             {
@@ -72,15 +66,15 @@ namespace GateRush.Runtime
 
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
             var halfExtent = Math.Max(maxX + 1 - minX, maxY + 1 - minY) * 0.5f;
-            return liftScale * (outlineWidthCells + lipOffsetCells) + (liftScale - 1f) * halfExtent;
+            return liftScale * outlineWidthCells + (liftScale - 1f) * halfExtent;
         }
 
         /// <summary>
         /// The area a passing block stays visible in: the grid, with its side
         /// on <paramref name="exitEdge"/> exactly the gate's inner line — where
         /// the block is cut — and its other three sides pushed out by
-        /// <paramref name="marginCells"/>, so a block on a border row keeps the
-        /// lip and outline that hang past the grid there.
+        /// <paramref name="marginCells"/>, so a lifted block on a border row
+        /// keeps the outline that reaches past the grid there.
         /// </summary>
         public static Rect MaskRect(int width, int height, BoardEdge exitEdge, float marginCells)
         {
