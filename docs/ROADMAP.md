@@ -62,8 +62,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) done. Next: tools to play any level
-(2.5), the owner's level set for the first build, then Phase 3.* Levels chain through Next
+*Status: playable; visual polish (2.4) and tools to play any level (2.5)
+done. Next: the owner's level set for the first build, then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -158,7 +158,8 @@ level without editing the Level scene: a Play button in the Level Editor,
 a Gate Rush → Play Level… window listing every level, a one-shot
 editor-only start-level override, and keys to step between levels during
 Play in the editor and development builds. The scene keeps starting on the
-first level. *Spec: `Modules/21-dev-tools.md`.*
+first level. *Spec: `Modules/21-dev-tools.md`. Status: done.* The keys are
+Page Down and Page Up.
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no

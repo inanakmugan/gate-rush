@@ -245,6 +245,13 @@ Edit Mode, against the plain classes. The look is checked by hand.
   downward, sorted behind every face. A peel draws the exposed face beneath,
   recolours the lip at once, and lifts the old face above it with a
   `SortingGroup` while it shrinks away.
+  *Later:* a block's lip offset downward hung below its footprint, over the
+  frame and gates on the bottom row. A block's lip now fills its own
+  quarters and the face is raised on its downward outline sides by the lip
+  (`FaceShape`), so a resting block draws nothing outside its cells; studs,
+  gloss and the axis arrow rise by half the lip. The frame, gate and machine
+  lips still hang, never over a block. The gap between blocks was narrowed
+  in `ArtRecipe`, closer to the reference. Module 20 has its own peel since.
 - **Retired:** `BlockCellRects` and its tests, `cellGap`,
   `cameraMarginCells`, `edgeBarThickness`, `backgroundColor`,
   `emptyCellColor`, `wallColor` and `cellOrder`. `RuntimeConfig.asset` was

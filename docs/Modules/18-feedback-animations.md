@@ -267,7 +267,9 @@ Edit Mode, against the plain classes. The look is checked by hand.
   a `SpriteMask` inside its own sorting group: exactly on the gate's inner
   line on the exit side, and past the grid by a margin derived from the
   lift scale, outline width and lip offset on the other three
-  (`GateExit`). Cubes stream from the gate's outer line for the whole
+  (`GateExit`). *Later:* with the lip inside the cells (Module 15) the
+  margin no longer counts the lip, and a top exit no longer travels an
+  extra lip (`PassCells` retired). Cubes stream from the gate's outer line for the whole
   pass (`BurstLayout.Stream`), and a soft glow (`GateGlow` sprite) lights
   the gate's inner edge. The nudge fields are retired.
 - **Win panel.** `BoardView` counts the passes still running; a

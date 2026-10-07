@@ -146,3 +146,38 @@ Edit Mode, against plain code where there is any.
 - After a played override, a plain Play starts on the scene's level.
 - `]` and `[` step through levels with cards and countdown as on Next.
 - After all of this, `git status` shows no change to `Level.unity`.
+
+---
+
+## Resolved during implementation
+
+- **Keys.** Page Down and Page Up instead of `]` and `[`: on the owner's
+  Turkish Q keyboard the bracket positions are Ğ and Ü, and a typed `]`
+  needs AltGr. Page Up and Page Down are the same on every layout and clash
+  with nothing in play. They live in `DevKeys`, with the step values, under
+  `UNITY_EDITOR || DEVELOPMENT_BUILD`; the Level field's tooltip names
+  them. They work during a card and after a result, and log at either end.
+- **One reading of the level files.** `LevelRoster.Read` replaces the pass
+  in `BuildCatalog`: which files load, which fail and why, the catalog or its
+  error, and each level's mechanics in order. The bootstrap and the Play
+  Level window both use it, so the window's numbers are the HUD's.
+  `LevelRoster.TryParse` is the one "does this text load as a level" rule,
+  also used by the Level Editor's file check. `LevelCatalog` gains
+  `TryGetPrevious`.
+- **Override.** `DevLevelOverride` keeps one `SessionState` string. The
+  bootstrap takes it as the first statement of `Awake`, before any check
+  that could return, so a misconfigured scene still clears it; a launcher
+  hook also clears it when Play ends. The runtime side compiles to "no
+  override" outside the editor.
+- **Launching.** `DevPlayLauncher` refuses while already playing, while
+  scripts compile or have errors, and when the scene is missing, so an
+  override never lingers into a plain Play. It leaves an already-open,
+  only Level scene as it is rather than reopening it and losing unsaved
+  scene edits. Launches are deferred past the GUI pass.
+- **Level Editor's Play.** Play always runs the saved file, so a clean
+  draft is checked as the file on disk; Save and Play checks the draft
+  first and saves nothing invalid. A never-saved level, or one saved
+  outside `Resources/Levels`, is refused with the reason.
+- **Play Level window.** Loadable levels in catalog order with the HUD's
+  numbers; unloadable files after them, greyed, with their error as a
+  tooltip; with two files sharing an id, a help box and unnumbered rows.
