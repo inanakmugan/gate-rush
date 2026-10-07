@@ -1420,3 +1420,40 @@ one block, one of them hidden until the player happens to grab the right
 block.
 
 ---
+
+## D49 — Open gates pull a block in
+
+**Decision.** While a block is dragged toward an open gate it can leave
+through, the gate pulls it: within `pullRangeCells` of the origin where the
+block would arrive flush and aligned with that gate, the drawn block is
+drawn a little toward that origin, more the closer it is, and the gate
+glows faintly. Released within `captureRangeCells` of that origin while
+still being led toward it, the block's move is that origin, so it arrives
+and clears there (D25), instead of the nearest cell (D44).
+
+**Why.** The owner, from the reference game: approaching a gate, the block
+feels sucked in. Without it the gate's mouth feels dead, and a block left
+half a cell short settles back and does nothing.
+
+**Rules stay on the grid.** The captured move is still `Move(block,
+origin)` to a whole-cell origin the block reaches in a straight line
+through legal positions from where it was drawn, so it is reachable by
+construction, as in D44, and the resolver decides the clear exactly as
+before. The solver is unaffected: arriving at that origin was always a
+move.
+
+**Only when led toward it.** The pull and the capture apply only while the
+pointer leads the block toward the gate's origin along that axis. Dragging
+away, or across, never pulls the block back, and a release while moving away
+settles to the nearest cell as before.
+
+**Consequence.** `DragController` finds the pull's target and decides the
+capture, in plain, tested code; `BoardView` draws the pull and the faint
+glow. Module 22 specifies it.
+
+**Rejected.** A purely visual pull with release unchanged: the block would
+look caught and then settle back short of the gate, which reads as a bug.
+Pulling the block all the way in on its own without a release: it takes the
+decision away from the player.
+
+---

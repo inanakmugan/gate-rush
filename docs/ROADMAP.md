@@ -63,7 +63,8 @@ pipeline (D38), and the fixes and rules in D39–D41.
 ## Phase 2 — Playable single level
 
 *Status: playable; visual polish (2.4) and tools to play any level (2.5)
-done. Next: the owner's level set for the first build, then Phase 3.* Levels chain through Next
+done. Next: the gate pull (2.6), the owner's level set for the first build,
+then Phase 3.* Levels chain through Next
 rather than one hardcoded level.
 
 Board rendering, pointer input, DOTween movement, countdown, win/lose. No
@@ -160,6 +161,11 @@ editor-only start-level override, and keys to step between levels during
 Play in the editor and development builds. The scene keeps starting on the
 first level. *Spec: `Modules/21-dev-tools.md`. Status: done.* The keys are
 Page Down and Page Up.
+
+**2.6 — Gate pull.** An open gate draws in a block dragged toward it, as in
+the reference game: the block is pulled a little toward the gate and the
+gate glows faintly, and a release close enough arrives and clears (D49).
+*Spec: `Modules/22-gate-pull.md`.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
