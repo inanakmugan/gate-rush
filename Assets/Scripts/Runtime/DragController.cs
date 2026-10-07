@@ -30,6 +30,16 @@ namespace GateRush.Runtime
     /// no easing can carry the block across the corner of a wall.</para>
     /// <para><b>No route-finding.</b> The block goes where the finger leads and
     /// waits when it is blocked; the player steers it around an obstacle.</para>
+    /// <para><b>The gate pull</b> (Module 22, D49). The collision sweep works
+    /// on the unpulled position. Each update, a <see cref="PullTarget"/> is
+    /// looked for from that position — an origin where the block would exit
+    /// by <see cref="BlockReachability.FindExitGate"/>, Core's own arrival
+    /// rule — and <see cref="Position"/> is that position drawn a fraction
+    /// of the way toward it: all the way within the capture range, where the
+    /// block latches onto the origin. Only that fraction is carried from one
+    /// update to the next, smoothed; the position is recomputed from the
+    /// unpulled one every time, so the pull never feeds back into the
+    /// sweep.</para>
     /// </remarks>
     public sealed class DragController
     {
@@ -49,10 +59,36 @@ namespace GateRush.Runtime
         private bool permitsY;
 
         private Coord start;
+
+        // The swept, unpulled position: what the sweep, the corner assist and
+        // NearestOrigin work on. Always legal.
         private Vector2 position;
         private Vector2 grabOffset;
         private Vector2 grabPoint;
         private Vector2 smoothedPointer;
+
+        // The position drawn toward the pull target, the target itself and
+        // its distance from the unpulled position, all recomputed by every
+        // update.
+        private Vector2 pulled;
+        private PullTarget? pull;
+        private float pullDistance;
+
+        // How much of the way to pullOrigin the block is drawn, from 0 to 1,
+        // smoothed over time; and the origin it is drawn toward, kept after
+        // its target is lost for as long as the fraction decays legally.
+        private float pullFraction;
+        private Coord pullOrigin;
+        private bool hasPullOrigin;
+
+        // Which way the smoothed, projected pointer target last moved on each
+        // axis (-1, 0 before it has moved, +1), and the axis it last moved
+        // further on. A still pointer keeps its lead; a reversal flips it at
+        // once. A forbidden axis never leads: its target coordinate is pinned.
+        private Vector2 lastTarget;
+        private int leadX;
+        private int leadY;
+        private int leadingAxis;
 
         /// <summary>A controller with no drag in progress.</summary>
         /// <exception cref="ArgumentNullException"><paramref name="settings"/> is null.</exception>
@@ -70,16 +106,26 @@ namespace GateRush.Runtime
         /// <summary>
         /// The dragged block's continuous origin, in cell units: the value the
         /// last <see cref="Update"/> returned, or the block's start right after
-        /// <see cref="TryBegin"/>. Always legal. Meaningless when no drag is in
-        /// progress.
+        /// <see cref="TryBegin"/>. Always legal. While a gate pulls, and while
+        /// a lost pull lets go, it lies on the straight, legal line between
+        /// the unpulled position and the pull's origin, never past the origin;
+        /// within the capture range it settles on the origin itself.
+        /// Meaningless when no drag is in progress.
         /// </summary>
-        public Vector2 Position => position;
+        public Vector2 Position => pulled;
 
         /// <summary>
-        /// The whole-cell origin the block would settle in if released now:
-        /// each axis of <see cref="Position"/> rounded to the nearest whole
-        /// cell, an exact half toward the start. It is one of the origins the
-        /// position overlaps, so it is legal.
+        /// What an open gate is pulling the block toward, as the last
+        /// <see cref="Update"/> found it, or null: none before the first
+        /// update, and none when no drag is in progress.
+        /// </summary>
+        public PullTarget? Pull => IsDragging ? pull : null;
+
+        /// <summary>
+        /// The whole-cell origin the block would settle in if released now
+        /// with no capture: each axis of the unpulled position rounded to the
+        /// nearest whole cell, an exact half toward the start. It is one of
+        /// the origins that position overlaps, so it is legal.
         /// </summary>
         public Coord NearestOrigin => new Coord(
             RoundTowardStart(position.x, start.X), RoundTowardStart(position.y, start.Y));
@@ -127,6 +173,15 @@ namespace GateRush.Runtime
             grabOffset = pointer - position;
             grabPoint = pointer;
             smoothedPointer = pointer;
+            pulled = position;
+            pull = null;
+            pullDistance = 0f;
+            pullFraction = 0f;
+            hasPullOrigin = false;
+            lastTarget = ProjectedTarget();
+            leadX = 0;
+            leadY = 0;
+            leadingAxis = AxisX;
             BlockIndex = blockIndex;
             return true;
         }
@@ -150,6 +205,11 @@ namespace GateRush.Runtime
         /// other coordinate is nudged toward that cell, by no more than the
         /// blocked axis's remaining distance, and on reaching it the blocked
         /// axis is swept again.</para>
+        /// <para>Last, the gate pull: <see cref="Pull"/> is found from where
+        /// the sweep left the block, and the returned position is drawn toward
+        /// it by a fraction that closes on what the pull asks for at
+        /// <see cref="DragSettings.PullFollowRate"/>. The sweep itself never
+        /// sees the pull.</para>
         /// <para>A non-finite pointer is ignored, and a non-positive or
         /// non-finite <paramref name="deltaSeconds"/> leaves the smoothed
         /// pointer where it is.</para>
@@ -161,25 +221,21 @@ namespace GateRush.Runtime
 
             if (!IsFinite(pointer))
             {
-                return position;
+                return pulled;
             }
 
             if (deltaSeconds > 0f && !float.IsInfinity(deltaSeconds))
             {
+                // A frame long enough to close the whole gap lands on the
+                // pointer itself: adding the rounded gap could leave it a hair
+                // off, and closing that hair next frame would read as the
+                // pointer leading the other way.
                 var follow = (float)(1.0 - Math.Exp(-(double)settings.FollowRate * deltaSeconds));
-                smoothedPointer += (pointer - smoothedPointer) * follow;
+                smoothedPointer = follow >= 1f ? pointer : smoothedPointer + (pointer - smoothedPointer) * follow;
             }
 
-            var target = smoothedPointer - grabOffset;
-            if (!permitsX)
-            {
-                target.x = start.X;
-            }
-
-            if (!permitsY)
-            {
-                target.y = start.Y;
-            }
+            var target = ProjectedTarget();
+            TrackLead(target);
 
             var first = Math.Abs(target.x - position.x) >= Math.Abs(target.y - position.y) ? AxisX : AxisY;
             var second = 1 - first;
@@ -196,7 +252,8 @@ namespace GateRush.Runtime
                 AssistAroundCorner(second, target[second]);
             }
 
-            return position;
+            ApplyPull(target, deltaSeconds);
+            return pulled;
         }
 
         /// <summary>
@@ -211,7 +268,14 @@ namespace GateRush.Runtime
         /// block is not moved toward <paramref name="pointer"/> first: it
         /// settles from where the player sees it.
         /// <list type="bullet">
-        /// <item><see cref="NearestOrigin"/> is not the start:
+        /// <item>There is a <see cref="Pull"/>, its origin is not the start
+        /// and it is at most <see cref="DragSettings.CaptureRangeCells"/>
+        /// away: <c>Move(block, origin)</c> — the block arrives at its gate
+        /// (D49). The origin is reachable: the unpulled position ends a
+        /// continuous legal path from the start (D44), and the pull's line
+        /// from it to the origin was checked legal, so the path extends to
+        /// the origin.</item>
+        /// <item>Otherwise, <see cref="NearestOrigin"/> is not the start:
         /// <c>Move(block, NearestOrigin)</c>. Whether it clears is the
         /// resolver's call (D25).</item>
         /// <item><see cref="NearestOrigin"/> is the start: a push candidate. The
@@ -237,7 +301,11 @@ namespace GateRush.Runtime
             Move? result = null;
             pushDirection = null;
 
-            if (settled != start)
+            if (pull.HasValue && pull.Value.Origin != start && pullDistance <= settings.CaptureRangeCells)
+            {
+                result = new Move(blockIndex, pull.Value.Origin);
+            }
+            else if (settled != start)
             {
                 result = new Move(blockIndex, settled);
             }
@@ -258,6 +326,314 @@ namespace GateRush.Runtime
             BlockIndex = -1;
             ctx = null;
             state = null;
+            pull = null;
+            pullDistance = 0f;
+        }
+
+        /// <summary>
+        /// Where the block is asked to go: the smoothed pointer minus the grab
+        /// offset, with the coordinate on an axis the block may not move along
+        /// pinned to its start.
+        /// </summary>
+        private Vector2 ProjectedTarget()
+        {
+            var target = smoothedPointer - grabOffset;
+            if (!permitsX)
+            {
+                target.x = start.X;
+            }
+
+            if (!permitsY)
+            {
+                target.y = start.Y;
+            }
+
+            return target;
+        }
+
+        /// <summary>
+        /// Records which way <paramref name="target"/> moved since the last
+        /// update, per axis, and the axis it moved further on (horizontal on a
+        /// tie). An axis it did not move on keeps its lead.
+        /// </summary>
+        private void TrackLead(Vector2 target)
+        {
+            var dx = target.x - lastTarget.x;
+            var dy = target.y - lastTarget.y;
+
+            if (dx != 0f)
+            {
+                leadX = Math.Sign(dx);
+            }
+
+            if (dy != 0f)
+            {
+                leadY = Math.Sign(dy);
+            }
+
+            if (dx != 0f || dy != 0f)
+            {
+                leadingAxis = Math.Abs(dx) >= Math.Abs(dy) ? AxisX : AxisY;
+            }
+
+            lastTarget = target;
+        }
+
+        /// <summary>
+        /// Finds the pull from the unpulled position and sets
+        /// <see cref="pull"/>, <see cref="pullDistance"/> and
+        /// <see cref="pulled"/>. Of the targets the two axes offer, the nearer
+        /// wins; a tie goes to the axis the pointer is leading on. With no
+        /// target, a block on its start may still be pushed into its gate
+        /// (<see cref="PushNudgeAtStart"/>).
+        /// </summary>
+        /// <remarks>
+        /// <para><b>The fraction.</b> The block is drawn
+        /// <see cref="pullFraction"/> of the way from the unpulled position to
+        /// the origin, both coordinates alike. What the pull asks for is 1
+        /// within the capture range — the block latches onto the origin — and
+        /// <c>PullAmount × ease(1 − distance / PullRangeCells)</c> outside it,
+        /// and 0 with no target. The fraction closes on that by
+        /// <c>1 − e^(−PullFollowRate·dt)</c> of the gap per update, so it
+        /// slides into the latch and out of it, the same at any frame rate,
+        /// and never passes what is asked: it never exceeds 1, so the block
+        /// never passes the origin.</para>
+        /// <para><b>Legal at every update.</b> With a target, the drawn
+        /// position is on the line <see cref="TryFindTarget"/> checked. With
+        /// the target gone, the last origin is kept only while every origin
+        /// the line from the unpulled position to it can overlap is legal
+        /// (<see cref="IsLineToOriginLegal"/>); otherwise the fraction drops to
+        /// 0 at once. A target at a new origin starts from 0: a fraction
+        /// earned toward one origin is never spent toward another.</para>
+        /// </remarks>
+        private void ApplyPull(Vector2 target, float deltaSeconds)
+        {
+            pullDistance = 0f;
+
+            var hasX = TryFindTarget(AxisX, out var originX, out var gateX, out var distanceX);
+            var hasY = TryFindTarget(AxisY, out var originY, out var gateY, out var distanceY);
+            var asked = 0f;
+
+            if (!hasX && !hasY)
+            {
+                pull = PushNudgeAtStart(target);
+                if (hasPullOrigin && !(pullFraction > 0f && IsLineToOriginLegal(pullOrigin)))
+                {
+                    hasPullOrigin = false;
+                    pullFraction = 0f;
+                }
+            }
+            else
+            {
+                var useX = hasX
+                           && (!hasY || distanceX < distanceY || (distanceX == distanceY && leadingAxis == AxisX));
+                var origin = useX ? originX : originY;
+                var gateIndex = useX ? gateX : gateY;
+                var distance = useX ? distanceX : distanceY;
+
+                if (!hasPullOrigin || pullOrigin != origin)
+                {
+                    pullOrigin = origin;
+                    hasPullOrigin = true;
+                    pullFraction = 0f;
+                }
+
+                var strength = 1f;
+                asked = 1f;
+                if (distance > settings.CaptureRangeCells)
+                {
+                    // Whatever the ease returns, the strength used is within
+                    // 0–1; a NaN fails the comparison and reads as none.
+                    var eased = settings.PullEase(1f - distance / settings.PullRangeCells);
+                    strength = eased >= 0f ? Math.Min(eased, 1f) : 0f;
+                    asked = settings.PullAmount * strength;
+                }
+
+                pullDistance = distance;
+                pull = new PullTarget(
+                    origin, gateIndex, strength, distance > 0f ? Vector2.zero : NudgeInto(gateIndex, target));
+            }
+
+            if (deltaSeconds > 0f && !float.IsInfinity(deltaSeconds))
+            {
+                var follow = (float)(1.0 - Math.Exp(-(double)settings.PullFollowRate * deltaSeconds));
+                pullFraction += (asked - pullFraction) * follow;
+            }
+
+            pulled = hasPullOrigin
+                ? new Vector2(
+                    Toward(position.x, pullOrigin.X, pullFraction), Toward(position.y, pullOrigin.Y, pullFraction))
+                : position;
+        }
+
+        /// <summary>
+        /// <paramref name="from"/> moved <paramref name="fraction"/> of the way
+        /// to <paramref name="to"/>, never outside the two: rounding may not
+        /// carry a block drawn all the way to its origin a hair past it, onto
+        /// a line that was not checked.
+        /// </summary>
+        private static float Toward(float from, float to, float fraction)
+        {
+            var value = from + (to - from) * fraction;
+            return Math.Max(Math.Min(from, to), Math.Min(Math.Max(from, to), value));
+        }
+
+        /// <summary>
+        /// Whether the block may be drawn anywhere on the straight line from
+        /// its unpulled position to <paramref name="origin"/>: every
+        /// whole-cell origin in the box the two span — floor to ceil of the
+        /// position, out to the origin, on each axis — passes
+        /// <see cref="BlockReachability.IsFootprintLegal"/>. Every position on
+        /// the line overlaps only origins in that box. For a live target this
+        /// is the set <see cref="TryFindTarget"/> already checked; it is asked
+        /// again only while a lost target's pull decays, when the block may
+        /// have moved anywhere.
+        /// </summary>
+        private bool IsLineToOriginLegal(Coord origin)
+        {
+            var minX = Math.Min((int)Math.Floor(position.x), origin.X);
+            var maxX = Math.Max((int)Math.Ceiling(position.x), origin.X);
+            var minY = Math.Min((int)Math.Floor(position.y), origin.Y);
+            var maxY = Math.Max((int)Math.Ceiling(position.y), origin.Y);
+
+            for (var x = minX; x <= maxX; x++)
+            {
+                for (var y = minY; y <= maxY; y++)
+                {
+                    if (!BlockReachability.IsFootprintLegal(ctx, state, BlockIndex, new Coord(x, y)))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// The pull target along <paramref name="axis"/>, in the direction the
+        /// pointer leads on it: the first whole-cell origin ahead, within the
+        /// pull range, at which the block would exit by Core's arrival rule
+        /// (<see cref="BlockReachability.FindExitGate"/> on the state the drag
+        /// began on), reached by a straight legal line. Its coordinate on the
+        /// other axis is the one <see cref="NearestOrigin"/> rounds to, so a
+        /// block a little off the gate's line is still pulled onto it.
+        /// </summary>
+        /// <remarks>
+        /// <para>The walk goes line by line from the first line ahead that the
+        /// block already overlaps — legal, since its position is — and ends at
+        /// the first line that is not legal for every row the other coordinate
+        /// overlaps (<see cref="IsLineLegal"/>): nothing is pulled through or
+        /// around anything. The first line off the board is illegal, so the
+        /// walk ends whatever the range. The origin's own row is one of those
+        /// rows, so the origin and every position on the line to it overlap
+        /// only origins that were checked.</para>
+        /// <para>The start is skipped: arriving there is a push in place, which
+        /// is D43's to decide, not the pull's.</para>
+        /// <para><paramref name="distance"/> is the straight-line distance from
+        /// the unpulled position to the origin, which is the distance along
+        /// the axis when the other coordinate is already on the origin's.</para>
+        /// </remarks>
+        private bool TryFindTarget(int axis, out Coord origin, out int gateIndex, out float distance)
+        {
+            origin = default;
+            gateIndex = -1;
+            distance = 0f;
+
+            var step = axis == AxisX ? leadX : leadY;
+            if (step == 0)
+            {
+                return false;
+            }
+
+            var other = 1 - axis;
+            var across = RoundTowardStart(position[other], other == AxisX ? start.X : start.Y);
+            var from = position[axis];
+            var first = step > 0 ? (int)Math.Ceiling(from) : (int)Math.Floor(from);
+
+            for (var line = first; Math.Abs(line - from) <= settings.PullRangeCells; line += step)
+            {
+                if (line != first && !IsLineLegal(axis, line))
+                {
+                    return false;
+                }
+
+                var candidate = OriginAt(axis, line, across);
+                if (candidate == start)
+                {
+                    continue;
+                }
+
+                var gate = BlockReachability.FindExitGate(ctx, state, BlockIndex, candidate, null);
+                if (gate < 0)
+                {
+                    continue;
+                }
+
+                distance = (new Vector2(candidate.X, candidate.Y) - position).magnitude;
+                if (distance > settings.PullRangeCells)
+                {
+                    return false;
+                }
+
+                origin = candidate;
+                gateIndex = gate;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// The nudge of a block standing on its start and pushed toward a gate
+        /// it can be cleared through in place: a target at the start, at full
+        /// strength, for the gate
+        /// <see cref="BlockReachability.FindExitGate"/> finds for the pushed
+        /// direction — D43's own rule, so the nudge shows only where a push
+        /// that way can clear. Null when the block is off its start, the
+        /// pointer does not push, or no gate is there. It never captures:
+        /// the release is still D43's, threshold included.
+        /// </summary>
+        private PullTarget? PushNudgeAtStart(Vector2 target)
+        {
+            if (position.x != start.X || position.y != start.Y)
+            {
+                return null;
+            }
+
+            var overshoot = DominantDirection(target.x - position.x, target.y - position.y, out var push);
+            if (!(overshoot > 0f))
+            {
+                return null;
+            }
+
+            var gateIndex = BlockReachability.FindExitGate(ctx, state, BlockIndex, start, push);
+            if (gateIndex < 0)
+            {
+                return null;
+            }
+
+            return new PullTarget(start, gateIndex, 1f, NudgeInto(gateIndex, target));
+        }
+
+        /// <summary>
+        /// How far into gate <paramref name="gateIndex"/>'s mouth a block
+        /// standing on its origin is drawn: along the gate's outward
+        /// direction, as far as the pointer target lies past the block that
+        /// way, up to <see cref="DragSettings.NudgeMaxCells"/> — the nudge's
+        /// own bound, whatever the pull's amount and range are. Zero when the
+        /// pointer does not push toward the gate.
+        /// </summary>
+        private Vector2 NudgeInto(int gateIndex, Vector2 target)
+        {
+            var outward = GateExit.Outward(ctx.Gates[gateIndex].Edge);
+            var overshoot = Vector2.Dot(target - position, outward);
+            if (!(overshoot > 0f))
+            {
+                return Vector2.zero;
+            }
+
+            return outward * Math.Min(overshoot, settings.NudgeMaxCells);
         }
 
         /// <summary>
@@ -450,14 +826,24 @@ namespace GateRush.Runtime
             var x = permitsX ? displacement.x : 0f;
             var y = permitsY ? displacement.y : 0f;
 
+            return DominantDirection(x, y, out push) >= settings.PushThresholdCells;
+        }
+
+        /// <summary>
+        /// The direction of a displacement by its dominant axis, horizontal on
+        /// a tie, and how far it goes that way. The one reading of "which way
+        /// is this push" the release and the nudge share.
+        /// </summary>
+        private static float DominantDirection(float x, float y, out Direction direction)
+        {
             if (Math.Abs(x) >= Math.Abs(y))
             {
-                push = x > 0f ? Direction.Right : Direction.Left;
-                return Math.Abs(x) >= settings.PushThresholdCells;
+                direction = x > 0f ? Direction.Right : Direction.Left;
+                return Math.Abs(x);
             }
 
-            push = y > 0f ? Direction.Up : Direction.Down;
-            return Math.Abs(y) >= settings.PushThresholdCells;
+            direction = y > 0f ? Direction.Up : Direction.Down;
+            return Math.Abs(y);
         }
 
         private void RequireDragging()

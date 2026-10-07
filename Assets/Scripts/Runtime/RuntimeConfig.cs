@@ -93,6 +93,7 @@ namespace GateRush.Runtime
 
         private const int DefaultLiftedBlockOrder = 26;
         private const int DefaultEffectOrder = 27;
+        private const int DefaultPullGlowOrder = DefaultBlockLipOrder - 1;
 
         [Header("Assets")]
         [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing, and the shape of the mask that clips a block passing through its gate.")]
@@ -275,6 +276,31 @@ namespace GateRush.Runtime
         [SerializeField] private float settleSeconds = 0.08f;
 
         [SerializeField] private Ease settleEase = Ease.OutQuad;
+
+        [Header("Gate pull (an open gate drawing in a block dragged toward it)")]
+        [Tooltip("How far, in cells, from where the block would arrive at its gate the pull starts.")]
+        [SerializeField] private float pullRangeCells = 0.8f;
+
+        [Tooltip("How far, in cells, from where the block would arrive at its gate it latches onto the gate, and a release arrives there. At most Pull Range Cells.")]
+        [SerializeField] private float captureRangeCells = 0.6f;
+
+        [Tooltip("The most of the way to the gate the block is drawn before it latches, as a fraction of its distance: above 0 and at most 1. Within Capture Range Cells it is drawn all the way.")]
+        [SerializeField] private float pullAmount = 1f;
+
+        [Tooltip("How fast, per second, the pull takes hold and lets go. Higher is snappier; the same at any frame rate.")]
+        [SerializeField] private float pullFollowRate = 25f;
+
+        [Tooltip("The furthest, in cells, a block on its gate's cell is drawn into the gate's mouth while pushed on toward it. 0 turns the nudge off; must stay below 0.5.")]
+        [SerializeField] private float nudgeMaxCells = 0.15f;
+
+        [Tooltip("How the pull's strength grows from the edge of its range (0) to the gate (1).")]
+        [SerializeField] private Ease pullEase = Ease.InOutSine;
+
+        [Tooltip("The gate's glow at full pull strength, from 0 to 1.")]
+        [SerializeField] private float pullGlowAlpha = 0.5f;
+
+        [Tooltip("Seconds the pull's glow takes to fade out fully, and to come up fully.")]
+        [SerializeField] private float pullGlowFadeSeconds = 0.12f;
 
         [Header("Grab lift")]
         [Tooltip("How much a grabbed block grows about its centre while it is held: at least 1.")]
@@ -790,6 +816,9 @@ namespace GateRush.Runtime
         [Tooltip("Cubes and ice shards, above everything else on the board.")]
         [SerializeField] private int effectOrder = DefaultEffectOrder;
 
+        [Tooltip("The glow of a gate pulling a dragged block: below Block Lip Order, so it lights the gate's mouth and never a block, and at least Gate Mark Order. Equal to Gate Mark Order is fine: the glow lies inside the grid, the marks outside it.")]
+        [SerializeField] private int pullGlowOrder = DefaultPullGlowOrder;
+
         /// <summary>The white square the floor's backing is drawn with, and the shape of a passing block's clip mask.</summary>
         public Sprite CellSprite => cellSprite;
 
@@ -988,6 +1017,12 @@ namespace GateRush.Runtime
 
         /// <summary>Easing of the settle.</summary>
         public Ease SettleEase => settleEase;
+
+        /// <summary>The opacity of a gate's glow at full pull strength (Module 22).</summary>
+        public float PullGlowAlpha => pullGlowAlpha;
+
+        /// <summary>Seconds the pull's glow takes to fade out fully, and to come up fully.</summary>
+        public float PullGlowFadeSeconds => pullGlowFadeSeconds;
 
         /// <summary>How much a grabbed block grows while held.</summary>
         public float LiftScale => liftScale;
@@ -1527,6 +1562,9 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of cubes and ice shards.</summary>
         public int EffectOrder => effectOrder;
 
+        /// <summary>Sorting order of a pulling gate's glow, below every block (Module 22).</summary>
+        public int PullGlowOrder => pullGlowOrder;
+
         /// <summary>The generated sprite for one of the four quarter pieces.</summary>
         public Sprite QuarterSprite(QuarterSpriteKind kind)
         {
@@ -1622,6 +1660,20 @@ namespace GateRush.Runtime
             new BurstSettings(
                 shardCountPerCell, shardCap, shardSizeCells.x, shardSizeCells.y, shardTravelCells.x, shardTravelCells.y,
                 shardSpreadDegrees, shardSpinDegrees, shardMaxDelaySeconds);
+
+        /// <summary>
+        /// The settings of one drag: the input values and the gate pull's
+        /// (Module 22), with the pull's ease as a plain function so
+        /// <see cref="DragController"/> needs no tweening library.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A drag value is out of range; see <see cref="Problems"/>.</exception>
+        public DragSettings CreateDragSettings()
+        {
+            var ease = pullEase;
+            return new DragSettings(
+                pushThresholdCells, followRate, cornerAssistCells, pullRangeCells, pullAmount, captureRangeCells,
+                pullFollowRate, nudgeMaxCells, linear => DOVirtual.EasedValue(0f, 1f, linear, ease));
+        }
 
         /// <summary>The generator machine placement rule these values describe.</summary>
         /// <exception cref="ArgumentOutOfRangeException">A machine size is out of range; see <see cref="Problems"/>.</exception>
@@ -1768,7 +1820,9 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: {problem}");
             }
 
-            foreach (var problem in DragSettings.Problems(pushThresholdCells, followRate, cornerAssistCells))
+            foreach (var problem in DragSettings.Problems(
+                         pushThresholdCells, followRate, cornerAssistCells, pullRangeCells, pullAmount, captureRangeCells,
+                         pullFollowRate, nudgeMaxCells))
             {
                 problems.Add($"{name}: {problem}");
             }
@@ -2040,6 +2094,11 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Gate Glow Whiten and Gate Glow Alpha must be from 0 to 1.");
             }
 
+            if (!(pullGlowAlpha >= 0f && pullGlowAlpha <= 1f))
+            {
+                problems.Add($"{name}: Pull Glow Alpha must be from 0 to 1.");
+            }
+
             foreach (var problem in BurstSettings.Problems(
                          "Cube", cubeCountPerCell, cubeCap, cubeSizeCells.x, cubeSizeCells.y, cubeTravelCells.x,
                          cubeTravelCells.y, cubeSpreadDegrees, cubeSpinDegrees, CubeStreamSetsItsOwnDelays))
@@ -2099,6 +2158,7 @@ namespace GateRush.Runtime
             AddIfNotPositive(problems, gateGlowDepthCells, "Gate Glow Depth Cells");
             AddIfNotPositive(problems, gateGlowFadeInSeconds, "Gate Glow Fade In Seconds");
             AddIfNotPositive(problems, gateGlowFadeOutSeconds, "Gate Glow Fade Out Seconds");
+            AddIfNotPositive(problems, pullGlowFadeSeconds, "Pull Glow Fade Seconds");
             AddIfNotPositive(problems, cubeSeconds, "Cube Seconds");
             AddIfNotPositive(problems, shardSeconds, "Shard Seconds");
             AddIfNotPositive(problems, shutterLiftSeconds, "Shutter Lift Seconds");
@@ -2112,6 +2172,12 @@ namespace GateRush.Runtime
             if (!(outlineOrder < blockLipOrder))
             {
                 problems.Add($"{name}: Outline Order must be below Block Lip Order, so the outline sits under the lip.");
+            }
+
+            if (!(pullGlowOrder < blockLipOrder && pullGlowOrder >= gateMarkOrder))
+            {
+                problems.Add(
+                    $"{name}: Pull Glow Order must be below Block Lip Order and at least Gate Mark Order, so the glow lights the gate's mouth and not a block.");
             }
         }
 
@@ -2257,6 +2323,7 @@ namespace GateRush.Runtime
             outlineOrder = DefaultOutlineOrder;
             liftedBlockOrder = DefaultLiftedBlockOrder;
             effectOrder = DefaultEffectOrder;
+            pullGlowOrder = DefaultPullGlowOrder;
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);
 #endif

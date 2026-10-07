@@ -20,6 +20,11 @@ namespace GateRush.Tests
         private const float PushDistance = 0.4f;
         private const float FollowRate = 20f;
         private const float CornerAssist = 0.3f;
+        private const float PullRange = 0.8f;
+        private const float PullAmount = 0.35f;
+        private const float CaptureRange = 0.6f;
+        private const float PullFollowRate = 25f;
+        private const float NudgeMax = 0.15f;
         private const int MinimumLevelsSolved = 10;
         private const int TimeBonus = 7;
 
@@ -65,7 +70,9 @@ namespace GateRush.Tests
             var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0), colors: new[] { BlockColor.Blue }) },
                 new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
             var session = new LevelSession(ctx);
-            var drag = new DragController(new DragSettings(PushThreshold, FollowRate, CornerAssist));
+            var drag = new DragController(new DragSettings(
+                PushThreshold, FollowRate, CornerAssist, PullRange, PullAmount, CaptureRange, PullFollowRate,
+                NudgeMax, linear => linear));
             var grab = new Vector2(0.5f, 0.5f);
             drag.TryBegin(session.Context, session.State, grab);
             var move = drag.End(grab - new Vector2(PushDistance, 0f));
