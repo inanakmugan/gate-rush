@@ -56,6 +56,20 @@ namespace GateRush.Editor
         [MenuItem("Window/Gate Rush/Level Editor")]
         public static void Open() => GetWindow<LevelEditorWindow>("Level Editor");
 
+        /// <summary>
+        /// Opens or focuses the Level Editor and opens the level file at
+        /// <paramref name="path"/> in it, exactly as its own Open menu does:
+        /// with unsaved changes it asks before discarding them, and a file
+        /// that cannot be read is reported and leaves the level under edit as
+        /// it was. The one way in for another tool, such as the Play Level
+        /// window's Edit (Module 21).
+        /// </summary>
+        /// <param name="path">The level file, as a project path.</param>
+        public static void OpenFile(string path)
+        {
+            GetWindow<LevelEditorWindow>("Level Editor").RequestOpen(path);
+        }
+
         // -- working state --
         private LevelDraft draft;
         private string assetPath;
@@ -3189,13 +3203,7 @@ namespace GateRush.Editor
                 foreach (var path in Directory.GetFiles(LevelsFolder, "*.json").OrderBy(p => p))
                 {
                     var captured = path;
-                    menu.AddItem(new GUIContent(Path.GetFileName(path)), false, () =>
-                    {
-                        if (ConfirmDiscardIfDirty())
-                        {
-                            LoadFrom(captured);
-                        }
-                    });
+                    menu.AddItem(new GUIContent(Path.GetFileName(path)), false, () => RequestOpen(captured));
                 }
             }
 
@@ -3205,6 +3213,20 @@ namespace GateRush.Editor
             }
 
             menu.ShowAsContext();
+        }
+
+        /// <summary>
+        /// Opens <paramref name="path"/> at the owner's request, asking first
+        /// when that would discard unsaved changes. The Open menu and
+        /// <see cref="OpenFile"/> both come through here, so a file opened
+        /// from elsewhere is opened no differently.
+        /// </summary>
+        private void RequestOpen(string path)
+        {
+            if (ConfirmDiscardIfDirty())
+            {
+                LoadFrom(path);
+            }
         }
 
         private void LoadFrom(string path)
