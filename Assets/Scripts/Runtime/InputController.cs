@@ -93,7 +93,10 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Abandons any drag in progress and shows its block back at its origin.
-        /// Does nothing when no drag is in progress.
+        /// Does nothing when no drag is in progress. A view that has already
+        /// been destroyed is left alone: <see cref="OnDisable"/> runs this
+        /// while the scene is torn down, when the view's objects may be gone
+        /// before this component is disabled.
         /// </summary>
         public void CancelDrag()
         {
@@ -104,7 +107,10 @@ namespace GateRush.Runtime
 
             var blockIndex = drag.BlockIndex;
             drag.Cancel();
-            view.Snap(blockIndex, run.Session.State.Origins[blockIndex]);
+            if (view != null)
+            {
+                view.Snap(blockIndex, run.Session.State.Origins[blockIndex]);
+            }
         }
 
         private void OnDisable()
@@ -175,7 +181,7 @@ namespace GateRush.Runtime
             }
             else
             {
-                view.ShowDragged(drag.Update(grid, Time.unscaledDeltaTime));
+                view.ShowDragged(drag.Update(grid, Time.unscaledDeltaTime), drag.Pull);
             }
         }
 

@@ -57,6 +57,14 @@ namespace GateRush.Runtime
         private readonly List<Action> doneAfterPasses = new List<Action>();
         private int passesInFlight;
 
+        // The glow of the gate pulling the dragged block (Module 22), while
+        // the drag holds it: its sprite, gate, full-opacity colour and the
+        // opacity shown. Null and -1 when no gate pulls.
+        private SpriteRenderer pullGlow;
+        private int pullGlowGate = -1;
+        private Color pullGlowTint;
+        private float pullGlowAlpha;
+
         /// <summary>
         /// Shows the result of a move: waits for the dragged block to settle,
         /// plays the leave stage on the old drawing, redraws from
@@ -602,6 +610,11 @@ namespace GateRush.Runtime
         /// </summary>
         private Transform ClipAtGate(DrawnBlock block, BoardEdge edge, out Vector2 maskCenter)
         {
+            // One clip per block: an exit that follows a nudged drag replaces
+            // the drag's clip rather than adding a second mask. No refresh
+            // for the removal: this call ends with one.
+            RemoveGateClip(block, refreshMasking: false);
+
             var root = block.Root;
             if (block.LiftGroup == null)
             {
@@ -611,7 +624,11 @@ namespace GateRush.Runtime
 
             foreach (var label in root.GetComponentsInChildren<TMP_Text>(true))
             {
-                label.gameObject.SetActive(false);
+                if (label.gameObject.activeSelf)
+                {
+                    label.gameObject.SetActive(false);
+                    block.GateClipHiddenLabels.Add(label.gameObject);
+                }
             }
 
             foreach (var sprite in root.GetComponentsInChildren<SpriteRenderer>(true))
@@ -630,7 +647,138 @@ namespace GateRush.Runtime
             var bounds = config.CellSprite.bounds.size;
             go.transform.localScale = new Vector3(area.width / bounds.x, area.height / bounds.y, 1f);
             go.transform.localPosition = maskCenter - (Vector2)root.localPosition;
+            block.GateClip = go.transform;
+            block.GateClipEdge = edge;
+            block.GateClipCenter = maskCenter;
+            RefreshMasking(root);
             return go.transform;
+        }
+
+        /// <summary>
+        /// Makes Unity take up a change of masking under
+        /// <paramref name="root"/> by turning the root off and on again within
+        /// this call.
+        /// </summary>
+        /// <remarks>
+        /// <para>Observed in Play Mode: when a <see cref="SpriteMask"/> is
+        /// added and the renderers' <c>maskInteraction</c> is changed at
+        /// runtime inside a <see cref="SortingGroup"/> that is already active,
+        /// the block keeps drawing as it was registered before — a clipped
+        /// block showed as a pale white silhouette for its whole pass — until
+        /// its root is re-enabled, which registers its renderers and mask
+        /// afresh. Nothing is drawn between the two calls, so the toggle is
+        /// never seen.</para>
+        /// <para>Nothing under a block's root is a component of this project
+        /// and no tween is linked to its objects, so the toggle runs no logic
+        /// and stops nothing. Labels the clip hid, and a mask on its way out,
+        /// were turned off on their own objects, so they stay off.</para>
+        /// <para>Skipped for a root that is not active in the hierarchy — it
+        /// registers when it is activated — and when this view is not active
+        /// and enabled: a clip can be removed while the view is being torn
+        /// down, and nothing is activated then.</para>
+        /// </remarks>
+        private void RefreshMasking(Transform root)
+        {
+            if (!isActiveAndEnabled || !root.gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            root.gameObject.SetActive(false);
+            root.gameObject.SetActive(true);
+        }
+
+        /// <summary>
+        /// Undoes <see cref="ClipAtGate"/>: the mask goes, the block's sprites
+        /// stop answering to masks, the block's masking is refreshed
+        /// (<see cref="RefreshMasking"/>) and the labels the clip hid show
+        /// again. The sorting group stays: while a block is dragged it is the
+        /// lift's, which removes it. Does nothing at all — no refresh either —
+        /// for a block that is not clipped: the drag asks this every frame.
+        /// </summary>
+        private void RemoveGateClip(DrawnBlock block) => RemoveGateClip(block, refreshMasking: true);
+
+        /// <summary>
+        /// The one removal of a gate clip. <paramref name="refreshMasking"/> is
+        /// false only for <see cref="ClipAtGate"/>, which replaces the clip and
+        /// refreshes once itself; everything else goes through
+        /// <see cref="RemoveGateClip(DrawnBlock)"/>.
+        /// </summary>
+        private void RemoveGateClip(DrawnBlock block, bool refreshMasking)
+        {
+            if (block.GateClip == null)
+            {
+                return;
+            }
+
+            // Destroy waits for the end of the frame; off now, so it cannot
+            // mask alongside a clip added in the same frame.
+            block.GateClip.gameObject.SetActive(false);
+            Destroy(block.GateClip.gameObject);
+            block.GateClip = null;
+
+            foreach (var sprite in block.Root.GetComponentsInChildren<SpriteRenderer>(true))
+            {
+                sprite.maskInteraction = SpriteMaskInteraction.None;
+            }
+
+            // Before the labels come back, so they are not toggled with it.
+            if (refreshMasking)
+            {
+                RefreshMasking(block.Root);
+            }
+
+            foreach (var label in block.GateClipHiddenLabels)
+            {
+                if (label != null)
+                {
+                    label.SetActive(true);
+                }
+            }
+
+            block.GateClipHiddenLabels.Clear();
+        }
+
+        /// <summary>
+        /// Keeps a clipped block's mask still on the board while the block's
+        /// root moves: the mask is the root's child, so it is moved against
+        /// it. Does nothing for a block that is not clipped.
+        /// </summary>
+        private static void HoldGateClip(DrawnBlock block)
+        {
+            if (block.GateClip != null)
+            {
+                block.GateClip.localPosition = block.GateClipCenter - (Vector2)block.Root.localPosition;
+            }
+        }
+
+        /// <summary>
+        /// The clip of a dragged block (Module 22): while a gate pulls it and
+        /// its own footprint, drawn at <paramref name="drawn"/>, crosses that
+        /// gate's inner line (<see cref="GateExit.FootprintCrossesInnerLine"/>)
+        /// — the nudge into the gate's mouth — it is clipped there exactly as
+        /// a passing block is (<see cref="ClipAtGate"/>), so it goes into the
+        /// mouth rather than over the gate and the frame. The clip goes the
+        /// moment that stops being true. Called after the root has been moved.
+        /// </summary>
+        private void ClipDraggedAtGate(DrawnBlock block, Vector2 drawn, PullTarget? pull)
+        {
+            if (pull.HasValue)
+            {
+                var edge = ctx.Gates[pull.Value.GateIndex].Edge;
+                if (GateExit.FootprintCrossesInnerLine(ctx.Width, ctx.Height, edge, block.Cells, drawn))
+                {
+                    if (block.GateClip == null || block.GateClipEdge != edge)
+                    {
+                        ClipAtGate(block, edge, out _);
+                    }
+
+                    HoldGateClip(block);
+                    return;
+                }
+            }
+
+            RemoveGateClip(block);
         }
 
         /// <summary>
@@ -642,18 +790,9 @@ namespace GateRush.Runtime
         /// </summary>
         private void PlayGateGlow(int gateIndex, float passSeconds)
         {
-            var gate = ctx.Gates[gateIndex];
-            var area = GridRectToLocal(GateExit.GlowRect(
-                ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, config.GateGlowDepthCells));
-
-            // Drawn along the gate before it is turned: the sprite's strong
-            // bottom edge faces the way out once turned from "down" to outward.
-            var size = new Vector2(CellsToWorld(gate.Width), CellsToWorld(config.GateGlowDepthCells));
-            var turn = Vector2.SignedAngle(Vector2.down, GateExit.Outward(gate.Edge));
-            var color = Color.Lerp(config.BlockFill(gate.Color), Color.white, config.GateGlowWhiten);
+            // Above everything: this glow lights the passing block on purpose.
+            var glow = AddGateGlow(gateIndex, config.EffectOrder, out var color);
             color.a = config.GateGlowAlpha;
-
-            var glow = AddSprite(debris, "Gate glow", config.GateGlowSprite, area.center, size, color, config.EffectOrder, turn);
             var fadeIn = config.GateGlowFadeInSeconds;
             var fadeOut = config.GateGlowFadeOutSeconds;
             var holdEnd = Mathf.Max(passSeconds, fadeIn);
@@ -683,6 +822,135 @@ namespace GateRush.Runtime
                         Destroy(glow.gameObject);
                     }
                 });
+        }
+
+        /// <summary>
+        /// The glow sprite of gate <paramref name="gateIndex"/>, under
+        /// <c>Effects/Debris</c> and fully clear: the gradient over
+        /// <see cref="GateExit.GlowRect"/>, turned so its strong edge lies on
+        /// the gate. <paramref name="tint"/> is its colour at full opacity,
+        /// from the gate's colour toward white. The one placement the exit's
+        /// glow and the pull's glow share; they differ in
+        /// <paramref name="order"/>, the exit's above the passing block and
+        /// the pull's below every block.
+        /// </summary>
+        private SpriteRenderer AddGateGlow(int gateIndex, int order, out Color tint)
+        {
+            var gate = ctx.Gates[gateIndex];
+            var area = GridRectToLocal(GateExit.GlowRect(
+                ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, config.GateGlowDepthCells));
+
+            // Drawn along the gate before it is turned: the sprite's strong
+            // bottom edge faces the way out once turned from "down" to outward.
+            var size = new Vector2(CellsToWorld(gate.Width), CellsToWorld(config.GateGlowDepthCells));
+            var turn = Vector2.SignedAngle(Vector2.down, GateExit.Outward(gate.Edge));
+            tint = Color.Lerp(config.BlockFill(gate.Color), Color.white, config.GateGlowWhiten);
+            tint.a = 1f;
+
+            var clear = tint;
+            clear.a = 0f;
+            return AddSprite(debris, "Gate glow", config.GateGlowSprite, area.center, size, clear, order, turn);
+        }
+
+        /// <summary>
+        /// Shows the pull of the drag in progress (Module 22): the glow of the
+        /// gate <paramref name="pull"/> names, at its strength times the
+        /// configured opacity, or none for null. Fed every frame of a drag by
+        /// <see cref="ShowDragged"/>.
+        /// </summary>
+        /// <remarks>
+        /// The glow is not debris while the drag holds it: no tween moves it,
+        /// its opacity follows the pull, closing on it at a full fade per
+        /// <c>Pull Glow Fade Seconds</c> on unscaled time, so a target that
+        /// appears at close range does not pop. It sorts at
+        /// <see cref="RuntimeConfig.PullGlowOrder"/>, below every block, so it
+        /// lights the gate's mouth and not the block in it. It sits under
+        /// <c>Effects/Debris</c> because that group outlives the board's
+        /// redraws. When the target goes or changes gate, and on
+        /// <see cref="Settle"/>, <see cref="Snap"/> and
+        /// <see cref="BeginDrag"/>, it is handed to debris to fade out
+        /// (<see cref="ReleasePullGlow"/>).
+        /// </remarks>
+        private void ShowPullGlow(PullTarget? pull)
+        {
+            if (!pull.HasValue || debris == null)
+            {
+                ReleasePullGlow();
+                return;
+            }
+
+            var target = pull.Value;
+            if (pullGlow == null || pullGlowGate != target.GateIndex)
+            {
+                ReleasePullGlow();
+                pullGlow = AddGateGlow(target.GateIndex, config.PullGlowOrder, out pullGlowTint);
+                pullGlowGate = target.GateIndex;
+                pullGlowAlpha = 0f;
+            }
+
+            var goal = target.Strength * config.PullGlowAlpha;
+            var fullFadePerSecond = config.PullGlowAlpha / config.PullGlowFadeSeconds;
+            pullGlowAlpha = Mathf.MoveTowards(pullGlowAlpha, goal, fullFadePerSecond * Time.unscaledDeltaTime);
+
+            var shown = pullGlowTint;
+            shown.a = pullGlowAlpha;
+            pullGlow.color = shown;
+        }
+
+        /// <summary>
+        /// Lets go of the pull's glow: from here it is debris, fading from the
+        /// opacity it has to none over the fade time and then destroyed, with
+        /// <see cref="debrisId"/> as its tween's id — so a restart, a level
+        /// change, disabling and destroying remove it like any debris. Does
+        /// nothing when there is no glow.
+        /// </summary>
+        private void ReleasePullGlow()
+        {
+            var glow = pullGlow;
+            var tint = pullGlowTint;
+            var from = pullGlowAlpha;
+            ForgetPullGlow();
+
+            if (glow == null)
+            {
+                return;
+            }
+
+            if (!(from > 0f))
+            {
+                Destroy(glow.gameObject);
+                return;
+            }
+
+            DOVirtual.Float(from, 0f, config.PullGlowFadeSeconds, alpha =>
+                {
+                    if (glow != null)
+                    {
+                        var shown = tint;
+                        shown.a = alpha;
+                        glow.color = shown;
+                    }
+                })
+                .SetEase(Ease.Linear)
+                .SetId(debrisId)
+                .OnComplete(() =>
+                {
+                    if (glow != null)
+                    {
+                        Destroy(glow.gameObject);
+                    }
+                });
+        }
+
+        /// <summary>
+        /// Forgets the pull's glow without touching the sprite: for when the
+        /// debris group it sits in is being destroyed anyway.
+        /// </summary>
+        private void ForgetPullGlow()
+        {
+            pullGlow = null;
+            pullGlowGate = -1;
+            pullGlowAlpha = 0f;
         }
 
         /// <summary>Ice shards fly out from the centre of a block that thawed, over its unfrozen face.</summary>
