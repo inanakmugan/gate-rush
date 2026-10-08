@@ -149,3 +149,48 @@ Edit Mode, against `DragController`.
   faintly; dragging away lets go with no jump.
 - Releasing a little short of a gate exits; releasing well short does not.
 - No pull toward closed gates, other colours, or through other blocks.
+
+---
+
+## Resolved during implementation
+
+- **Target.** Found from the unpulled position each update, along each
+  axis the block may move: the first origin ahead where
+  `BlockReachability.FindExitGate` gives an exit, within `pullRangeCells`,
+  on a straight line that is legal by D44. The coordinate across the axis
+  is the drawn position rounded to the nearest cell (decision B), so a
+  block slightly off the gate's line is still pulled. The nearest target
+  wins, by straight-line distance.
+- **Lead.** "Led toward it" uses the last non-zero movement on each axis,
+  so a pause of the pointer does not drop the target, and dragging away
+  or across never pulls.
+- **The start is never a target.** The drag's own start origin is never
+  pulled toward and never captures (D43): a block already at its gate
+  clears by a push in place, as before.
+- **Smoothed magnet.** The pull fraction follows its goal at
+  `pullFollowRate` (25 per second), so the block never jumps when a target
+  appears or goes. Inside `captureRangeCells` the strength is 1 and the
+  block latches onto the origin. `pullAmount` ended at 1 rather than the
+  starting 0.35.
+- **Nudge.** Pushing on from the origin draws the block into the gate's
+  mouth, capped by `nudgeMaxCells` (0.15; `DragSettings` keeps it below
+  half a cell). Presentation only: the position stays legal.
+- **Clip.** A nudged block is clipped at the gate's inner line by the same
+  `ClipAtGate`, `RemoveGateClip` and `HoldGateClip` the exit pass uses, and
+  only while its own footprint crosses that line
+  (`GateExit.FootprintCrossesInnerLine`); a lifted outline reaching over
+  the frame does not count. `BeginDrag` removes a clip left on the grabbed
+  block.
+- **Glow order.** `pullGlowOrder` is `BlockLipOrder - 1` (11), checked by
+  `Problems()` to stay below the block lip and at least the gate mark, so
+  the glow lights the gate's mouth and never a block.
+- **Exit rendering.** A block passing through its gate drew as a pale
+  white silhouette. The bug was older than this module (it showed on main
+  too): a `SpriteMask` added, and `maskInteraction` changed, at runtime
+  inside an already-active `SortingGroup` is not picked up until the root
+  is re-enabled. `ClipAtGate` and `RemoveGateClip` now toggle the block's
+  root once after changing its masking, skipped when the view or the root
+  is inactive, and only when a clip is actually added or removed.
+- **Known debt.** `RuntimeConfig`'s `PushThresholdCells`, `FollowRate` and
+  `CornerAssistCells` accessors are unused: the values reach the drag only
+  through `CreateDragSettings`.
