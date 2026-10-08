@@ -73,7 +73,8 @@ Assets/Scripts/
   Platform/        pure C# — platform service interfaces
   Serialization/   references UnityEngine (JsonUtility) — DTOs only
   Runtime/         MonoBehaviours, presentation, DOTween
-  UI/              screens and navigation
+  Runtime/UI/      the prototype menu's screens (Module 23)
+  UI/              screens and navigation (Phase 6; not created yet)
 Assets/Editor/     Level Editor window, editor tooling
 Assets/Tests/      Edit Mode tests
 Assets/Resources/Levels/   level JSON files

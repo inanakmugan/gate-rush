@@ -192,3 +192,38 @@ Edit Mode.
   Restart and Menu.
 - The Level Editor's Play and Gate Rush → Play Level… still go straight
   into their level.
+
+---
+
+## Resolved during implementation
+
+- **Saved data.** `CompletedLevels` is saved under the constant
+  `CompletedLevels.SaveKey` ("GateRush.CompletedLevels") as comma-separated
+  ids in ascending order, invariant culture. Null or empty data is an empty
+  set. `TryFromData` reports unreadable data so `Runtime` can log it, since
+  `Meta` does not log; `FromData` never throws.
+- **Saving.** A win is saved when the winning move is applied, before the
+  exit animation, so a tab closed mid-animation keeps it. Only levels in the
+  level order are marked. A `PlayerPrefsException` is logged, not thrown,
+  and the mark then lasts for the session.
+- **Menu rules.** `MenuLevels.TryGetStartLevel` answers false for a level
+  order with no levels. `MenuLevels.Entries` has no locked state at all.
+  `LevelCatalog` gained `Ids`, parallel to `Names`, and `ResultTitle` gained
+  `IsLastLevel`, so the title and the second line come from one query.
+- **Going to the menu.** In order: input is unbound
+  (`InputController.Unbind`, which cancels a drag and is safe to repeat), the
+  time-bonus listener goes, the run is released (`LevelRun.Release` stops the
+  countdown and unsubscribes it from its session and countdown) and dropped,
+  the board is cleared (which abandons a presentation without reporting it),
+  and the card and the result panel are hidden with their tweens killed.
+  Nothing of the level can act afterwards.
+- **Fallbacks.** With an unusable level order, Play starts the scene's level
+  and Levels is hidden. An editor override naming no loadable file opens the
+  title screen (Module 21 is superseded there).
+- **Look.** The result panel keeps Next and Restart on its first row and
+  puts Menu on a second, in a neutral colour; it grew to 860 x 860 units.
+  The menu reuses existing button colours and the result panel's pop, and
+  `menuTitleWidthUnits` keeps the game's name from being cut off on a narrow
+  screen. The HUD's Menu button is a three-bar icon drawn from rounded boxes.
+- **Testing in the editor.** Play Mode writes the machine's real
+  `PlayerPrefs`; Edit → Clear All PlayerPrefs resets the completed levels.

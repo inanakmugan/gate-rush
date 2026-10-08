@@ -67,6 +67,9 @@ Pure C#. Wallet, lives, streak, inventory, level progress, store catalog,
 persistence model. Completely independent of `Core` — the two meet only inside
 `Runtime`, when a level ends and its result is reported.
 
+So far it holds only `CompletedLevels`, the set of won levels (Module 23); the
+rest arrives with Phase 4.
+
 ### Serialization — level and save data
 
 Depends on `Core` and on `UnityEngine` (for `JsonUtility`). A **deliberate
@@ -86,6 +89,9 @@ implementations supplied at startup:
 | `ITimeProvider` | Current UTC time and frame delta | Manually advanced clock |
 | `IHapticService` | Vibration feedback | No-op |
 
+Only `ISaveStore` exists so far (Module 23); its `PlayerPrefs` implementation
+lives in `Runtime`. The others arrive when `Meta` needs them.
+
 ### Runtime — presentation
 
 MonoBehaviours. Reads `Core` and `Meta` state and draws it. Owns DOTween
@@ -96,6 +102,10 @@ animation, pointer input, the level countdown, and the visibility overlay
 
 Home, Store, Leaderboard, Profile, Settings, Win Streak. Screens hold no rules.
 A screen never computes whether the player can afford something; it asks `Meta`.
+
+Not created yet: it arrives with Phase 6. Until then the only screens, the
+prototype menu (Module 23, D50), live in `Runtime/UI` inside the `Runtime`
+assembly.
 
 ---
 
@@ -236,7 +246,7 @@ runtime. Therefore:
 | No threads | Solver never runs at runtime — it is editor-only |
 | No haptics | `IHapticService` no-op implementation |
 | Mouse vs. touch | Unified pointer handling in `InputController` |
-| Large build size | Code stripping, Brotli with decompression fallback |
+| Large build size | Code stripping, Brotli without decompression fallback: itch.io sends the right `Content-Encoding` (D51) |
 
 Take the **first WebGL build early** — immediately after the first playable
 level exists, not at the end of the project. Code stripping occasionally removes
@@ -254,7 +264,7 @@ small project than a finished one.
 | `GateRush.Solver` | `GateRush.Core` | **Editor only** |
 | `GateRush.Runtime` | Core, Meta, Serialization, Platform, DOTween | All |
 | `GateRush.Editor` | All of the above incl. Solver | Editor only |
-| `GateRush.Tests` | Core, Meta, Platform, Serialization, Solver, Editor | Editor only |
+| `GateRush.Tests` | Core, Meta, Platform, Serialization, Solver, Editor, Runtime | Editor only |
 
 `GateRush.Core`, `GateRush.Meta`, `GateRush.Platform`, and `GateRush.Solver`
 have `noEngineReferences` enabled. This turns the "no `UnityEngine`" rule from a

@@ -62,13 +62,13 @@ pipeline (D38), and the fixes and rules in D39–D41.
 
 ## Phase 2 — Playable single level
 
-*Status: playable; visual polish (2.4) and tools to play any level (2.5)
-done. Next: the gate pull (2.6), the owner's level set for the first build,
-then Phase 3.* Levels chain through Next
-rather than one hardcoded level.
+*Status: done.* 2.0 to 2.7 are complete: 15 levels that introduce every
+mechanic in turn, visual polish, development tools, the gate pull and a
+prototype menu. Levels chain through Next and the menu's level select.
 
-Board rendering, pointer input, DOTween movement, countdown, win/lose. No
-menus, one hardcoded level.
+Board rendering, pointer input, DOTween movement, countdown, win/lose. Planned
+with no menus and one hardcoded level; the level set (2.0) and the prototype
+menu (2.7) grew it.
 
 Split into three steps so a design or data-model problem surfaces before
 Runtime code exists, and a feel problem surfaces before animation and UI
@@ -83,9 +83,13 @@ editor or data-model gap here than after 2.1 depends on the level format.
 
 *Status: done.* level-0 to level-5 are authored, validate, and carry their own
 id, a placeholder gold reward and a solver-suggested time budget, all set in
-the editor. level-3 is for now a copy of level-2. level-1 starts with a ready
-opening move; the others need not, which D16 allows: it is a guideline, not a
-rule.
+the editor. level-1 starts with a ready opening move; the others need not,
+which D16 allows: it is a guideline, not a rule. The set later grew to 15
+levels, level-0 to level-14, one per mechanic in the owner's plan (How to
+Play to Final mix). Levels 8 to 15 were searched for and checked with the
+project's own A\* outside the editor, then validated in the Level Editor.
+The Final mix leaves out the elevator: with all ten mechanics on one board
+no candidate could be decided within the solver's budget.
 
 **2.1 — Static skeleton.** Render the board, wire pointer input straight to
 `MoveResolver`, apply moves instantly — no animation, no countdown, no
@@ -174,7 +178,7 @@ completed ones marked, a Menu button in the HUD and on the result panel,
 completed levels remembered across reloads through `ISaveStore`, and "All
 Levels Played" with "Thanks for playing!" after the last level. Not Phase
 6's Home and not Phase 4's save model; both take it over later (D50).
-*Spec: `Modules/23-prototype-menu.md`.*
+*Spec: `Modules/23-prototype-menu.md`. Status: done.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
@@ -241,6 +245,13 @@ default canvas size. Compression gzip or Brotli without Decompression
 Fallback. Saved data does not carry over between uploads. The build opens
 on the prototype menu (2.7, D50).
 
+*Status: published* at https://inanakmugan.itch.io/gate-rush, Brotli without
+fallback, a 13 MB ZIP. It runs in desktop browsers, and completed levels
+survive a reload. Still to check: the draw calls and the per-move board
+rebuild profiled on a phone. Learned on the first upload: a page that fills
+its loading bar and stops is first worth a fresh ZIP, with `index.html`,
+`Build` and `TemplateData` at its root; the first ZIP was the whole fault.
+
 ---
 
 ## Phase 4 — Meta core
@@ -271,14 +282,16 @@ Meta is already tested by this point, so this phase is presentation only.
 ## Phase 7 — Polish
 
 Audio, haptics, notifications, screen transitions, privacy text, the
-end-of-content screen after the final authored level.
+end-of-content screen after the final authored level (a first version, "All
+Levels Played", came with 2.7).
 
 ---
 
 ## Phase 8 — Release
 
 itch.io upload, README with a play link, architecture summary, and pointers into
-`docs/`.
+`docs/`. The itch.io page and the README's play link came early, with
+Phase 3.
 
 ---
 

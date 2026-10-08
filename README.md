@@ -1,23 +1,22 @@
 # Gate Rush
 
-A Unity reimplementation of the sliding-block puzzle *Block Out!* by Grand Games,
-built as a portfolio project with an emphasis on engine-independent game logic,
-solver-verified level design, and a documented architecture.
+A sliding-block puzzle game built in Unity as a portfolio project, with an
+emphasis on engine-independent game logic, solver-verified level design, and a
+documented architecture.
 
 <p align="center">
   <img src="docs/media/gameplay.gif" alt="Gate Rush gameplay: blocks slide cell by cell and leave through matching gates" width="360">
 </p>
 
-**▶ Play in browser:** *(coming with the first web build — Phase 3)*
+**▶ Play in browser:** [inanakmugan.itch.io/gate-rush](https://inanakmugan.itch.io/gate-rush)
 
 Unity 6000.3.25f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL and
 Android
 
 **Status:** work in progress. The puzzle core, the solver and the level editor
-are built (Phase 1), and the game is playable in the editor: levels load,
-blocks glide cell by cell, cleared blocks leave through their gates, and each
-level runs against a countdown (Phase 2). The first web build is next. See
-[`docs/ROADMAP.md`](docs/ROADMAP.md).
+are built (Phase 1). The game has 15 hand-made levels that introduce every
+mechanic in turn, a title screen and a level select (Phase 2), and the first
+web build is live on itch.io (Phase 3). See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -25,9 +24,9 @@ level runs against a countdown (Phase 2). The first web build is next. See
 
 Blocks slide freely across a tightly packed grid and are pushed out through
 colour-matched gates on the board edges. Moves are unlimited; the only pressure
-is a countdown. Ten interacting mechanics layer on top: count-gated gates and
+is a countdown. Nine more mechanics layer on top: count-gated gates and
 blocks, layered colour stacks, shutters, block generators, elevators, axis
-restrictions, and lock-and-key pairs.
+restrictions, lock-and-key pairs, and time bonuses.
 
 ## What is interesting about it
 
@@ -91,7 +90,7 @@ Meta            economy, lives         no engine references
 Platform        service interfaces     no engine references
 Serialization   JSON DTOs
 Runtime         MonoBehaviours, DOTween, input
-UI              screens and navigation
+UI              screens and navigation (Phase 6; the menu lives in Runtime)
 ```
 
 Full write-up: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -119,9 +118,12 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-None of the suites needs a scene: `Core`, `Solver`, `Serialization` and the
-editor's logic are all tested headless.
+1,463 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+`Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
+are all tested headless.
 
 ## Note on the web build
 
-Progress is stored in browser storage. Clearing site data will reset it.
+Completed levels are stored in browser storage. Clearing site data resets
+them, and so does a new upload of the build on itch.io, since each upload is
+served from a new path.

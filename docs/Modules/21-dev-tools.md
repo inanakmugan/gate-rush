@@ -181,3 +181,6 @@ Edit Mode, against plain code where there is any.
 - **Play Level window.** Loadable levels in catalog order with the HUD's
   numbers; unloadable files after them, greyed, with their error as a
   tooltip; with two files sharing an id, a help box and unnumbered rows.
+- **Superseded by Module 23.** A plain Play now opens the prototype menu,
+  not the scene's level. An override naming no loadable file opens the title
+  screen; the override itself still skips the menu.
