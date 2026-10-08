@@ -412,7 +412,7 @@ drifting apart.
 ## D24 — Universal Render Pipeline, Linear colour space
 
 **Decision.** URP with the 2D Renderer, Linear colour space, on Unity
-6000.3.22f1 (6.3 LTS).
+6.3 LTS (set up on 6000.3.22f1, now patched to 6000.3.25f1).
 
 **Why.** The game needs no lighting, shadows, or custom shaders, and the Built-In
 pipeline would produce a smaller WebGL build. URP was chosen for two reasons that

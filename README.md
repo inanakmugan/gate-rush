@@ -10,7 +10,7 @@ solver-verified level design, and a documented architecture.
 
 **▶ Play in browser:** *(coming with the first web build — Phase 3)*
 
-Unity 6000.3.22f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL and
+Unity 6000.3.25f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL and
 Android
 
 **Status:** work in progress. The puzzle core, the solver and the level editor
