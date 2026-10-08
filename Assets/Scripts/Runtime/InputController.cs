@@ -71,7 +71,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Binds the controller to one level, replacing any earlier binding.
-        /// Until this is called it ignores input.
+        /// Until this is called, and after <see cref="Unbind"/>, it ignores
+        /// input.
         /// </summary>
         /// <param name="isHeld">
         /// Asked every frame: while it answers true — an introduction card is
@@ -89,6 +90,25 @@ namespace GateRush.Runtime
             this.layout = layout;
             this.view = view;
             this.boardCamera = boardCamera;
+        }
+
+        /// <summary>
+        /// Lets go of the level this controller was bound to, cancelling any
+        /// drag in progress first: from here until the next
+        /// <see cref="Initialize"/> no input is read at all — no pointer, no
+        /// <b>R</b>, no development key — because there is no board to act on
+        /// (the menu, Module 23). Does nothing when nothing is bound, so it is
+        /// safe to call more than once.
+        /// </summary>
+        public void Unbind()
+        {
+            CancelDrag();
+            run = null;
+            drag = null;
+            layout = null;
+            view = null;
+            boardCamera = null;
+            isHeld = null;
         }
 
         /// <summary>

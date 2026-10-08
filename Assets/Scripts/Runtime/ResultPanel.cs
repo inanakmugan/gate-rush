@@ -8,7 +8,9 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The end-of-level panel: a full-screen backdrop and a rounded panel with
-    /// a title, Restart and, after a win, Next. Builds its hierarchy from code
+    /// a title, Restart, Menu and, after a win with a level to follow, Next;
+    /// after the last level a smaller line sits under the title (Module 23).
+    /// Builds its hierarchy from code
     /// and opens with a short fade-and-scale pop. Holds no rules — the
     /// bootstrap decides what to show and handles what the buttons ask for.
     /// </summary>
@@ -29,13 +31,22 @@ namespace GateRush.Runtime
     /// </remarks>
     public sealed class ResultPanel : MonoBehaviour
     {
+        private static readonly Vector2 BottomMiddle = new Vector2(0.5f, 0f);
+
         private RuntimeConfig config;
         private RectTransform root;
         private CanvasGroup group;
         private RectTransform panel;
+        private RectTransform titleRect;
         private TMP_Text title;
+        private TMP_Text message;
+
+        // The title's bottom edge above the panel's foot when no message
+        // shows, in canvas units; a message sits there and pushes it up.
+        private float titleBottom;
         private Button nextButton;
         private Button restartButton;
+        private Button menuButton;
         private bool isSubscribed;
 
         /// <summary>Raised when the player presses Restart.</summary>
@@ -43,6 +54,9 @@ namespace GateRush.Runtime
 
         /// <summary>Raised when the player presses Next.</summary>
         public event Action NextRequested;
+
+        /// <summary>Raised when the player presses Menu (Module 23).</summary>
+        public event Action MenuRequested;
 
         /// <summary>
         /// A message saying this panel is not on or under a canvas; empty when
@@ -93,21 +107,36 @@ namespace GateRush.Runtime
             var padding = config.ResultPaddingUnits;
             var buttonSize = config.ResultButtonSizeUnits;
 
-            // The title fills the panel above the buttons, inside the padding,
-            // and wraps there if it is too long for one line.
-            var titleRect = UiBuilder.CreateRect("Title", panel);
+            // From the panel's foot: Menu, then the row of Next and Restart,
+            // then the line under the title when there is one, then the title.
+            var rowBottom = padding + buttonSize.y + config.ResultButtonGapUnits;
+            titleBottom = rowBottom + buttonSize.y + padding;
+
+            // The title fills the panel above the buttons — above the message
+            // when one shows (Show) — inside the padding, and wraps there if
+            // it is too long for one line.
+            titleRect = UiBuilder.CreateRect("Title", panel);
             UiBuilder.Stretch(titleRect);
-            titleRect.offsetMin = new Vector2(padding, 2f * padding + buttonSize.y);
+            titleRect.offsetMin = new Vector2(padding, titleBottom);
             titleRect.offsetMax = new Vector2(-padding, -padding);
             title = UiBuilder.AddLabel(titleRect, config.LabelFont, config.ResultTitleFontSize, config.ResultTitleColor, true);
+
+            var messageRect = UiBuilder.CreateRect("Message", panel);
+            messageRect.anchorMin = Vector2.zero;
+            messageRect.anchorMax = Vector2.right;
+            messageRect.pivot = BottomMiddle;
+            messageRect.anchoredPosition = new Vector2(0f, titleBottom);
+            messageRect.sizeDelta = new Vector2(-2f * padding, config.ResultMessageHeightUnits);
+            message = UiBuilder.AddLabel(
+                messageRect, config.LabelFont, config.ResultMessageFontSize, config.ResultMessageColor, false);
 
             // The buttons are laid out centred in a row, so Restart alone sits
             // in the middle when Next is hidden.
             var buttons = UiBuilder.CreateRect("Buttons", panel);
             buttons.anchorMin = Vector2.zero;
             buttons.anchorMax = Vector2.right;
-            buttons.pivot = new Vector2(0.5f, 0f);
-            buttons.anchoredPosition = new Vector2(0f, padding);
+            buttons.pivot = BottomMiddle;
+            buttons.anchoredPosition = new Vector2(0f, rowBottom);
             buttons.sizeDelta = new Vector2(-2f * padding, buttonSize.y);
             var layout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = config.ResultButtonGapUnits;
@@ -120,6 +149,10 @@ namespace GateRush.Runtime
             nextButton = BuildButton(buttons, "Next", config.NextButtonColor, config.NextLabel, referencePixelsPerUnit);
             restartButton = BuildButton(buttons, "Restart", config.RestartButtonColor, config.RestartLabel, referencePixelsPerUnit);
 
+            // Menu has a row of its own, centred at the panel's foot.
+            menuButton = BuildButton(panel, "Menu", config.MenuButtonColor, config.MenuLabel, referencePixelsPerUnit);
+            UiBuilder.Place((RectTransform)menuButton.transform, BottomMiddle, new Vector2(0f, padding), buttonSize);
+
             root.gameObject.SetActive(false);
 
             if (isActiveAndEnabled)
@@ -128,16 +161,21 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>Shows the win result; Next only when there is a next level.</summary>
-        public void ShowWin(string titleText, bool hasNext)
+        /// <summary>
+        /// Shows the win result with Restart and Menu, and Next only when
+        /// there is a next level. <paramref name="messageText"/> is the
+        /// smaller line under the title — the closing message after the last
+        /// level; null or empty for no line, as after any other win.
+        /// </summary>
+        public void ShowWin(string titleText, string messageText, bool hasNext)
         {
-            Show(titleText, hasNext);
+            Show(titleText, messageText, hasNext);
         }
 
-        /// <summary>Shows the loss result, with Restart only.</summary>
+        /// <summary>Shows the loss result, with Restart and Menu and no line under the title.</summary>
         public void ShowLoss(string titleText)
         {
-            Show(titleText, false);
+            Show(titleText, null, false);
         }
 
         /// <summary>Hides the panel, stopping its pop. Does nothing before <see cref="Initialize"/>.</summary>
@@ -153,9 +191,17 @@ namespace GateRush.Runtime
             root.gameObject.SetActive(false);
         }
 
-        private void Show(string titleText, bool showsNext)
+        private void Show(string titleText, string messageText, bool showsNext)
         {
             title.text = titleText;
+
+            // The title gives up the message's height only when a message shows.
+            var showsMessage = !string.IsNullOrEmpty(messageText);
+            message.text = showsMessage ? messageText : string.Empty;
+            message.gameObject.SetActive(showsMessage);
+            var bottom = showsMessage ? titleBottom + config.ResultMessageHeightUnits : titleBottom;
+            titleRect.offsetMin = new Vector2(titleRect.offsetMin.x, bottom);
+
             nextButton.gameObject.SetActive(showsNext);
             root.gameObject.SetActive(true);
             PlayPop();
@@ -221,20 +267,21 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Listens to both buttons once. Called from <see cref="Initialize"/>
-        /// as well as <see cref="OnEnable"/>: the buttons do not exist until
-        /// Initialize, which the bootstrap may call after this component was
-        /// enabled.
+        /// Listens to the three buttons once. Called from
+        /// <see cref="Initialize"/> as well as <see cref="OnEnable"/>: the
+        /// buttons do not exist until Initialize, which the bootstrap may call
+        /// after this component was enabled.
         /// </summary>
         private void Subscribe()
         {
-            if (isSubscribed || restartButton == null || nextButton == null)
+            if (isSubscribed || restartButton == null || nextButton == null || menuButton == null)
             {
                 return;
             }
 
             restartButton.onClick.AddListener(OnRestartClicked);
             nextButton.onClick.AddListener(OnNextClicked);
+            menuButton.onClick.AddListener(OnMenuClicked);
             isSubscribed = true;
         }
 
@@ -255,7 +302,17 @@ namespace GateRush.Runtime
                 nextButton.onClick.RemoveListener(OnNextClicked);
             }
 
+            if (menuButton != null)
+            {
+                menuButton.onClick.RemoveListener(OnMenuClicked);
+            }
+
             isSubscribed = false;
+        }
+
+        private void OnMenuClicked()
+        {
+            MenuRequested?.Invoke();
         }
 
         private void OnRestartClicked()

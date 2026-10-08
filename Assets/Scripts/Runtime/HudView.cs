@@ -8,11 +8,11 @@ using UnityEngine.UI;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// The HUD in the top band: a restart button on the left, the timer pill
-    /// with a clock icon in the centre, and a "Level N" pill on the right.
-    /// Builds its hierarchy from code, in the game's style, and holds no rules
-    /// — the bootstrap decides what to show and handles the restart it asks
-    /// for.
+    /// The HUD in the top band: a restart button and a menu button on the
+    /// left, the timer pill with a clock icon in the centre, and a "Level N"
+    /// pill on the right. Builds its hierarchy from code, in the game's style,
+    /// and holds no rules — the bootstrap decides what to show and handles the
+    /// restart and the menu it asks for.
     /// </summary>
     /// <remarks>
     /// <para>Put this component on the screen-space canvas, or under it; it
@@ -45,6 +45,7 @@ namespace GateRush.Runtime
         private RectTransform row;
         private Vector2 rowSize;
         private Button restartButton;
+        private Button menuButton;
         private GameObject timerPill;
         private TMP_Text timerDigits;
         private GameObject levelPill;
@@ -63,6 +64,9 @@ namespace GateRush.Runtime
 
         /// <summary>Raised when the player presses the restart button.</summary>
         public event Action RestartRequested;
+
+        /// <summary>Raised when the player presses the menu button (Module 23).</summary>
+        public event Action MenuRequested;
 
         /// <summary>
         /// A message saying this view is not on or under a canvas; empty when
@@ -99,13 +103,16 @@ namespace GateRush.Runtime
             row.anchorMin = row.anchorMax = new Vector2(0.5f, 0.5f);
 
             BuildRestart(referencePixelsPerUnit);
+            BuildMenu(referencePixelsPerUnit);
             BuildTimer(referencePixelsPerUnit);
             BuildLevel(referencePixelsPerUnit);
             BuildTimeBonus();
 
             // The timer is centred, so each side must hold the wider of the
-            // two outer elements with padding at the edge and next to it.
-            var side = Mathf.Max(config.HudRestartSizeUnits, config.LevelPillWidthUnits) + 2f * config.HudSidePaddingUnits;
+            // two outer groups — the two buttons, or the level pill — with
+            // padding at the edge and next to it.
+            var buttons = 2f * config.HudRestartSizeUnits + config.HudButtonGapUnits;
+            var side = Mathf.Max(buttons, config.LevelPillWidthUnits) + 2f * config.HudSidePaddingUnits;
             rowSize = new Vector2(
                 config.TimerPillWidthUnits + 2f * side,
                 Mathf.Max(config.HudRestartSizeUnits, config.HudPillHeightUnits));
@@ -118,6 +125,32 @@ namespace GateRush.Runtime
             if (isActiveAndEnabled)
             {
                 Subscribe();
+            }
+        }
+
+        /// <summary>
+        /// Shows the whole HUD, for a level being played. What its pills read
+        /// is unchanged. Does nothing before <see cref="Initialize"/>.
+        /// </summary>
+        public void Show()
+        {
+            if (band != null)
+            {
+                band.gameObject.SetActive(true);
+            }
+        }
+
+        /// <summary>
+        /// Hides the whole HUD, buttons included, and stops a time bonus that
+        /// is showing — for the menu, where no level is loaded (Module 23).
+        /// Does nothing before <see cref="Initialize"/>.
+        /// </summary>
+        public void Hide()
+        {
+            CancelTimeBonus();
+            if (band != null)
+            {
+                band.gameObject.SetActive(false);
             }
         }
 
@@ -302,6 +335,35 @@ namespace GateRush.Runtime
             UiBuilder.AddIcon(icon, config.RestartSprite, config.HudIconColor);
         }
 
+        /// <summary>
+        /// The menu button, right of the restart button and in its style: the
+        /// same square in the frame's colour, with the menu icon's bars drawn
+        /// from rounded boxes, stacked and centred.
+        /// </summary>
+        private void BuildMenu(float referencePixelsPerUnit)
+        {
+            var rect = UiBuilder.CreateRect("Menu", row);
+            var size = Vector2.one * config.HudRestartSizeUnits;
+            var left = config.HudSidePaddingUnits + config.HudRestartSizeUnits + config.HudButtonGapUnits;
+            UiBuilder.Place(rect, LeftMiddle, new Vector2(left, 0f), size);
+            var face = UiBuilder.AddRoundedBox(
+                rect, size, config.RoundedRectSprite, config.FrameColor, config.HudRestartCornerUnits, referencePixelsPerUnit);
+            menuButton = UiBuilder.AddButton(rect, face);
+
+            var barSize = config.HudMenuBarSizeUnits;
+            var pitch = barSize.y + config.HudMenuBarGapUnits;
+            var topBarY = pitch * (RuntimeConfig.MenuIconBarCount - 1) * 0.5f;
+            for (var i = 0; i < RuntimeConfig.MenuIconBarCount; i++)
+            {
+                var bar = UiBuilder.CreateRect("Bar", rect);
+                UiBuilder.PlaceCentered(bar, barSize);
+                bar.anchoredPosition = new Vector2(0f, topBarY - i * pitch);
+                UiBuilder.AddRoundedBox(
+                        bar, barSize, config.RoundedRectSprite, config.HudIconColor, barSize.y * 0.5f, referencePixelsPerUnit)
+                    .raycastTarget = false;
+            }
+        }
+
         private void BuildTimer(float referencePixelsPerUnit)
         {
             var rect = UiBuilder.CreateRect("Timer", row);
@@ -361,19 +423,20 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Listens to the restart button once. Called from
+        /// Listens to both buttons once. Called from
         /// <see cref="Initialize"/> as well as <see cref="OnEnable"/>: the
-        /// button does not exist until Initialize, which the bootstrap may call
+        /// buttons do not exist until Initialize, which the bootstrap may call
         /// after this component was enabled.
         /// </summary>
         private void Subscribe()
         {
-            if (isSubscribed || restartButton == null)
+            if (isSubscribed || restartButton == null || menuButton == null)
             {
                 return;
             }
 
             restartButton.onClick.AddListener(OnRestartClicked);
+            menuButton.onClick.AddListener(OnMenuClicked);
             isSubscribed = true;
         }
 
@@ -389,12 +452,22 @@ namespace GateRush.Runtime
                 restartButton.onClick.RemoveListener(OnRestartClicked);
             }
 
+            if (menuButton != null)
+            {
+                menuButton.onClick.RemoveListener(OnMenuClicked);
+            }
+
             isSubscribed = false;
         }
 
         private void OnRestartClicked()
         {
             RestartRequested?.Invoke();
+        }
+
+        private void OnMenuClicked()
+        {
+            MenuRequested?.Invoke();
         }
     }
 }

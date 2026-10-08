@@ -48,7 +48,7 @@ namespace GateRush.Runtime
         /// Whether the taken name <paramref name="requested"/> is one of the
         /// level files that load, <paramref name="loadable"/>. When it is not,
         /// <paramref name="warning"/> names it, so the caller can report the
-        /// override and play its own level instead. Editor only.
+        /// override and open the menu instead. Editor only.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="requested"/> or <paramref name="loadable"/> is null.</exception>
         public static bool TryResolve(string requested, ICollection<string> loadable, out string warning)
@@ -76,8 +76,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The level the editor tools asked for, once: reading it clears it,
-        /// so the Play session after this one starts on the scene's level
-        /// again. Always false outside the editor.
+        /// so the Play session after this one is a plain Play again and opens
+        /// on the menu (Module 23). Always false outside the editor.
         /// </summary>
         public static bool TryTake(out string levelName)
         {
