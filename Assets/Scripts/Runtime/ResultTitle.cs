@@ -4,7 +4,8 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The result panel's title after a win (Module 18): the all-done title
-    /// after the last level, the win title after any other.
+    /// after the last level, the win title after any other. Also answers
+    /// whether a level is the last one, for the closing message (Module 23).
     /// </summary>
     /// <remarks>
     /// "The last level" is decided by the same catalog query that decides
@@ -29,10 +30,27 @@ namespace GateRush.Runtime
                 throw new ArgumentNullException(nameof(levelName));
             }
 
-            var isLast = catalog != null
-                         && catalog.TryGetNumber(levelName, out _)
-                         && !catalog.TryGetNext(levelId, out _);
-            return isLast ? allDoneTitle : winTitle;
+            return IsLastLevel(catalog, levelName, levelId) ? allDoneTitle : winTitle;
+        }
+
+        /// <summary>
+        /// True exactly when <paramref name="catalog"/> holds the level
+        /// <paramref name="levelName"/> with id <paramref name="levelId"/> and
+        /// has no next level after it. The one query behind the all-done
+        /// title and the closing message under it (Module 23), so the two
+        /// always show together.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="levelName"/> is null.</exception>
+        public static bool IsLastLevel(LevelCatalog catalog, string levelName, int levelId)
+        {
+            if (levelName == null)
+            {
+                throw new ArgumentNullException(nameof(levelName));
+            }
+
+            return catalog != null
+                   && catalog.TryGetNumber(levelName, out _)
+                   && !catalog.TryGetNext(levelId, out _);
         }
     }
 }

@@ -176,10 +176,10 @@ MonoBehaviour:
   timerPulseScale: 1.15
   timerPulseSeconds: 0.25
   winTitle: Level Complete
-  allDoneTitle: All Levels Complete
+  allDoneTitle: All Levels Played
   lossTitle: Time's Up
   resultBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
-  resultPanelSizeUnits: {x: 860, y: 620}
+  resultPanelSizeUnits: {x: 860, y: 860}
   resultPanelCornerUnits: 60
   resultPaddingUnits: 60
   resultTitleFontSize: 110

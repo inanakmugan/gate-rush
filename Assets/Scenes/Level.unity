@@ -134,6 +134,7 @@ GameObject:
   - component: {fileID: 483171906}
   - component: {fileID: 483171907}
   - component: {fileID: 483171908}
+  - component: {fileID: 483171909}
   m_Layer: 5
   m_Name: Canvas
   m_TagString: Untagged
@@ -259,6 +260,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b3d1b4e8b33ce42959f7d83149ad85, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.IntroductionCard
+--- !u!114 &483171909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 483171901}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d70eea984fa882a4492030db2dffbdbb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.MenuScreen
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -614,6 +627,7 @@ MonoBehaviour:
   hudView: {fileID: 483171907}
   introductionCard: {fileID: 483171908}
   resultPanel: {fileID: 483171906}
+  menuScreen: {fileID: 483171909}
 --- !u!4 &2009815754
 Transform:
   m_ObjectHideFlags: 0

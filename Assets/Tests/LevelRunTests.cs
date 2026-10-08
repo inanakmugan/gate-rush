@@ -123,5 +123,79 @@ namespace GateRush.Tests
 
             Assert.AreEqual(LevelOutcome.Won, run.Outcome);
         }
+
+        [Test]
+        public void Release_ThenTheCountdownRunsOut_DoesNotLose()
+        {
+            var countdown = new Countdown(Budget);
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), countdown);
+            run.Start();
+
+            run.Release();
+
+            // Whoever still holds the countdown restarts and expires it: the
+            // released run must not hear of it.
+            countdown.Start();
+            countdown.Tick(Budget);
+            Assert.IsTrue(countdown.HasExpired, "the countdown did expire");
+            Assert.AreEqual(LevelOutcome.None, run.Outcome);
+        }
+
+        [Test]
+        public void Release_StopsTheCountdownSoTicksNoLongerRunItDown()
+        {
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+            run.Start();
+            run.Tick(Tick);
+
+            run.Release();
+            run.Tick(Budget);
+
+            Assert.IsFalse(run.Countdown.IsRunning);
+            Assert.AreEqual(Budget - Tick, run.Countdown.RemainingSeconds, 1e-5f);
+            Assert.AreEqual(LevelOutcome.None, run.Outcome);
+        }
+
+        [Test]
+        public void Release_ThenASolvingMove_DoesNotWin()
+        {
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+            run.Start();
+
+            run.Release();
+            Assert.IsTrue(run.Session.TryApply(OpeningPush));
+
+            Assert.AreEqual(LevelOutcome.None, run.Outcome);
+        }
+
+        [Test]
+        public void Release_ThenATimeBonus_DoesNotReachTheCountdown()
+        {
+            // A second block keeps the level from being won by the clear.
+            var ctx = Ctx(3, 1,
+                new[] { Block(1, new Coord(0, 0), timeBonusSeconds: Bonus), Block(2, new Coord(2, 0), colors: new[] { BlockColor.Blue }) },
+                new[] { Gate(1, BoardEdge.Left, 0, 1, BlockColor.Red) });
+            var run = new LevelRun(new LevelSession(ctx), new Countdown(Budget));
+            run.Start();
+
+            run.Release();
+            Assert.IsTrue(run.Session.TryApply(OpeningPush));
+
+            Assert.AreEqual(Budget, run.Countdown.RemainingSeconds, 1e-5f);
+        }
+
+        [Test]
+        public void Release_Twice_OrWithoutACountdown_DoesNotThrow()
+        {
+            var timed = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+            var untimed = new LevelRun(new LevelSession(OneBlockLevel()), countdown: null);
+
+            Assert.DoesNotThrow(() =>
+            {
+                timed.Release();
+                timed.Release();
+                untimed.Release();
+            });
+        }
     }
 }

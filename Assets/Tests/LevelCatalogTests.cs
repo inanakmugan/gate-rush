@@ -140,6 +140,25 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Ids_AreAscendingAndParallelToNames()
+        {
+            var catalog = new LevelCatalog(new[] { ("level-b", 4), ("level-d", 1), ("level-a", 3), ("level-c", 0) });
+
+            var ids = catalog.Ids;
+
+            CollectionAssert.AreEqual(new[] { 0, 1, 3, 4 }, ids);
+            Assert.AreEqual(catalog.Names.Count, ids.Count);
+
+            // The level just before the one after id i is the level with id
+            // i, so its name must be the name at index i.
+            for (var i = 0; i + 1 < ids.Count; i++)
+            {
+                Assert.IsTrue(catalog.TryGetPrevious(ids[i + 1], out var name), $"id {ids[i + 1]} has a previous level");
+                Assert.AreEqual(catalog.Names[i], name, $"id {ids[i]}");
+            }
+        }
+
+        [Test]
         public void TryGetNumber_NullName_Throws()
         {
             var catalog = new LevelCatalog(new[] { ("level-0", 0) });

@@ -23,9 +23,12 @@ namespace GateRush.Runtime
     /// countdown.
     /// </summary>
     /// <remarks>
-    /// Subscribes to the session and the countdown it is given and never
-    /// unsubscribes: the three are created together, for one level, and are
-    /// discarded together. Neither is shared with another run.
+    /// Subscribes to the session and the countdown it is given; the three are
+    /// created together, for one level, and are discarded together. Neither is
+    /// shared with another run. A run replaced by another level's is simply
+    /// dropped; one abandoned with nothing to replace it — the player went to
+    /// the menu (Module 23) — is <see cref="Release"/>d, so nothing it was
+    /// listening to can decide an outcome afterwards.
     /// </remarks>
     public sealed class LevelRun
     {
@@ -84,6 +87,23 @@ namespace GateRush.Runtime
             Countdown?.Reset();
             Session.Restart();
             Countdown?.Start();
+        }
+
+        /// <summary>
+        /// Abandons the run: stops the countdown and stops listening to the
+        /// session and the countdown, so no later move, bonus or tick changes
+        /// <see cref="Outcome"/> or the remaining time. Safe to call more than
+        /// once. The run is not to be used afterwards.
+        /// </summary>
+        public void Release()
+        {
+            Session.StateChanged -= DecideWin;
+            Session.TimeBonusEarned -= AddBonus;
+            if (Countdown != null)
+            {
+                Countdown.Expired -= DecideLoss;
+                Countdown.Stop();
+            }
         }
 
         private void DecideWin()

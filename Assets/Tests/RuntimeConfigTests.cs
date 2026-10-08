@@ -292,6 +292,114 @@ namespace GateRush.Tests
                 string.Join(" | ", problems));
         }
 
+        [Test]
+        public void Problems_DefaultMenuValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            // Every message about the menu, the HUD's menu button and the
+            // result panel's new line names one of these.
+            Assert.That(problems, Has.None.Contains("Menu "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Level Select "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Level Tile "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Level Tick "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Result "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Defaults_EndOfSetTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("All Levels Played", config.AllDoneTitle);
+            Assert.AreEqual("Thanks for playing!", config.AllDoneMessage);
+        }
+
+        [TestCase("gameTitle", "Game Title")]
+        [TestCase("playLabel", "Play Label")]
+        [TestCase("levelsLabel", "Levels Label")]
+        [TestCase("levelSelectTitle", "Level Select Title")]
+        [TestCase("backLabel", "Back Label")]
+        [TestCase("menuLabel", "Menu Label")]
+        [TestCase("allDoneMessage", "All Done Message")]
+        public void Problems_EmptyNewText_IsReportedByName(string field, string shownName)
+        {
+            SetString(field, "  ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
+        }
+
+        [TestCase("menuTitleHeightUnits", "Menu Title Height Units")]
+        [TestCase("menuTitleWidthUnits", "Menu Title Width Units")]
+        [TestCase("menuTitleFontSize", "Menu Title Font Size")]
+        [TestCase("levelSelectTitleFontSize", "Level Select Title Font Size")]
+        [TestCase("menuButtonCornerUnits", "Menu Button Corner Units")]
+        [TestCase("menuButtonFontSize", "Menu Button Font Size")]
+        [TestCase("levelTileSizeUnits", "Level Tile Size Units")]
+        [TestCase("levelTileCornerUnits", "Level Tile Corner Units")]
+        [TestCase("levelTileFontSize", "Level Tile Font Size")]
+        [TestCase("levelTickSizeUnits", "Level Tick Size Units")]
+        [TestCase("levelTickThicknessUnits", "Level Tick Thickness Units")]
+        [TestCase("resultMessageHeightUnits", "Result Message Height Units")]
+        [TestCase("resultMessageFontSize", "Result Message Font Size")]
+        public void Problems_NonPositiveNewSize_IsReportedByName(string field, string shownName)
+        {
+            SetFloat(field, 0f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [TestCase("menuButtonSizeUnits", "Menu Button Size Units")]
+        [TestCase("hudMenuBarSizeUnits", "Hud Menu Bar Size Units")]
+        public void Problems_NonPositiveNewVectorSize_IsReportedByName(string field, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).vector2Value = new Vector2(0f, 1f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NoLevelSelectColumns_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("levelSelectColumns").intValue = 0;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Level Select Columns must be at least 1"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ResultPanelTooShortForTwoButtonRows_IsReportedByName()
+        {
+            // One button row's height: room for the buttons the panel had
+            // before Menu got a row of its own, and no more.
+            var serialized = new SerializedObject(config);
+            var buttonHeight = serialized.FindProperty("resultButtonSizeUnits").vector2Value.y;
+            var panel = serialized.FindProperty("resultPanelSizeUnits");
+            panel.vector2Value = new Vector2(panel.vector2Value.x, buttonHeight);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
+        }
+
+        private void SetString(string field, string value)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private void SetFloat(string field, float value)
         {
             var serialized = new SerializedObject(config);

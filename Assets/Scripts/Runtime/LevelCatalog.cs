@@ -43,6 +43,7 @@ namespace GateRush.Runtime
             }
 
             Names = new List<string>(namesById.Values).AsReadOnly();
+            Ids = new List<int>(namesById.Keys).AsReadOnly();
         }
 
         /// <summary>
@@ -50,6 +51,13 @@ namespace GateRush.Runtime
         /// the level <see cref="TryGetNumber"/> numbers <c>i + 1</c>.
         /// </summary>
         public IReadOnlyList<string> Names { get; }
+
+        /// <summary>
+        /// Every level's id in ascending order, parallel to
+        /// <see cref="Names"/>: the id at index <c>i</c> is that of the level
+        /// named <c>Names[i]</c>.
+        /// </summary>
+        public IReadOnlyList<int> Ids { get; }
 
         /// <summary>
         /// The name of the level with the smallest id greater than

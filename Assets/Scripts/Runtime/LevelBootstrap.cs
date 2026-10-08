@@ -1,21 +1,31 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Core;
+using GateRush.Meta;
+using GateRush.Platform;
 using UnityEngine;
 
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Builds one playable level from a JSON <see cref="TextAsset"/>: the
-    /// <see cref="LevelSession"/> and its <see cref="LevelRun"/> with the
-    /// countdown, the plain helpers they need, and the views that draw them.
-    /// Runs the countdown, feeds the HUD, shows the result panel, and handles
-    /// Restart and Next. The first level is <see cref="level"/>; swap it by
-    /// dragging a different JSON onto it. Holds all per-play state on this
-    /// instance — Enter Play Mode runs without a domain reload, so nothing here
-    /// is static.
+    /// Opens the game on the menu and builds the level the menu picks from its
+    /// JSON <see cref="TextAsset"/>: the <see cref="LevelSession"/> and its
+    /// <see cref="LevelRun"/> with the countdown, the plain helpers they need,
+    /// and the views that draw them. Runs the countdown, feeds the HUD, shows
+    /// the result panel, and handles Restart, Next and Menu. Holds all
+    /// per-play state on this instance — Enter Play Mode runs without a domain
+    /// reload, so nothing here is static.
     /// </summary>
     /// <remarks>
+    /// <para><b>Menu (Module 23, D50).</b> A plain Play and the player build
+    /// open on <see cref="MenuScreen"/>'s title page with no level loaded: no
+    /// board, no countdown, the HUD hidden and the input controller unbound.
+    /// Play starts the level <see cref="MenuLevels.TryGetStartLevel"/> picks;
+    /// the level select starts any level. Menu, from the HUD or the result
+    /// panel, abandons the level (<see cref="GoToMenu"/>). A level that is
+    /// won is recorded in <see cref="CompletedLevels"/> and saved through
+    /// <see cref="ISaveStore"/> at once. With no usable level order the
+    /// select is hidden and Play starts <see cref="level"/>.</para>
     /// <para>A level or config that cannot be used logs the reason and draws
     /// nothing. A level whose time budget is not positive logs an error and
     /// plays without a countdown, so an unfinished level stays testable.</para>
@@ -34,9 +44,8 @@ namespace GateRush.Runtime
     /// level order, or any level while that order is unusable, shows none
     /// either.</para>
     /// <para><b>Development tools (Module 21).</b> In the editor, a level the
-    /// editor tools asked for (<see cref="DevLevelOverride"/>) replaces
-    /// <see cref="level"/> for one Play session; the field itself is never
-    /// written. In the editor and in development builds, Page Down and Page Up
+    /// editor tools asked for (<see cref="DevLevelOverride"/>) skips the menu
+    /// and is played at once, for one Play session. In the editor and in development builds, Page Down and Page Up
     /// (<c>DevKeys</c>) go to the next and previous level through the same
     /// load as Next. A release build has neither.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
@@ -52,7 +61,7 @@ namespace GateRush.Runtime
         /// </summary>
         public const string LevelsResourcePath = "Levels";
 
-        [Tooltip("The first level to play, from Assets/Resources/Levels. The Level Editor's Play button and Gate Rush > Play Level… start on another level for one Play session without changing this. In the editor and in development builds, Page Down goes to the next level and Page Up to the previous one, in level order, at any moment; at the last or first level the key only logs a line. A release build has neither.")]
+        [Tooltip("The level Play starts only when the level order is unusable (two files in Assets/Resources/Levels sharing a level id); otherwise the menu picks the level and this is not read. The Level Editor's Play button and Gate Rush > Play Level… skip the menu and start on their level for one Play session. In the editor and in development builds, Page Down goes to the next level and Page Up to the previous one, in level order, at any moment a level is played; at the last or first level the key only logs a line. A release build has neither.")]
         [SerializeField] private TextAsset level;
 
         [SerializeField] private RuntimeConfig config;
@@ -75,6 +84,9 @@ namespace GateRush.Runtime
         [Tooltip("The result panel on the canvas.")]
         [SerializeField] private ResultPanel resultPanel;
 
+        [Tooltip("The menu on the canvas: the title screen and the level select, shown while no level is loaded.")]
+        [SerializeField] private MenuScreen menuScreen;
+
         private readonly Dictionary<string, TextAsset> levelAssets = new Dictionary<string, TextAsset>();
 
         // What each level in the catalog contains, in the catalog's order:
@@ -85,6 +97,13 @@ namespace GateRush.Runtime
 
         private bool isUsable;
         private LevelCatalog catalog;
+
+        // Where the completed levels are kept, and the set itself. Both are
+        // made in Awake and stay for the scene's life.
+        private ISaveStore saveStore;
+        private CompletedLevels completed;
+
+        // Null while the menu shows: no level is loaded.
         private LevelRun run;
 
         // The session whose time bonuses the HUD shows; null while not
@@ -103,8 +122,8 @@ namespace GateRush.Runtime
         private void Awake()
         {
             // Taken before anything can return: taking clears the override, so
-            // even a scene that draws nothing leaves the next plain Play on
-            // the scene's level.
+            // even a scene that draws nothing leaves the next plain Play a
+            // plain Play, opening on the menu.
             var hasOverride = DevLevelOverride.TryTake(out var overrideName);
 
             if (!HasEverythingAssigned())
@@ -120,37 +139,177 @@ namespace GateRush.Runtime
 
             // Each puts what it builds last among the canvas's children, so
             // this order — after the HUD, which puts itself first — leaves the
-            // card over the HUD and the result panel over the card.
+            // card over the HUD, the result panel over the card, and the menu
+            // over all of them; the menu never shows together with the others.
             introductionCard.Initialize(config);
             resultPanel.Initialize(config);
+            menuScreen.Initialize(config);
+
+            boardCamera.orthographic = true;
+            boardCamera.clearFlags = CameraClearFlags.SolidColor;
+            boardCamera.backgroundColor = config.BackgroundBottom;
+
             BuildCatalog();
-            Load(StartLevel(hasOverride, overrideName));
+            LoadCompletedLevels();
+
+            if (!TryGetOverrideLevel(hasOverride, overrideName, out var overrideLevel) || !Load(overrideLevel))
+            {
+                ShowMenu();
+            }
         }
 
         /// <summary>
-        /// The level this Play session starts on: the one the editor tools
-        /// asked for (<see cref="DevLevelOverride"/>, Module 21) when it is a
-        /// level file that loads, otherwise the scene's <see cref="level"/>.
-        /// An override naming no such file is reported and ignored. The
-        /// serialized field is never written, and outside the editor there is
-        /// never an override.
+        /// The level the editor tools asked this Play session to start on
+        /// (<see cref="DevLevelOverride"/>, Module 21), when it is a level file
+        /// that loads: it is played at once, skipping the menu. False for a
+        /// plain Play; an override naming no such file is reported and
+        /// ignored, which also leaves a plain Play. Outside the editor there
+        /// is never an override.
         /// </summary>
-        private TextAsset StartLevel(bool hasOverride, string overrideName)
+        private bool TryGetOverrideLevel(bool hasOverride, string overrideName, out TextAsset asset)
         {
 #if UNITY_EDITOR
             if (hasOverride)
             {
                 if (DevLevelOverride.TryResolve(overrideName, levelAssets.Keys, out var warning))
                 {
-                    return levelAssets[overrideName];
+                    asset = levelAssets[overrideName];
+                    return true;
                 }
 
                 Debug.LogWarning(
-                    $"{warning} It must be a level in Resources/{LevelsResourcePath}; the scene's level '{level.name}' is played.",
+                    $"{warning} It must be a level in Resources/{LevelsResourcePath}; the title screen opens instead.",
                     this);
             }
 #endif
-            return level;
+            asset = null;
+            return false;
+        }
+
+        /// <summary>
+        /// Reads the completed levels from the save store. Nothing saved yet
+        /// is no level completed; so is data that cannot be read, with a
+        /// warning — it never stops the game.
+        /// </summary>
+        private void LoadCompletedLevels()
+        {
+            saveStore = new PlayerPrefsSaveStore();
+            if (!saveStore.TryLoad(CompletedLevels.SaveKey, out var data))
+            {
+                completed = new CompletedLevels();
+                return;
+            }
+
+            if (!CompletedLevels.TryFromData(data, out completed))
+            {
+                Debug.LogWarning(
+                    $"The completed levels saved under '{CompletedLevels.SaveKey}' cannot be read ('{data}'); no level counts as completed.",
+                    this);
+            }
+        }
+
+        /// <summary>
+        /// Records the level being played as completed, when the level order
+        /// holds it, and saves at once when that is news — so a tab closed
+        /// during the exit animation keeps the win. A save that fails is
+        /// logged and the game goes on; the mark then lasts for this session.
+        /// </summary>
+        private void MarkLevelCompleted()
+        {
+            if (catalog == null || !catalog.TryGetNumber(levelName, out _)
+                || !completed.MarkCompleted(run.Session.Context.LevelId))
+            {
+                return;
+            }
+
+            try
+            {
+                saveStore.Save(CompletedLevels.SaveKey, completed.ToData());
+            }
+            catch (PlayerPrefsException e)
+            {
+                Debug.LogWarning(
+                    $"Level '{levelName}' is completed, but saving that failed; it is remembered until the game is closed. {e.Message}",
+                    this);
+            }
+        }
+
+        /// <summary>
+        /// Opens the menu's title page over the background, with the level
+        /// select listing every level of the level order and its completed
+        /// mark. With no usable level order the select is empty, which hides
+        /// the Levels button.
+        /// </summary>
+        private void ShowMenu()
+        {
+            hudView.Hide();
+            var entries = catalog != null
+                ? MenuLevels.Entries(catalog, completed)
+                : Array.Empty<MenuLevelEntry>();
+            menuScreen.ShowTitle(entries);
+
+            fittedScreenWidth = 0;
+            fittedScreenHeight = 0;
+            FitBackgroundToScreen();
+        }
+
+        /// <summary>
+        /// Abandons the level being played and opens the menu (Module 23).
+        /// Nothing of the level is left to act afterwards: the drag is
+        /// cancelled and input unbound; the run is released, so its countdown
+        /// is stopped and neither a tick, a move nor a bonus reaches it; the
+        /// board is cleared, which abandons a presentation in progress without
+        /// reporting it done, blocks still passing through their gates
+        /// included; the card is hidden without its callback; the result
+        /// panel and a time bonus are hidden with their tweens killed. Does
+        /// nothing while the menu already shows.
+        /// </summary>
+        private void GoToMenu()
+        {
+            if (run == null)
+            {
+                return;
+            }
+
+            inputController.Unbind();
+            StopListeningForTimeBonus();
+            run.Release();
+            run = null;
+            levelName = null;
+            moveNumber = 0;
+
+            boardView.Clear();
+            introductionCard.Hide();
+            resultPanel.Hide();
+            ShowMenu();
+        }
+
+        /// <summary>
+        /// Play on the title page: the first level in level order not yet
+        /// completed, or the first level when all are
+        /// (<see cref="MenuLevels.TryGetStartLevel"/>). With no usable level
+        /// order — or no level in it — the scene's <see cref="level"/>.
+        /// </summary>
+        private void OnPlayRequested()
+        {
+            // Every name in the catalog is a level that loaded, kept in
+            // levelAssets under that name (BuildCatalog), so this cannot miss.
+            var start = catalog != null && MenuLevels.TryGetStartLevel(catalog, completed, out var startName)
+                ? levelAssets[startName]
+                : level;
+            Load(start);
+        }
+
+        /// <summary>A level's button on the level select: that level, whatever is completed.</summary>
+        private void OnLevelRequested(string requestedName)
+        {
+            if (levelAssets.TryGetValue(requestedName, out var asset))
+            {
+                Load(asset);
+                return;
+            }
+
+            Debug.LogError($"The level select asked for '{requestedName}', which is not a level that loaded; nothing changes.", this);
         }
 
         private void OnEnable()
@@ -163,8 +322,12 @@ namespace GateRush.Runtime
             inputController.MoveApplied += OnMoveApplied;
             inputController.RestartRequested += Restart;
             hudView.RestartRequested += Restart;
+            hudView.MenuRequested += GoToMenu;
             resultPanel.RestartRequested += Restart;
             resultPanel.NextRequested += Next;
+            resultPanel.MenuRequested += GoToMenu;
+            menuScreen.PlayRequested += OnPlayRequested;
+            menuScreen.LevelRequested += OnLevelRequested;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested += OnDevLevelStep;
 #endif
@@ -181,8 +344,12 @@ namespace GateRush.Runtime
             inputController.MoveApplied -= OnMoveApplied;
             inputController.RestartRequested -= Restart;
             hudView.RestartRequested -= Restart;
+            hudView.MenuRequested -= GoToMenu;
             resultPanel.RestartRequested -= Restart;
             resultPanel.NextRequested -= Next;
+            resultPanel.MenuRequested -= GoToMenu;
+            menuScreen.PlayRequested -= OnPlayRequested;
+            menuScreen.LevelRequested -= OnLevelRequested;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested -= OnDevLevelStep;
 #endif
@@ -193,6 +360,13 @@ namespace GateRush.Runtime
         {
             if (run == null)
             {
+                // The menu: no level, so nothing ticks; only the background
+                // follows the screen.
+                if (isUsable)
+                {
+                    FitBackgroundToScreen();
+                }
+
                 return;
             }
 
@@ -212,17 +386,21 @@ namespace GateRush.Runtime
         /// <summary>
         /// Replaces whatever is being played with <paramref name="asset"/>,
         /// started afresh. Its countdown starts at once, or — when the level
-        /// introduces mechanics — when the last introduction card closes. A
-        /// level that fails to load logs the reason and changes nothing.
+        /// introduces mechanics — when the last introduction card closes. The
+        /// menu, if it was showing, closes and the HUD shows. A level that
+        /// fails to load logs the reason, changes nothing — a menu that was
+        /// showing stays — and answers false.
         /// </summary>
-        private void Load(TextAsset asset)
+        private bool Load(TextAsset asset)
         {
             if (!TryParse(asset, out var ctx, out var error))
             {
                 Debug.LogError($"Level '{asset.name}' failed to load; it is not played. {error}", this);
-                return;
+                return false;
             }
 
+            menuScreen.Hide();
+            hudView.Show();
             inputController.CancelDrag();
 
             // Cards of the level being left go, without starting its run.
@@ -267,10 +445,6 @@ namespace GateRush.Runtime
                 boardCamera,
                 IsIntroducing);
 
-            boardCamera.orthographic = true;
-            boardCamera.clearFlags = CameraClearFlags.SolidColor;
-            boardCamera.backgroundColor = config.BackgroundBottom;
-
             fittedScreenWidth = 0;
             fittedScreenHeight = 0;
             FitCameraToScreen();
@@ -296,6 +470,8 @@ namespace GateRush.Runtime
             {
                 StartRun();
             }
+
+            return true;
         }
 
         /// <summary>
@@ -418,6 +594,13 @@ namespace GateRush.Runtime
             var after = session.State;
             moveNumber++;
 
+            // The win was decided when the move was applied; it is recorded
+            // now, not when the panel opens.
+            if (run.Outcome == LevelOutcome.Won)
+            {
+                MarkLevelCompleted();
+            }
+
             MoveChanges changes;
             try
             {
@@ -486,7 +669,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void OnTimeBonusEarned(int seconds)
         {
-            if (run.Countdown != null && run.Outcome == LevelOutcome.None)
+            if (run != null && run.Countdown != null && run.Outcome == LevelOutcome.None)
             {
                 hudView.ShowTimeBonus(seconds);
             }
@@ -499,15 +682,19 @@ namespace GateRush.Runtime
         /// </summary>
         private void OnPresentationDone()
         {
-            if (run.Outcome != LevelOutcome.Won)
+            // GoToMenu clears the board, which drops this callback; the null
+            // check only keeps a report that slipped through from opening a
+            // panel over the menu.
+            if (run == null || run.Outcome != LevelOutcome.Won)
             {
                 return;
             }
 
             Debug.Log($"Level '{levelName}' solved.", this);
-            var title = ResultTitle.ForWin(
-                catalog, levelName, run.Session.Context.LevelId, config.WinTitle, config.AllDoneTitle);
-            resultPanel.ShowWin(title, TryGetNextLevel(out _));
+            var levelId = run.Session.Context.LevelId;
+            var title = ResultTitle.ForWin(catalog, levelName, levelId, config.WinTitle, config.AllDoneTitle);
+            var message = ResultTitle.IsLastLevel(catalog, levelName, levelId) ? config.AllDoneMessage : null;
+            resultPanel.ShowWin(title, message, TryGetNextLevel(out _));
         }
 
         /// <summary>The HUD skips the work when the displayed second has not changed, so this runs every frame.</summary>
@@ -588,10 +775,32 @@ namespace GateRush.Runtime
             backgroundView.Fit(boardCamera);
         }
 
+        /// <summary>
+        /// While no level is loaded there is no board to fit the camera to:
+        /// the camera stays as it is and the background is stretched over its
+        /// view again when the screen's size has changed. <see cref="Load"/>
+        /// zeroes the fitted size, so the next level is fitted afresh.
+        /// </summary>
+        private void FitBackgroundToScreen()
+        {
+            if (Screen.width == fittedScreenWidth && Screen.height == fittedScreenHeight)
+            {
+                return;
+            }
+
+            fittedScreenWidth = Screen.width;
+            fittedScreenHeight = Screen.height;
+            if (fittedScreenWidth > 0 && fittedScreenHeight > 0)
+            {
+                backgroundView.Fit(boardCamera);
+            }
+        }
+
         private bool TryGetNextLevel(out TextAsset next)
         {
             next = null;
-            return catalog != null
+            return run != null
+                   && catalog != null
                    && catalog.TryGetNext(run.Session.Context.LevelId, out var name)
                    && levelAssets.TryGetValue(name, out next);
         }
@@ -661,7 +870,7 @@ namespace GateRush.Runtime
             if (roster.Catalog == null)
             {
                 Debug.LogError(
-                    $"{roster.CatalogError} The level order is unusable, so Next is hidden and no introduction card shows; the current level still plays.",
+                    $"{roster.CatalogError} The level order is unusable, so the level select and Next are hidden and no introduction card shows; Play starts the scene's level.",
                     this);
                 return;
             }
@@ -696,13 +905,20 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || hudView == null || introductionCard == null || resultPanel == null)
+                || hudView == null || introductionCard == null || resultPanel == null || menuScreen == null)
             {
                 Debug.LogError(
-                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card " +
-                    "and Result Panel must all be assigned; nothing is drawn.",
+                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card, " +
+                    "Result Panel and Menu Screen must all be assigned; nothing is drawn.",
                     this);
                 return false;
+            }
+
+            var menuProblem = menuScreen.MissingCanvas();
+            if (menuProblem.Length > 0)
+            {
+                Debug.LogError($"{menuProblem} Nothing is drawn.", menuScreen);
+                isAssigned = false;
             }
 
             var cardProblem = introductionCard.MissingCanvas();
