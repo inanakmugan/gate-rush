@@ -14,7 +14,7 @@ namespace GateRush.Runtime
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
     /// settings, label settings, the settle, the lift and every feedback
     /// animation (Module 18), the HUD, the result panel and the introduction
-    /// cards with their texts (Module 19). Nothing in <c>GateRush.Runtime</c> hardcodes one of
+    /// cards with their texts (Module 19), and the menu (Module 23). Nothing in <c>GateRush.Runtime</c> hardcodes one of
     /// these at a call site. Board sizes are in cells unless named otherwise,
     /// so the board keeps its proportions whatever <see cref="CellSize"/> is;
     /// HUD and panel sizes are in canvas units of a 1080 × 1920 portrait
@@ -90,6 +90,13 @@ namespace GateRush.Runtime
         /// was checked.
         /// </summary>
         private const int DeepestLayerCountChecked = 99;
+
+        /// <summary>
+        /// How many bars the HUD's menu button draws: the three of the usual
+        /// menu icon. Not a tunable; it is the icon's shape. Public so
+        /// <see cref="HudView"/> draws the count <see cref="Problems"/> sized.
+        /// </summary>
+        public const int MenuIconBarCount = 3;
 
         private const int DefaultLiftedBlockOrder = 26;
         private const int DefaultEffectOrder = 27;
@@ -526,17 +533,41 @@ namespace GateRush.Runtime
         [Tooltip("Seconds the timer pill's pulse takes, up and back.")]
         [SerializeField] private float timerPulseSeconds = 0.25f;
 
+        [Tooltip("Space between the restart button and the menu button beside it.")]
+        [SerializeField] private float hudButtonGapUnits = 20f;
+
+        [Tooltip("Width and thickness of each of the three bars drawn on the HUD's menu button. The button itself has the restart button's size, corner and tint.")]
+        [SerializeField] private Vector2 hudMenuBarSizeUnits = new Vector2(60f, 10f);
+
+        [Tooltip("Space between the menu button's bars. The three bars and their gaps must fit in the button.")]
+        [SerializeField] private float hudMenuBarGapUnits = 12f;
+
         [Header("Result panel (canvas units; the panel is tinted the frame's colour)")]
         [SerializeField] private string winTitle = "Level Complete";
 
         [Tooltip("The win title after the last level in the level order, in place of Win Title.")]
-        [SerializeField] private string allDoneTitle = "All Levels Complete";
+        [SerializeField] private string allDoneTitle = "All Levels Played";
+
+        [Tooltip("The smaller line under All Done Title, after the last level only.")]
+        [SerializeField] private string allDoneMessage = "Thanks for playing!";
         [SerializeField] private string lossTitle = "Time's Up";
+
+        [Tooltip("Height kept for the line under the title, when there is one.")]
+        [SerializeField] private float resultMessageHeightUnits = 80f;
+
+        [SerializeField] private float resultMessageFontSize = 56f;
+        [SerializeField] private Color resultMessageColor = Color.white;
+
+        [Tooltip("Label of the Menu button: on the result panel, in a row of its own under Next and Restart.")]
+        [SerializeField] private string menuLabel = "Menu";
+
+        [Tooltip("Tint of the result panel's Menu button, and of the menu's Levels and Back buttons.")]
+        [SerializeField] private Color menuButtonColor = new Color(0.33f, 0.40f, 0.62f);
 
         [Tooltip("The full-screen backdrop behind the panel; it covers the board and the HUD and swallows presses on them.")]
         [SerializeField] private Color resultBackdropColor = new Color(0f, 0f, 0f, 0.6f);
 
-        [SerializeField] private Vector2 resultPanelSizeUnits = new Vector2(860f, 620f);
+        [SerializeField] private Vector2 resultPanelSizeUnits = new Vector2(860f, 860f);
         [SerializeField] private float resultPanelCornerUnits = 60f;
 
         [Tooltip("Space inside the panel's edges, and between the title and the buttons.")]
@@ -547,7 +578,7 @@ namespace GateRush.Runtime
         [SerializeField] private Vector2 resultButtonSizeUnits = new Vector2(340f, 130f);
         [SerializeField] private float resultButtonCornerUnits = 40f;
 
-        [Tooltip("Space between Next and Restart.")]
+        [Tooltip("Space between Next and Restart, and between their row and the Menu button under it.")]
         [SerializeField] private float resultButtonGapUnits = 40f;
 
         [SerializeField] private float resultButtonFontSize = 64f;
@@ -564,6 +595,77 @@ namespace GateRush.Runtime
 
         [Tooltip("The panel's scale when the pop starts; it ends at 1.")]
         [SerializeField] private float resultPopStartScale = 0.8f;
+
+        [Header("Menu (canvas units; drawn over the background with no level loaded; the opening pop and the button label colour are the result panel's)")]
+        [Tooltip("The game's name on the title screen.")]
+        [SerializeField] private string gameTitle = "Gate Rush";
+
+        [Tooltip("Label of the title screen's Play button, which is tinted Next Button Color. It starts the first level not yet completed.")]
+        [SerializeField] private string playLabel = "Play";
+
+        [Tooltip("Label of the title screen's Levels button, which opens the level select.")]
+        [SerializeField] private string levelsLabel = "Levels";
+
+        [Tooltip("Heading of the level select.")]
+        [SerializeField] private string levelSelectTitle = "Levels";
+
+        [Tooltip("Label of the level select's button back to the title screen.")]
+        [SerializeField] private string backLabel = "Back";
+
+        [Tooltip("Least space kept between the menu and the safe area's edges; the menu is scaled down to keep it.")]
+        [SerializeField] private float menuPaddingUnits = 60f;
+
+        [Tooltip("Height of the row holding the game's name, and of the level select's heading.")]
+        [SerializeField] private float menuTitleHeightUnits = 240f;
+
+        [Tooltip("Width kept for the game's name: the title screen is scaled down until this much fits the screen, so a name that fits in it is never cut off.")]
+        [SerializeField] private float menuTitleWidthUnits = 900f;
+
+        [SerializeField] private float menuTitleFontSize = 170f;
+        [SerializeField] private float levelSelectTitleFontSize = 120f;
+        [SerializeField] private Color menuTitleColor = Color.white;
+
+        [Tooltip("Space between the title or heading and what is under it, and between the level grid and Back.")]
+        [SerializeField] private float menuSectionGapUnits = 90f;
+
+        [Tooltip("Size of the Play, Levels and Back buttons.")]
+        [SerializeField] private Vector2 menuButtonSizeUnits = new Vector2(520f, 150f);
+
+        [SerializeField] private float menuButtonCornerUnits = 46f;
+        [SerializeField] private float menuButtonFontSize = 76f;
+
+        [Tooltip("Space between Play and Levels.")]
+        [SerializeField] private float menuButtonGapUnits = 40f;
+
+        [Tooltip("How many level buttons the level select puts in a row.")]
+        [SerializeField] private int levelSelectColumns = 4;
+
+        [Tooltip("Side of a square level button.")]
+        [SerializeField] private float levelTileSizeUnits = 190f;
+
+        [SerializeField] private float levelTileCornerUnits = 44f;
+
+        [Tooltip("Space between level buttons, across and down.")]
+        [SerializeField] private float levelTileGapUnits = 30f;
+
+        [SerializeField] private float levelTileFontSize = 84f;
+
+        [Tooltip("Tint of the button of a level not yet completed.")]
+        [SerializeField] private Color levelTileColor = new Color(0.20f, 0.24f, 0.44f);
+
+        [Tooltip("Tint of the button of a completed level, which also carries a tick.")]
+        [SerializeField] private Color levelTileCompletedColor = new Color(0.30f, 0.78f, 0.32f);
+
+        [Tooltip("Side of the square the completed tick is drawn in, in a level button's top right corner. At most the button's side.")]
+        [SerializeField] private float levelTickSizeUnits = 60f;
+
+        [Tooltip("Thickness of the tick's two strokes.")]
+        [SerializeField] private float levelTickThicknessUnits = 12f;
+
+        [SerializeField] private Color levelTickColor = Color.white;
+
+        [Tooltip("Space between the tick's square and the level button's top and right edges.")]
+        [SerializeField] private float levelTickInsetUnits = 10f;
 
         [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
         [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
@@ -1155,6 +1257,114 @@ namespace GateRush.Runtime
 
         /// <summary>Result panel title after the countdown runs out.</summary>
         public string LossTitle => lossTitle;
+
+        /// <summary>The line under <see cref="AllDoneTitle"/>, after the last level only (Module 23).</summary>
+        public string AllDoneMessage => allDoneMessage;
+
+        /// <summary>Height kept for the result panel's line under the title, in canvas units.</summary>
+        public float ResultMessageHeightUnits => resultMessageHeightUnits;
+
+        /// <summary>Font size of the result panel's line under the title.</summary>
+        public float ResultMessageFontSize => resultMessageFontSize;
+
+        /// <summary>Colour of the result panel's line under the title.</summary>
+        public Color ResultMessageColor => resultMessageColor;
+
+        /// <summary>Label of the result panel's Menu button.</summary>
+        public string MenuLabel => menuLabel;
+
+        /// <summary>Tint of the result panel's Menu button and of the menu's Levels and Back buttons.</summary>
+        public Color MenuButtonColor => menuButtonColor;
+
+        /// <summary>Space between the HUD's restart and menu buttons, in canvas units.</summary>
+        public float HudButtonGapUnits => hudButtonGapUnits;
+
+        /// <summary>Width and thickness of each bar on the HUD's menu button, in canvas units.</summary>
+        public Vector2 HudMenuBarSizeUnits => hudMenuBarSizeUnits;
+
+        /// <summary>Space between the bars on the HUD's menu button, in canvas units.</summary>
+        public float HudMenuBarGapUnits => hudMenuBarGapUnits;
+
+        /// <summary>The game's name on the title screen.</summary>
+        public string GameTitle => gameTitle;
+
+        /// <summary>Label of the title screen's Play button.</summary>
+        public string PlayLabel => playLabel;
+
+        /// <summary>Label of the title screen's Levels button.</summary>
+        public string LevelsLabel => levelsLabel;
+
+        /// <summary>Heading of the level select.</summary>
+        public string LevelSelectTitle => levelSelectTitle;
+
+        /// <summary>Label of the level select's Back button.</summary>
+        public string BackLabel => backLabel;
+
+        /// <summary>Least space between the menu and the safe area's edges, in canvas units.</summary>
+        public float MenuPaddingUnits => menuPaddingUnits;
+
+        /// <summary>Height of the game's name row and of the level select's heading, in canvas units.</summary>
+        public float MenuTitleHeightUnits => menuTitleHeightUnits;
+
+        /// <summary>Width kept for the game's name on the title screen, in canvas units.</summary>
+        public float MenuTitleWidthUnits => menuTitleWidthUnits;
+
+        /// <summary>Font size of the game's name.</summary>
+        public float MenuTitleFontSize => menuTitleFontSize;
+
+        /// <summary>Font size of the level select's heading.</summary>
+        public float LevelSelectTitleFontSize => levelSelectTitleFontSize;
+
+        /// <summary>Colour of the game's name and of the level select's heading.</summary>
+        public Color MenuTitleColor => menuTitleColor;
+
+        /// <summary>Space between a menu page's sections, in canvas units.</summary>
+        public float MenuSectionGapUnits => menuSectionGapUnits;
+
+        /// <summary>Size of the Play, Levels and Back buttons, in canvas units.</summary>
+        public Vector2 MenuButtonSizeUnits => menuButtonSizeUnits;
+
+        /// <summary>Corner radius of the menu's buttons, in canvas units.</summary>
+        public float MenuButtonCornerUnits => menuButtonCornerUnits;
+
+        /// <summary>Font size of the menu's button labels.</summary>
+        public float MenuButtonFontSize => menuButtonFontSize;
+
+        /// <summary>Space between Play and Levels, in canvas units.</summary>
+        public float MenuButtonGapUnits => menuButtonGapUnits;
+
+        /// <summary>How many level buttons the level select puts in a row.</summary>
+        public int LevelSelectColumns => levelSelectColumns;
+
+        /// <summary>Side of a level button, in canvas units.</summary>
+        public float LevelTileSizeUnits => levelTileSizeUnits;
+
+        /// <summary>Corner radius of a level button, in canvas units.</summary>
+        public float LevelTileCornerUnits => levelTileCornerUnits;
+
+        /// <summary>Space between level buttons, in canvas units.</summary>
+        public float LevelTileGapUnits => levelTileGapUnits;
+
+        /// <summary>Font size of a level button's number.</summary>
+        public float LevelTileFontSize => levelTileFontSize;
+
+        /// <summary>Tint of the button of a level not yet completed.</summary>
+        public Color LevelTileColor => levelTileColor;
+
+        /// <summary>Tint of the button of a completed level.</summary>
+        public Color LevelTileCompletedColor => levelTileCompletedColor;
+
+        /// <summary>Side of the square the completed tick is drawn in, in canvas units.</summary>
+        public float LevelTickSizeUnits => levelTickSizeUnits;
+
+        /// <summary>Thickness of the completed tick's strokes, in canvas units.</summary>
+        public float LevelTickThicknessUnits => levelTickThicknessUnits;
+
+        /// <summary>Colour of the completed tick.</summary>
+        public Color LevelTickColor => levelTickColor;
+
+        /// <summary>Space between the tick's square and the level button's top and right edges, in canvas units.</summary>
+        public float LevelTickInsetUnits => levelTickInsetUnits;
 
         /// <summary>Space from the safe area's sides to the HUD's outer elements, and the least space beside the timer, in canvas units.</summary>
         public float HudSidePaddingUnits => hudSidePaddingUnits;
@@ -1847,6 +2057,7 @@ namespace GateRush.Runtime
 
             AddHudProblems(problems);
             AddResultPanelProblems(problems);
+            AddMenuProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
             return problems;
@@ -2233,6 +2444,18 @@ namespace GateRush.Runtime
 
             AddIfNotPositive(problems, timeBonusSeconds, "Time Bonus Seconds");
             AddIfNotPositive(problems, timerPulseSeconds, "Timer Pulse Seconds");
+
+            if (!(hudButtonGapUnits >= 0f))
+            {
+                problems.Add($"{name}: Hud Button Gap Units may not be negative.");
+            }
+
+            AddIfNotPositive(problems, hudMenuBarSizeUnits, "Hud Menu Bar Size Units");
+            if (!(hudMenuBarGapUnits >= 0f && hudMenuBarSizeUnits.x <= hudRestartSizeUnits
+                  && MenuIconBarCount * hudMenuBarSizeUnits.y + (MenuIconBarCount - 1) * hudMenuBarGapUnits <= hudRestartSizeUnits))
+            {
+                problems.Add($"{name}: Hud Menu Bar Gap Units must be at least 0, and the menu button's {MenuIconBarCount} bars of Hud Menu Bar Size Units with their gaps must fit in Hud Restart Size Units.");
+            }
         }
 
         /// <summary>The constraints on the result panel's values, each message naming its field.</summary>
@@ -2246,10 +2469,16 @@ namespace GateRush.Runtime
 
             if (!(resultPaddingUnits >= 0f && resultButtonGapUnits >= 0f
                   && 2f * resultButtonSizeUnits.x + resultButtonGapUnits <= resultPanelSizeUnits.x - 2f * resultPaddingUnits
-                  && resultButtonSizeUnits.y + 3f * resultPaddingUnits < resultPanelSizeUnits.y))
+                  && 2f * resultButtonSizeUnits.y + resultButtonGapUnits + 3f * resultPaddingUnits + resultMessageHeightUnits
+                  < resultPanelSizeUnits.y))
             {
-                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side with Result Button Gap Units between them, and leave room for the title, inside Result Padding Units.");
+                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side and two rows of them, with Result Button Gap Units between them, and leave room for Result Message Height Units and the title, inside Result Padding Units.");
             }
+
+            AddIfBlank(problems, allDoneMessage, "All Done Message");
+            AddIfBlank(problems, menuLabel, "Menu Label");
+            AddIfNotPositive(problems, resultMessageHeightUnits, "Result Message Height Units");
+            AddIfNotPositive(problems, resultMessageFontSize, "Result Message Font Size");
 
             if (!(resultTitleFontSize > 0f && resultButtonFontSize > 0f))
             {
@@ -2259,6 +2488,64 @@ namespace GateRush.Runtime
             if (!(resultPopSeconds > 0f && resultPopStartScale > 0f))
             {
                 problems.Add($"{name}: Result Pop Seconds and Result Pop Start Scale must be positive.");
+            }
+        }
+
+        /// <summary>
+        /// The constraints on the menu's values (Module 23), each message
+        /// naming its field: every text is there to read, every size is
+        /// positive, and the tick fits its level button.
+        /// </summary>
+        private void AddMenuProblems(List<string> problems)
+        {
+            AddIfBlank(problems, gameTitle, "Game Title");
+            AddIfBlank(problems, playLabel, "Play Label");
+            AddIfBlank(problems, levelsLabel, "Levels Label");
+            AddIfBlank(problems, levelSelectTitle, "Level Select Title");
+            AddIfBlank(problems, backLabel, "Back Label");
+
+            if (!(menuPaddingUnits >= 0f && menuSectionGapUnits >= 0f && menuButtonGapUnits >= 0f && levelTileGapUnits >= 0f))
+            {
+                problems.Add($"{name}: Menu Padding Units, Menu Section Gap Units, Menu Button Gap Units and Level Tile Gap Units may not be negative.");
+            }
+
+            AddIfNotPositive(problems, menuTitleHeightUnits, "Menu Title Height Units");
+            AddIfNotPositive(problems, menuTitleWidthUnits, "Menu Title Width Units");
+            AddIfNotPositive(problems, menuTitleFontSize, "Menu Title Font Size");
+            AddIfNotPositive(problems, levelSelectTitleFontSize, "Level Select Title Font Size");
+            AddIfNotPositive(problems, menuButtonSizeUnits, "Menu Button Size Units");
+            AddIfNotPositive(problems, menuButtonCornerUnits, "Menu Button Corner Units");
+            AddIfNotPositive(problems, menuButtonFontSize, "Menu Button Font Size");
+            AddIfNotPositive(problems, levelTileSizeUnits, "Level Tile Size Units");
+            AddIfNotPositive(problems, levelTileCornerUnits, "Level Tile Corner Units");
+            AddIfNotPositive(problems, levelTileFontSize, "Level Tile Font Size");
+            AddIfNotPositive(problems, levelTickSizeUnits, "Level Tick Size Units");
+            AddIfNotPositive(problems, levelTickThicknessUnits, "Level Tick Thickness Units");
+
+            if (levelSelectColumns < 1)
+            {
+                problems.Add($"{name}: Level Select Columns must be at least 1.");
+            }
+
+            if (!(levelTickInsetUnits >= 0f && levelTickSizeUnits + levelTickInsetUnits <= levelTileSizeUnits))
+            {
+                problems.Add($"{name}: Level Tick Inset Units must be at least 0, and Level Tick Size Units plus the inset at most Level Tile Size Units.");
+            }
+        }
+
+        private void AddIfBlank(List<string> problems, string text, string field)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                problems.Add($"{name}: {field} is empty.");
+            }
+        }
+
+        private void AddIfNotPositive(List<string> problems, Vector2 value, string field)
+        {
+            if (!(value.x > 0f && value.y > 0f) || float.IsInfinity(value.x) || float.IsInfinity(value.y))
+            {
+                problems.Add($"{name}: {field} must be positive and finite on both axes.");
             }
         }
 
