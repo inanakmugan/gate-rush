@@ -5,7 +5,7 @@ portfolio project. **Architecture decisions belong to the project owner and are
 recorded in `docs/`. Your role is to implement against those specs, not to
 redesign them.**
 
-Unity 6000.3.22f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · targets
+Unity 6000.3.25f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · targets
 WebGL and Android.
 
 ## Reference documents
