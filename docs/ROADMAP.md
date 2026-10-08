@@ -190,6 +190,14 @@ taken when its area is next touched.
   colour after a search error; `DraftValidator`'s summary says two checks
   read outside inputs where there are now three; the shutter-threshold
   warning has no test.
+- *Level Editor readability:* the canvas does not show everything the game
+  does, so some features are found only by selecting each block.
+  Time-bonus blocks (M10), locked and key blocks (M8) and axis-restricted
+  blocks (M7) show no mark, though the game marks them (clock, padlock
+  with its count, key with its lock's colour, double-headed axis arrow).
+  A shutter (M5) is drawn beneath the blocks it covers, so
+  its region is hard to see; it should be drawn over them, translucent or
+  as an outline, so both the region and the blocks under it stay visible.
 - *Solver:* `SolveStatus`, `ISearchStrategy` and `SearchBudget` XML
   comments are out of date; `ExitCandidates`' Dijkstra is slower than it
   needs to be; two floors in `NearestNextClearStrategyTests` now count the
@@ -198,6 +206,15 @@ taken when its area is next touched.
 - *Presentation:* `MechanicIllustration` mirrors `BoardView`'s drawing
   recipes, so the two must change together; the time-bonus mark's overlap
   check covers bonuses up to two digits.
+- *Seen in the reference game, not built yet:* when there is empty space
+  in front of a generator (M6), the board shows a preview of the block it
+  will push out next, where that block will appear. Today the next block
+  shows only on the generator's own screen (D48). The owner has
+  screenshots to share when this is specified.
+- *End of the level set:* after the last level the result panel shows only
+  the title "All Levels Complete" (`allDoneTitle`) and Restart. Decided:
+  the title becomes "All Levels Played" with "Thanks for playing!"
+  beneath it, both from the config.
 
 ---
 
