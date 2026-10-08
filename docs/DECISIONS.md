@@ -1457,3 +1457,65 @@ Pulling the block all the way in on its own without a release: it takes the
 decision away from the player.
 
 ---
+
+## D50 — A prototype menu before the first WebGL build
+
+**Decision.** Before Phase 3, the game gets a small front end in the Level
+scene: a title screen with Play and Levels, a level select where every
+level is playable and completed levels are marked, a Menu button in the HUD
+and on the result panel, completed levels saved through `ISaveStore`, and a
+closing message after the last level. Module 23 specifies it.
+
+**Why.** The first WebGL build is also the first thing a studio will open.
+Someone reviewing it spends a few minutes and should reach any mechanic at
+once, so every level is open from the select. A Play screen also gives the
+browser the first click it needs before audio or full screen. Without
+saved progress, every reload of the page starts again at level 1.
+
+**One scene.** The menu is an overlay built from code, as the result panel
+is. A separate menu scene would need the chosen level to cross into the
+Level scene, and the usual way is a static field, which the project rules
+forbid.
+
+**Small on purpose.** This is not Phase 6's Home and not Phase 4's save
+model. The only progress kept is the set of completed levels; Phase 4 takes
+it over, and Phase 6 replaces the screens. Module 21 placed a player level
+select in Phase 6 and saving in Phase 4; this decision brings the smallest
+useful part of each forward for the build.
+
+**Rejected.** No menu at all: the build would open in the middle of level
+1, and a reviewer would have no way to reach the later mechanics. Levels
+that unlock in order: the real game's feel, but a reviewer would not see
+past the first few.
+
+---
+
+## D51 — The first build is published on itch.io
+
+**Decision.** The Phase 3 WebGL build, and the builds after it, are
+published on itch.io as an HTML5 upload: a ZIP with `index.html` at its
+root, marked Mobile Friendly, portrait.
+
+**Why.** It is free, it is where game portfolios and jam entries are
+usually shown, it plays in the browser with one click, and it serves
+Unity's compressed builds as they are: it sets `Content-Encoding` for
+gzip files and for files ending in `.br`.
+
+**Consequences.**
+- Compression is gzip or Brotli without Decompression Fallback; the
+  fallback would only add loader size and slower loading.
+- The page's embed viewport matches the build's default canvas size, in
+  portrait. On a phone itch.io always launches full screen, so the layout
+  must already adapt to the screen (it does: the camera fits the safe
+  area).
+- `PlayerPrefs` lives in IndexedDB under a path that changes with each
+  upload, so saved data does not carry over from one upload to the next.
+  Module 23 accepts this for the prototype behind `ISaveStore`.
+- itch.io's limits apply: at most 1,000 files and 500 MB extracted, 200 MB
+  per file.
+
+**Rejected.** GitHub Pages: it does not set `Content-Encoding` for Unity's
+compressed files, so the build would need Decompression Fallback. Hosting
+it ourselves: more work for no gain at this stage.
+
+---

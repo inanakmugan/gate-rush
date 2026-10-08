@@ -165,7 +165,16 @@ Page Down and Page Up.
 **2.6 — Gate pull.** An open gate draws in a block dragged toward it, as in
 the reference game: the block is pulled a little toward the gate and the
 gate glows faintly, and a release close enough arrives and clears (D49).
-*Spec: `Modules/22-gate-pull.md`.*
+*Spec: `Modules/22-gate-pull.md`. Status: done.* The work also fixed an
+older bug: a block passing through its gate drew as a white silhouette.
+
+**2.7 — Prototype menu.** A small front end for the first WebGL build: a
+title screen with Play and Levels, a level select with every level open and
+completed ones marked, a Menu button in the HUD and on the result panel,
+completed levels remembered across reloads through `ISaveStore`, and "All
+Levels Played" with "Thanks for playing!" after the last level. Not Phase
+6's Home and not Phase 4's save model; both take it over later (D50).
+*Spec: `Modules/23-prototype-menu.md`.*
 
 **Cleanup after 2.2 — remove the `ClearOuterColor` key effect.** Keys only
 unlock movement: a lock stops a block from moving and nothing else, and no
@@ -211,10 +220,6 @@ taken when its area is next touched.
   will push out next, where that block will appear. Today the next block
   shows only on the generator's own screen (D48). The owner has
   screenshots to share when this is specified.
-- *End of the level set:* after the last level the result panel shows only
-  the title "All Levels Complete" (`allDoneTitle`) and Restart. Decided:
-  the title becomes "All Levels Played" with "Thanks for playing!"
-  beneath it, both from the config.
 
 ---
 
@@ -229,6 +234,12 @@ calls and the per-move board rebuild are profiled on a phone (Module 15).
 
 Finding a stripping problem here costs an afternoon. Finding it in Phase 7 costs
 a week.
+
+**Hosting: itch.io (D51).** An HTML5 upload: a ZIP with `index.html` at its
+root, Mobile Friendly, portrait, the embed viewport matching the build's
+default canvas size. Compression gzip or Brotli without Decompression
+Fallback. Saved data does not carry over between uploads. The build opens
+on the prototype menu (2.7, D50).
 
 ---
 
