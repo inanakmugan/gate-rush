@@ -245,10 +245,13 @@ default canvas size. Compression gzip or Brotli without Decompression
 Fallback. Saved data does not carry over between uploads. The build opens
 on the prototype menu (2.7, D50).
 
-*Status: published* at https://inanakmugan.itch.io/gate-rush, Brotli without
-fallback, a 13 MB ZIP. It runs in desktop browsers, and completed levels
-survive a reload. Still to check: the draw calls and the per-move board
-rebuild profiled on a phone. Learned on the first upload: a page that fills
+*Status: done.* Published at https://inanakmugan.itch.io/gate-rush, Brotli
+without fallback, a 13 MB ZIP. It runs in desktop browsers and on an iPhone 13
+Pro: every level loads (so stripping removed nothing the levels need), touch
+and drag work, and completed levels survive a reload. On the phone it feels
+heavier than a native app, which the owner finds acceptable for a WebGL build.
+Profiling the draw calls and the per-move board rebuild moves to Phase 7, under
+optimisation. Learned on the first upload: a page that fills
 its loading bar and stops is first worth a fresh ZIP, with `index.html`,
 `Build` and `TemplateData` at its root; the first ZIP was the whole fault.
 
@@ -284,6 +287,10 @@ Meta is already tested by this point, so this phase is presentation only.
 Audio, haptics, notifications, screen transitions, privacy text, the
 end-of-content screen after the final authored level (a first version, "All
 Levels Played", came with 2.7).
+
+Optimisation, carried over from Phase 3: profile the draw calls and the
+per-move board rebuild (Module 15), on a phone where possible. The WebGL build
+plays on an iPhone 13 Pro but feels heavier than a native app.
 
 ---
 
