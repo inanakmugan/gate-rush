@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using GateRush.Runtime;
 using GateRush.Solver;
 
 namespace GateRush.Editor
@@ -11,7 +12,9 @@ namespace GateRush.Editor
     /// exhaustive budgets, D5), the suggested-time-budget formula (D12), and the
     /// window-layout proportions the docs/Modules/09a follow-up replaced fixed
     /// pixel constants with, how the board fits its canvas, and how the solver
-    /// result line is presented. Kept in an asset so no number is fixed at a call
+    /// result line is presented; and how the canvas draws cells, shutters,
+    /// elevators and a block's marks, with a reference to the game's own
+    /// config for the marks' sprites (Module 24). Kept in an asset so no number is fixed at a call
     /// site and every one of them can be edited in the window and persist.
     /// </summary>
     /// <remarks>
@@ -91,6 +94,53 @@ namespace GateRush.Editor
 
         [SerializeField] private Color blockNumberColor = new Color(0.12f, 0.14f, 0.20f);
         [SerializeField] private Color blockNumberPlateColor = new Color(1f, 1f, 1f, 0.85f);
+
+        [Header("Game marks (Module 24): the padlock, key, time bonus and axis arrow, drawn with the game's own sprites, sizes and colours")]
+        [Tooltip("The game's config (Assets/Config/RuntimeConfig.asset). Its sprites, mark sizes and colours are what the canvas draws; without it these marks are not drawn.")]
+        [SerializeField] private RuntimeConfig runtimeConfig;
+
+        [Tooltip("Side of the plate showing a padlock's required key count, in cells: above 0. It grows where the smallest font needs more.")]
+        [SerializeField] private float lockCountPlateCells = 0.3f;
+
+        [Tooltip("How far below the padlock's centre its key count sits, in cells: above 0.")]
+        [SerializeField] private float lockCountDropCells = 0.22f;
+
+        [Tooltip("Height of a time bonus's plate, in cells: above 0. It grows where the smallest font needs more.")]
+        [SerializeField] private float bonusPlateHeightCells = 0.34f;
+
+        [Tooltip("The clock's size as a fraction of the time-bonus plate's height: above 0, at most 1.")]
+        [SerializeField] private float bonusIconSizeRatio = 0.75f;
+
+        [Tooltip("Space round the clock and the text as a fraction of the time-bonus plate's height: above 0, below 0.5.")]
+        [SerializeField] private float bonusPaddingRatio = 0.12f;
+
+        [Tooltip("The time-bonus plate's rim as a fraction of its height: above 0, below 0.5.")]
+        [SerializeField] private float bonusRimRatio = 0.08f;
+
+        [Header("Canvas (Module 24): cell fills, and how shutters and elevators read on the grid")]
+        [Tooltip("Fill of a cell nothing occupies.")]
+        [SerializeField] private Color cellBackgroundColor = new Color(0.22f, 0.22f, 0.25f);
+
+        [Tooltip("Fill of a static wall cell.")]
+        [SerializeField] private Color wallCellColor = new Color(0.08f, 0.08f, 0.09f);
+
+        [Tooltip("A shutter's hue (M5): its drag preview, and its flat fill and outline while the game's config or sprites are missing.")]
+        [SerializeField] private Color shutterColor = new Color(0.42f, 0.58f, 0.95f);
+
+        [Tooltip("How opaque a shutter's slats over its region are, multiplying the game's slat colour's alpha: above 0 and below 1, so the region reads and the blocks under it stay visible.")]
+        [SerializeField] private float shutterOverlayAlpha = 0.35f;
+
+        [Tooltip("Thickness of a shutter's outline, in pixels: above 0.")]
+        [SerializeField] private float shutterOutlineThickness = 3f;
+
+        [Tooltip("An elevator's hue (M9): its empty cells' tint, its border and its drag preview.")]
+        [SerializeField] private Color elevatorColor = new Color(0.95f, 0.66f, 0.24f);
+
+        [Tooltip("How far an empty cell in an elevator's region is tinted from the background toward the elevator's hue: 0 to 1.")]
+        [SerializeField] private float elevatorCellTintStrength = 0.45f;
+
+        [Tooltip("Thickness of an elevator region's border, in pixels: above 0.")]
+        [SerializeField] private float regionBorderThickness = 1f;
 
         /// <summary>
         /// The quick optimal attempt Validate makes first: exhaustive A* at a
@@ -206,11 +256,182 @@ namespace GateRush.Editor
         public Color BlockNumberPlateColor => blockNumberPlateColor;
 
         /// <summary>
-        /// Every reason the block marks cannot be drawn as configured, as
-        /// messages naming the field; empty when they can. The window shows
-        /// them above the grid.
+        /// The game's config, whose sprites, mark sizes and colours the canvas
+        /// draws a block's padlock, key, time bonus and axis arrow with
+        /// (Module 24), so both screens show the same icon. Null until the
+        /// owner assigns it; <see cref="AreGameMarksUsable"/> says whether
+        /// it, and everything read from it, is there.
+        /// </summary>
+        public RuntimeConfig GameConfig => runtimeConfig;
+
+        /// <summary>Side of the plate showing a padlock's required key count, in cells. Default 0.3.</summary>
+        public float LockCountPlateCells => lockCountPlateCells;
+
+        /// <summary>How far below the padlock's centre its key count sits, in cells. Default 0.22.</summary>
+        public float LockCountDropCells => lockCountDropCells;
+
+        /// <summary>Height of a time bonus's plate, in cells. Default 0.34.</summary>
+        public float BonusPlateHeightCells => bonusPlateHeightCells;
+
+        /// <summary>The clock's size as a fraction of the time-bonus plate's height. Default 0.75.</summary>
+        public float BonusIconSizeRatio => bonusIconSizeRatio;
+
+        /// <summary>Space round the clock and the text as a fraction of the time-bonus plate's height. Default 0.12.</summary>
+        public float BonusPaddingRatio => bonusPaddingRatio;
+
+        /// <summary>The time-bonus plate's rim as a fraction of its height. Default 0.08.</summary>
+        public float BonusRimRatio => bonusRimRatio;
+
+        /// <summary>Fill of a cell nothing occupies.</summary>
+        public Color CellBackgroundColor => cellBackgroundColor;
+
+        /// <summary>Fill of a static wall cell.</summary>
+        public Color WallCellColor => wallCellColor;
+
+        /// <summary>A shutter's hue (M5): its drag preview, and its flat fill and outline while the game's slats cannot be drawn (<see cref="AreGameMarksUsable"/>).</summary>
+        public Color ShutterColor => shutterColor;
+
+        /// <summary>How opaque a shutter's slats over its region are, multiplying the game's slat colour's alpha. Default 0.35.</summary>
+        public float ShutterOverlayAlpha => shutterOverlayAlpha;
+
+        /// <summary>Thickness of a shutter's outline, in pixels. Default 3.</summary>
+        public float ShutterOutlineThickness => shutterOutlineThickness;
+
+        /// <summary>An elevator's hue (M9): its empty cells' tint, its border and its drag preview.</summary>
+        public Color ElevatorColor => elevatorColor;
+
+        /// <summary>How far an empty cell in an elevator's region is tinted toward <see cref="ElevatorColor"/>. Default 0.45.</summary>
+        public float ElevatorCellTintStrength => elevatorCellTintStrength;
+
+        /// <summary>Thickness of an elevator region's border, in pixels. Default 1.</summary>
+        public float RegionBorderThickness => regionBorderThickness;
+
+        /// <summary>
+        /// True when the values behind a block's Module 20 look — the ice
+        /// colour, the frozen count, the layer inset and the layer number —
+        /// are usable. It reads those fields alone: a missing
+        /// <see cref="GameConfig"/> or a bad Module 24 value never turns it
+        /// off.
+        /// </summary>
+        public bool AreBlockMarksUsable => BlockLookProblems().Count == 0;
+
+        /// <summary>
+        /// True when the padlock, key, time bonus and axis arrow can be drawn,
+        /// and a shutter in the game's slats (Module 24):
+        /// <see cref="GameConfig"/> is assigned with the sprites they need,
+        /// and the marks' own sizes here are usable.
+        /// </summary>
+        public bool AreGameMarksUsable => GameMarkProblems().Count == 0;
+
+        /// <summary>
+        /// Every reason the canvas cannot be drawn as configured, as messages
+        /// naming the field, each once; empty when it can. The window shows
+        /// them above the grid. They fall in three groups: the Module 20
+        /// block look (<see cref="AreBlockMarksUsable"/>), the game marks
+        /// (<see cref="AreGameMarksUsable"/>), and the canvas's own values,
+        /// which are reported but still drawn as set.
         /// </summary>
         public IReadOnlyList<string> Problems()
+        {
+            var problems = BlockLookProblems();
+            problems.AddRange(GameMarkProblems());
+
+            if (!(shutterOverlayAlpha > 0f && shutterOverlayAlpha < 1f))
+            {
+                problems.Add($"{name}: Shutter Overlay Alpha must be above 0 and below 1, so a shutter's region reads and the blocks under it stay visible.");
+            }
+
+            if (!(shutterOutlineThickness > 0f))
+            {
+                problems.Add($"{name}: Shutter Outline Thickness must be above 0.");
+            }
+
+            if (!(elevatorCellTintStrength >= 0f && elevatorCellTintStrength <= 1f))
+            {
+                problems.Add($"{name}: Elevator Cell Tint Strength must be from 0 to 1.");
+            }
+
+            if (!(regionBorderThickness > 0f))
+            {
+                problems.Add($"{name}: Region Border Thickness must be above 0.");
+            }
+
+            return problems;
+        }
+
+        /// <summary>
+        /// Why the padlock, key, time bonus and axis arrow cannot be drawn,
+        /// nor a shutter in the game's slats: the game's config or one of
+        /// its sprites is missing, or one of the marks' sizes here is
+        /// unusable. Empty when they can.
+        /// </summary>
+        private List<string> GameMarkProblems()
+        {
+            var problems = new List<string>();
+
+            if (runtimeConfig == null)
+            {
+                problems.Add(
+                    $"{name}: Runtime Config is not assigned, so padlocks, keys, time bonuses and axis arrows are not drawn on the canvas and shutters show as a flat fill. " +
+                    "Assign Assets/Config/RuntimeConfig.asset.");
+            }
+            else
+            {
+                AddMissingSprite(problems, runtimeConfig.PadlockSprite, "Padlock Sprite");
+                AddMissingSprite(problems, runtimeConfig.KeyBodySprite, "Key Body Sprite");
+                AddMissingSprite(problems, runtimeConfig.KeyGemSprite, "Key Gem Sprite");
+                AddMissingSprite(problems, runtimeConfig.ClockSprite, "Clock Sprite");
+                AddMissingSprite(problems, runtimeConfig.AxisArrowSprite, "Axis Arrow Sprite");
+                AddMissingSprite(problems, runtimeConfig.ShutterSlatsSprite, "Shutter Slats Sprite");
+            }
+
+            if (!(lockCountPlateCells > 0f))
+            {
+                problems.Add($"{name}: Lock Count Plate Cells must be above 0.");
+            }
+
+            if (!(lockCountDropCells > 0f))
+            {
+                problems.Add($"{name}: Lock Count Drop Cells must be above 0.");
+            }
+
+            if (!(bonusPlateHeightCells > 0f))
+            {
+                problems.Add($"{name}: Bonus Plate Height Cells must be above 0.");
+            }
+
+            if (!(bonusIconSizeRatio > 0f && bonusIconSizeRatio <= 1f))
+            {
+                problems.Add($"{name}: Bonus Icon Size Ratio must be above 0 and at most 1.");
+            }
+
+            if (!(bonusPaddingRatio > 0f && bonusPaddingRatio < 0.5f))
+            {
+                problems.Add($"{name}: Bonus Padding Ratio must be above 0 and below 0.5.");
+            }
+
+            if (!(bonusRimRatio > 0f && bonusRimRatio < 0.5f))
+            {
+                problems.Add($"{name}: Bonus Rim Ratio must be above 0 and below 0.5.");
+            }
+
+            return problems;
+        }
+
+        private void AddMissingSprite(List<string> problems, Sprite sprite, string field)
+        {
+            if (sprite == null)
+            {
+                problems.Add(
+                    $"{name}: Runtime Config '{runtimeConfig.name}' has no {field}, so padlocks, keys, time bonuses and axis arrows are not drawn on the canvas and shutters show as a flat fill.");
+            }
+        }
+
+        /// <summary>
+        /// Why a block's Module 20 look — ice, frozen count, layer inset and
+        /// layer number — cannot be drawn as configured. Empty when it can.
+        /// </summary>
+        private List<string> BlockLookProblems()
         {
             var problems = new List<string>();
 

@@ -12,6 +12,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5811853539149cc4093abbed005d5943, type: 3}
   m_Name: LevelEditorSettings
   m_EditorClassIdentifier: GateRush.Editor::GateRush.Editor.LevelEditorSettings
+  quickMaxDepth: 400
+  quickMaxExploredStates: 100000
+  quickMaxWallClockMs: 2000
   canonicalMaxDepth: 200
   canonicalMaxExploredStates: 200000
   canonicalMaxWallClockMs: 5000
@@ -28,3 +31,35 @@ MonoBehaviour:
   canvasMinHeight: 220
   queueEntryFreeDrawMaxDepth: 4
   undoStackDepth: 50
+  boardMarginCells: 1
+  boardMinCellSize: 16
+  boardMaxCellSize: 96
+  solverSolvableColor: {r: 0.4, g: 0.85, b: 0.45, a: 1}
+  solverUnsolvableColor: {r: 0.95, g: 0.42, b: 0.38, a: 1}
+  solverIndeterminateColor: {r: 0.95, g: 0.75, b: 0.3, a: 1}
+  solverNotRunColor: {r: 0.7, g: 0.7, b: 0.72, a: 1}
+  validateButtonWidth: 120
+  validateButtonHeight: 28
+  warningIconSize: 12
+  blockInsetCells: 0.2
+  frozenBlockColor: {r: 0.8, g: 0.91, b: 0.98, a: 1}
+  blockNumberPlateCells: 0.5
+  blockNumberSizeRatio: 0.7
+  blockNumberMinFontSize: 7
+  blockNumberColor: {r: 0.12, g: 0.14, b: 0.2, a: 1}
+  blockNumberPlateColor: {r: 1, g: 1, b: 1, a: 0.85}
+  runtimeConfig: {fileID: 11400000, guid: 9cd3ac5d10531b440817f895710981e1, type: 2}
+  lockCountPlateCells: 0.3
+  lockCountDropCells: 0.22
+  bonusPlateHeightCells: 0.34
+  bonusIconSizeRatio: 0.75
+  bonusPaddingRatio: 0.12
+  bonusRimRatio: 0.08
+  cellBackgroundColor: {r: 0.22, g: 0.22, b: 0.25, a: 1}
+  wallCellColor: {r: 0.08, g: 0.08, b: 0.09, a: 1}
+  shutterColor: {r: 0.42, g: 0.58, b: 0.95, a: 1}
+  shutterOverlayAlpha: 0.35
+  shutterOutlineThickness: 3
+  elevatorColor: {r: 0.95, g: 0.66, b: 0.24, a: 1}
+  elevatorCellTintStrength: 0.45
+  regionBorderThickness: 1

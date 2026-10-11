@@ -12,7 +12,9 @@ namespace GateRush.Tests
     /// proportions and floors (docs/Modules/09a follow-up, item 4) match what
     /// today's window is tuned for. Module 20: the block mark values have
     /// their documented defaults, which <see cref="LevelEditorSettings.Problems"/>
-    /// accepts.
+    /// accepts. Module 24: a missing <c>RuntimeConfig</c> reference and a
+    /// shutter overlay alpha of 0 or 1 are reported, and neither turns off the
+    /// Module 20 block look.
     /// </summary>
     public class LevelEditorSettingsTests
     {
@@ -152,13 +154,120 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_Defaults_ReportNothing()
+        public void Defaults_Canvas_KeepTheColoursTheWindowHardcoded()
         {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(new Color(0.22f, 0.22f, 0.25f), settings.CellBackgroundColor);
+            Assert.AreEqual(new Color(0.08f, 0.08f, 0.09f), settings.WallCellColor);
+            Assert.AreEqual(new Color(0.42f, 0.58f, 0.95f), settings.ShutterColor);
+            Assert.AreEqual(new Color(0.95f, 0.66f, 0.24f), settings.ElevatorColor);
+            Assert.AreEqual(0.45f, settings.ElevatorCellTintStrength);
+            Assert.AreEqual(1f, settings.RegionBorderThickness);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Problems_DefaultsWithoutARuntimeConfig_ReportOnlyTheMissingReference()
+        {
+            // A fresh instance has no reference: the owner assigns it on the
+            // asset. Every other default is usable.
             var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
 
             var problems = settings.Problems();
 
-            Assert.IsEmpty(problems, string.Join(" | ", problems));
+            Assert.AreEqual(1, problems.Count, string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Runtime Config is not assigned"), string.Join(" | ", problems));
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void AreBlockMarksUsable_WithoutARuntimeConfig_IsStillTrue()
+        {
+            // The Module 20 look — ice, frozen count, layer inset and number —
+            // reads its own fields alone, so a missing reference leaves it
+            // drawn; only the game's marks go.
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            var isLookUsable = settings.AreBlockMarksUsable;
+            var areGameMarksUsable = settings.AreGameMarksUsable;
+
+            Assert.IsNull(settings.GameConfig);
+            Assert.IsTrue(isLookUsable);
+            Assert.IsFalse(areGameMarksUsable);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void AreBlockMarksUsable_BadBlockInset_IsFalse_AndEveryProblemIsListedOnce()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("blockInsetCells").floatValue = 0.5f;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+            var isLookUsable = settings.AreBlockMarksUsable;
+
+            Assert.IsFalse(isLookUsable);
+            Assert.That(problems, Has.Some.Contains("Block Inset Cells"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Runtime Config"), string.Join(" | ", problems));
+            CollectionAssert.AllItemsAreUnique(problems, "the window shows each problem once");
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Problems_RuntimeConfigAssignedWithoutSprites_NamesTheSpritesNotTheReference()
+        {
+            // A bare config has no generated art assigned.
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var config = ScriptableObject.CreateInstance<GateRush.Runtime.RuntimeConfig>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("runtimeConfig").objectReferenceValue = config;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+            var isLookUsable = settings.AreBlockMarksUsable;
+            var areGameMarksUsable = settings.AreGameMarksUsable;
+
+            Assert.AreSame(config, settings.GameConfig);
+            Assert.That(problems, Has.None.Contains("is not assigned"), string.Join(" | ", problems));
+            foreach (var sprite in new[]
+                     {
+                         "Padlock Sprite", "Key Body Sprite", "Key Gem Sprite", "Clock Sprite", "Axis Arrow Sprite",
+                         "Shutter Slats Sprite",
+                     })
+            {
+                Assert.That(problems, Has.Some.Contains(sprite), string.Join(" | ", problems));
+            }
+
+            Assert.AreEqual(6, problems.Count, "the five game-mark sprites and the slats, nothing else: " + string.Join(" | ", problems));
+            Assert.IsTrue(isLookUsable);
+            Assert.IsFalse(areGameMarksUsable, "a mark's sprite is missing");
+
+            Object.DestroyImmediate(settings);
+            Object.DestroyImmediate(config);
+        }
+
+        [TestCase(0f)]
+        [TestCase(1f)]
+        public void Problems_ShutterOverlayAlphaAtEitherEnd_IsReportedByName(float alpha)
+        {
+            // At 0 the region does not read; at 1 it hides the blocks under it.
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("shutterOverlayAlpha").floatValue = alpha;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+            var isLookUsable = settings.AreBlockMarksUsable;
+
+            Assert.That(problems, Has.Some.Contains("Shutter Overlay Alpha"), string.Join(" | ", problems));
+            Assert.IsTrue(isLookUsable, "a canvas value never hides the block look");
 
             Object.DestroyImmediate(settings);
         }
