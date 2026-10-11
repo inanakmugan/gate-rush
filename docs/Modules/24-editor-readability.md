@@ -184,3 +184,52 @@ edge markers, drag preview.
   the threshold plate shows.
 - A generator queue entry and an elevator wave show their blocks' marks.
 - Clicking a block under a shutter still selects the block.
+
+---
+
+## Resolved during implementation
+
+- **Shared rules.** `MarkLayout.Slots` returns `BlockMarkSlots` (icon,
+  layers, bonus, `MarkCrowding`) in cell units; `BoardView.MarksOf` keeps
+  its signature and multiplies by its cell size.
+  `MarkLayout.AxisArrowRect` gives the M7 arrow's rect and
+  `BoardView.DrawAxisArrow` uses it too.
+  `RuntimeConfig.MarkScale(MarkCrowding)` maps crowding to the board's
+  scales, so the editor does not repeat it. Board positions may differ
+  from before in the last float bit only; a test compares `Slots` with the
+  old `MarksOf` formula over every palette shape and an L.
+- **Editor look.** `EditorBlockLook.Of` also takes the footprint and the
+  frozen raise (for the slots) and a `hasKey` flag, which separates "no
+  key" from "key whose lock is not found". `IsFrozenAtStart` exposes the
+  Core predicate for the cell fill. A block with both a lock and a key
+  shows the padlock only (Module 07 rejects that pair). A layer number
+  alone stays at the anchor; it moves to the layer slot when the block has
+  other marks.
+- **Lock colour.** `DraftLockColors` is built once per GUI pass and
+  searches board blocks, then wave blocks, then queue entries; the first
+  match wins and a locked block with no colours gives null. The gem and
+  the shutter plate use the editor's own palette, so they match the blocks
+  as the editor draws them.
+- **Drawing.** Sprites are drawn with `GUI.DrawTextureWithTexCoords` from
+  `sprite.textureRect`; the key is turned by `-KeyRotationDegrees`, since
+  GUI space has Y down. The axis arrow is the game's sliced sprite drawn
+  as three pieces (two heads from `sprite.border`, a stretched middle),
+  turned a quarter for a vertical block. The bonus text uses
+  `RuntimeConfig.BadgeTextColor`. Chains are not drawn.
+- **Shutter.** After seeing the canvas, the owner replaced the flat
+  translucent fill, which was almost invisible over blocks, with the
+  game's own look: `ShutterSlatsSprite` tiled one per cell in
+  `ShutterSlatColor` (alpha times Shutter Overlay Alpha) and an outline in
+  `ShutterBorderColor`. Without a usable `RuntimeConfig` it falls back to
+  the flat fill and Shutter Color outline, so a shutter is never
+  invisible.
+- **Settings.** `Problems()` is built from three groups, each message
+  listed once: block look (the four Module 20 fields, behind
+  `AreBlockMarksUsable`), game marks (the reference, its six sprites
+  including the slats, and the six mark sizes, behind
+  `AreGameMarksUsable`), and canvas values, which are reported but still
+  drawn as set. A missing reference never hides the Module 20 look. A
+  fresh settings instance reports only the missing reference. The cell,
+  wall, shutter and elevator colours, the elevator tint strength and the
+  region border thickness moved out of the window; the drag preview reads
+  the shutter and elevator colours from settings.
