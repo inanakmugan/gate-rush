@@ -418,9 +418,17 @@ namespace GateRush.Editor
             DrawShapePaletteRow();
 
             // Block marks are not drawn while their settings are unusable
-            // (DrawBlockLook); say why rather than leave them missing.
+            // (DrawBlockLook); say why rather than leave them missing. The
+            // two flags read separate groups of fields: the Module 20 look
+            // (ice, frozen count, layer inset and number) never depends on
+            // the game's config, so a missing reference leaves it as it was.
+            // The game's marks sit on that look's number plates and fonts,
+            // so they need both. Problems() lists every group once.
             var settingsProblems = settings.Problems();
-            areBlockMarksUsable = settingsProblems.Count == 0;
+            areBlockMarksUsable = settings.AreBlockMarksUsable;
+            isGameConfigUsable = settings.AreGameMarksUsable;
+            areGameMarksUsable = areBlockMarksUsable && isGameConfigUsable;
+            lockColors = DraftLockColors.Of(draft);
             foreach (var problem in settingsProblems)
             {
                 EditorGUILayout.HelpBox(problem, MessageType.Warning);
@@ -719,9 +727,12 @@ namespace GateRush.Editor
             DrawBlockOutlines(layout);
             DrawBlockLooks(layout);
 
+            // After the blocks and their marks, so a shutter lies over what
+            // it covers and both stay visible (Module 24).
             if (!InWaveScope())
             {
-                DrawRegionBorders(layout);
+                DrawShutterOverlays(layout);
+                DrawElevatorBorders(layout);
             }
 
             DrawSelectionOutline(layout);
@@ -764,9 +775,15 @@ namespace GateRush.Editor
             rows = Math.Max(1, elevator.Max.Y - elevator.Min.Y + 1);
         }
 
+        /// <summary>
+        /// A cell's fill: its block's, a wall's, or the background, tinted
+        /// toward the elevator's hue inside an elevator's region. A shutter
+        /// tints nothing here; its overlay is drawn over the blocks instead
+        /// (<see cref="DrawShutterOverlays"/>).
+        /// </summary>
         private Color FillOf(Coord cell)
         {
-            var background = new Color(0.22f, 0.22f, 0.25f);
+            var background = settings.CellBackgroundColor;
 
             if (InWaveScope())
             {
@@ -784,7 +801,7 @@ namespace GateRush.Editor
 
             if (draft.StaticWalls.Contains(cell))
             {
-                return new Color(0.08f, 0.08f, 0.09f);
+                return settings.WallCellColor;
             }
 
             foreach (var block in draft.Blocks)
@@ -795,27 +812,16 @@ namespace GateRush.Editor
                 }
             }
 
-            foreach (var shutter in draft.Shutters)
-            {
-                if (DraftHitTest.InRegion(shutter.Min, shutter.Max, cell))
-                {
-                    return Color.Lerp(background, ShutterTint, 0.5f);
-                }
-            }
-
             foreach (var elevator in draft.Elevators)
             {
                 if (DraftHitTest.InRegion(elevator.Min, elevator.Max, cell))
                 {
-                    return Color.Lerp(background, ElevatorTint, 0.45f);
+                    return Color.Lerp(background, settings.ElevatorColor, settings.ElevatorCellTintStrength);
                 }
             }
 
             return background;
         }
-
-        private static readonly Color ShutterTint = new Color(0.42f, 0.58f, 0.95f);
-        private static readonly Color ElevatorTint = new Color(0.95f, 0.66f, 0.24f);
 
         /// <summary>The stroke along a block's own outer edge — darker and thicker than <c>EditorGrid</c>'s cell lines, which run between every pair of cells including two inside one block.</summary>
         private static readonly Color BlockBoundaryColor = new Color(0f, 0f, 0f, 0.8f);
@@ -891,7 +897,7 @@ namespace GateRush.Editor
         /// frozen block is ice wherever it is drawn.
         /// </summary>
         private Color BlockFill(IReadOnlyList<BlockColor> colorStack, int? unfreezeAtClearCount) =>
-            EditorBlockLook.Of(colorStack, unfreezeAtClearCount).IsFrozen
+            EditorBlockLook.IsFrozenAtStart(unfreezeAtClearCount)
                 ? settings.FrozenBlockColor
                 : Palette(FirstColor(colorStack));
 
@@ -908,8 +914,7 @@ namespace GateRush.Editor
                 {
                     if (block.RegionOrigin.HasValue)
                     {
-                        DrawBlockLook(
-                            layout.CellSpaceAt(block.RegionOrigin.Value), block.Cells, block.ColorStack, block.UnfreezeAtClearCount);
+                        DrawSpawnedBlockLook(layout.CellSpaceAt(block.RegionOrigin.Value), block);
                     }
                 }
 
@@ -918,23 +923,40 @@ namespace GateRush.Editor
 
             foreach (var block in draft.Blocks)
             {
-                DrawBlockLook(layout.CellSpaceAt(block.StartOrigin), block.Cells, block.ColorStack, block.UnfreezeAtClearCount);
+                DrawBlockLook(
+                    layout.CellSpaceAt(block.StartOrigin), block.Cells, block.ColorStack, block.UnfreezeAtClearCount, block.Axis,
+                    block.TimeBonusSeconds, block.LockId, block.RequiredKeyCount, block.KeyTargetLockId);
             }
         }
 
+        /// <summary>A wave block's or a queue entry's look in <paramref name="space"/> (<see cref="DrawBlockLook"/>).</summary>
+        private void DrawSpawnedBlockLook(EditorCellSpace space, SpawnedBlockDraft block) =>
+            DrawBlockLook(
+                space, block.Cells, block.ColorStack, block.UnfreezeAtClearCount, block.Axis, block.TimeBonusSeconds,
+                block.LockId, block.RequiredKeyCount, block.KeyTargetLockId);
+
         /// <summary>
         /// Draws what <see cref="EditorBlockLook"/> says a block shows beyond
-        /// its fill (Module 20): a layered block's second colour, inset as one
-        /// piece over the footprint (<see cref="EditorLayerInset"/>), and its
-        /// number — a frozen block's count, or a deep stack's depth — on a
-        /// plate at the footprint's anchor. The one drawing for the main
-        /// grid, a wave's scope and a generator queue entry's preview and
-        /// free-draw grid; only <paramref name="space"/> differs. Draws
-        /// nothing while the settings' block mark values are unusable, which
-        /// the window reports above the grid.
+        /// its fill (Modules 20 and 24): a layered block's second colour,
+        /// inset as one piece over the footprint
+        /// (<see cref="EditorLayerInset"/>); its number — a frozen block's
+        /// count at the footprint's anchor, or a deep stack's depth in its
+        /// layer slot — on a plate; and the game's own marks: the axis arrow,
+        /// the padlock with its key count or the key with its lock's colour,
+        /// and the time bonus, each where the board puts it. The one drawing
+        /// for the main grid, a wave's scope and a generator queue entry's
+        /// preview and free-draw grid; only <paramref name="space"/> differs.
         /// </summary>
+        /// <remarks>
+        /// Draws nothing while the settings' block mark values are unusable.
+        /// While only the game's marks are — no <c>RuntimeConfig</c> assigned
+        /// — it draws the second colour and the number at the anchor, as
+        /// before Module 24, and none of the game's marks. The window reports
+        /// either above the grid.
+        /// </remarks>
         private void DrawBlockLook(
-            EditorCellSpace space, IReadOnlyList<Coord> cells, IReadOnlyList<BlockColor> colorStack, int? unfreezeAtClearCount)
+            EditorCellSpace space, IReadOnlyList<Coord> cells, IReadOnlyList<BlockColor> colorStack, int? unfreezeAtClearCount,
+            MovementAxis axis, int timeBonusSeconds, int? lockId, int requiredKeyCount, int? keyTargetLockId)
         {
             // An empty footprint has no anchor to mark; a queue entry being
             // free-drawn can be empty for a moment.
@@ -943,7 +965,12 @@ namespace GateRush.Editor
                 return;
             }
 
-            var look = EditorBlockLook.Of(colorStack, unfreezeAtClearCount);
+            var config = areGameMarksUsable ? settings.GameConfig : null;
+            var look = EditorBlockLook.Of(
+                cells, colorStack, unfreezeAtClearCount, axis, timeBonusSeconds, lockId, requiredKeyCount,
+                keyTargetLockId.HasValue,
+                keyTargetLockId.HasValue ? lockColors.LockColor(keyTargetLockId.Value) : null,
+                config != null ? config.FrozenMarkRaiseCells : 0f);
             if (look.BeneathColor.HasValue)
             {
                 var beneath = Palette(look.BeneathColor.Value);
@@ -956,20 +983,75 @@ namespace GateRush.Editor
                 }
             }
 
+            var anchor = GateRush.Runtime.MarkLayout.Anchor(cells);
+            if (config == null)
+            {
+                if (look.Number.HasValue)
+                {
+                    DrawBlockNumber(space, anchor, look.Number.Value, 1f);
+                }
+
+                return;
+            }
+
+            if (Event.current.type != EventType.Repaint)
+            {
+                return;
+            }
+
+            // The arrow lies under the other marks, as on the board.
+            if (look.Axis != MovementAxis.Free)
+            {
+                DrawAxisArrow(space, cells, look.Axis, config);
+            }
+
+            // A frozen block's count stays on the anchor at full size; its
+            // other marks are raised above it. A depth shares the row.
+            var scale = config.MarkScale(look.Slots.Crowding);
             if (look.Number.HasValue)
             {
-                DrawBlockNumber(space, GateRush.Runtime.MarkLayout.Anchor(cells), look.Number.Value);
+                DrawBlockNumber(
+                    space, look.IsFrozen ? anchor : look.Slots.Layers, look.Number.Value, look.IsFrozen ? 1f : scale);
+            }
+
+            switch (look.Icon.Kind)
+            {
+                case EditorMarkIconKind.Padlock:
+                    DrawPadlock(space, look.Slots.Icon, scale, look.Icon.RequiredKeyCount.Value, config);
+                    break;
+                case EditorMarkIconKind.Key:
+                    DrawKey(space, look.Slots.Icon, scale, look.Icon.KeyColor, config);
+                    break;
+            }
+
+            if (look.TimeBonusSeconds.HasValue)
+            {
+                DrawTimeBonus(space, look.Slots.Bonus, scale, look.TimeBonusSeconds.Value, config);
             }
         }
 
         /// <summary>
-        /// A block's number on its plate, centred on <paramref name="anchor"/>
+        /// A block's number on its plate, centred on <paramref name="center"/>
         /// (in the block's cell units). The plate is
-        /// <see cref="LevelEditorSettings.BlockNumberPlateCells"/> of a cell,
-        /// and never smaller than the smallest font needs, so on a preview's
-        /// small cells the number stays readable and the plate grows instead.
+        /// <see cref="LevelEditorSettings.BlockNumberPlateCells"/> of a cell
+        /// times <paramref name="scale"/>, the crowding scale of the row it
+        /// sits in (<see cref="DrawPlate"/>).
         /// </summary>
-        private void DrawBlockNumber(EditorCellSpace space, Vector2 anchor, int number)
+        private void DrawBlockNumber(EditorCellSpace space, Vector2 center, int number, float scale) =>
+            DrawPlate(
+                space.ToGui(center), settings.BlockNumberPlateCells * space.CellSize * scale,
+                number.ToString(System.Globalization.CultureInfo.InvariantCulture), settings.BlockNumberPlateColor);
+
+        /// <summary>
+        /// <paramref name="text"/> on a square plate of
+        /// <paramref name="plateColor"/> centred on GUI point
+        /// <paramref name="center"/>: a block's number, a padlock's key count,
+        /// a shutter's threshold. The plate is <paramref name="side"/> pixels
+        /// and never smaller than the smallest font needs, so on a preview's
+        /// small cells the text stays readable and the plate grows instead.
+        /// Needs the settings' block mark values usable; callers check.
+        /// </summary>
+        private void DrawPlate(Vector2 center, float side, string text, Color plateColor)
         {
             if (Event.current.type != EventType.Repaint)
             {
@@ -978,11 +1060,17 @@ namespace GateRush.Editor
 
             var ratio = settings.BlockNumberSizeRatio;
             var minFont = settings.BlockNumberMinFontSize;
-            var side = Mathf.Max(settings.BlockNumberPlateCells * space.CellSize, minFont / ratio);
-            var center = space.ToGui(anchor);
+            side = Mathf.Max(side, minFont / ratio);
             var plate = new Rect(center.x - (side * 0.5f), center.y - (side * 0.5f), side, side);
-            EditorGUI.DrawRect(plate, settings.BlockNumberPlateColor);
+            EditorGUI.DrawRect(plate, plateColor);
 
+            var style = MarkTextStyle(settings.BlockNumberColor, Mathf.Max(minFont, Mathf.RoundToInt(side * ratio)));
+            GUI.Label(plate, text, style);
+        }
+
+        /// <summary>The one style for text on a mark's plate, in <paramref name="color"/> at <paramref name="fontSize"/>.</summary>
+        private GUIStyle MarkTextStyle(Color color, int fontSize)
+        {
             // Built lazily: EditorStyles is only available inside a GUI pass.
             if (blockNumberStyle == null)
             {
@@ -995,18 +1083,220 @@ namespace GateRush.Editor
                 };
             }
 
-            blockNumberStyle.normal.textColor = settings.BlockNumberColor;
-            blockNumberStyle.fontSize = Mathf.Max(minFont, Mathf.RoundToInt(side * ratio));
-            GUI.Label(plate, number.ToString(System.Globalization.CultureInfo.InvariantCulture), blockNumberStyle);
+            blockNumberStyle.normal.textColor = color;
+            blockNumberStyle.fontSize = fontSize;
+            return blockNumberStyle;
         }
 
-        // The style of a block's number. An instance field, rebuilt after a
-        // domain reload, so the window keeps no static state for it.
+        /// <summary>
+        /// A locked block's padlock (M8): the game's sprite at the game's
+        /// size and colour, with the keys its lock requires on a small plate
+        /// below its centre. No chains: on the editor's cells they would hide
+        /// the block's colour.
+        /// </summary>
+        private void DrawPadlock(
+            EditorCellSpace space, Vector2 slot, float scale, int requiredKeyCount, GateRush.Runtime.RuntimeConfig config)
+        {
+            var center = space.ToGui(slot);
+            var size = config.PadlockSizeCells * space.CellSize * scale;
+            DrawSprite(config.PadlockSprite, CenteredRect(center, new Vector2(size, size)), config.PadlockColor, 0f);
+
+            // GUI space is +Y down, so the drop is added.
+            DrawPlate(
+                new Vector2(center.x, center.y + (settings.LockCountDropCells * space.CellSize * scale)),
+                settings.LockCountPlateCells * space.CellSize * scale,
+                requiredKeyCount.ToString(System.Globalization.CultureInfo.InvariantCulture), settings.BlockNumberPlateColor);
+        }
+
+        /// <summary>
+        /// A key-carrying block's key (M8): the game's key at the game's
+        /// size, colour and turn, and its gem in <paramref name="lockColor"/>,
+        /// the colour of the lock it opens (D47) as this editor draws that
+        /// block. A key whose lock no block carries has no gem.
+        /// </summary>
+        private static void DrawKey(
+            EditorCellSpace space, Vector2 slot, float scale, BlockColor? lockColor, GateRush.Runtime.RuntimeConfig config)
+        {
+            var body = config.KeyBodySprite;
+            var length = config.KeySizeCells * space.CellSize * scale;
+            var rect = CenteredRect(space.ToGui(slot), new Vector2(length, length * body.rect.height / body.rect.width));
+            DrawSprite(body, rect, config.KeyColor, config.KeyRotationDegrees);
+            if (lockColor.HasValue)
+            {
+                DrawSprite(config.KeyGemSprite, rect, Palette(lockColor.Value), config.KeyRotationDegrees);
+            }
+        }
+
+        /// <summary>
+        /// A block's time bonus (M10): a plate in the game's bonus colours
+        /// with its rim, the game's clock at its left and the game's text
+        /// for <paramref name="seconds"/> beside it. The plate is
+        /// <see cref="LevelEditorSettings.BonusPlateHeightCells"/> high and
+        /// as wide as the clock and the text need; like a number's plate it
+        /// grows where the smallest font needs more.
+        /// </summary>
+        private void DrawTimeBonus(
+            EditorCellSpace space, Vector2 slot, float scale, int seconds, GateRush.Runtime.RuntimeConfig config)
+        {
+            var ratio = settings.BlockNumberSizeRatio;
+            var minFont = settings.BlockNumberMinFontSize;
+            var height = Mathf.Max(settings.BonusPlateHeightCells * space.CellSize * scale, minFont / ratio);
+            var text = config.TimeBonusMarkText(seconds);
+            var style = MarkTextStyle(config.BadgeTextColor, Mathf.Max(minFont, Mathf.RoundToInt(height * ratio)));
+            var textWidth = style.CalcSize(new GUIContent(text)).x;
+
+            var padding = height * settings.BonusPaddingRatio;
+            var icon = height * settings.BonusIconSizeRatio;
+            var rim = height * settings.BonusRimRatio;
+            var width = padding + icon + padding + textWidth + padding;
+            var center = space.ToGui(slot);
+            var plate = CenteredRect(center, new Vector2(width, height));
+
+            EditorGUI.DrawRect(plate, config.TimeBonusMarkRimColor);
+            EditorGUI.DrawRect(
+                new Rect(plate.x + rim, plate.y + rim, plate.width - (2f * rim), plate.height - (2f * rim)),
+                config.TimeBonusMarkColor);
+            DrawSprite(
+                config.ClockSprite, new Rect(plate.x + padding, center.y - (icon * 0.5f), icon, icon),
+                config.TimeBonusMarkIconColor, 0f);
+            GUI.Label(new Rect(plate.x + padding + icon + padding, plate.y, textWidth, height), text, style);
+        }
+
+        /// <summary>
+        /// An axis-restricted block's arrow (M7): the game's arrow sprite in
+        /// the game's colour over <see cref="GateRush.Runtime.MarkLayout.AxisArrowRect"/>,
+        /// the rectangle the board draws it in. Like the board's sliced
+        /// renderer it scales the sprite to the arrow's thickness and
+        /// stretches only the middle between its two heads, so the heads keep
+        /// their shape at any length.
+        /// </summary>
+        private static void DrawAxisArrow(
+            EditorCellSpace space, IReadOnlyList<Coord> cells, MovementAxis axis, GateRush.Runtime.RuntimeConfig config)
+        {
+            var arrow = GateRush.Runtime.MarkLayout.AxisArrowRect(
+                cells, axis, config.AxisArrowThicknessCells, config.AxisArrowEndInsetCells);
+            var isHorizontal = axis == MovementAxis.HorizontalOnly;
+            var length = (isHorizontal ? arrow.width : arrow.height) * space.CellSize;
+            var thickness = (isHorizontal ? arrow.height : arrow.width) * space.CellSize;
+            if (!(length > 0f && thickness > 0f))
+            {
+                return;
+            }
+
+            var sprite = config.AxisArrowSprite;
+            var texture = sprite.texture;
+            var source = sprite.textureRect;
+            var pixelScale = thickness / source.height;
+
+            // The heads are the sprite's left and right slice borders; on an
+            // arrow too short for both they shrink together to fit.
+            var leftHead = sprite.border.x * pixelScale;
+            var rightHead = sprite.border.z * pixelScale;
+            var heads = leftHead + rightHead;
+            if (heads > length)
+            {
+                leftHead *= length / heads;
+                rightHead *= length / heads;
+            }
+
+            // Drawn lying along x about its centre, then turned for a
+            // vertical block. Slice edges are whole pixels so they meet.
+            var center = space.ToGui(arrow.center);
+            var left = Mathf.Round(center.x - (length * 0.5f));
+            var right = Mathf.Round(center.x + (length * 0.5f));
+            var leftSeam = Mathf.Round(left + leftHead);
+            var rightSeam = Mathf.Round(right - rightHead);
+            var top = center.y - (thickness * 0.5f);
+
+            var u0 = source.xMin / texture.width;
+            var u1 = (source.xMin + sprite.border.x) / texture.width;
+            var u2 = (source.xMax - sprite.border.z) / texture.width;
+            var u3 = source.xMax / texture.width;
+            var v = source.yMin / texture.height;
+            var vSize = source.height / texture.height;
+
+            var previousColor = GUI.color;
+            var previousMatrix = GUI.matrix;
+            GUI.color = previousColor * config.AxisArrowColor;
+            if (!isHorizontal)
+            {
+                GUIUtility.RotateAroundPivot(VerticalArrowTurnDegrees, center);
+            }
+
+            GUI.DrawTextureWithTexCoords(
+                new Rect(left, top, leftSeam - left, thickness), texture, new Rect(u0, v, u1 - u0, vSize), true);
+            if (rightSeam > leftSeam)
+            {
+                GUI.DrawTextureWithTexCoords(
+                    new Rect(leftSeam, top, rightSeam - leftSeam, thickness), texture, new Rect(u1, v, u2 - u1, vSize), true);
+            }
+
+            GUI.DrawTextureWithTexCoords(
+                new Rect(rightSeam, top, right - rightSeam, thickness), texture, new Rect(u2, v, u3 - u2, vSize), true);
+
+            GUI.matrix = previousMatrix;
+            GUI.color = previousColor;
+        }
+
+        /// <summary>The quarter turn that stands a horizontal arrow upright. Geometry, not a tunable.</summary>
+        private const float VerticalArrowTurnDegrees = 90f;
+
+        /// <summary>
+        /// Draws <paramref name="sprite"/> over <paramref name="rect"/>,
+        /// tinted <paramref name="tint"/> and turned
+        /// <paramref name="rotationDegrees"/> counter-clockwise about the
+        /// rect's centre, as a <c>SpriteRenderer</c> turns it on the board.
+        /// The game's sprites are whole textures, unpacked, so the sprite's
+        /// texture rect is all of it that is drawn.
+        /// </summary>
+        private static void DrawSprite(Sprite sprite, Rect rect, Color tint, float rotationDegrees)
+        {
+            var texture = sprite.texture;
+            var source = sprite.textureRect;
+            var coords = new Rect(
+                source.x / texture.width, source.y / texture.height,
+                source.width / texture.width, source.height / texture.height);
+
+            var previousColor = GUI.color;
+            var previousMatrix = GUI.matrix;
+            GUI.color = previousColor * tint;
+            if (rotationDegrees != 0f)
+            {
+                // GUI space is +Y down, so a positive GUI turn is clockwise
+                // on screen; the board's is counter-clockwise.
+                GUIUtility.RotateAroundPivot(-rotationDegrees, rect.center);
+            }
+
+            GUI.DrawTextureWithTexCoords(rect, texture, coords, true);
+            GUI.matrix = previousMatrix;
+            GUI.color = previousColor;
+        }
+
+        private static Rect CenteredRect(Vector2 center, Vector2 size) =>
+            new Rect(center.x - (size.x * 0.5f), center.y - (size.y * 0.5f), size.x, size.y);
+
+        // The style of the text on a block's marks. An instance field,
+        // rebuilt after a domain reload, so the window keeps no static state
+        // for it.
         [NonSerialized] private GUIStyle blockNumberStyle;
 
-        // Whether the settings' block mark values are usable, worked out once
-        // per GUI pass in OnGUI before anything draws a block.
+        // Whether the settings' Module 20 block mark values are usable, worked
+        // out once per GUI pass in OnGUI before anything draws a block.
         [NonSerialized] private bool areBlockMarksUsable;
+
+        // Whether the game's marks (Module 24) can be drawn as well: the
+        // block mark values above, the game's config and its sprites. Worked
+        // out with areBlockMarksUsable.
+        [NonSerialized] private bool areGameMarksUsable;
+
+        // Whether the game's config and the sprites read from it are there,
+        // whatever the block mark values are: a shutter's slats need only
+        // this. Worked out with the two flags above.
+        [NonSerialized] private bool isGameConfigUsable;
+
+        // The colour of every lock in the draft, read once per GUI pass in
+        // OnGUI, so each key asks without scanning the level.
+        [NonSerialized] private DraftLockColors lockColors;
 
         /// <summary>
         /// Paints out the grid line at every seam that falls inside one block,
@@ -1129,7 +1419,7 @@ namespace GateRush.Editor
 
                 case DragKind.RegionMove:
                 case DragKind.RegionCreate:
-                    var tint = dragRegionTool == EditorTool.Shutter ? ShutterTint : ElevatorTint;
+                    var tint = dragRegionTool == EditorTool.Shutter ? settings.ShutterColor : settings.ElevatorColor;
                     OutlineRegionRect(layout, dragRegionCandidateMin, dragRegionCandidateMax, Color.Lerp(tint, Color.white, 0.4f), 2.5f);
                     break;
 
@@ -1325,18 +1615,84 @@ namespace GateRush.Editor
             Handles.color = previous;
         }
 
-        // A4: a thin border in each region's own hue, always drawn, so a region's
-        // extent reads even under a block or where two regions overlap.
-        private void DrawRegionBorders(EditorGridLayout layout)
+        /// <summary>
+        /// Every shutter (M5) over the blocks it covers (Module 24), in the
+        /// game's own look: the game's slats, one tile per cell as the board
+        /// tiles them, in the game's slat colour made translucent by
+        /// <see cref="LevelEditorSettings.ShutterOverlayAlpha"/>, and a bold
+        /// outline in the game's shutter border colour, so the region reads
+        /// as a shutter and each block under it, marks included, stays
+        /// visible between and through the slats; and its threshold on a
+        /// plate at the region's top-left cell, tinted the colour a
+        /// colour-bound shutter counts. Drawing only: a click on a block
+        /// under a shutter still selects the block.
+        /// </summary>
+        /// <remarks>
+        /// Without the game's config or its sprites, which the window reports
+        /// above the grid, a shutter falls back to a flat translucent fill
+        /// and an outline in the settings' shutter hue, so it is never
+        /// invisible.
+        /// </remarks>
+        private void DrawShutterOverlays(EditorGridLayout layout)
         {
+            var config = isGameConfigUsable ? settings.GameConfig : null;
+            var hue = config != null ? config.ShutterSlatColor : settings.ShutterColor;
+            var outline = config != null ? config.ShutterBorderColor : settings.ShutterColor;
+            var fill = config != null
+                ? new Color(hue.r, hue.g, hue.b, hue.a * settings.ShutterOverlayAlpha)
+                : new Color(hue.r, hue.g, hue.b, settings.ShutterOverlayAlpha);
+
             foreach (var shutter in draft.Shutters)
             {
-                OutlineRegionRect(layout, shutter.Min, shutter.Max, ShutterTint, 1f);
-            }
+                if (!TryRegionRect(layout, shutter.Min, shutter.Max, out var rect))
+                {
+                    continue;
+                }
 
+                if (config == null)
+                {
+                    EditorGUI.DrawRect(rect, fill);
+                }
+                else if (Event.current.type == EventType.Repaint)
+                {
+                    // The rect is whole on-grid cells, so it divides evenly.
+                    var columns = Mathf.RoundToInt(rect.width / layout.CellSize);
+                    var rows = Mathf.RoundToInt(rect.height / layout.CellSize);
+                    for (var row = 0; row < rows; row++)
+                    {
+                        for (var column = 0; column < columns; column++)
+                        {
+                            DrawSprite(
+                                config.ShutterSlatsSprite,
+                                new Rect(
+                                    rect.x + (column * layout.CellSize), rect.y + (row * layout.CellSize),
+                                    layout.CellSize, layout.CellSize),
+                                fill, 0f);
+                        }
+                    }
+                }
+
+                EditorGrid.DrawOutline(rect, outline, settings.ShutterOutlineThickness);
+
+                // The plate is a block number's, so it needs those values.
+                if (areBlockMarksUsable)
+                {
+                    DrawPlate(
+                        new Vector2(rect.xMin + (layout.CellSize * 0.5f), rect.yMin + (layout.CellSize * 0.5f)),
+                        settings.BlockNumberPlateCells * layout.CellSize,
+                        shutter.Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                        shutter.RequiredColor.HasValue ? Palette(shutter.RequiredColor.Value) : settings.BlockNumberPlateColor);
+                }
+            }
+        }
+
+        // A4: a thin border in each elevator's hue, always drawn, so a region's
+        // extent reads even under a block or where two regions overlap.
+        private void DrawElevatorBorders(EditorGridLayout layout)
+        {
             foreach (var elevator in draft.Elevators)
             {
-                OutlineRegionRect(layout, elevator.Min, elevator.Max, ElevatorTint, 1f);
+                OutlineRegionRect(layout, elevator.Min, elevator.Max, settings.ElevatorColor, settings.RegionBorderThickness);
             }
         }
 
@@ -2489,7 +2845,7 @@ namespace GateRush.Editor
                 EditorGrid.DrawCellPreview(rect, entry.Cells, BlockFill(entry.ColorStack, entry.UnfreezeAtClearCount));
                 if (EditorGrid.TryPreviewCellSpace(rect, entry.Cells, out var space))
                 {
-                    DrawBlockLook(space, entry.Cells, entry.ColorStack, entry.UnfreezeAtClearCount);
+                    DrawSpawnedBlockLook(space, entry);
                 }
             }
         }
@@ -2520,7 +2876,7 @@ namespace GateRush.Editor
 
             // The entry's cells are in this grid's own coordinates, so its
             // cell space starts at the grid's origin.
-            DrawBlockLook(layout.CellSpaceAt(new Coord(0, 0)), entry.Cells, entry.ColorStack, entry.UnfreezeAtClearCount);
+            DrawSpawnedBlockLook(layout.CellSpaceAt(new Coord(0, 0)), entry);
 
             var e = Event.current;
             if (e.type == EventType.MouseDown && e.button == 0 && layout.TryPick(e.mousePosition, out var clicked))
@@ -3545,9 +3901,19 @@ namespace GateRush.Editor
         /// <summary>Draws a single outline around the region rectangle, clipped to the visible grid.</summary>
         private static void OutlineRegionRect(EditorGridLayout layout, Coord min, Coord max, Color color, float thickness)
         {
+            if (TryRegionRect(layout, min, max, out var rect))
+            {
+                EditorGrid.DrawOutline(rect, color, thickness);
+            }
+        }
+
+        /// <summary>The screen rect of the part of a region that is on the grid; false when none of it is.</summary>
+        private static bool TryRegionRect(EditorGridLayout layout, Coord min, Coord max, out Rect rect)
+        {
+            rect = default;
             if (max.X < 0 || min.X > layout.Columns - 1 || max.Y < 0 || min.Y > layout.Rows - 1)
             {
-                return;
+                return false;
             }
 
             var loX = Mathf.Clamp(Mathf.Min(min.X, max.X), 0, layout.Columns - 1);
@@ -3557,13 +3923,12 @@ namespace GateRush.Editor
 
             var a = layout.CellRect(new Coord(loX, loY));
             var b = layout.CellRect(new Coord(hiX, hiY));
-            var rect = Rect.MinMaxRect(
+            rect = Rect.MinMaxRect(
                 Mathf.Min(a.xMin, b.xMin),
                 Mathf.Min(a.yMin, b.yMin),
                 Mathf.Max(a.xMax, b.xMax),
                 Mathf.Max(a.yMax, b.yMax));
-
-            EditorGrid.DrawOutline(rect, color, thickness);
+            return true;
         }
 
         private static BlockColor FirstColor(IReadOnlyList<BlockColor> stack) =>

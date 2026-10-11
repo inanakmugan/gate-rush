@@ -1809,6 +1809,27 @@ namespace GateRush.Runtime
         public Color LipFill(Color face) =>
             new Color(face.r * lipDarken, face.g * lipDarken, face.b * lipDarken, face.a);
 
+        /// <summary>
+        /// The scale a block's marks are drawn at for <paramref name="crowding"/>:
+        /// 1 with room, <see cref="CrowdedMarkScale"/> for a crowded pair,
+        /// <see cref="CrowdedTripleMarkScale"/> for a crowded triple. The one
+        /// mapping for the board and the Level Editor (Module 24).
+        /// </summary>
+        public float MarkScale(MarkCrowding crowding)
+        {
+            switch (crowding)
+            {
+                case MarkCrowding.Roomy:
+                    return 1f;
+                case MarkCrowding.CrowdedPair:
+                    return crowdedMarkScale;
+                case MarkCrowding.CrowdedTriple:
+                    return crowdedTripleMarkScale;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(crowding), crowding, "Unknown mark crowding.");
+            }
+        }
+
         /// <summary>The width, in cells, of the badge showing <paramref name="value"/>.</summary>
         public float BadgeWidthCells(int value) =>
             MarkLayout.BadgeWidth(value, badgeHeightCells, badgeDigitWidthCells, badgePaddingCells);
