@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GateRush.Core;
+using GateRush.Editor;
 using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEngine;
@@ -16,7 +17,10 @@ namespace GateRush.Tests
     /// marks sharing a block both sit on its footprint, a cell apart where it
     /// has room and half a cell apart, crowded, where it has not. Module 20:
     /// a row of one, two or three marks — the layer badge among them — stays
-    /// on the footprint, and the badge clears a padlock on a 1×1.
+    /// on the footprint, and the badge clears a padlock on a 1×1. Module 24:
+    /// <see cref="MarkLayout.Slots"/> places a block's marks where
+    /// <c>BoardView.MarksOf</c> placed them before the decision moved here,
+    /// and <see cref="MarkLayout.AxisArrowRect"/> is the board's M7 arrow.
     /// </summary>
     public class MarkLayoutTests
     {
@@ -340,6 +344,200 @@ namespace GateRush.Tests
 
             Assert.AreEqual(icon + gap + 2 * digit + 2 * padding, two, Tolerance);
             Assert.AreEqual(digit, three - two, Tolerance, "each character adds a digit's width");
+        }
+
+        private const float FrozenRaise = 0.3f;
+
+        [Test]
+        public void Slots_1x1WithPadlockAndBonus_ShareTheCellAsACrowdedPair()
+        {
+            var slots = MarkLayout.Slots(Single, isFrozen: false, hasIcon: true, hasLayers: false, hasBonus: true, FrozenRaise);
+
+            AssertPoint(new Vector2(0.25f, 0.5f), slots.Icon);
+            AssertPoint(new Vector2(0.75f, 0.5f), slots.Bonus);
+            AssertPoint(new Vector2(0.5f, 0.5f), slots.Layers);
+            Assert.AreEqual(MarkCrowding.CrowdedPair, slots.Crowding);
+        }
+
+        [Test]
+        public void Slots_1x3WithThreeMarks_SitOnePerCellInOrder()
+        {
+            var slots = MarkLayout.Slots(Horizontal3, isFrozen: false, hasIcon: true, hasLayers: true, hasBonus: true, FrozenRaise);
+
+            AssertPoint(new Vector2(0.5f, 0.5f), slots.Icon);
+            AssertPoint(new Vector2(1.5f, 0.5f), slots.Layers);
+            AssertPoint(new Vector2(2.5f, 0.5f), slots.Bonus);
+            Assert.AreEqual(MarkCrowding.Roomy, slots.Crowding);
+        }
+
+        [Test]
+        public void Slots_LWithTwoMarks_ShareItsBendCell()
+        {
+            var slots = MarkLayout.Slots(L, isFrozen: false, hasIcon: true, hasLayers: true, hasBonus: false, FrozenRaise);
+
+            AssertPoint(new Vector2(0.25f, 0.5f), slots.Icon);
+            AssertPoint(new Vector2(0.75f, 0.5f), slots.Layers);
+            AssertPoint(new Vector2(0.5f, 0.5f), slots.Bonus);
+            Assert.AreEqual(MarkCrowding.CrowdedPair, slots.Crowding);
+        }
+
+        [Test]
+        public void Slots_Frozen2x1WithAKey_IsRaisedAboveTheAnchor()
+        {
+            var slots = MarkLayout.Slots(Horizontal2, isFrozen: true, hasIcon: true, hasLayers: false, hasBonus: false, FrozenRaise);
+
+            AssertPoint(new Vector2(1f, 0.5f + FrozenRaise), slots.Icon);
+            Assert.AreEqual(MarkCrowding.Roomy, slots.Crowding);
+        }
+
+        [Test]
+        public void Slots_OneMark_SitsAtTheAnchorUncrowded()
+        {
+            var anchor = MarkLayout.Anchor(L);
+
+            var icon = MarkLayout.Slots(L, false, hasIcon: true, hasLayers: false, hasBonus: false, FrozenRaise);
+            var layers = MarkLayout.Slots(L, false, hasIcon: false, hasLayers: true, hasBonus: false, FrozenRaise);
+            var bonus = MarkLayout.Slots(L, false, hasIcon: false, hasLayers: false, hasBonus: true, FrozenRaise);
+
+            AssertPoint(anchor, icon.Icon);
+            AssertPoint(anchor, layers.Layers);
+            AssertPoint(anchor, bonus.Bonus);
+            Assert.AreEqual(MarkCrowding.Roomy, icon.Crowding);
+            Assert.AreEqual(MarkCrowding.Roomy, layers.Crowding);
+            Assert.AreEqual(MarkCrowding.Roomy, bonus.Crowding);
+        }
+
+        [Test]
+        public void Slots_Frozen_RaisesEveryMarkByTheFrozenRaise()
+        {
+            var plain = MarkLayout.Slots(Horizontal2, isFrozen: false, hasIcon: true, hasLayers: false, hasBonus: true, FrozenRaise);
+
+            var frozen = MarkLayout.Slots(Horizontal2, isFrozen: true, hasIcon: true, hasLayers: false, hasBonus: true, FrozenRaise);
+
+            AssertPoint(plain.Icon + new Vector2(0f, FrozenRaise), frozen.Icon);
+            AssertPoint(plain.Bonus + new Vector2(0f, FrozenRaise), frozen.Bonus);
+            Assert.AreEqual(plain.Crowding, frozen.Crowding);
+        }
+
+        /// <summary>
+        /// The footprints the board's mark placement is pinned over: every
+        /// shape the Level Editor's palette places, and this fixture's L.
+        /// </summary>
+        private static IEnumerable<TestCaseData> PaletteFootprints()
+        {
+            var presets = new[]
+            {
+                ShapePreset.Single, ShapePreset.Horizontal2, ShapePreset.Vertical2, ShapePreset.Horizontal3,
+                ShapePreset.Vertical3, ShapePreset.Square2, ShapePreset.LNorthEast, ShapePreset.LNorthWest,
+                ShapePreset.LSouthEast, ShapePreset.LSouthWest,
+            };
+            foreach (var preset in presets)
+            {
+                yield return new TestCaseData(ShapePresets.Cells(preset))
+                    .SetName($"Slots_{preset}_TimesTheCellSizeIsWhereTheBoardPlacedItsMarks");
+            }
+
+            yield return new TestCaseData((IReadOnlyList<Coord>)L).SetName("Slots_L_TimesTheCellSizeIsWhereTheBoardPlacedItsMarks");
+        }
+
+        [TestCaseSource(nameof(PaletteFootprints))]
+        public void Slots_TimesTheCellSize_IsWhereTheBoardPlacedItsMarks(IReadOnlyList<Coord> cells)
+        {
+            // BoardView.MarksOf as it stood before Module 24 moved its
+            // decision into MarkLayout.Slots, restated here in world units.
+            const float CellSize = 1.25f;
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            var raiseCells = config.FrozenMarkRaiseCells;
+            var pairScale = config.CrowdedMarkScale;
+            var tripleScale = config.CrowdedTripleMarkScale;
+            var checkedCombinations = 0;
+
+            foreach (var isFrozen in new[] { false, true })
+            {
+                foreach (var hasIcon in new[] { false, true })
+                {
+                    foreach (var hasLayers in new[] { false, true })
+                    {
+                        foreach (var hasBonus in new[] { false, true })
+                        {
+                            var raise = isFrozen ? new Vector2(0f, raiseCells * CellSize) : Vector2.zero;
+                            var anchor = MarkLayout.Anchor(cells) * CellSize + raise;
+                            var count = (hasIcon ? 1 : 0) + (hasLayers ? 1 : 0) + (hasBonus ? 1 : 0);
+                            var expectedIcon = anchor;
+                            var expectedLayers = anchor;
+                            var expectedBonus = anchor;
+                            var expectedScale = 1f;
+                            if (count >= 2)
+                            {
+                                var row = MarkLayout.Row(cells, count);
+                                expectedScale = !row.IsCrowded ? 1f : count == 2 ? pairScale : tripleScale;
+                                var slot = 0;
+                                expectedIcon = hasIcon ? row[slot++] * CellSize + raise : anchor;
+                                expectedLayers = hasLayers ? row[slot++] * CellSize + raise : anchor;
+                                expectedBonus = hasBonus ? row[slot] * CellSize + raise : anchor;
+                            }
+
+                            var slots = MarkLayout.Slots(cells, isFrozen, hasIcon, hasLayers, hasBonus, raiseCells);
+
+                            var label = $"frozen {isFrozen}, icon {hasIcon}, layers {hasLayers}, bonus {hasBonus}";
+                            Assert.AreEqual(expectedIcon.x, slots.Icon.x * CellSize, Tolerance, $"icon x ({label})");
+                            Assert.AreEqual(expectedIcon.y, slots.Icon.y * CellSize, Tolerance, $"icon y ({label})");
+                            Assert.AreEqual(expectedLayers.x, slots.Layers.x * CellSize, Tolerance, $"layers x ({label})");
+                            Assert.AreEqual(expectedLayers.y, slots.Layers.y * CellSize, Tolerance, $"layers y ({label})");
+                            Assert.AreEqual(expectedBonus.x, slots.Bonus.x * CellSize, Tolerance, $"bonus x ({label})");
+                            Assert.AreEqual(expectedBonus.y, slots.Bonus.y * CellSize, Tolerance, $"bonus y ({label})");
+                            Assert.AreEqual(expectedScale, config.MarkScale(slots.Crowding), Tolerance, $"scale ({label})");
+                            checkedCombinations++;
+                        }
+                    }
+                }
+            }
+
+            UnityEngine.Object.DestroyImmediate(config);
+            Assert.AreEqual(16, checkedCombinations, "every combination of frozen and the three marks was compared");
+        }
+
+        [Test]
+        public void AxisArrowRect_Horizontal1x3_RunsItsLengthLessTheInsetsThroughItsMiddle()
+        {
+            var arrow = MarkLayout.AxisArrowRect(Horizontal3, MovementAxis.HorizontalOnly, Thickness, EndInset);
+
+            AssertPoint(new Vector2(1.5f, 0.5f), arrow.center);
+            Assert.AreEqual(3f - 2f * EndInset, arrow.width, Tolerance, "the bounding box's length less an inset at each end");
+            Assert.AreEqual(Thickness, arrow.height, Tolerance);
+        }
+
+        [Test]
+        public void AxisArrowRect_VerticalBlock_RunsAlongY()
+        {
+            var arrow = MarkLayout.AxisArrowRect(Vertical3, MovementAxis.VerticalOnly, Thickness, EndInset);
+
+            AssertPoint(new Vector2(0.5f, 1.5f), arrow.center);
+            Assert.AreEqual(Thickness, arrow.width, Tolerance);
+            Assert.AreEqual(3f - 2f * EndInset, arrow.height, Tolerance);
+        }
+
+        [Test]
+        public void AxisArrowRect_L_GoesThroughTheCentreOfItsBoundingBox()
+        {
+            // The board draws an L's arrow through its bounding box's centre,
+            // not its mark anchor: the arrow spans the whole block.
+            var across = MarkLayout.AxisArrowRect(L, MovementAxis.HorizontalOnly, Thickness, EndInset);
+            var up = MarkLayout.AxisArrowRect(L, MovementAxis.VerticalOnly, Thickness, EndInset);
+
+            AssertPoint(new Vector2(1f, 1f), across.center);
+            Assert.AreEqual(2f - 2f * EndInset, across.width, Tolerance);
+            Assert.AreEqual(Thickness, across.height, Tolerance);
+            AssertPoint(new Vector2(1f, 1f), up.center);
+            Assert.AreEqual(Thickness, up.width, Tolerance);
+            Assert.AreEqual(2f - 2f * EndInset, up.height, Tolerance);
+        }
+
+        [Test]
+        public void AxisArrowRect_FreeBlock_Throws()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(
+                () => MarkLayout.AxisArrowRect(Single, MovementAxis.Free, Thickness, EndInset));
         }
 
         /// <summary>

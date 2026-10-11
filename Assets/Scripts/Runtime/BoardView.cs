@@ -737,24 +737,25 @@ namespace GateRush.Runtime
         /// The M7 arrow: a 9-sliced sprite through the centre of the
         /// footprint's bounding box, raised with the studs
         /// (<see cref="FaceContentRise"/>), along the block's axis, stopping
-        /// <see cref="RuntimeConfig.AxisArrowEndInsetCells"/> short of each end.
-        /// It is scaled uniformly to its thickness and stretched only in its
-        /// sliced middle, so the heads keep their shape at any length.
+        /// <see cref="RuntimeConfig.AxisArrowEndInsetCells"/> short of each end
+        /// (<see cref="MarkLayout.AxisArrowRect"/>, the rule the Level Editor
+        /// shares). It is scaled uniformly to its thickness and stretched only
+        /// in its sliced middle, so the heads keep their shape at any length.
         /// </summary>
         private void DrawAxisArrow(Transform face, DrawnBlock block)
         {
-            MarkLayout.Bounds(block.Cells, out var minX, out var maxX, out var minY, out var maxY);
             var isHorizontal = block.Axis == MovementAxis.HorizontalOnly;
-            var alongCells = isHorizontal ? maxX + 1 - minX : maxY + 1 - minY;
-            var length = CellsToWorld(alongCells - 2f * config.AxisArrowEndInsetCells);
+            var arrow = CellRectToLocal(MarkLayout.AxisArrowRect(
+                block.Cells, block.Axis, config.AxisArrowThicknessCells, config.AxisArrowEndInsetCells));
+            var length = isHorizontal ? arrow.width : arrow.height;
 
             var sprite = config.AxisArrowSprite;
             var spriteSize = sprite.bounds.size;
-            var scale = CellsToWorld(config.AxisArrowThicknessCells) / spriteSize.y;
+            var scale = (isHorizontal ? arrow.height : arrow.width) / spriteSize.y;
 
             var go = new GameObject("Axis arrow");
             go.transform.SetParent(face, false);
-            go.transform.localPosition = block.FootprintCenter + FaceContentRise();
+            go.transform.localPosition = arrow.center + FaceContentRise();
             go.transform.localRotation = Quaternion.Euler(
                 0f, 0f, isHorizontal ? 0f : Vector2.SignedAngle(Vector2.right, Vector2.up));
             go.transform.localScale = new Vector3(scale, scale, 1f);
@@ -833,34 +834,21 @@ namespace GateRush.Runtime
         /// <summary>
         /// Where a block's padlock or key, its layer badge and its time-bonus
         /// mark sit, relative to its body, and how large. One of them alone
-        /// sits at the footprint's anchor at full size; two or three follow
-        /// <see cref="MarkLayout.Row"/>, in that order, and where the row is
-        /// crowded shrink to <see cref="RuntimeConfig.CrowdedMarkScale"/> (two)
-        /// or <see cref="RuntimeConfig.CrowdedTripleMarkScale"/> (three). On a
-        /// frozen block they are raised above the frozen badge. The one rule
-        /// for a block's drawing and for the lock that fades away when it
-        /// opens, so the fading padlock is where the drawn one was.
+        /// sits at the footprint's anchor at full size; two or three take a
+        /// row's slots, in that order, and where the row is crowded shrink
+        /// (<see cref="RuntimeConfig.MarkScale"/>). On a frozen block they are
+        /// raised above the frozen badge. The decision is
+        /// <see cref="MarkLayout.Slots"/>', in cells, which the Level Editor
+        /// shares; this only brings it to world units. The one rule for a
+        /// block's drawing and for the lock that fades away when it opens, so
+        /// the fading padlock is where the drawn one was.
         /// </summary>
         private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool isFrozen, bool hasIcon, bool hasBonus, bool hasLayers)
         {
-            var raise = isFrozen ? new Vector2(0f, CellsToWorld(config.FrozenMarkRaiseCells)) : Vector2.zero;
-            var anchor = MarkLayout.Anchor(cells) * layout.CellSize + raise;
-            var count = (hasIcon ? 1 : 0) + (hasLayers ? 1 : 0) + (hasBonus ? 1 : 0);
-            if (count < 2)
-            {
-                return new BlockMarks(anchor, anchor, anchor, 1f);
-            }
-
-            var row = MarkLayout.Row(cells, count);
-            var scale = !row.IsCrowded ? 1f : count == 2 ? config.CrowdedMarkScale : config.CrowdedTripleMarkScale;
-
-            // The row's slots go to the marks the block has, in the row's
-            // order; a mark it has not keeps the anchor and is never drawn.
-            var slot = 0;
-            var icon = hasIcon ? row[slot++] * layout.CellSize + raise : anchor;
-            var layers = hasLayers ? row[slot++] * layout.CellSize + raise : anchor;
-            var bonus = hasBonus ? row[slot] * layout.CellSize + raise : anchor;
-            return new BlockMarks(icon, layers, bonus, scale);
+            var slots = MarkLayout.Slots(cells, isFrozen, hasIcon, hasLayers, hasBonus, config.FrozenMarkRaiseCells);
+            return new BlockMarks(
+                slots.Icon * layout.CellSize, slots.Layers * layout.CellSize, slots.Bonus * layout.CellSize,
+                config.MarkScale(slots.Crowding));
         }
 
         /// <summary>A group at <paramref name="center"/> scaled by <paramref name="scale"/>: a mark drawn about its own centre.</summary>

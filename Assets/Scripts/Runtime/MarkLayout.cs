@@ -139,6 +139,74 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// Where a block's padlock or key, its layer count and its time-bonus
+        /// mark sit, in cell units relative to the footprint's origin, and how
+        /// crowded they are (Module 24). One of them alone sits on
+        /// <see cref="Anchor"/>, uncrowded; two or three take
+        /// <see cref="Row"/>'s slots in that order. On a frozen block every
+        /// slot is raised by <paramref name="frozenRaiseCells"/>, above the
+        /// frozen count, which stays on the anchor. A mark the block has not
+        /// keeps the (raised) anchor and is never drawn. The one rule for the
+        /// board and the Level Editor: each multiplies by its own cell size.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        public static BlockMarkSlots Slots(
+            IReadOnlyList<Coord> cells, bool isFrozen, bool hasIcon, bool hasLayers, bool hasBonus, float frozenRaiseCells)
+        {
+            var raise = isFrozen ? new Vector2(0f, frozenRaiseCells) : Vector2.zero;
+            var anchor = Anchor(cells) + raise;
+            var count = (hasIcon ? 1 : 0) + (hasLayers ? 1 : 0) + (hasBonus ? 1 : 0);
+            if (count < 2)
+            {
+                return new BlockMarkSlots(anchor, anchor, anchor, MarkCrowding.Roomy);
+            }
+
+            var row = Row(cells, count);
+            var crowding = !row.IsCrowded ? MarkCrowding.Roomy
+                : count == 2 ? MarkCrowding.CrowdedPair
+                : MarkCrowding.CrowdedTriple;
+
+            // The row's slots go to the marks the block has, in the row's
+            // order.
+            var slot = 0;
+            var icon = hasIcon ? row[slot++] + raise : anchor;
+            var layers = hasLayers ? row[slot++] + raise : anchor;
+            var bonus = hasBonus ? row[slot] + raise : anchor;
+            return new BlockMarkSlots(icon, layers, bonus, crowding);
+        }
+
+        /// <summary>
+        /// The M7 arrow of an axis-restricted block, in cell units relative to
+        /// the footprint's origin: a rectangle centred on the centre of the
+        /// footprint's bounding box, running along <paramref name="axis"/> for
+        /// the bounding box's length less <paramref name="endInsetCells"/> at
+        /// each end, <paramref name="thicknessCells"/> across. The one rule for
+        /// the board and the Level Editor (Module 24).
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="axis"/> is <see cref="MovementAxis.Free"/>: a free block has no arrow.</exception>
+        public static Rect AxisArrowRect(IReadOnlyList<Coord> cells, MovementAxis axis, float thicknessCells, float endInsetCells)
+        {
+            if (cells == null || cells.Count == 0)
+            {
+                throw new ArgumentException("A footprint has at least one cell.", nameof(cells));
+            }
+
+            if (axis != MovementAxis.HorizontalOnly && axis != MovementAxis.VerticalOnly)
+            {
+                throw new ArgumentOutOfRangeException(nameof(axis), axis, "Only an axis-restricted block has an arrow.");
+            }
+
+            Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            var isHorizontal = axis == MovementAxis.HorizontalOnly;
+            var alongCells = isHorizontal ? maxX + 1 - minX : maxY + 1 - minY;
+            var length = alongCells - 2f * endInsetCells;
+            var size = isHorizontal ? new Vector2(length, thicknessCells) : new Vector2(thicknessCells, length);
+            var center = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f);
+            return new Rect(center - size * 0.5f, size);
+        }
+
+        /// <summary>
         /// The anchor of <paramref name="cells"/> in doubled coordinates, which
         /// keep it whole: an odd value is a cell's middle on that axis, an even
         /// one a line between cells. Every cell touching the anchor is in the
@@ -308,6 +376,48 @@ namespace GateRush.Runtime
         /// <summary>The cell indices on one axis a doubled coordinate touches: its own when odd, both neighbours when even.</summary>
         private static int[] TouchingIndices(int doubled) =>
             doubled % 2 != 0 ? new[] { (doubled - 1) / 2 } : new[] { doubled / 2 - 1, doubled / 2 };
+    }
+
+    /// <summary>How much room the marks sharing one block have (<see cref="MarkLayout.Slots"/>).</summary>
+    public enum MarkCrowding
+    {
+        /// <summary>Each mark has a cell, or there is only one: full size.</summary>
+        Roomy,
+
+        /// <summary>Two marks share the anchor's cells and are drawn smaller.</summary>
+        CrowdedPair,
+
+        /// <summary>Three marks share the anchor's cells and are drawn smaller still.</summary>
+        CrowdedTriple
+    }
+
+    /// <summary>
+    /// Where a block's padlock or key, its layer count and its time-bonus mark
+    /// sit, in cell units relative to the footprint's origin
+    /// (<see cref="MarkLayout.Slots"/>).
+    /// </summary>
+    public readonly struct BlockMarkSlots
+    {
+        /// <summary>The slots of a block's marks.</summary>
+        public BlockMarkSlots(Vector2 icon, Vector2 layers, Vector2 bonus, MarkCrowding crowding)
+        {
+            Icon = icon;
+            Layers = layers;
+            Bonus = bonus;
+            Crowding = crowding;
+        }
+
+        /// <summary>The centre of the padlock or key.</summary>
+        public Vector2 Icon { get; }
+
+        /// <summary>The centre of the layer count (M4).</summary>
+        public Vector2 Layers { get; }
+
+        /// <summary>The centre of the time-bonus mark (M10).</summary>
+        public Vector2 Bonus { get; }
+
+        /// <summary>Whether the marks have room for full size, or share the anchor's cells as a pair or a triple.</summary>
+        public MarkCrowding Crowding { get; }
     }
 
     /// <summary>Where the marks sharing one block go (<see cref="MarkLayout.Row"/>).</summary>
