@@ -203,14 +203,10 @@ taken when its area is next touched.
   colour after a search error; `DraftValidator`'s summary says two checks
   read outside inputs where there are now three; the shutter-threshold
   warning has no test.
-- *Level Editor readability:* the canvas does not show everything the game
-  does, so some features are found only by selecting each block.
-  Time-bonus blocks (M10), locked and key blocks (M8) and axis-restricted
-  blocks (M7) show no mark, though the game marks them (clock, padlock
-  with its count, key with its lock's colour, double-headed axis arrow).
-  A shutter (M5) is drawn beneath the blocks it covers, so
-  its region is hard to see; it should be drawn over them, translucent or
-  as an outline, so both the region and the blocks under it stay visible.
+- *Level Editor readability:* specified in Module 24. The canvas will mark
+  time-bonus (M10), locked and key (M8) and axis-restricted (M7) blocks as
+  the game does, placed by the board's own `MarkLayout` rule, and draw a
+  shutter (M5) over the blocks it covers so both stay visible.
 - *Solver:* `SolveStatus`, `ISearchStrategy` and `SearchBudget` XML
   comments are out of date; `ExitCandidates`' Dijkstra is slower than it
   needs to be; two floors in `NearestNextClearStrategyTests` now count the
