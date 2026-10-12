@@ -1519,3 +1519,34 @@ compressed files, so the build would need Decompression Fallback. Hosting
 it ourselves: more work for no gain at this stage.
 
 ---
+
+## D52 — Sound comes before the meta game
+
+**Decision.** Audio and haptics, listed under Phase 7, are built now as
+Module 25, before Phase 4's meta game. Sound effects come from Kenney's
+CC0 packs. One toggle turns sound and vibration off together. Vibration
+uses the browser's Vibration API, so the web build vibrates on Android and
+not on iOS.
+
+**Why.** The game has had no sound at all. For a portfolio piece aimed at
+mobile studios, the feel of a move — the grab, the exit, the win — shows
+more than an economy nobody sees in a short video, and the gameplay video
+recorded next should have sound. CC0 packs carry no licence risk and need
+no credit, and Kenney's packs cover interface, impact and jingle sounds
+in one style.
+
+**Consequences.**
+- Phase 4 starts after Module 25. Phase 7 keeps notifications, screen
+  transitions, privacy text and optimisation.
+- Board sounds are tied to Module 18's presentation stages, so they stay
+  in step with the animations and stop with them.
+- iPhone players get sound but no vibration until a native build (Phase
+  8).
+- The toggle lives on the prototype menu until Phase 6 builds a settings
+  screen; splitting sound and vibration waits for it.
+
+**Rejected.** Making our own sounds now: slower, and not where the
+portfolio's value is. A paid pack: unnecessary for a prototype. Separate
+sound and vibration toggles: one button is enough on the prototype menu.
+
+---
