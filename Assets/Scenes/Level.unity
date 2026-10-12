@@ -587,6 +587,7 @@ GameObject:
   - component: {fileID: 2009815754}
   - component: {fileID: 2009815753}
   - component: {fileID: 2009815752}
+  - component: {fileID: 2009815755}
   m_Layer: 0
   m_Name: Game
   m_TagString: Untagged
@@ -628,6 +629,8 @@ MonoBehaviour:
   introductionCard: {fileID: 483171908}
   resultPanel: {fileID: 483171906}
   menuScreen: {fileID: 483171909}
+  soundPlayer: {fileID: 2009815755}
+  soundConfig: {fileID: 11400000, guid: 350c44b8733e8b141a796e427fe7c92e, type: 2}
 --- !u!4 &2009815754
 Transform:
   m_ObjectHideFlags: 0
@@ -643,6 +646,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2009815755
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2009815751}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9b009c0a2e7ee974b8438acbfe70fb74, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.SoundPlayer
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

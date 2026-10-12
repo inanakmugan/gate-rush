@@ -1,0 +1,111 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e064f9c7e7bb364ab79b9817b3340e8, type: 3}
+  m_Name: SoundConfig
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.SoundConfig
+  cues:
+  - cue: 0
+    clips:
+    - {fileID: 8300000, guid: 763041c098dcaf94fb572784df7349c1, type: 3}
+    volume: 0.8
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 1
+    clips:
+    - {fileID: 8300000, guid: 4f49eca0370fa3d429d3c78794636c55, type: 3}
+    volume: 0.45
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 2
+    clips:
+    - {fileID: 8300000, guid: 0168063a71b470a4a8a26bcac8b70526, type: 3}
+    volume: 0.4
+    pitchMin: 0.97
+    pitchMax: 1.03
+  - cue: 3
+    clips:
+    - {fileID: 8300000, guid: 92cfad0dc3e5e0b438bab09cdd3cdeb8, type: 3}
+    volume: 0.35
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 4
+    clips:
+    - {fileID: 8300000, guid: e2037288cf55f714a986e10d61b87a68, type: 3}
+    - {fileID: 8300000, guid: 8033a98f8bd491b4e854dbcb99801875, type: 3}
+    - {fileID: 8300000, guid: ca00963d4acf8214b87d5878917a5bcb, type: 3}
+    - {fileID: 8300000, guid: 08e0a9946d47bba49a8653151829732f, type: 3}
+    - {fileID: 8300000, guid: c4d1706c4c7d84d489e01357db4e1bcf, type: 3}
+    volume: 0.5
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 5
+    clips:
+    - {fileID: 8300000, guid: 58035a6f6f41ef6428ef462cf539ed02, type: 3}
+    volume: 0.6
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 6
+    clips:
+    - {fileID: 8300000, guid: 1d770ae3d43d0ce4f8667b68eaa83bd7, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  - cue: 7
+    clips:
+    - {fileID: 8300000, guid: 30d34c0219c2ec743bf80e83a8a71792, type: 3}
+    volume: 0.4
+    pitchMin: 0.97
+    pitchMax: 1.03
+  - cue: 8
+    clips:
+    - {fileID: 8300000, guid: 95cbcb5f1af4a494f9f0556abbdc261c, type: 3}
+    volume: 0.5
+    pitchMin: 0.95
+    pitchMax: 1.05
+  - cue: 9
+    clips:
+    - {fileID: 8300000, guid: d8c557c76d1f74d4d8ce61bec95b8752, type: 3}
+    volume: 0.45
+    pitchMin: 1
+    pitchMax: 1
+  - cue: 10
+    clips:
+    - {fileID: 8300000, guid: 8a5103e22452f3647b3166cd0781562d, type: 3}
+    volume: 0.6
+    pitchMin: 1
+    pitchMax: 1
+  - cue: 11
+    clips:
+    - {fileID: 8300000, guid: 1d9669cdafcc1304e9993d54f335bf67, type: 3}
+    volume: 0.5
+    pitchMin: 1
+    pitchMax: 1
+  - cue: 12
+    clips:
+    - {fileID: 8300000, guid: 67ce48ab5ae2d9345a379f1871be1583, type: 3}
+    volume: 0.5
+    pitchMin: 1
+    pitchMax: 1
+  - cue: 13
+    clips:
+    - {fileID: 8300000, guid: 8eea53d8a3e8f9342a4c3b0f3a256c8f, type: 3}
+    volume: 0.5
+    pitchMin: 1
+    pitchMax: 1
+  masterVolume: 1
+  voiceCount: 8
+  minRepeatSeconds: 0.05
+  randomSeed: 2025
+  tickFromSeconds: 5
+  exitPulseMilliseconds: 20
+  winPulseMilliseconds: 60
+  lossPulseMilliseconds: 120
