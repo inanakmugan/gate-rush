@@ -211,6 +211,34 @@ namespace GateRush.Runtime
             return Build(ctx, before, after, Array.Empty<ClearedBlock>());
         }
 
+        /// <summary>
+        /// The changes made of exactly these lists, with nothing worked out
+        /// and nothing checked against a board. For Edit Mode tests of what
+        /// reads a <see cref="MoveChanges"/> (<see cref="MoveCues"/>), which
+        /// need changes no board produces: in play only the moved block
+        /// clears. The game itself builds changes through
+        /// <see cref="Between"/> and <see cref="WithoutClears"/> only.
+        /// </summary>
+        /// <exception cref="ArgumentNullException">An argument is null.</exception>
+        internal static MoveChanges Of(
+            IReadOnlyList<ClearedBlock> clears,
+            IReadOnlyList<int> thawedBlocks,
+            IReadOnlyList<int> openedGates,
+            IReadOnlyList<int> openedShutters,
+            IReadOnlyList<int> unlockedBlocks,
+            IReadOnlyList<CountPop> countPops,
+            IReadOnlyList<BlockSpawn> spawns)
+        {
+            return new MoveChanges(
+                clears ?? throw new ArgumentNullException(nameof(clears)),
+                thawedBlocks ?? throw new ArgumentNullException(nameof(thawedBlocks)),
+                openedGates ?? throw new ArgumentNullException(nameof(openedGates)),
+                openedShutters ?? throw new ArgumentNullException(nameof(openedShutters)),
+                unlockedBlocks ?? throw new ArgumentNullException(nameof(unlockedBlocks)),
+                countPops ?? throw new ArgumentNullException(nameof(countPops)),
+                spawns ?? throw new ArgumentNullException(nameof(spawns)));
+        }
+
         private static MoveChanges Build(
             LevelContext ctx, BoardState before, BoardState after, IReadOnlyList<ClearedBlock> clears)
         {
