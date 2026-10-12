@@ -280,9 +280,9 @@ Audio, haptics, notifications, screen transitions, privacy text, the
 end-of-content screen after the final authored level (a first version, "All
 Levels Played", came with 2.7).
 
-*7.1 — Sound and haptics* came forward and is built before Phase 4 (Module
+*7.1 — Sound and haptics* came forward and was built before Phase 4 (Module
 25, D52): sound effects tied to the presentation stages, a sound toggle on
-the menu, and vibration where the browser allows it.
+the menu, and vibration where the browser allows it. *Status: done.*
 
 Optimisation, carried over from Phase 3: profile the draw calls and the
 per-move board rebuild (Module 15), on a phone where possible. The WebGL build

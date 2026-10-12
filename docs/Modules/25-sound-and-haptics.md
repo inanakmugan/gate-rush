@@ -220,3 +220,62 @@ plays only Drop.
   browser.
 - On an Android phone, exit, win and loss vibrate; on an iPhone nothing
   vibrates and nothing breaks.
+
+---
+
+## Resolved during implementation
+
+- **Surface.** Added beyond the spec: `HapticMoment` (Exit, Win, Loss);
+  `SoundPlayer.Initialize(SoundConfig, IHaptics)` and `StopVoices()`;
+  `SoundConfig.TryGetCue`, `PulseMilliseconds` and a Random Seed field
+  (every value is valid, so it has no check);
+  `InputController.DragStarted` and `DragDropped`; `ButtonPressed` on
+  `HudView`, `ResultPanel`, `IntroductionCard` and `MenuScreen`.
+  `MoveChanges.Of` is internal, visible to the tests through a new
+  `Assets/Scripts/Runtime/AssemblyInfo.cs` that matches Core's and
+  Solver's, so a stage with two clears can be tested.
+- **Stage events.** `PlayLeave` and `PlayArrive` raise their event every
+  time they run, also when the stage has no tween: ice shards are debris,
+  so an arrive stage with only a thaw still plays IceBreak. `Rebuild`,
+  `Clear` and `FinishPresentationAtOnce` never reach them, so abandoned
+  and finished-at-once presentations stay silent.
+- **Drop.** `Settle` runs before a move's outcome is known, but
+  `OnMoveApplied` has its `MoveChanges` in the same call, so the bootstrap
+  plays Drop there when `Clears` is empty; a clearing move sounds from its
+  leave stage. A release with no move, a rejected move and `CancelDrag`
+  raise `DragDropped`. Accepted gap: on the logged path where a move's
+  clear cannot be worked out, that move plays Drop instead of Exit. A drag
+  held when the time runs out plays Drop and Loss together.
+- **Taps and stopping.** `ButtonPressed` is raised after a button's own
+  request, so Restart and Menu stop the voices first and the tap is still
+  heard; turning sound off plays no tap, turning it on does. Voices stop
+  on restart, on every level load (Next included, which cuts the win
+  jingle) and on the way to the menu, after `CancelDrag`. `PlayCue`,
+  `Pulse` and `StopSounds` also check that the player is still alive,
+  since `InputController.OnDisable` cancels a drag while the scene is torn
+  down.
+- **Configuration.** A missing Sound Player or Sound Config logs one error
+  and the game runs silently; `SoundConfig.Problems()` is logged once at
+  start and a cue with no clip is silent. `Problems()` also reports a
+  pitch above 3, the engine's limit, and an empty clip slot beside
+  assigned ones. The Sound On / Sound Off labels live in `RuntimeConfig`
+  with the other menu texts. The title page is three button rows; with
+  Levels hidden the sound button moves up into its row.
+- **Sounds.** From Kenney's CC0 packs, under `Assets/Audio/Sfx/`, mono,
+  Decompress On Load, Preload Audio Data on: UiTap `click_003`; Exit
+  `confirmation_001`; Peel `maximize_009`; IceBreak
+  `impactGlass_light_000` to `004`; ShutterOpen `metalLatch`; Unlock
+  `metalClick`, raised by 7 dB to sit with the others; Spawn `phaseJump1`;
+  CountPop `rollover4`; TimeBonus `powerUp8`; TimerTick `switch10`; Win
+  `jingles_STEEL10`; Loss `jingles_STEEL11`. Candidates were picked by
+  measuring length, loudness, brightness and pitch movement, and very low
+  thuds (around 100 Hz) were left out because phone speakers barely play
+  them. Per-cue volumes were set from measured loudness so the cues sit at
+  similar levels.
+- **Lift and Drop.** Pack sounds for both grew tiresome within a level,
+  because they are the only sounds that play on every move. They were
+  replaced by sounds made for the game: `lift_soft` (a button click with
+  its top cut, about 10 ms) and `drop_soft` (a wood tap with its top cut,
+  shortened to 60 ms and lowered by 6 dB), both at volume 0.3 with a
+  slight pitch spread. Sounds that play on every move are judged over a
+  whole level, not one move; they should be felt more than heard.

@@ -87,10 +87,11 @@ implementations supplied at startup:
 | `ILevelSource` | Retrieve level JSON by index | In-memory dictionary |
 | `ISaveStore` | Persist and load a string blob | In-memory dictionary |
 | `ITimeProvider` | Current UTC time and frame delta | Manually advanced clock |
-| `IHapticService` | Vibration feedback | No-op |
+| `IHaptics` | Vibration feedback | No-op |
 
-Only `ISaveStore` exists so far (Module 23); its `PlayerPrefs` implementation
-lives in `Runtime`. The others arrive when `Meta` needs them.
+`ISaveStore` (Module 23) and `IHaptics` (Module 25) exist so far; their
+implementations, `PlayerPrefsSaveStore` and `WebHaptics`, live in `Runtime`.
+The others arrive when `Meta` needs them.
 
 ### Runtime — presentation
 
@@ -244,7 +245,7 @@ runtime. Therefore:
 | No file system | `ISaveStore` → `PlayerPrefs` implementation on WebGL |
 | No async file reads | Levels ship in `Resources`, loaded synchronously |
 | No threads | Solver never runs at runtime — it is editor-only |
-| No haptics | `IHapticService` no-op implementation |
+| Haptics | `IHaptics` → `WebHaptics`, the browser's Vibration API through a `.jslib`; does nothing in the Editor and where the API is missing (every iOS browser) |
 | Mouse vs. touch | Unified pointer handling in `InputController` |
 | Large build size | Code stripping, Brotli without decompression fallback: itch.io sends the right `Content-Encoding` (D51) |
 
