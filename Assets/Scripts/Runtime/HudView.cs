@@ -69,6 +69,14 @@ namespace GateRush.Runtime
         public event Action MenuRequested;
 
         /// <summary>
+        /// Raised when the player presses either button, after the button's
+        /// own event — so a listener that stops sounds on a restart or on the
+        /// way to the menu has done so before the press itself sounds
+        /// (Module 25).
+        /// </summary>
+        public event Action ButtonPressed;
+
+        /// <summary>
         /// A message saying this view is not on or under a canvas; empty when
         /// it is.
         /// </summary>
@@ -463,11 +471,13 @@ namespace GateRush.Runtime
         private void OnRestartClicked()
         {
             RestartRequested?.Invoke();
+            ButtonPressed?.Invoke();
         }
 
         private void OnMenuClicked()
         {
             MenuRequested?.Invoke();
+            ButtonPressed?.Invoke();
         }
     }
 }

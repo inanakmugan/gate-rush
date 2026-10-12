@@ -87,6 +87,13 @@ namespace GateRush.Runtime
         public bool IsOpen { get; private set; }
 
         /// <summary>
+        /// Raised when a press closes a card — on the close button or anywhere
+        /// on the backdrop — as its fade starts (Module 25). A press while a
+        /// card is already fading closes nothing and raises nothing.
+        /// </summary>
+        public event Action ButtonPressed;
+
+        /// <summary>
         /// A message saying this card is not on or under a canvas; empty when
         /// it is.
         /// </summary>
@@ -381,6 +388,8 @@ namespace GateRush.Runtime
                 .SetUpdate(true)
                 .SetId(this)
                 .OnComplete(OnClosed);
+
+            ButtonPressed?.Invoke();
         }
 
         private void OnClosed()

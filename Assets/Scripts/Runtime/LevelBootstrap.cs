@@ -48,6 +48,17 @@ namespace GateRush.Runtime
     /// and is played at once, for one Play session. In the editor and in development builds, Page Down and Page Up
     /// (<c>DevKeys</c>) go to the next and previous level through the same
     /// load as Next. A release build has neither.</para>
+    /// <para><b>Sound (Module 25).</b> This is the only caller of
+    /// <see cref="SoundPlayer"/>: the views raise events and the handlers
+    /// here play the cues — a move's from <see cref="MoveCues"/> as each
+    /// stage of its presentation starts, the timer's from
+    /// <see cref="TimerTicks"/>. Voices are stopped on a restart, a level
+    /// change and the way to the menu. The menu's sound button flips
+    /// <see cref="SoundSetting"/>, saved through <see cref="ISaveStore"/> at
+    /// once. With no Sound Player or Sound Config assigned, one error is
+    /// logged and the game runs silently; the config's problems — a fresh
+    /// one has no clips — are logged once, at start, and never stop the
+    /// game.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
@@ -87,6 +98,12 @@ namespace GateRush.Runtime
         [Tooltip("The menu on the canvas: the title screen and the level select, shown while no level is loaded.")]
         [SerializeField] private MenuScreen menuScreen;
 
+        [Tooltip("Plays the sound cues and vibration pulses (Module 25). Left empty, the game runs silently and logs one error.")]
+        [SerializeField] private SoundPlayer soundPlayer;
+
+        [Tooltip("Each cue's clips and levels, and the vibration lengths: Assets/Config/SoundConfig.asset. Left empty, the game runs silently and logs one error.")]
+        [SerializeField] private SoundConfig soundConfig;
+
         private readonly Dictionary<string, TextAsset> levelAssets = new Dictionary<string, TextAsset>();
 
         // What each level in the catalog contains, in the catalog's order:
@@ -98,10 +115,15 @@ namespace GateRush.Runtime
         private bool isUsable;
         private LevelCatalog catalog;
 
-        // Where the completed levels are kept, and the set itself. Both are
-        // made in Awake and stay for the scene's life.
+        // Where the completed levels and the sound setting are kept, and the
+        // two themselves. All are made in Awake and stay for the scene's life.
         private ISaveStore saveStore;
         private CompletedLevels completed;
+        private SoundSetting soundSetting;
+
+        // True once the sound player has been initialised; false leaves the
+        // game silent (no Sound Player or no Sound Config assigned).
+        private bool hasSound;
 
         // Null while the menu shows: no level is loaded.
         private LevelRun run;
@@ -150,7 +172,10 @@ namespace GateRush.Runtime
             boardCamera.backgroundColor = config.BackgroundBottom;
 
             BuildCatalog();
+            saveStore = new PlayerPrefsSaveStore();
             LoadCompletedLevels();
+            InitializeSound();
+            LoadSoundSetting();
 
             if (!TryGetOverrideLevel(hasOverride, overrideName, out var overrideLevel) || !Load(overrideLevel))
             {
@@ -193,7 +218,6 @@ namespace GateRush.Runtime
         /// </summary>
         private void LoadCompletedLevels()
         {
-            saveStore = new PlayerPrefsSaveStore();
             if (!saveStore.TryLoad(CompletedLevels.SaveKey, out var data))
             {
                 completed = new CompletedLevels();
@@ -206,6 +230,173 @@ namespace GateRush.Runtime
                     $"The completed levels saved under '{CompletedLevels.SaveKey}' cannot be read ('{data}'); no level counts as completed.",
                     this);
             }
+        }
+
+        /// <summary>
+        /// Gives the sound player its config and the platform's haptics, and
+        /// logs what is wrong with the config — once, here, when the game
+        /// starts. A config with problems still plays what it can: a cue with
+        /// no clip is silent. With no Sound Player or no Sound Config
+        /// assigned, one error is logged and the whole game is silent.
+        /// </summary>
+        private void InitializeSound()
+        {
+            if (soundPlayer == null || soundConfig == null)
+            {
+                Debug.LogError(
+                    "LevelBootstrap: Sound Player and Sound Config must both be assigned for sound and vibration; the game runs silently.",
+                    this);
+                return;
+            }
+
+            foreach (var problem in soundConfig.Problems())
+            {
+                Debug.LogWarning($"{problem} The game runs on; what cannot be played is silent.", soundConfig);
+            }
+
+            soundPlayer.Initialize(soundConfig, new WebHaptics());
+            hasSound = true;
+        }
+
+        /// <summary>
+        /// Reads the sound setting from the save store and applies it to the
+        /// sound player and the menu's sound button. Nothing saved yet is on;
+        /// so is data that cannot be read, with a warning — it never stops
+        /// the game.
+        /// </summary>
+        private void LoadSoundSetting()
+        {
+            if (!saveStore.TryLoad(SoundSetting.SaveKey, out var data))
+            {
+                soundSetting = new SoundSetting();
+            }
+            else if (!SoundSetting.TryFromData(data, out soundSetting))
+            {
+                Debug.LogWarning(
+                    $"The sound setting saved under '{SoundSetting.SaveKey}' cannot be read ('{data}'); sound is on.",
+                    this);
+            }
+
+            ApplySoundSetting();
+        }
+
+        /// <summary>Makes the sound player and the menu's sound button follow <see cref="soundSetting"/>.</summary>
+        private void ApplySoundSetting()
+        {
+            if (hasSound)
+            {
+                soundPlayer.IsOn = soundSetting.IsOn;
+            }
+
+            menuScreen.ShowSound(soundSetting.IsOn);
+        }
+
+        /// <summary>
+        /// The menu's sound button: turns sound and vibration off or on
+        /// together and saves the choice at once. Turning off stops what is
+        /// playing; turning on affects the next cue. A save that fails is
+        /// logged and the game goes on; the choice then lasts for this
+        /// session.
+        /// </summary>
+        private void OnSoundToggleRequested()
+        {
+            soundSetting.IsOn = !soundSetting.IsOn;
+            ApplySoundSetting();
+
+            try
+            {
+                saveStore.Save(SoundSetting.SaveKey, soundSetting.ToData());
+            }
+            catch (PlayerPrefsException e)
+            {
+                Debug.LogWarning(
+                    $"The sound setting was changed, but saving it failed; it is remembered until the game is closed. {e.Message}",
+                    this);
+            }
+        }
+
+        /// <summary>
+        /// Plays <paramref name="cue"/>, when there is a sound player to play
+        /// it. A player that has been destroyed is left alone: while the
+        /// scene is torn down, <see cref="InputController"/> cancels its drag
+        /// as it is disabled and reports the drop, when the player's object
+        /// may already be gone.
+        /// </summary>
+        private void PlayCue(SoundCue cue)
+        {
+            if (hasSound && soundPlayer != null)
+            {
+                soundPlayer.Play(cue);
+            }
+        }
+
+        /// <summary>
+        /// Vibrates for <paramref name="moment"/>, when there is a sound
+        /// player to do it; a destroyed one is left alone, as in
+        /// <see cref="PlayCue"/>.
+        /// </summary>
+        private void Pulse(HapticMoment moment)
+        {
+            if (hasSound && soundPlayer != null)
+            {
+                soundPlayer.Pulse(moment);
+            }
+        }
+
+        /// <summary>
+        /// Stops every sound that is playing: the level they belong to is
+        /// restarted, replaced or left. A destroyed player is left alone, as
+        /// in <see cref="PlayCue"/>.
+        /// </summary>
+        private void StopSounds()
+        {
+            if (hasSound && soundPlayer != null)
+            {
+                soundPlayer.StopVoices();
+            }
+        }
+
+        /// <summary>The leave stage of a move's presentation has started: its cues play, and an exit vibrates.</summary>
+        private void OnLeaveStarted(MoveChanges changes)
+        {
+            var cues = MoveCues.Leave(changes);
+            for (var i = 0; i < cues.Count; i++)
+            {
+                PlayCue(cues[i]);
+                if (cues[i] == SoundCue.Exit)
+                {
+                    Pulse(HapticMoment.Exit);
+                }
+            }
+        }
+
+        /// <summary>The arrive stage of a move's presentation has started: its cues play.</summary>
+        private void OnArriveStarted(MoveChanges changes)
+        {
+            var cues = MoveCues.Arrive(changes);
+            for (var i = 0; i < cues.Count; i++)
+            {
+                PlayCue(cues[i]);
+            }
+        }
+
+        private void OnDragStarted()
+        {
+            PlayCue(SoundCue.Lift);
+        }
+
+        /// <summary>
+        /// A drag ended with no move, the block back where it started. A drag
+        /// that ended in a move is <see cref="OnMoveApplied"/>'s.
+        /// </summary>
+        private void OnDragDropped()
+        {
+            PlayCue(SoundCue.Drop);
+        }
+
+        private void OnButtonPressed()
+        {
+            PlayCue(SoundCue.UiTap);
         }
 
         /// <summary>
@@ -260,7 +451,7 @@ namespace GateRush.Runtime
         /// is stopped and neither a tick, a move nor a bonus reaches it; the
         /// board is cleared, which abandons a presentation in progress without
         /// reporting it done, blocks still passing through their gates
-        /// included; the card is hidden without its callback; the result
+        /// included; every sound is stopped (Module 25); the card is hidden without its callback; the result
         /// panel and a time bonus are hidden with their tweens killed. Does
         /// nothing while the menu already shows.
         /// </summary>
@@ -272,6 +463,7 @@ namespace GateRush.Runtime
             }
 
             inputController.Unbind();
+            StopSounds();
             StopListeningForTimeBonus();
             run.Release();
             run = null;
@@ -328,6 +520,15 @@ namespace GateRush.Runtime
             resultPanel.MenuRequested += GoToMenu;
             menuScreen.PlayRequested += OnPlayRequested;
             menuScreen.LevelRequested += OnLevelRequested;
+            menuScreen.SoundToggleRequested += OnSoundToggleRequested;
+            boardView.LeaveStarted += OnLeaveStarted;
+            boardView.ArriveStarted += OnArriveStarted;
+            inputController.DragStarted += OnDragStarted;
+            inputController.DragDropped += OnDragDropped;
+            hudView.ButtonPressed += OnButtonPressed;
+            introductionCard.ButtonPressed += OnButtonPressed;
+            resultPanel.ButtonPressed += OnButtonPressed;
+            menuScreen.ButtonPressed += OnButtonPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested += OnDevLevelStep;
 #endif
@@ -350,6 +551,15 @@ namespace GateRush.Runtime
             resultPanel.MenuRequested -= GoToMenu;
             menuScreen.PlayRequested -= OnPlayRequested;
             menuScreen.LevelRequested -= OnLevelRequested;
+            menuScreen.SoundToggleRequested -= OnSoundToggleRequested;
+            boardView.LeaveStarted -= OnLeaveStarted;
+            boardView.ArriveStarted -= OnArriveStarted;
+            inputController.DragStarted -= OnDragStarted;
+            inputController.DragDropped -= OnDragDropped;
+            hudView.ButtonPressed -= OnButtonPressed;
+            introductionCard.ButtonPressed -= OnButtonPressed;
+            resultPanel.ButtonPressed -= OnButtonPressed;
+            menuScreen.ButtonPressed -= OnButtonPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested -= OnDevLevelStep;
 #endif
@@ -373,11 +583,22 @@ namespace GateRush.Runtime
             FitCameraToScreen();
 
             var wasPlaying = run.Outcome == LevelOutcome.None;
+            var countdown = run.Countdown;
+            var secondsBefore = countdown != null ? countdown.WholeSecondsRemaining : 0;
             run.Tick(Time.unscaledDeltaTime);
             if (wasPlaying && run.Outcome == LevelOutcome.Lost)
             {
                 inputController.CancelDrag();
                 resultPanel.ShowLoss(config.LossTitle);
+                PlayCue(SoundCue.Loss);
+                Pulse(HapticMoment.Loss);
+            }
+            else if (hasSound && countdown != null && run.Outcome == LevelOutcome.None
+                     && TimerTicks.ShouldTick(secondsBefore, countdown.WholeSecondsRemaining, soundConfig.TickFromSeconds))
+            {
+                // Only a level still being played ticks: a won or lost one has
+                // stopped its countdown, and one held by a card has not started it.
+                PlayCue(SoundCue.TimerTick);
             }
 
             ShowRemainingTime();
@@ -402,6 +623,7 @@ namespace GateRush.Runtime
             menuScreen.Hide();
             hudView.Show();
             inputController.CancelDrag();
+            StopSounds();
 
             // Cards of the level being left go, without starting its run.
             introductionCard.Hide();
@@ -519,6 +741,7 @@ namespace GateRush.Runtime
             }
 
             inputController.CancelDrag();
+            StopSounds();
             run.Restart();
             moveNumber = 0;
             hudView.CancelTimeBonus();
@@ -618,6 +841,14 @@ namespace GateRush.Runtime
                     this);
             }
 
+            // The block was released before the move was applied, so only now
+            // is it known whether it stays on the board: a move that clears
+            // nothing is a drop; one that clears sounds from its leave stage.
+            if (changes.Clears.Count == 0)
+            {
+                PlayCue(SoundCue.Drop);
+            }
+
             boardView.Present(after, changes, moveNumber, OnPresentationDone);
         }
 
@@ -672,6 +903,7 @@ namespace GateRush.Runtime
             if (run != null && run.Countdown != null && run.Outcome == LevelOutcome.None)
             {
                 hudView.ShowTimeBonus(seconds);
+                PlayCue(SoundCue.TimeBonus);
             }
         }
 
@@ -695,6 +927,8 @@ namespace GateRush.Runtime
             var title = ResultTitle.ForWin(catalog, levelName, levelId, config.WinTitle, config.AllDoneTitle);
             var message = ResultTitle.IsLastLevel(catalog, levelName, levelId) ? config.AllDoneMessage : null;
             resultPanel.ShowWin(title, message, TryGetNextLevel(out _));
+            PlayCue(SoundCue.Win);
+            Pulse(HapticMoment.Win);
         }
 
         /// <summary>The HUD skips the work when the displayed second has not changed, so this runs every frame.</summary>

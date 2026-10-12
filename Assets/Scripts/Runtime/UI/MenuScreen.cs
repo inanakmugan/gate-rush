@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using DG.Tweening;
+using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
@@ -10,8 +11,8 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The prototype menu (Module 23, D50): a title page with the game's name,
-    /// Play and Levels, and a level-select page with one button per level and
-    /// Back. An overlay in the Level scene, drawn over the background while no
+    /// Play, Levels and the sound button (Module 25), and a level-select page
+    /// with one button per level and Back. An overlay in the Level scene, drawn over the background while no
     /// level is loaded. Builds its hierarchy from code and holds no rules — the
     /// bootstrap says which levels to list (<see cref="MenuLevels.Entries"/>)
     /// and starts the level a button asks for.
@@ -24,6 +25,11 @@ namespace GateRush.Runtime
     /// <para><b>No level is locked.</b> Every entry gets a button that asks
     /// for its level, completed or not; a completed one only looks different:
     /// its own tint and a tick.</para>
+    /// <para><b>Sound button.</b> It reads whether sound is on
+    /// (<see cref="ShowSound"/>) and asks for the other
+    /// (<see cref="SoundToggleRequested"/>); the bootstrap owns the setting.
+    /// It sits under Levels, or in Levels' row while that button is
+    /// hidden.</para>
     /// <para><b>Fit.</b> Each page has a fixed size in canvas units and is
     /// scaled down uniformly to the safe area less the menu's padding
     /// (<see cref="ScreenBands.ContentScale"/>), so it fits a portrait phone
@@ -53,6 +59,14 @@ namespace GateRush.Runtime
         private const float TickShortStrokeDegrees = 135f;
         private const float TickLongStrokeDegrees = 45f;
 
+        // The title page's rows of buttons, from the top. Not tunables: they
+        // are the page's order. The sound button moves up into Levels' row
+        // while Levels is hidden.
+        private const int PlayRow = 0;
+        private const int LevelsRow = 1;
+        private const int SoundRow = 2;
+        private const int TitleButtonRows = 3;
+
         private readonly List<LevelButton> levelButtons = new List<LevelButton>();
 
         private RuntimeConfig config;
@@ -66,6 +80,11 @@ namespace GateRush.Runtime
         private Vector2 titlePageSize;
         private Button playButton;
         private Button levelsButton;
+        private Button soundButton;
+        private TMP_Text soundLabel;
+
+        // What the sound button reads; kept so a menu built again reads the same.
+        private bool isSoundOn = true;
 
         // Null while there is no level to list.
         private RectTransform levelsFit;
@@ -81,6 +100,19 @@ namespace GateRush.Runtime
 
         /// <summary>Raised when the player presses a level's button, with that level's file name.</summary>
         public event Action<string> LevelRequested;
+
+        /// <summary>
+        /// Raised when the player presses the sound button (Module 25). The
+        /// listener changes the setting and answers with <see cref="ShowSound"/>.
+        /// </summary>
+        public event Action SoundToggleRequested;
+
+        /// <summary>
+        /// Raised when the player presses any button of the menu, after the
+        /// button's own event — so a level that starts, or sound that was just
+        /// turned on, is in place before the press itself sounds (Module 25).
+        /// </summary>
+        public event Action ButtonPressed;
 
         /// <summary>True from <see cref="ShowTitle"/> until <see cref="Hide"/>.</summary>
         public bool IsOpen => root != null && root.gameObject.activeSelf;
@@ -157,12 +189,27 @@ namespace GateRush.Runtime
             }
 
             BuildLevelsPage(entries);
-            levelsButton.gameObject.SetActive(entries.Count > 0);
+            var hasLevels = entries.Count > 0;
+            levelsButton.gameObject.SetActive(hasLevels);
+            PlaceTitleButton(soundButton, hasLevels ? SoundRow : LevelsRow);
 
             fittedSafeSize = Vector2.negativeInfinity;
             root.gameObject.SetActive(true);
             Fit();
             ShowPage(titlePage);
+        }
+
+        /// <summary>
+        /// Makes the sound button read on or off, now and whenever the menu
+        /// is built again. May be called before <see cref="Initialize"/>.
+        /// </summary>
+        public void ShowSound(bool isOn)
+        {
+            isSoundOn = isOn;
+            if (soundLabel != null)
+            {
+                soundLabel.text = isOn ? config.SoundOnLabel : config.SoundOffLabel;
+            }
         }
 
         /// <summary>Hides the menu, stopping its pop. Does nothing before <see cref="Initialize"/>.</summary>
@@ -270,13 +317,14 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>The title page, rows from the top: the game's name, Play, Levels.</summary>
+        /// <summary>The title page, rows from the top: the game's name, Play, Levels, the sound button.</summary>
         private void BuildTitlePage()
         {
             var buttonSize = config.MenuButtonSizeUnits;
             titlePageSize = new Vector2(
                 Mathf.Max(config.MenuTitleWidthUnits, buttonSize.x),
-                config.MenuTitleHeightUnits + config.MenuSectionGapUnits + 2f * buttonSize.y + config.MenuButtonGapUnits);
+                config.MenuTitleHeightUnits + config.MenuSectionGapUnits
+                + TitleButtonRows * buttonSize.y + (TitleButtonRows - 1) * config.MenuButtonGapUnits);
 
             // Fit scales the page down to the safe area; the pop scales Page.
             titleFit = UiBuilder.CreateRect("Title fit", safe);
@@ -284,16 +332,27 @@ namespace GateRush.Runtime
             titlePage = UiBuilder.CreateRect("Title page", titleFit);
             UiBuilder.PlaceCentered(titlePage, titlePageSize);
 
-            var top = 0f;
             BuildHeading(titlePage, titlePageSize.x, config.GameTitle, config.MenuTitleFontSize);
-            top += config.MenuTitleHeightUnits + config.MenuSectionGapUnits;
 
             playButton = BuildButton(titlePage, "Play", config.NextButtonColor, config.PlayLabel);
-            UiBuilder.Place((RectTransform)playButton.transform, TopMiddle, new Vector2(0f, -top), buttonSize);
-            top += buttonSize.y + config.MenuButtonGapUnits;
+            PlaceTitleButton(playButton, PlayRow);
 
             levelsButton = BuildButton(titlePage, "Levels", config.MenuButtonColor, config.LevelsLabel);
-            UiBuilder.Place((RectTransform)levelsButton.transform, TopMiddle, new Vector2(0f, -top), buttonSize);
+            PlaceTitleButton(levelsButton, LevelsRow);
+
+            soundButton = BuildButton(titlePage, "Sound", config.MenuButtonColor, config.SoundOnLabel);
+            soundLabel = soundButton.GetComponentInChildren<TMP_Text>(true);
+            PlaceTitleButton(soundButton, SoundRow);
+            ShowSound(isSoundOn);
+        }
+
+        /// <summary>Places a title page button in row <paramref name="row"/> of the buttons under the game's name.</summary>
+        private void PlaceTitleButton(Button button, int row)
+        {
+            var buttonSize = config.MenuButtonSizeUnits;
+            var top = config.MenuTitleHeightUnits + config.MenuSectionGapUnits
+                      + row * (buttonSize.y + config.MenuButtonGapUnits);
+            UiBuilder.Place((RectTransform)button.transform, TopMiddle, new Vector2(0f, -top), buttonSize);
         }
 
         /// <summary>
@@ -443,13 +502,14 @@ namespace GateRush.Runtime
         /// </summary>
         private void Subscribe()
         {
-            if (isSubscribed || playButton == null || levelsButton == null)
+            if (isSubscribed || playButton == null || levelsButton == null || soundButton == null)
             {
                 return;
             }
 
             playButton.onClick.AddListener(OnPlayClicked);
             levelsButton.onClick.AddListener(OnLevelsClicked);
+            soundButton.onClick.AddListener(OnSoundClicked);
             if (backButton != null)
             {
                 backButton.onClick.AddListener(OnBackClicked);
@@ -480,6 +540,11 @@ namespace GateRush.Runtime
                 levelsButton.onClick.RemoveListener(OnLevelsClicked);
             }
 
+            if (soundButton != null)
+            {
+                soundButton.onClick.RemoveListener(OnSoundClicked);
+            }
+
             if (backButton != null)
             {
                 backButton.onClick.RemoveListener(OnBackClicked);
@@ -499,6 +564,7 @@ namespace GateRush.Runtime
         private void OnPlayClicked()
         {
             PlayRequested?.Invoke();
+            ButtonPressed?.Invoke();
         }
 
         private void OnLevelsClicked()
@@ -507,16 +573,26 @@ namespace GateRush.Runtime
             {
                 ShowPage(levelsPage);
             }
+
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnSoundClicked()
+        {
+            SoundToggleRequested?.Invoke();
+            ButtonPressed?.Invoke();
         }
 
         private void OnBackClicked()
         {
             ShowPage(titlePage);
+            ButtonPressed?.Invoke();
         }
 
         private void OnLevelClicked(string levelName)
         {
             LevelRequested?.Invoke(levelName);
+            ButtonPressed?.Invoke();
         }
 
         /// <summary>A level's button with the listener made for it, kept so the listener can be removed again.</summary>

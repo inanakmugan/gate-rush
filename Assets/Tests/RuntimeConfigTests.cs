@@ -317,6 +317,8 @@ namespace GateRush.Tests
         [TestCase("gameTitle", "Game Title")]
         [TestCase("playLabel", "Play Label")]
         [TestCase("levelsLabel", "Levels Label")]
+        [TestCase("soundOnLabel", "Sound On Label")]
+        [TestCase("soundOffLabel", "Sound Off Label")]
         [TestCase("levelSelectTitle", "Level Select Title")]
         [TestCase("backLabel", "Back Label")]
         [TestCase("menuLabel", "Menu Label")]

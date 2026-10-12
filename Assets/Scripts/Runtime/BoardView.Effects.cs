@@ -66,6 +66,23 @@ namespace GateRush.Runtime
         private float pullGlowAlpha;
 
         /// <summary>
+        /// Raised when the leave stage of a presentation starts playing, with
+        /// the move's changes — the moment its sounds start (Module 25). Never
+        /// raised for a presentation that is abandoned before the stage
+        /// (<see cref="Rebuild"/>, <see cref="Clear"/>) or finished at once
+        /// after a disable.
+        /// </summary>
+        public event Action<MoveChanges> LeaveStarted;
+
+        /// <summary>
+        /// Raised when the arrive stage of a presentation starts playing, on
+        /// the new drawing, with the move's changes. Never raised for a
+        /// presentation that is abandoned before the stage or finished at
+        /// once after a disable.
+        /// </summary>
+        public event Action<MoveChanges> ArriveStarted;
+
+        /// <summary>
         /// Shows the result of a move: waits for the dragged block to settle,
         /// plays the leave stage on the old drawing, redraws from
         /// <paramref name="state"/>, plays the arrive stage, and calls
@@ -239,6 +256,11 @@ namespace GateRush.Runtime
                 }
             }
 
+            // Raised once the stage's own tweens are set up, and whatever the
+            // stage holds for: a destroyed block's pass is debris, which the
+            // sequence never waits on, and it sounds all the same.
+            LeaveStarted?.Invoke(presentedChanges);
+
             if (leave == null)
             {
                 PlayArrive();
@@ -321,6 +343,10 @@ namespace GateRush.Runtime
             {
                 RiseFromElevator(Arrive(), wave.Key, wave.Value);
             }
+
+            // As in the leave stage: breaking ice is debris, with no tween in
+            // the sequence, and it sounds all the same.
+            ArriveStarted?.Invoke(changes);
 
             if (arrive == null)
             {

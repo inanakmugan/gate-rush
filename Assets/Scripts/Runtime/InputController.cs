@@ -58,6 +58,19 @@ namespace GateRush.Runtime
         /// <summary>Raised when the player presses <b>R</b>. Any drag in progress has been cancelled.</summary>
         public event Action RestartRequested;
 
+        /// <summary>Raised when a block is grabbed: a drag has begun and the view lifts it (Module 25).</summary>
+        public event Action DragStarted;
+
+        /// <summary>
+        /// Raised when a drag ends with no move applied, the block back where
+        /// it started: a release that makes no move, a move the session
+        /// rejected, and <see cref="CancelDrag"/>. A drag that ends in a move
+        /// raises <see cref="MoveApplied"/> instead; whether that block
+        /// stayed on the board is for the listener to read from the move's
+        /// changes.
+        /// </summary>
+        public event Action DragDropped;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>
         /// Raised when a development level key (<see cref="DevKeys"/>) goes
@@ -131,6 +144,8 @@ namespace GateRush.Runtime
             {
                 view.Snap(blockIndex, run.Session.State.Origins[blockIndex]);
             }
+
+            DragDropped?.Invoke();
         }
 
         private void OnDisable()
@@ -188,6 +203,7 @@ namespace GateRush.Runtime
                 && drag.TryBegin(run.Session.Context, run.Session.State, grid))
             {
                 view.BeginDrag(drag.BlockIndex);
+                DragStarted?.Invoke();
             }
 
             if (!drag.IsDragging)
@@ -219,6 +235,7 @@ namespace GateRush.Runtime
 
             if (!move.HasValue)
             {
+                DragDropped?.Invoke();
                 return;
             }
 
@@ -233,6 +250,7 @@ namespace GateRush.Runtime
                 "The block is shown back at its origin.",
                 this);
             view.Snap(blockIndex, session.State.Origins[blockIndex]);
+            DragDropped?.Invoke();
         }
 
         /// <summary>

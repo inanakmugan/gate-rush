@@ -606,6 +606,12 @@ namespace GateRush.Runtime
         [Tooltip("Label of the title screen's Levels button, which opens the level select.")]
         [SerializeField] private string levelsLabel = "Levels";
 
+        [Tooltip("Label of the title screen's sound button while sound and vibration are on. The button has the Levels button's tint and turns them off.")]
+        [SerializeField] private string soundOnLabel = "Sound: On";
+
+        [Tooltip("Label of the title screen's sound button while sound and vibration are off. The button turns them on.")]
+        [SerializeField] private string soundOffLabel = "Sound: Off";
+
         [Tooltip("Heading of the level select.")]
         [SerializeField] private string levelSelectTitle = "Levels";
 
@@ -634,7 +640,7 @@ namespace GateRush.Runtime
         [SerializeField] private float menuButtonCornerUnits = 46f;
         [SerializeField] private float menuButtonFontSize = 76f;
 
-        [Tooltip("Space between Play and Levels.")]
+        [Tooltip("Space between Play, Levels and the sound button.")]
         [SerializeField] private float menuButtonGapUnits = 40f;
 
         [Tooltip("How many level buttons the level select puts in a row.")]
@@ -1293,6 +1299,12 @@ namespace GateRush.Runtime
 
         /// <summary>Label of the title screen's Levels button.</summary>
         public string LevelsLabel => levelsLabel;
+
+        /// <summary>Label of the title screen's sound button while sound and vibration are on (Module 25).</summary>
+        public string SoundOnLabel => soundOnLabel;
+
+        /// <summary>Label of the title screen's sound button while sound and vibration are off (Module 25).</summary>
+        public string SoundOffLabel => soundOffLabel;
 
         /// <summary>Heading of the level select.</summary>
         public string LevelSelectTitle => levelSelectTitle;
@@ -2522,6 +2534,8 @@ namespace GateRush.Runtime
             AddIfBlank(problems, gameTitle, "Game Title");
             AddIfBlank(problems, playLabel, "Play Label");
             AddIfBlank(problems, levelsLabel, "Levels Label");
+            AddIfBlank(problems, soundOnLabel, "Sound On Label");
+            AddIfBlank(problems, soundOffLabel, "Sound Off Label");
             AddIfBlank(problems, levelSelectTitle, "Level Select Title");
             AddIfBlank(problems, backLabel, "Back Label");
 
