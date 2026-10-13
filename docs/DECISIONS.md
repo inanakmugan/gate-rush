@@ -1582,3 +1582,30 @@ board: the machine's screen already does, and a faint footprint reads as
 "not there yet".
 
 ---
+
+## D54 — The suggested time budget leaves time bonuses out
+
+**Decision.** The Level Editor suggests `base + perMove * moves`, rounded
+up, and no longer adds the level's time bonuses (M10). It shows their
+total beside the suggestion as information. Module 27 makes the change.
+
+**Why.** A level is won only when every block is destroyed, so every time
+bonus reaches the countdown during any winning play. Adding the bonuses to
+the starting budget as well gave the player the same seconds twice and
+made bonus blocks pointless; levels 9 and 14 already had their bonuses
+removed by hand. Without them, a bonus is a real cushion that rewards
+clearing its block early, and the suggestion stays fair whenever the
+solution reaches the bonus, since the solver does not model time (D12).
+
+**Consequences.**
+- M10 and Module 09's metric line now say the bonuses are shown, not
+  added.
+- Saved budgets of existing levels are unchanged.
+
+**Rejected.** Subtracting the bonuses from the budget: the player could
+run out before reaching a bonus that the solution clears late, and the
+solver cannot see it. Subtracting a share of them: a tunable with no clear
+right value; a designer who wants a tighter level edits the budget by
+hand.
+
+---
