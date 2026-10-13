@@ -181,6 +181,14 @@ namespace GateRush.Editor
         private string validationError;
 
         /// <summary>
+        /// The same failure in one line, for the solver line: set and cleared
+        /// with <see cref="validationError"/>, so the line reads as an error
+        /// (<see cref="SolverLineKind.Error"/>) exactly while the box above it
+        /// explains one, and never as not run.
+        /// </summary>
+        private string validationErrorSummary;
+
+        /// <summary>
         /// Why the last run gave no verdict at all — the level is not one the
         /// pipeline can validate yet. Neither a verdict nor a solver bug, so it
         /// is kept apart from <see cref="validationError"/> and shown as a warning.
@@ -715,11 +723,11 @@ namespace GateRush.Editor
             var fit = settings.BoardFit;
             var required = fit.RequiredCanvasSize(columns, rows);
             var rect = GUILayoutUtility.GetRect(
-                Mathf.Max(200f, required.x),
+                Mathf.Max(settings.CanvasMinWidth, required.x),
                 Mathf.Max(settings.CanvasMinHeight, required.y),
                 GUILayout.ExpandWidth(true),
                 GUILayout.ExpandHeight(true));
-            EditorGUI.DrawRect(rect, new Color(0.16f, 0.16f, 0.18f));
+            EditorGUI.DrawRect(rect, settings.CanvasBackgroundColor);
 
             var layout = EditorGridLayout.Fit(rect, columns, rows, fit);
 
@@ -741,7 +749,8 @@ namespace GateRush.Editor
             {
                 foreach (var c in freeCells)
                 {
-                    OutlineCellIfInside(layout, c, new Color(0.4f, 0.9f, 0.5f));
+                    OutlineCellIfInside(
+                        layout, c, settings.FreeDrawCellOutlineColor, settings.FreeDrawCellOutlineThickness);
                 }
             }
 
@@ -823,18 +832,14 @@ namespace GateRush.Editor
             return background;
         }
 
-        /// <summary>The stroke along a block's own outer edge — darker and thicker than <c>EditorGrid</c>'s cell lines, which run between every pair of cells including two inside one block.</summary>
-        private static readonly Color BlockBoundaryColor = new Color(0f, 0f, 0f, 0.8f);
-
-        private const float BlockBoundaryThickness = 1.5f;
-
         /// <summary>
         /// Makes each block read as one shape. <see cref="FillOf"/> colours a
         /// cell by its block's colour and has no way to say where one block
         /// stops, and <see cref="EditorGrid.DrawCells"/> rules a faint line
         /// between every pair of cells without knowing which block either
         /// belongs to. So two things are needed, in this order: the grid line at
-        /// a seam <em>inside</em> a block is painted out, and a bold stroke is
+        /// a seam <em>inside</em> a block is painted out, and a bold stroke
+        /// (<see cref="LevelEditorSettings.BlockBoundaryColor"/>) is
         /// added at the block's true outer edge. Both sets come from
         /// <see cref="BlockOutline"/>, computed from the footprint itself
         /// (docs/Modules/09a).
@@ -988,7 +993,7 @@ namespace GateRush.Editor
             {
                 if (look.Number.HasValue)
                 {
-                    DrawBlockNumber(space, anchor, look.Number.Value, 1f);
+                    DrawBlockNumber(space, anchor, look.Number.Value, FullMarkScale);
                 }
 
                 return;
@@ -1011,7 +1016,7 @@ namespace GateRush.Editor
             if (look.Number.HasValue)
             {
                 DrawBlockNumber(
-                    space, look.IsFrozen ? anchor : look.Slots.Layers, look.Number.Value, look.IsFrozen ? 1f : scale);
+                    space, look.IsFrozen ? anchor : look.Slots.Layers, look.Number.Value, look.IsFrozen ? FullMarkScale : scale);
             }
 
             switch (look.Icon.Kind)
@@ -1061,7 +1066,7 @@ namespace GateRush.Editor
             var ratio = settings.BlockNumberSizeRatio;
             var minFont = settings.BlockNumberMinFontSize;
             side = Mathf.Max(side, minFont / ratio);
-            var plate = new Rect(center.x - (side * 0.5f), center.y - (side * 0.5f), side, side);
+            var plate = new Rect(center.x - (side * Half), center.y - (side * Half), side, side);
             EditorGUI.DrawRect(plate, plateColor);
 
             var style = MarkTextStyle(settings.BlockNumberColor, Mathf.Max(minFont, Mathf.RoundToInt(side * ratio)));
@@ -1099,7 +1104,7 @@ namespace GateRush.Editor
         {
             var center = space.ToGui(slot);
             var size = config.PadlockSizeCells * space.CellSize * scale;
-            DrawSprite(config.PadlockSprite, CenteredRect(center, new Vector2(size, size)), config.PadlockColor, 0f);
+            DrawSprite(config.PadlockSprite, CenteredRect(center, new Vector2(size, size)), config.PadlockColor, NoRotation);
 
             // GUI space is +Y down, so the drop is added.
             DrawPlate(
@@ -1154,11 +1159,11 @@ namespace GateRush.Editor
 
             EditorGUI.DrawRect(plate, config.TimeBonusMarkRimColor);
             EditorGUI.DrawRect(
-                new Rect(plate.x + rim, plate.y + rim, plate.width - (2f * rim), plate.height - (2f * rim)),
+                new Rect(plate.x + rim, plate.y + rim, plate.width - (BothSides * rim), plate.height - (BothSides * rim)),
                 config.TimeBonusMarkColor);
             DrawSprite(
-                config.ClockSprite, new Rect(plate.x + padding, center.y - (icon * 0.5f), icon, icon),
-                config.TimeBonusMarkIconColor, 0f);
+                config.ClockSprite, new Rect(plate.x + padding, center.y - (icon * Half), icon, icon),
+                config.TimeBonusMarkIconColor, NoRotation);
             GUI.Label(new Rect(plate.x + padding + icon + padding, plate.y, textWidth, height), text, style);
         }
 
@@ -1202,11 +1207,11 @@ namespace GateRush.Editor
             // Drawn lying along x about its centre, then turned for a
             // vertical block. Slice edges are whole pixels so they meet.
             var center = space.ToGui(arrow.center);
-            var left = Mathf.Round(center.x - (length * 0.5f));
-            var right = Mathf.Round(center.x + (length * 0.5f));
+            var left = Mathf.Round(center.x - (length * Half));
+            var right = Mathf.Round(center.x + (length * Half));
             var leftSeam = Mathf.Round(left + leftHead);
             var rightSeam = Mathf.Round(right - rightHead);
-            var top = center.y - (thickness * 0.5f);
+            var top = center.y - (thickness * Half);
 
             var u0 = source.xMin / texture.width;
             var u1 = (source.xMin + sprite.border.x) / texture.width;
@@ -1238,6 +1243,18 @@ namespace GateRush.Editor
             GUI.color = previousColor;
         }
 
+        /// <summary>Half of a length: where a centre sits. Geometry, not a tunable.</summary>
+        private const float Half = 0.5f;
+
+        /// <summary>The two sides a rim is taken from. Geometry, not a tunable.</summary>
+        private const float BothSides = 2f;
+
+        /// <summary>A sprite drawn upright, as authored. Geometry, not a tunable.</summary>
+        private const float NoRotation = 0f;
+
+        /// <summary>A mark at its own size, not shrunk for a crowded row. Geometry, not a tunable.</summary>
+        private const float FullMarkScale = 1f;
+
         /// <summary>The quarter turn that stands a horizontal arrow upright. Geometry, not a tunable.</summary>
         private const float VerticalArrowTurnDegrees = 90f;
 
@@ -1260,7 +1277,7 @@ namespace GateRush.Editor
             var previousColor = GUI.color;
             var previousMatrix = GUI.matrix;
             GUI.color = previousColor * tint;
-            if (rotationDegrees != 0f)
+            if (rotationDegrees != NoRotation)
             {
                 // GUI space is +Y down, so a positive GUI turn is clockwise
                 // on screen; the board's is counter-clockwise.
@@ -1273,7 +1290,7 @@ namespace GateRush.Editor
         }
 
         private static Rect CenteredRect(Vector2 center, Vector2 size) =>
-            new Rect(center.x - (size.x * 0.5f), center.y - (size.y * 0.5f), size.x, size.y);
+            new Rect(center.x - (size.x * Half), center.y - (size.y * Half), size.x, size.y);
 
         // The style of the text on a block's marks. An instance field,
         // rebuilt after a domain reload, so the window keeps no static state
@@ -1330,7 +1347,7 @@ namespace GateRush.Editor
             }
         }
 
-        private static void DrawFootprintBoundary(EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin)
+        private void DrawFootprintBoundary(EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin)
         {
             foreach (var boundary in BlockOutline.Edges(cells))
             {
@@ -1339,7 +1356,8 @@ namespace GateRush.Editor
                     continue;
                 }
 
-                EditorGUI.DrawRect(SideRect(r, boundary.Side, BlockBoundaryThickness), BlockBoundaryColor);
+                EditorGUI.DrawRect(
+                    SideRect(r, boundary.Side, settings.BlockBoundaryThickness), settings.BlockBoundaryColor);
             }
         }
 
@@ -1382,22 +1400,23 @@ namespace GateRush.Editor
 
         private void DrawSelectionOutline(EditorGridLayout layout)
         {
-            var color = new Color(1f, 0.85f, 0.2f);
+            var color = settings.SelectionOutlineColor;
+            var thickness = settings.SelectionOutlineThickness;
 
             switch (selection)
             {
                 case BlockDraft block when dragKind != DragKind.BoardBlock || !ReferenceEquals(block, dragBoardBlock):
                     foreach (var c in block.Cells)
                     {
-                        OutlineCellIfInside(layout, block.StartOrigin + c, color);
+                        OutlineCellIfInside(layout, block.StartOrigin + c, color, thickness);
                     }
 
                     break;
                 case ShutterDraft shutter when dragKind != DragKind.RegionMove || !ReferenceEquals(shutter, dragShutter):
-                    OutlineRegionRect(layout, shutter.Min, shutter.Max, color, 2f);
+                    OutlineRegionRect(layout, shutter.Min, shutter.Max, color, thickness);
                     break;
                 case ElevatorDraft elevator when dragKind != DragKind.RegionMove || !ReferenceEquals(elevator, dragElevator):
-                    OutlineRegionRect(layout, elevator.Min, elevator.Max, color, 2f);
+                    OutlineRegionRect(layout, elevator.Min, elevator.Max, color, thickness);
                     break;
             }
         }
@@ -1420,7 +1439,10 @@ namespace GateRush.Editor
                 case DragKind.RegionMove:
                 case DragKind.RegionCreate:
                     var tint = dragRegionTool == EditorTool.Shutter ? settings.ShutterColor : settings.ElevatorColor;
-                    OutlineRegionRect(layout, dragRegionCandidateMin, dragRegionCandidateMax, Color.Lerp(tint, Color.white, 0.4f), 2.5f);
+                    OutlineRegionRect(
+                        layout, dragRegionCandidateMin, dragRegionCandidateMax,
+                        Color.Lerp(tint, Color.white, settings.DragRegionPreviewLighten),
+                        settings.DragRegionPreviewThickness);
                     break;
 
                 case DragKind.EdgeFeature:
@@ -1432,16 +1454,16 @@ namespace GateRush.Editor
                     var candidate = new EdgeFeatureSpan(
                         span.Owner, dragEdgeCandidateEdge, dragEdgeCandidateOffset, span.Width);
                     EditorGUI.DrawRect(
-                        EdgeMarkerRect(layout, candidate, 0),
-                        dragEdgeCandidateLegal ? new Color(0.4f, 0.95f, 0.5f, 0.75f) : new Color(0.95f, 0.3f, 0.3f, 0.75f));
+                        EdgeMarkerRect(layout, candidate, FirstMarkerLane),
+                        settings.EdgeDragColor(dragEdgeCandidateLegal));
                     break;
                 }
             }
         }
 
-        private static void DrawBlockPreview(EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin, bool legal)
+        private void DrawBlockPreview(EditorGridLayout layout, IReadOnlyList<Coord> cells, Coord origin, bool legal)
         {
-            var fill = legal ? new Color(0.4f, 0.95f, 0.5f, 0.55f) : new Color(0.95f, 0.3f, 0.3f, 0.6f);
+            var fill = settings.BlockDragColor(legal);
             foreach (var relative in cells)
             {
                 var cell = origin + relative;
@@ -1462,7 +1484,7 @@ namespace GateRush.Editor
         // for the same edge cells exactly as two generators can (M6).
         private void DrawEdgeMarkers(EditorGridLayout layout)
         {
-            var neutral = new Color(0.78f, 0.78f, 0.82f);
+            var neutral = settings.GeneratorMarkerColor;
             var spans = EdgeFeatures.Enumerate(draft);
             var lanes = EdgeFeatures.Lanes(spans);
 
@@ -1485,7 +1507,8 @@ namespace GateRush.Editor
 
                 if (ReferenceEquals(selection, spans[i].Owner))
                 {
-                    EditorGrid.DrawOutline(rect, Color.white, 1.5f);
+                    EditorGrid.DrawOutline(
+                        rect, settings.SelectedMarkerOutlineColor, settings.SelectedMarkerOutlineThickness);
                 }
             }
         }
@@ -1503,17 +1526,20 @@ namespace GateRush.Editor
         // and Core rejects it only once ToContext runs — so without lanes the
         // wider marker simply covers its neighbour and the designer cannot see
         // what they did (docs/Modules/09a).
-        private static Rect EdgeMarkerRect(EditorGridLayout layout, EdgeFeatureSpan span, int lane)
+        private Rect EdgeMarkerRect(EditorGridLayout layout, EdgeFeatureSpan span, int lane)
         {
             var depth = MarkerDepth(layout, span.Owner);
             var rect = EditorGrid.EdgeMarker(layout, span.Edge, span.Offset, span.Width, depth);
-            return lane == 0 ? rect : PushedOutward(rect, span.Edge, lane * depth);
+            return lane == FirstMarkerLane ? rect : PushedOutward(rect, span.Edge, lane * depth);
         }
 
-        private static float MarkerDepth(EditorGridLayout layout, object owner) =>
+        /// <summary>The lane flush against the grid, where a marker sits unless it shares edge cells with one drawn before it.</summary>
+        private const int FirstMarkerLane = 0;
+
+        private float MarkerDepth(EditorGridLayout layout, object owner) =>
             owner is GateDraft
-                ? Mathf.Max(4f, layout.CellSize * 0.35f)
-                : Mathf.Max(6f, layout.CellSize * 0.5f);
+                ? settings.GateMarkerDepth(layout.CellSize)
+                : settings.GeneratorMarkerDepth(layout.CellSize);
 
         /// <summary>Moves a marker rect away from the grid, perpendicular to the edge it hangs off.</summary>
         private static Rect PushedOutward(Rect r, BoardEdge edge, float distance)
@@ -1531,29 +1557,28 @@ namespace GateRush.Editor
             }
         }
 
-        // The label only ever sits on GateMarker.Frost, a fixed near-white, so
-        // plain dark text reads without an outline.
-        private static readonly Color MarkerLabelColor = new Color(0.12f, 0.14f, 0.2f);
-        private const float MarkerLabelSizeRatio = 0.7f;
-        private const int MarkerLabelMinFontSize = 7;
-
-        private static GUIStyle markerLabelStyle;
+        // The style of a gate marker's threshold. An instance field, rebuilt
+        // after a domain reload like blockNumberStyle, so the window keeps no
+        // static state for it.
+        [NonSerialized] private GUIStyle markerLabelStyle;
 
         /// <summary>
         /// Draws <paramref name="text"/> centred on a marker rect, sized to the
         /// rect's short side — a Left/Right gate is only its depth wide. Skipped
         /// when that size would be unreadable; the fill alone still carries the
-        /// signal at small cell sizes.
+        /// signal at small cell sizes. The label only ever sits on
+        /// <see cref="GateMarker.Frost"/>, a fixed near-white, so the
+        /// settings' plain dark text reads without an outline.
         /// </summary>
-        private static void DrawMarkerLabel(Rect r, string text)
+        private void DrawMarkerLabel(Rect r, string text)
         {
             if (Event.current.type != EventType.Repaint)
             {
                 return;
             }
 
-            var fontSize = Mathf.RoundToInt(Mathf.Min(r.width, r.height) * MarkerLabelSizeRatio);
-            if (fontSize < MarkerLabelMinFontSize)
+            var fontSize = Mathf.RoundToInt(Mathf.Min(r.width, r.height) * settings.MarkerLabelSizeRatio);
+            if (fontSize < settings.MarkerLabelMinFontSize)
             {
                 return;
             }
@@ -1568,9 +1593,11 @@ namespace GateRush.Editor
                     padding = new RectOffset(0, 0, 0, 0),
                     margin = new RectOffset(0, 0, 0, 0),
                 };
-                markerLabelStyle.normal.textColor = MarkerLabelColor;
             }
 
+            // Set on every draw, not once at build, so an edit to the
+            // settings shows without a domain reload.
+            markerLabelStyle.normal.textColor = settings.MarkerLabelColor;
             markerLabelStyle.fontSize = fontSize;
             GUI.Label(r, text, markerLabelStyle);
         }
@@ -1667,7 +1694,7 @@ namespace GateRush.Editor
                                 new Rect(
                                     rect.x + (column * layout.CellSize), rect.y + (row * layout.CellSize),
                                     layout.CellSize, layout.CellSize),
-                                fill, 0f);
+                                fill, NoRotation);
                         }
                     }
                 }
@@ -1678,7 +1705,7 @@ namespace GateRush.Editor
                 if (areBlockMarksUsable)
                 {
                     DrawPlate(
-                        new Vector2(rect.xMin + (layout.CellSize * 0.5f), rect.yMin + (layout.CellSize * 0.5f)),
+                        new Vector2(rect.xMin + (layout.CellSize * Half), rect.yMin + (layout.CellSize * Half)),
                         settings.BlockNumberPlateCells * layout.CellSize,
                         shutter.Threshold.ToString(System.Globalization.CultureInfo.InvariantCulture),
                         shutter.RequiredColor.HasValue ? Palette(shutter.RequiredColor.Value) : settings.BlockNumberPlateColor);
@@ -2648,7 +2675,7 @@ namespace GateRush.Editor
             if (suggested.HasValue)
             {
                 var note = metrics.IsTimeBudgetFromUnprovenLength ? " (from unproven length)" : string.Empty;
-                GUILayout.Label($"{suggested.Value}s{note}", EditorStyles.miniLabel);
+                GUILayout.Label($"{suggested.Value}s{note}{TimeBonusNote()}", EditorStyles.miniLabel);
             }
             else
             {
@@ -2703,7 +2730,10 @@ namespace GateRush.Editor
             block.UnfreezeAtClearCount = NullableIntField("Unfreeze at clear #", block.UnfreezeAtClearCount);
             block.TimeBonusSeconds = EditorGUILayout.IntField("Time bonus (s)", block.TimeBonusSeconds);
 
-            block.LockId = NullableIntField("Lock id", block.LockId);
+            // SetLockId, not the plain setter: clearing the lock resets the
+            // key count, so a count typed for a lock since removed is not
+            // kept (Module 27).
+            block.SetLockId(NullableIntField("Lock id", block.LockId));
             if (block.LockId.HasValue)
             {
                 block.RequiredKeyCount = EditorGUILayout.IntField("Required keys", block.RequiredKeyCount);
@@ -2764,7 +2794,8 @@ namespace GateRush.Editor
             block.UnfreezeAtClearCount = NullableIntField("Unfreeze at clear #", block.UnfreezeAtClearCount);
             block.TimeBonusSeconds = EditorGUILayout.IntField("Time bonus (s)", block.TimeBonusSeconds);
 
-            block.LockId = NullableIntField("Lock id", block.LockId);
+            // As for a placed block: clearing the lock resets the key count.
+            block.SetLockId(NullableIntField("Lock id", block.LockId));
             if (block.LockId.HasValue)
             {
                 block.RequiredKeyCount = EditorGUILayout.IntField("Required keys", block.RequiredKeyCount);
@@ -3143,8 +3174,11 @@ namespace GateRush.Editor
 
         // -- footer: warnings, metrics, solve ------------------
 
-        /// <summary>The solver line's style, built on first draw; its text colour is set each frame from the verdict.</summary>
-        private static GUIStyle solverLineStyle;
+        // The solver line's style, built on first draw; its text colour is set
+        // each frame from the verdict. An instance field, rebuilt after a
+        // domain reload like blockNumberStyle, so the window keeps no static
+        // state for it.
+        [NonSerialized] private GUIStyle solverLineStyle;
 
         /// <summary>
         /// Built-in warning icon names, tried in order; the first that loads is
@@ -3156,18 +3190,23 @@ namespace GateRush.Editor
         /// <summary>What a warning line starts with when none of <see cref="WarningIconNames"/> loads.</summary>
         private const string WarningFallbackPrefix = "• ";
 
-        private static Texture warningIcon;
-        private static bool warningIconResolved;
+        // The resolved warning icon and whether the lookup has run. Instance
+        // fields, reset by a domain reload and resolved again on the next
+        // draw, so the window keeps no static state for them. The flag is
+        // separate because a failed lookup leaves the icon null and must
+        // still count as done.
+        [NonSerialized] private Texture warningIcon;
+        [NonSerialized] private bool warningIconResolved;
 
         /// <summary>
-        /// The warning icon, resolved once and cached — including a failed
+        /// The warning icon, resolved once per window and cached — including a failed
         /// lookup, so a missing icon costs one search, not one per repaint. Uses
         /// <see cref="EditorGUIUtility.FindTexture"/>, which returns null for an
         /// unknown name, not <c>IconContent</c>, which logs an error for one.
         /// Null when no name loads; the caller then falls back to
         /// <see cref="WarningFallbackPrefix"/>.
         /// </summary>
-        private static Texture WarningIcon()
+        private Texture WarningIcon()
         {
             if (warningIconResolved)
             {
@@ -3186,6 +3225,9 @@ namespace GateRush.Editor
 
             return warningIcon;
         }
+
+        /// <summary>What a metric shows when the draft does not form a level and so has no starting board to measure.</summary>
+        private const string NotAvailableText = "n/a";
 
         private void DrawFooter()
         {
@@ -3220,10 +3262,14 @@ namespace GateRush.Editor
 
             if (metrics != null)
             {
-                var branching = metrics.OpeningBranchingFactor < 0 ? "n/a" : metrics.OpeningBranchingFactor.ToString();
+                // Every number here reads the level's starting board, which a
+                // draft that does not form a level has none of.
+                var branching = metrics.HasStartingBoard ? metrics.OpeningBranchingFactor.ToString() : NotAvailableText;
+                var emptyCells = metrics.HasStartingBoard ? metrics.EmptyCellCount.ToString() : NotAvailableText;
+                var fill = metrics.HasStartingBoard ? metrics.FillRatio.ToString("P0") : NotAvailableText;
                 var ready = metrics.HasReadyOpeningMove ? "✓" : "✗";
                 EditorGUILayout.LabelField(
-                    $"Empty cells {metrics.EmptyCellCount} · Fill {metrics.FillRatio:P0} · " +
+                    $"Empty cells {emptyCells} · Fill {fill} · " +
                     $"Opening branching {branching} · Ready move {ready}",
                     EditorStyles.miniLabel);
             }
@@ -3240,8 +3286,11 @@ namespace GateRush.Editor
 
             // The solver line tints by the answer it is showing: while a run is
             // in progress it shows progress, not the held verdict, so it reads
-            // as not run until the new answer lands.
-            var lineKind = SolverLineKinds.Of(IsValidating || solve == null ? (LevelSolveVerdict?)null : solve.Verdict);
+            // as not run until the new answer lands. A run that failed has no
+            // verdict; it reads as an error, never as not run.
+            var lineKind = SolverLineKinds.Of(
+                IsValidating || solve == null ? (LevelSolveVerdict?)null : solve.Verdict,
+                !IsValidating && validationErrorSummary != null);
             if (solverLineStyle == null)
             {
                 solverLineStyle = new GUIStyle(EditorStyles.boldLabel) { wordWrap = true };
@@ -3274,6 +3323,11 @@ namespace GateRush.Editor
 
         private string SolveSummary()
         {
+            if (validationErrorSummary != null)
+            {
+                return $"Solver: error — {validationErrorSummary}";
+            }
+
             if (solve == null)
             {
                 if (validationCancelledReason != null)
@@ -3298,7 +3352,9 @@ namespace GateRush.Editor
                         ? " (from unproven length)"
                         : string.Empty;
                     return $"Solver: solvable in {solve.Solution.Count}, {quality} ({stage})" +
-                           (suggested.HasValue ? $"  ·  Suggested budget {suggested.Value}s{budgetNote}" : string.Empty);
+                           (suggested.HasValue
+                               ? $"  ·  Suggested budget {suggested.Value}s{budgetNote}{TimeBonusNote()}"
+                               : string.Empty);
                 case LevelSolveVerdict.Unsolvable:
                     return $"Solver: unsolvable ({stage}) — {UnsolvableBasis()}";
                 default:
@@ -3307,6 +3363,17 @@ namespace GateRush.Editor
                            $"nearest-next-clear {answering.ExploredStateCount} states/{answering.ElapsedMs}ms";
             }
         }
+
+        /// <summary>
+        /// What follows a suggested budget wherever it is shown: the total of
+        /// the level's time bonuses (M10), which the suggestion leaves out
+        /// (D54) and the player collects on top of it. Empty when the level
+        /// has none, so a level without bonuses reads as before.
+        /// </summary>
+        private string TimeBonusNote() =>
+            metrics != null && metrics.AvailableTimeBonusSeconds > 0
+                ? $" · +{metrics.AvailableTimeBonusSeconds} s in bonuses"
+                : string.Empty;
 
         /// <summary>Why the pipeline believes an Unsolvable verdict.</summary>
         private string UnsolvableBasis()
@@ -3376,6 +3443,7 @@ namespace GateRush.Editor
 
             solve = null;
             validationError = null;
+            validationErrorSummary = null;
             validationNotice = null;
             validationCancelledReason = null;
             Revalidate();
@@ -3475,6 +3543,7 @@ namespace GateRush.Editor
                 validationError =
                     "Solver disagreement — neither verdict can be trusted, and this is a solver bug, not a " +
                     $"property of the level:\n{disagreement.Message}";
+                validationErrorSummary = $"solver disagreement: {disagreement.Message}";
                 Debug.LogError(disagreement);
                 EditorUtility.DisplayDialog("Solver disagreement", validationError, "OK");
                 return;
@@ -3483,6 +3552,7 @@ namespace GateRush.Editor
             if (failure != null && !(failure is OperationCanceledException))
             {
                 validationError = $"Solver error — the search could not complete, and this is a solver bug:\n{failure.Message}";
+                validationErrorSummary = failure.Message;
                 Debug.LogException(failure);
                 EditorUtility.DisplayDialog("Solver error", validationError, "OK");
                 return;
@@ -3509,6 +3579,7 @@ namespace GateRush.Editor
         {
             solve = null;
             validationError = null;
+            validationErrorSummary = null;
             validationNotice = null;
             validationCancelledReason = null;
             CancelValidation("the level changed while it was running");
@@ -3890,11 +3961,11 @@ namespace GateRush.Editor
             return false;
         }
 
-        private void OutlineCellIfInside(EditorGridLayout layout, Coord cell, Color color)
+        private static void OutlineCellIfInside(EditorGridLayout layout, Coord cell, Color color, float thickness)
         {
             if (cell.X >= 0 && cell.X < layout.Columns && cell.Y >= 0 && cell.Y < layout.Rows)
             {
-                EditorGrid.DrawOutline(layout.CellRect(cell), color);
+                EditorGrid.DrawOutline(layout.CellRect(cell), color, thickness);
             }
         }
 

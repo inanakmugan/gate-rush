@@ -293,8 +293,9 @@ it is exactly the question the solver answers.
 - Branching factor at the opening position.
 - Whether a ready opening move exists.
 - Solver's explored-state count and largest stratum.
-- **Suggested time budget**, derived from the solution length plus available M10
-  bonuses. This is what turns a feel-based number into a measured one (D12).
+- **Suggested time budget**, derived from the solution length, with the total
+  of the M10 bonuses shown beside it but not added (D54, Module 27). This is
+  what turns a feel-based number into a measured one (D12).
 
 ---
 
@@ -350,7 +351,7 @@ that warns about everything is as useless as one that warns about nothing.
 - Empty cell count and fill ratio on a known board.
 - Opening branching factor matches `MoveGenerator`'s output for that board.
 - Ready-opening-move detection, positive and negative.
-- Suggested time budget rises with solution length and with available bonuses.
+- Suggested time budget rises with solution length and ignores bonuses (D54).
 
 **Grid resize**
 - Growing a grid changes nothing else.

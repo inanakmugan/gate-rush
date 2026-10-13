@@ -25,7 +25,10 @@ namespace GateRush.Editor
     /// opened and fixed. This conversion is lenient: an unparseable enum name
     /// becomes that enum's first member rather than throwing, so nothing about a
     /// malformed file keeps it from opening.</item>
-    /// <item><see cref="ToDto"/>: the save half. Warnings never block saving.</item>
+    /// <item><see cref="ToDto"/>: the save half. Warnings never block saving.
+    /// One value is not written as held: a block with no lock id always saves
+    /// <see cref="LockKeyCount.Default"/> as its key count, so a stale count
+    /// can never reach level data (Module 27).</item>
     /// <item><see cref="ToContext"/>: draft to <see cref="LevelContext"/>, where
     /// <c>Core</c>'s rules apply. It routes through the DTO and
     /// <see cref="LevelSerializer"/> so structural checking is not duplicated;
@@ -282,7 +285,7 @@ namespace GateRush.Editor
                     axis = b.Axis.ToString(),
                     unfreezeAtClearCount = ToSentinel(b.UnfreezeAtClearCount),
                     lockId = ToSentinel(b.LockId),
-                    requiredKeyCount = b.RequiredKeyCount,
+                    requiredKeyCount = LockKeyCount.For(b.LockId, b.RequiredKeyCount),
                     keyTargetLockId = ToSentinel(b.KeyTargetLockId),
                     timeBonusSeconds = b.TimeBonusSeconds,
                 }),
@@ -330,7 +333,7 @@ namespace GateRush.Editor
                 axis = sb.Axis.ToString(),
                 unfreezeAtClearCount = ToSentinel(sb.UnfreezeAtClearCount),
                 lockId = ToSentinel(sb.LockId),
-                requiredKeyCount = sb.RequiredKeyCount,
+                requiredKeyCount = LockKeyCount.For(sb.LockId, sb.RequiredKeyCount),
                 keyTargetLockId = ToSentinel(sb.KeyTargetLockId),
                 timeBonusSeconds = sb.TimeBonusSeconds,
                 hasRegionOrigin = sb.RegionOrigin.HasValue,
@@ -544,6 +547,61 @@ namespace GateRush.Editor
         public override string ToString() => Message;
     }
 
+    /// <summary>
+    /// The required key count of a block under edit, as it depends on whether
+    /// the block carries a lock (M8). One place for the rule, shared by
+    /// <see cref="BlockDraft"/>, <see cref="SpawnedBlockDraft"/> and the save
+    /// in <see cref="LevelDraft.ToDto"/>, so a placed block, a wave block and
+    /// a queue entry cannot come to treat it differently.
+    /// </summary>
+    public static class LockKeyCount
+    {
+        /// <summary>
+        /// The key count of a block with no lock: what a new draft block
+        /// holds and what every lock-free block in a level file carries.
+        /// </summary>
+        public const int Default = 0;
+
+        /// <summary>
+        /// The fewest keys a lock can require. <c>Core</c> rejects a locked
+        /// block that requires fewer (<c>BlockValidation.ValidateLock</c>).
+        /// </summary>
+        public const int MinimumForLock = 1;
+
+        /// <summary>
+        /// The key count to save for a block: <paramref name="requiredKeyCount"/>
+        /// while it carries a lock, <see cref="Default"/> otherwise, whatever
+        /// the draft holds.
+        /// </summary>
+        public static int For(int? lockId, int requiredKeyCount) =>
+            lockId.HasValue ? requiredKeyCount : Default;
+
+        /// <summary>
+        /// The key count a block holds after its lock id changes from
+        /// <paramref name="previousLockId"/> to <paramref name="newLockId"/>.
+        /// Clearing the lock resets it to <see cref="Default"/>. Gaining a
+        /// lock raises a count below <see cref="MinimumForLock"/> to it, so a
+        /// freshly locked block is one <c>Core</c> accepts; a count already
+        /// valid is kept. A lock id that only changes value, or does not
+        /// change, leaves the count alone — a count the designer typed is not
+        /// corrected behind their back.
+        /// </summary>
+        public static int AfterLockIdChange(int? previousLockId, int? newLockId, int requiredKeyCount)
+        {
+            if (!newLockId.HasValue)
+            {
+                return Default;
+            }
+
+            if (!previousLockId.HasValue && requiredKeyCount < MinimumForLock)
+            {
+                return MinimumForLock;
+            }
+
+            return requiredKeyCount;
+        }
+    }
+
     /// <summary>A block under edit. Cells and <see cref="StartOrigin"/> are stored as authored, not normalised.</summary>
     public sealed class BlockDraft
     {
@@ -554,9 +612,22 @@ namespace GateRush.Editor
         public MovementAxis Axis { get; set; }
         public int? UnfreezeAtClearCount { get; set; }
         public int? LockId { get; set; }
-        public int RequiredKeyCount { get; set; }
+        public int RequiredKeyCount { get; set; } = LockKeyCount.Default;
         public int? KeyTargetLockId { get; set; }
         public int TimeBonusSeconds { get; set; }
+
+        /// <summary>
+        /// Sets <see cref="LockId"/> the way the properties panel edits it,
+        /// keeping <see cref="RequiredKeyCount"/> in step
+        /// (<see cref="LockKeyCount.AfterLockIdChange"/>): cleared with the
+        /// lock, and at least one when a lock is gained. The plain setters
+        /// stay for loading a file, which keeps what it reads.
+        /// </summary>
+        public void SetLockId(int? lockId)
+        {
+            RequiredKeyCount = LockKeyCount.AfterLockIdChange(LockId, lockId, RequiredKeyCount);
+            LockId = lockId;
+        }
     }
 
     public sealed class GateDraft
@@ -632,9 +703,21 @@ namespace GateRush.Editor
         public MovementAxis Axis { get; set; }
         public int? UnfreezeAtClearCount { get; set; }
         public int? LockId { get; set; }
-        public int RequiredKeyCount { get; set; }
+        public int RequiredKeyCount { get; set; } = LockKeyCount.Default;
         public int? KeyTargetLockId { get; set; }
         public int TimeBonusSeconds { get; set; }
         public Coord? RegionOrigin { get; set; }
+
+        /// <summary>
+        /// Sets <see cref="LockId"/> the way the properties panel edits it,
+        /// keeping <see cref="RequiredKeyCount"/> in step — the same rule as
+        /// <see cref="BlockDraft.SetLockId"/>
+        /// (<see cref="LockKeyCount.AfterLockIdChange"/>).
+        /// </summary>
+        public void SetLockId(int? lockId)
+        {
+            RequiredKeyCount = LockKeyCount.AfterLockIdChange(LockId, lockId, RequiredKeyCount);
+            LockId = lockId;
+        }
     }
 }

@@ -197,12 +197,11 @@ most levels and is easy to lose in input handling.
 **Known debt.** Small items found along the way, none blocking; each is
 taken when its area is next touched.
 
-- *Level Editor:* the "Empty cells / Fill" metric ignores blocks spawned at level start;
-  magic numbers remain in the window's drawing code; a lock-free block
-  keeps a stale `RequiredKeyCount`; the solver line shows the "not run"
-  colour after a search error; `DraftValidator`'s summary says two checks
-  read outside inputs where there are now three; the shutter-threshold
-  warning has no test.
+- *Level Editor:* specified in Module 27, together with D54 (the suggested
+  time budget leaves bonuses out): the fill metric from the starting
+  board, no stale key count, an error state on the solver line, the
+  validator summary, the shutter-threshold test, and the remaining canvas
+  magic numbers.
 - *Solver:* `SolveStatus`, `ISearchStrategy` and `SearchBudget` XML
   comments are out of date; `ExitCandidates`' Dijkstra is slower than it
   needs to be; two floors in `NearestNextClearStrategyTests` now count the

@@ -14,7 +14,10 @@ namespace GateRush.Tests
     /// their documented defaults, which <see cref="LevelEditorSettings.Problems"/>
     /// accepts. Module 24: a missing <c>RuntimeConfig</c> reference and a
     /// shutter overlay alpha of 0 or 1 are reported, and neither turns off the
-    /// Module 20 block look.
+    /// Module 20 block look. Module 27: the canvas fields that replaced the
+    /// window's remaining literals default to those literals, each has a
+    /// <see cref="LevelEditorSettings.Problems"/> check, and the defaults
+    /// report nothing new; the solver line has an error tint of its own.
     /// </summary>
     public class LevelEditorSettingsTests
     {
@@ -56,7 +59,7 @@ namespace GateRush.Tests
             Assert.AreEqual(10, formula.Base);
             Assert.AreEqual(3, formula.PerMove);
             Assert.AreEqual(5, formula.Rounding);
-            Assert.AreEqual(35, formula.Suggest(8, 0));
+            Assert.AreEqual(35, formula.Suggest(8));
 
             Object.DestroyImmediate(settings);
         }
@@ -283,6 +286,143 @@ namespace GateRush.Tests
             var problems = settings.Problems();
 
             Assert.That(problems, Has.Some.Contains("Block Inset Cells"), string.Join(" | ", problems));
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_Module27Canvas_KeepTheLiteralsTheWindowHardcoded()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(new Color(0.16f, 0.16f, 0.18f), settings.CanvasBackgroundColor);
+            Assert.AreEqual(200f, settings.CanvasMinWidth);
+            Assert.AreEqual(new Color(0.4f, 0.9f, 0.5f), settings.FreeDrawCellOutlineColor);
+            Assert.AreEqual(2f, settings.FreeDrawCellOutlineThickness);
+            Assert.AreEqual(new Color(0f, 0f, 0f, 0.8f), settings.BlockBoundaryColor);
+            Assert.AreEqual(1.5f, settings.BlockBoundaryThickness);
+            Assert.AreEqual(new Color(1f, 0.85f, 0.2f), settings.SelectionOutlineColor);
+            Assert.AreEqual(2f, settings.SelectionOutlineThickness);
+            Assert.AreEqual(0.4f, settings.DragRegionPreviewLighten);
+            Assert.AreEqual(2.5f, settings.DragRegionPreviewThickness);
+            Assert.AreEqual(new Color(0.4f, 0.95f, 0.5f, 0.55f), settings.BlockDragColor(isLegal: true));
+            Assert.AreEqual(new Color(0.95f, 0.3f, 0.3f, 0.6f), settings.BlockDragColor(isLegal: false));
+            Assert.AreEqual(new Color(0.4f, 0.95f, 0.5f, 0.75f), settings.EdgeDragColor(isLegal: true));
+            Assert.AreEqual(new Color(0.95f, 0.3f, 0.3f, 0.75f), settings.EdgeDragColor(isLegal: false));
+            Assert.AreEqual(new Color(0.78f, 0.78f, 0.82f), settings.GeneratorMarkerColor);
+            Assert.AreEqual(Color.white, settings.SelectedMarkerOutlineColor);
+            Assert.AreEqual(1.5f, settings.SelectedMarkerOutlineThickness);
+            Assert.AreEqual(new Color(0.12f, 0.14f, 0.2f), settings.MarkerLabelColor);
+            Assert.AreEqual(0.7f, settings.MarkerLabelSizeRatio);
+            Assert.AreEqual(7, settings.MarkerLabelMinFontSize);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Defaults_MarkerDepth_IsAShareOfACellFlooredInPixels()
+        {
+            // The literals were max(4, 0.35 cell) for a gate and
+            // max(6, 0.5 cell) for a generator.
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+
+            Assert.AreEqual(4f, settings.GateMarkerDepth(cellSize: 1f), "the floor wins on a tiny cell");
+            Assert.AreEqual(35f, settings.GateMarkerDepth(cellSize: 100f), 0.0001f);
+            Assert.AreEqual(6f, settings.GeneratorMarkerDepth(cellSize: 1f), "the floor wins on a tiny cell");
+            Assert.AreEqual(50f, settings.GeneratorMarkerDepth(cellSize: 100f), 0.0001f);
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [TestCase("solverErrorColor", "Solver Error Color")]
+        [TestCase("canvasBackgroundColor", "Canvas Background Color")]
+        [TestCase("freeDrawCellOutlineColor", "Free Draw Cell Outline Color")]
+        [TestCase("blockBoundaryColor", "Block Boundary Color")]
+        [TestCase("selectionOutlineColor", "Selection Outline Color")]
+        [TestCase("blockDragLegalColor", "Block Drag Legal Color")]
+        [TestCase("blockDragIllegalColor", "Block Drag Illegal Color")]
+        [TestCase("edgeDragLegalColor", "Edge Drag Legal Color")]
+        [TestCase("edgeDragIllegalColor", "Edge Drag Illegal Color")]
+        [TestCase("generatorMarkerColor", "Generator Marker Color")]
+        [TestCase("selectedMarkerOutlineColor", "Selected Marker Outline Color")]
+        [TestCase("markerLabelColor", "Marker Label Color")]
+        public void Problems_Module27ColourWithZeroAlpha_IsReportedByName(string field, string shownName)
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            var property = serialized.FindProperty(field);
+            Assert.IsNotNull(property, $"no serialized field '{field}'");
+            var color = property.colorValue;
+            property.colorValue = new Color(color.r, color.g, color.b, 0f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+            var isLookUsable = settings.AreBlockMarksUsable;
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+            Assert.IsTrue(isLookUsable, "a canvas value never hides the block look");
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [TestCase("canvasMinWidth", "Canvas Min Width", 0f)]
+        [TestCase("freeDrawCellOutlineThickness", "Free Draw Cell Outline Thickness", 0f)]
+        [TestCase("blockBoundaryThickness", "Block Boundary Thickness", 0f)]
+        [TestCase("selectionOutlineThickness", "Selection Outline Thickness", 0f)]
+        [TestCase("dragRegionPreviewLighten", "Drag Region Preview Lighten", -0.1f)]
+        [TestCase("dragRegionPreviewLighten", "Drag Region Preview Lighten", 1.1f)]
+        [TestCase("dragRegionPreviewThickness", "Drag Region Preview Thickness", 0f)]
+        [TestCase("selectedMarkerOutlineThickness", "Selected Marker Outline Thickness", 0f)]
+        [TestCase("gateMarkerDepthCells", "Gate Marker Depth Cells", 0f)]
+        [TestCase("gateMarkerMinDepth", "Gate Marker Min Depth", 0f)]
+        [TestCase("generatorMarkerDepthCells", "Generator Marker Depth Cells", 0f)]
+        [TestCase("generatorMarkerMinDepth", "Generator Marker Min Depth", 0f)]
+        [TestCase("markerLabelSizeRatio", "Marker Label Size Ratio", 0f)]
+        [TestCase("markerLabelSizeRatio", "Marker Label Size Ratio", 1.1f)]
+        public void Problems_Module27NumberOutOfRange_IsReportedByName(string field, string shownName, float value)
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            var property = serialized.FindProperty(field);
+            Assert.IsNotNull(property, $"no serialized field '{field}'");
+            property.floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [Test]
+        public void Problems_MarkerLabelMinFontSizeBelowOne_IsReportedByName()
+        {
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("markerLabelMinFontSize").intValue = 0;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Marker Label Min Font Size"), string.Join(" | ", problems));
+
+            Object.DestroyImmediate(settings);
+        }
+
+        [TestCase(0f)]
+        [TestCase(1f)]
+        public void Problems_DragRegionPreviewLightenAtEitherEnd_IsAccepted(float lighten)
+        {
+            // 0 keeps the region's own hue and 1 is plain white: both draw.
+            var settings = ScriptableObject.CreateInstance<LevelEditorSettings>();
+            var serialized = new UnityEditor.SerializedObject(settings);
+            serialized.FindProperty("dragRegionPreviewLighten").floatValue = lighten;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = settings.Problems();
+
+            Assert.That(problems, Has.None.Contains("Drag Region Preview Lighten"), string.Join(" | ", problems));
 
             Object.DestroyImmediate(settings);
         }

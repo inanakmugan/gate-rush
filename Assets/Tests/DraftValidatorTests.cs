@@ -693,6 +693,71 @@ namespace GateRush.Tests
             Assert.IsTrue(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
         }
 
+        // -- ThresholdExceedsAvailableClears: shutters (M5) ---
+
+        private const int ShutterDraftRedClears = 2;
+        private const int ShutterDraftTotalClears = 3;
+
+        /// <summary>
+        /// Two red blocks and a blue one — <see cref="ShutterDraftRedClears"/>
+        /// red clears, <see cref="ShutterDraftTotalClears"/> in all — under one
+        /// shutter, the only thing in the draft that carries a threshold.
+        /// </summary>
+        private static LevelDraft ShutterThresholdDraft(int threshold, BlockColor? requiredColor) =>
+            Draft(3, 3, d =>
+            {
+                d.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+                d.Blocks.Add(RedBlock(2, new Coord(1, 0)));
+                d.Blocks.Add(new BlockDraft
+                {
+                    Id = 3, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Blue }, StartOrigin = new Coord(2, 0),
+                });
+                d.Shutters.Add(new ShutterDraft
+                {
+                    Id = 1, Min = new Coord(0, 0), Max = new Coord(2, 0), Threshold = threshold,
+                    RequiredColor = requiredColor,
+                });
+            });
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_GlobalShutterThresholdAboveTotalClears_Fires()
+        {
+            var draft = ShutterThresholdDraft(ShutterDraftTotalClears + 1, requiredColor: null);
+
+            var message = Message(draft, DraftWarningCategory.ThresholdExceedsAvailableClears);
+
+            StringAssert.Contains("Shutter 1", message);
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_GlobalShutterThresholdAtTotalClears_Silent()
+        {
+            var draft = ShutterThresholdDraft(ShutterDraftTotalClears, requiredColor: null);
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_ColourShutterThresholdAboveThatColoursClears_Fires()
+        {
+            // Within the level's total, so only the per-colour count can
+            // object: a red shutter counts red clears alone.
+            var draft = ShutterThresholdDraft(ShutterDraftRedClears + 1, BlockColor.Red);
+
+            var message = Message(draft, DraftWarningCategory.ThresholdExceedsAvailableClears);
+
+            Assert.LessOrEqual(ShutterDraftRedClears + 1, ShutterDraftTotalClears, "The threshold must be within the total, or this proves nothing.");
+            StringAssert.Contains("Shutter 1", message);
+        }
+
+        [Test]
+        public void ThresholdExceedsAvailableClears_ColourShutterThresholdAtThatColoursClears_Silent()
+        {
+            var draft = ShutterThresholdDraft(ShutterDraftRedClears, BlockColor.Red);
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.ThresholdExceedsAvailableClears));
+        }
+
         // -- ShutterRegionNotFullyCovered (M5) ----------------
 
         [Test]

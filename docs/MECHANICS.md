@@ -314,8 +314,9 @@ wave's own.
 A block may carry a bonus of N seconds, added to the countdown when the block is
 **destroyed** (final colour cleared), not on each clear.
 
-Time is not part of `BoardState` and not part of the search space. The editor
-sums available bonuses when suggesting a time budget.
+Time is not part of `BoardState` and not part of the search space. The
+editor's suggested time budget leaves bonuses out and shows their total
+beside it (D54).
 
 ---
 

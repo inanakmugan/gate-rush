@@ -14,7 +14,9 @@ namespace GateRush.Editor
     /// pixel constants with, how the board fits its canvas, and how the solver
     /// result line is presented; and how the canvas draws cells, shutters,
     /// elevators and a block's marks, with a reference to the game's own
-    /// config for the marks' sprites (Module 24). Kept in an asset so no number is fixed at a call
+    /// config for the marks' sprites (Module 24); and the rest of the canvas's
+    /// colours, sizes and thicknesses — block outlines, the selection, drag
+    /// previews and edge markers (Module 27). Kept in an asset so no number is fixed at a call
     /// site and every one of them can be edited in the window and persist.
     /// </summary>
     /// <remarks>
@@ -42,7 +44,7 @@ namespace GateRush.Editor
         [SerializeField] private int exhaustiveMaxExploredStates = 1_000_000;
         [SerializeField] private long exhaustiveMaxWallClockMs = 15_000;
 
-        [Header("Suggested time budget = base + perMove * moves + bonuses, rounded up")]
+        [Header("Suggested time budget = base + perMove * moves, rounded up; time bonuses are shown beside it, not added (D54)")]
         [SerializeField] private int timeBudgetBaseSeconds = 10;
         [SerializeField] private int timeBudgetSecondsPerMove = 3;
         [SerializeField] private int timeBudgetRoundingSeconds = 5;
@@ -70,6 +72,9 @@ namespace GateRush.Editor
         [SerializeField] private Color solverUnsolvableColor = new Color(0.95f, 0.42f, 0.38f);
         [SerializeField] private Color solverIndeterminateColor = new Color(0.95f, 0.75f, 0.3f);
         [SerializeField] private Color solverNotRunColor = new Color(0.7f, 0.7f, 0.72f);
+
+        [Tooltip("Tint of the solver line when the last run ended in a solver failure, which is a bug and never a verdict (Module 27): alpha above 0.")]
+        [SerializeField] private Color solverErrorColor = new Color(0.93f, 0.4f, 0.85f);
         [SerializeField] private float validateButtonWidth = 120f;
         [SerializeField] private float validateButtonHeight = 28f;
 
@@ -141,6 +146,79 @@ namespace GateRush.Editor
 
         [Tooltip("Thickness of an elevator region's border, in pixels: above 0.")]
         [SerializeField] private float regionBorderThickness = 1f;
+
+        [Header("Canvas (Module 27): the canvas itself, block outlines, the selection, drag previews and edge markers. Colours need an alpha above 0")]
+        [Tooltip("Fill of the canvas round the grid.")]
+        [SerializeField] private Color canvasBackgroundColor = new Color(0.16f, 0.16f, 0.18f);
+
+        [Tooltip("The narrowest the canvas is laid out, in pixels: above 0.")]
+        [SerializeField] private float canvasMinWidth = 200f;
+
+        [Tooltip("Outline of a cell picked for a free-drawn block that is not placed yet.")]
+        [SerializeField] private Color freeDrawCellOutlineColor = new Color(0.4f, 0.9f, 0.5f);
+
+        [Tooltip("Thickness of that outline, in pixels: above 0.")]
+        [SerializeField] private float freeDrawCellOutlineThickness = 2f;
+
+        [Tooltip("Stroke along a block's own outer edge, darker than the grid's cell lines.")]
+        [SerializeField] private Color blockBoundaryColor = new Color(0f, 0f, 0f, 0.8f);
+
+        [Tooltip("Thickness of a block's outer stroke, in pixels: above 0.")]
+        [SerializeField] private float blockBoundaryThickness = 1.5f;
+
+        [Tooltip("Outline of the selected block, shutter or elevator.")]
+        [SerializeField] private Color selectionOutlineColor = new Color(1f, 0.85f, 0.2f);
+
+        [Tooltip("Thickness of the selection outline, in pixels: above 0.")]
+        [SerializeField] private float selectionOutlineThickness = 2f;
+
+        [Tooltip("How far a dragged shutter's or elevator's outline is lightened from its hue toward white: 0 to 1.")]
+        [SerializeField] private float dragRegionPreviewLighten = 0.4f;
+
+        [Tooltip("Thickness of a dragged shutter's or elevator's outline, in pixels: above 0.")]
+        [SerializeField] private float dragRegionPreviewThickness = 2.5f;
+
+        [Tooltip("Fill of a dragged block's cells where it may be dropped.")]
+        [SerializeField] private Color blockDragLegalColor = new Color(0.4f, 0.95f, 0.5f, 0.55f);
+
+        [Tooltip("Fill of a dragged block's cells where it may not be dropped.")]
+        [SerializeField] private Color blockDragIllegalColor = new Color(0.95f, 0.3f, 0.3f, 0.6f);
+
+        [Tooltip("Fill of a dragged gate's or generator's marker where it may be dropped.")]
+        [SerializeField] private Color edgeDragLegalColor = new Color(0.4f, 0.95f, 0.5f, 0.75f);
+
+        [Tooltip("Fill of a dragged gate's or generator's marker where it may not be dropped.")]
+        [SerializeField] private Color edgeDragIllegalColor = new Color(0.95f, 0.3f, 0.3f, 0.75f);
+
+        [Tooltip("Fill of a generator's triangle (M6): neutral, since its queue can hold any colours.")]
+        [SerializeField] private Color generatorMarkerColor = new Color(0.78f, 0.78f, 0.82f);
+
+        [Tooltip("Outline of the selected gate's or generator's marker.")]
+        [SerializeField] private Color selectedMarkerOutlineColor = Color.white;
+
+        [Tooltip("Thickness of the selected marker's outline, in pixels: above 0.")]
+        [SerializeField] private float selectedMarkerOutlineThickness = 1.5f;
+
+        [Tooltip("How far a gate's bar reaches out from the grid, in cells: above 0.")]
+        [SerializeField] private float gateMarkerDepthCells = 0.35f;
+
+        [Tooltip("The least a gate's bar reaches out from the grid, in pixels, however small the cells: above 0.")]
+        [SerializeField] private float gateMarkerMinDepth = 4f;
+
+        [Tooltip("How far a generator's triangle reaches out from the grid, in cells: above 0.")]
+        [SerializeField] private float generatorMarkerDepthCells = 0.5f;
+
+        [Tooltip("The least a generator's triangle reaches out from the grid, in pixels, however small the cells: above 0.")]
+        [SerializeField] private float generatorMarkerMinDepth = 6f;
+
+        [Tooltip("Colour of the threshold on a closed gate's marker (M2). It sits on the frost fill, a near-white.")]
+        [SerializeField] private Color markerLabelColor = new Color(0.12f, 0.14f, 0.2f);
+
+        [Tooltip("A gate threshold's font size as a fraction of its marker's short side: above 0, at most 1.")]
+        [SerializeField] private float markerLabelSizeRatio = 0.7f;
+
+        [Tooltip("The smallest font a gate's threshold is drawn in, in pixels: at least 1. Below it the threshold is not drawn.")]
+        [SerializeField] private int markerLabelMinFontSize = 7;
 
         /// <summary>
         /// The quick optimal attempt Validate makes first: exhaustive A* at a
@@ -216,6 +294,8 @@ namespace GateRush.Editor
                     return solverIndeterminateColor;
                 case SolverLineKind.NotRun:
                     return solverNotRunColor;
+                case SolverLineKind.Error:
+                    return solverErrorColor;
                 default:
                     throw new System.ArgumentOutOfRangeException(nameof(kind), kind, "Unknown solver line kind.");
             }
@@ -306,6 +386,77 @@ namespace GateRush.Editor
         /// <summary>Thickness of an elevator region's border, in pixels. Default 1.</summary>
         public float RegionBorderThickness => regionBorderThickness;
 
+        /// <summary>Fill of the canvas round the grid.</summary>
+        public Color CanvasBackgroundColor => canvasBackgroundColor;
+
+        /// <summary>The narrowest the canvas is laid out, in pixels; the width's counterpart of <see cref="CanvasMinHeight"/>. Default 200.</summary>
+        public float CanvasMinWidth => canvasMinWidth;
+
+        /// <summary>Outline of a cell picked for a free-drawn block that is not placed yet.</summary>
+        public Color FreeDrawCellOutlineColor => freeDrawCellOutlineColor;
+
+        /// <summary>Thickness of a pending free-draw cell's outline, in pixels. Default 2.</summary>
+        public float FreeDrawCellOutlineThickness => freeDrawCellOutlineThickness;
+
+        /// <summary>The stroke along a block's own outer edge — darker and thicker than <c>EditorGrid</c>'s cell lines, which run between every pair of cells including two inside one block.</summary>
+        public Color BlockBoundaryColor => blockBoundaryColor;
+
+        /// <summary>Thickness of a block's outer stroke, in pixels. Default 1.5.</summary>
+        public float BlockBoundaryThickness => blockBoundaryThickness;
+
+        /// <summary>Outline of the selected block, shutter or elevator.</summary>
+        public Color SelectionOutlineColor => selectionOutlineColor;
+
+        /// <summary>Thickness of the selection outline, in pixels. Default 2.</summary>
+        public float SelectionOutlineThickness => selectionOutlineThickness;
+
+        /// <summary>How far a dragged region's outline is lightened from its hue toward white. Default 0.4.</summary>
+        public float DragRegionPreviewLighten => dragRegionPreviewLighten;
+
+        /// <summary>Thickness of a dragged region's outline, in pixels. Default 2.5.</summary>
+        public float DragRegionPreviewThickness => dragRegionPreviewThickness;
+
+        /// <summary>Fill of a dragged block's cells: one colour where it may be dropped, another where it may not.</summary>
+        public Color BlockDragColor(bool isLegal) => isLegal ? blockDragLegalColor : blockDragIllegalColor;
+
+        /// <summary>Fill of a dragged gate's or generator's marker: one colour where it may be dropped, another where it may not.</summary>
+        public Color EdgeDragColor(bool isLegal) => isLegal ? edgeDragLegalColor : edgeDragIllegalColor;
+
+        /// <summary>Fill of a generator's triangle (M6). Neutral: a generator's queue can be any mix of colours, so none of them is its own.</summary>
+        public Color GeneratorMarkerColor => generatorMarkerColor;
+
+        /// <summary>Outline of the selected gate's or generator's marker.</summary>
+        public Color SelectedMarkerOutlineColor => selectedMarkerOutlineColor;
+
+        /// <summary>Thickness of the selected marker's outline, in pixels. Default 1.5.</summary>
+        public float SelectedMarkerOutlineThickness => selectedMarkerOutlineThickness;
+
+        /// <summary>
+        /// How far a gate's bar reaches out from the grid, in pixels, for
+        /// cells of <paramref name="cellSize"/>: a share of a cell, floored
+        /// so it stays clickable on small cells. Default 0.35 cell, at
+        /// least 4 px.
+        /// </summary>
+        public float GateMarkerDepth(float cellSize) =>
+            Mathf.Max(gateMarkerMinDepth, cellSize * gateMarkerDepthCells);
+
+        /// <summary>
+        /// How far a generator's triangle reaches out from the grid, in
+        /// pixels, for cells of <paramref name="cellSize"/>. Default 0.5
+        /// cell, at least 6 px.
+        /// </summary>
+        public float GeneratorMarkerDepth(float cellSize) =>
+            Mathf.Max(generatorMarkerMinDepth, cellSize * generatorMarkerDepthCells);
+
+        /// <summary>Colour of the threshold on a closed gate's marker (M2).</summary>
+        public Color MarkerLabelColor => markerLabelColor;
+
+        /// <summary>A gate threshold's font size as a fraction of its marker's short side. Default 0.7.</summary>
+        public float MarkerLabelSizeRatio => markerLabelSizeRatio;
+
+        /// <summary>The smallest font a gate's threshold is drawn in, in pixels; below it the threshold is skipped. Default 7.</summary>
+        public int MarkerLabelMinFontSize => markerLabelMinFontSize;
+
         /// <summary>
         /// True when the values behind a block's Module 20 look — the ice
         /// colour, the frozen count, the layer inset and the layer number —
@@ -356,7 +507,64 @@ namespace GateRush.Editor
                 problems.Add($"{name}: Region Border Thickness must be above 0.");
             }
 
+            AddIfInvisible(problems, solverErrorColor, "Solver Error Color");
+            AddIfInvisible(problems, canvasBackgroundColor, "Canvas Background Color");
+            AddIfNotAboveZero(problems, canvasMinWidth, "Canvas Min Width");
+            AddIfInvisible(problems, freeDrawCellOutlineColor, "Free Draw Cell Outline Color");
+            AddIfNotAboveZero(problems, freeDrawCellOutlineThickness, "Free Draw Cell Outline Thickness");
+            AddIfInvisible(problems, blockBoundaryColor, "Block Boundary Color");
+            AddIfNotAboveZero(problems, blockBoundaryThickness, "Block Boundary Thickness");
+            AddIfInvisible(problems, selectionOutlineColor, "Selection Outline Color");
+            AddIfNotAboveZero(problems, selectionOutlineThickness, "Selection Outline Thickness");
+
+            if (!(dragRegionPreviewLighten >= 0f && dragRegionPreviewLighten <= 1f))
+            {
+                problems.Add($"{name}: Drag Region Preview Lighten must be from 0 to 1.");
+            }
+
+            AddIfNotAboveZero(problems, dragRegionPreviewThickness, "Drag Region Preview Thickness");
+            AddIfInvisible(problems, blockDragLegalColor, "Block Drag Legal Color");
+            AddIfInvisible(problems, blockDragIllegalColor, "Block Drag Illegal Color");
+            AddIfInvisible(problems, edgeDragLegalColor, "Edge Drag Legal Color");
+            AddIfInvisible(problems, edgeDragIllegalColor, "Edge Drag Illegal Color");
+            AddIfInvisible(problems, generatorMarkerColor, "Generator Marker Color");
+            AddIfInvisible(problems, selectedMarkerOutlineColor, "Selected Marker Outline Color");
+            AddIfNotAboveZero(problems, selectedMarkerOutlineThickness, "Selected Marker Outline Thickness");
+            AddIfNotAboveZero(problems, gateMarkerDepthCells, "Gate Marker Depth Cells");
+            AddIfNotAboveZero(problems, gateMarkerMinDepth, "Gate Marker Min Depth");
+            AddIfNotAboveZero(problems, generatorMarkerDepthCells, "Generator Marker Depth Cells");
+            AddIfNotAboveZero(problems, generatorMarkerMinDepth, "Generator Marker Min Depth");
+            AddIfInvisible(problems, markerLabelColor, "Marker Label Color");
+
+            if (!(markerLabelSizeRatio > 0f && markerLabelSizeRatio <= 1f))
+            {
+                problems.Add($"{name}: Marker Label Size Ratio must be above 0 and at most 1.");
+            }
+
+            if (markerLabelMinFontSize < 1)
+            {
+                problems.Add($"{name}: Marker Label Min Font Size must be at least 1.");
+            }
+
             return problems;
+        }
+
+        /// <summary>Reports a colour whose alpha is not above 0: whatever is drawn in it would not show.</summary>
+        private void AddIfInvisible(List<string> problems, Color color, string field)
+        {
+            if (!(color.a > 0f))
+            {
+                problems.Add($"{name}: {field} must have an alpha above 0, or what it draws is invisible.");
+            }
+        }
+
+        /// <summary>Reports a size or thickness that is not above 0.</summary>
+        private void AddIfNotAboveZero(List<string> problems, float value, string field)
+        {
+            if (!(value > 0f))
+            {
+                problems.Add($"{name}: {field} must be above 0.");
+            }
         }
 
         /// <summary>

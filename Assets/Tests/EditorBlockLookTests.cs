@@ -109,7 +109,9 @@ namespace GateRush.Tests
         [Test]
         public void Of_NoLockId_ShowsNoPadlockWhateverRequiredKeyCountHolds()
         {
-            // A lock-free block can keep a stale RequiredKeyCount (known debt).
+            // A draft loaded from a hand-edited file can still hold a key count
+            // on a lock-free block; the editor no longer leaves one behind and
+            // never saves one (Module 27).
             var look = Look(OneColour, lockId: null, requiredKeyCount: 3);
 
             Assert.AreEqual(EditorMarkIconKind.None, look.Icon.Kind);

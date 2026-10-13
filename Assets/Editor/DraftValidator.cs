@@ -34,7 +34,12 @@ namespace GateRush.Editor
         /// <summary>An axis-restricted block has no gate of a needed colour on an edge it can reach (M7).</summary>
         AxisRestrictedBlockHasNoGate,
 
-        /// <summary>A gate or shutter threshold is higher than the total clears the level can produce.</summary>
+        /// <summary>
+        /// A threshold is higher than the clears the level can produce: a
+        /// gate's (M2), a frozen block's (M3) or a global shutter's (M5)
+        /// against the total, a colour-bound shutter's against the clears of
+        /// its colour.
+        /// </summary>
         ThresholdExceedsAvailableClears,
 
         /// <summary>A lock has fewer keys targeting it than it requires (M8).</summary>
@@ -115,13 +120,19 @@ namespace GateRush.Editor
     /// <see cref="LevelContext"/>. When the draft does not form one, a single
     /// <see cref="DraftWarningCategory.DraftDoesNotFormValidLevel"/> carries
     /// <c>Core</c>'s message and those two are skipped; the rest still run off
-    /// the draft.
+    /// the draft. One of the rest reads the context where there is one:
+    /// <see cref="DraftWarningCategory.AxisRestrictedBlockHasNoGate"/> takes a
+    /// generator queue entry's spawn origin from it, and without a context
+    /// judges that entry by the two ends of its axis alone.
     /// <para>
-    /// Two checks read inputs from outside the draft, passed in by the caller
-    /// so this class stays pure and reads no files: what other level files
-    /// declare — their ids and board signatures — and the last solve's
-    /// suggested time budget. Neither needs a search; each is only as current
-    /// as what the caller passes.
+    /// Three checks read inputs from outside the draft, passed in by the
+    /// caller so this class stays pure and reads no files.
+    /// <see cref="DraftWarningCategory.LevelIdAlreadyUsed"/> and
+    /// <see cref="DraftWarningCategory.BoardIdenticalToOtherLevel"/> read what
+    /// other level files declare — their ids and board signatures;
+    /// <see cref="DraftWarningCategory.TimeBudgetBelowSuggested"/> reads the
+    /// last solve's suggested time budget. None needs a search; each is only
+    /// as current as what the caller passes.
     /// </para>
     /// <para>
     /// <see cref="DraftWarningCategory.BoardIdenticalToOtherLevel"/> catches
@@ -363,6 +374,14 @@ namespace GateRush.Editor
 
         // -- Thresholds vs available clears --------------------------
 
+        /// <summary>
+        /// Reports every threshold above the clears the level can produce:
+        /// each colour of each block the draft can put on the board is one
+        /// clear. A frozen block's, a gate's and a global shutter's threshold
+        /// are held against the total; a colour-bound shutter's against the
+        /// clears of its colour. A threshold equal to the count is reachable
+        /// and not reported.
+        /// </summary>
         private static void AddThresholdWarnings(
             LevelDraft draft, IReadOnlyList<BlockLike> blockLikes, List<DraftWarning> warnings)
         {
