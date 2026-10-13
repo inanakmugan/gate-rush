@@ -1550,3 +1550,35 @@ portfolio's value is. A paid pack: unnecessary for a prototype. Separate
 sound and vibration toggles: one button is enough on the prototype menu.
 
 ---
+
+## D53 — Holding a block in front of a generator previews its next block
+
+**Decision.** While the player holds a block that stands on any of the
+cells a generator's next block needs, the board shows that block's
+footprint on those cells: translucent cells in its colour, beneath the
+blocks. Releasing the block hides it. The machine's screen keeps showing
+the next block at all times (D48). Module 26 specifies it.
+
+**Why.** A new screenshot from the reference game shows it: a red L held
+in front of a generator, and the generator's next block, a red 2x2,
+outlined faintly on its target cells, half hidden under the L. The owner
+confirmed it appears only while the block is held. D48 had rejected this
+grab-time preview on the belief that the reference game does not show it;
+that part of D48 was wrong. The preview answers the question the player
+has when grabbing that block: what comes in if I move it.
+
+**Consequences.**
+- D48's rejection of the grab-time preview is withdrawn; the rest of D48
+  stands.
+- M6 states the preview as presentation only; no rule changes.
+- The decision of which generators preview is plain, tested code that uses
+  the resolver's spawn origin, so the preview lands exactly where the
+  block will spawn.
+
+**Rejected.** Showing the preview at all times on free target cells: a
+block spawns as soon as all its cells are free, and the owner saw it only
+while a block was held. Showing the full block look (studs, marks) on the
+board: the machine's screen already does, and a faint footprint reads as
+"not there yet".
+
+---

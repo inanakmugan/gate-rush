@@ -201,6 +201,9 @@ A generator sits on a board edge and pushes blocks inward — the inverse of a g
 - The player sees the next block's shape and colour before it arrives: the
   generator shows it on its own screen at all times, with the number of
   blocks still queued (D48). This is presentation only.
+- While the player holds a block that stands on any of the next block's
+  cells, the board also shows the next block's footprint on those cells,
+  faintly and beneath the blocks (D53). This is presentation only.
 - After its sequence is exhausted, the generator is destroyed.
 - A level is not complete while any generator still has output pending.
 - A generator spans one or two cells of its edge — the reference game never
