@@ -395,6 +395,105 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
         }
 
+        [Test]
+        public void Problems_DefaultGeneratorPreviewValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Generator Preview"), string.Join(" | ", problems));
+        }
+
+        [TestCase("generatorPreviewFillAlpha", 0f)]
+        [TestCase("generatorPreviewFillAlpha", 1.5f)]
+        [TestCase("generatorPreviewRimAlpha", 0f)]
+        [TestCase("generatorPreviewRimAlpha", 1.5f)]
+        public void Problems_GeneratorPreviewAlphaOutOfRange_IsReportedByName(string field, float value)
+        {
+            SetFloat(field, value);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems,
+                Has.Some.Contains("Generator Preview Fill Alpha and Generator Preview Rim Alpha must be above 0 and at most 1"),
+                string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_GeneratorPreviewInsetAndRimReachingHalfACell_IsReportedByName()
+        {
+            // With the default rim above 0, an inset of half a cell alone
+            // leaves the cell no fill.
+            SetFloat("generatorPreviewInsetCells", 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Generator Preview Inset Cells must be at least 0"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_GeneratorPreviewCornerNotAboveTheRim_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("generatorPreviewCornerCells").floatValue =
+                serialized.FindProperty("generatorPreviewRimCells").floatValue;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems, Has.Some.Contains("Generator Preview Corner Cells must be above Generator Preview Rim Cells"),
+                string.Join(" | ", problems));
+        }
+
+        [TestCase("generatorPreviewFadeInSeconds", "Generator Preview Fade In Seconds")]
+        [TestCase("generatorPreviewFadeOutSeconds", "Generator Preview Fade Out Seconds")]
+        public void Problems_NonPositiveGeneratorPreviewFade_IsReportedByName(string field, string shownName)
+        {
+            SetFloat(field, 0f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [TestCase("generatorPreviewRimOrder", "floorOrder")]
+        [TestCase("generatorPreviewRimOrder", "elevatorBorderOrder")]
+        [TestCase("generatorPreviewRimOrder", "generatorPreviewOrder")]
+        public void Problems_GeneratorPreviewRimOrderNotInItsPlace_IsReportedByName(string field, string sameAs)
+        {
+            SetOrderEqualTo(field, sameAs);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems, Has.Some.Contains("Generator Preview Rim Order must be above Floor Order and Elevator Border Order"),
+                string.Join(" | ", problems));
+        }
+
+        [TestCase("blockLipOrder")]
+        [TestCase("shutterOrder")]
+        [TestCase("liftedBlockOrder")]
+        public void Problems_GeneratorPreviewOrderNotBelowWhatCoversIt_IsReportedByName(string sameAs)
+        {
+            SetOrderEqualTo("generatorPreviewOrder", sameAs);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems,
+                Has.Some.Contains("Generator Preview Order must be below Block Lip Order, Shutter Order and Lifted Block Order"),
+                string.Join(" | ", problems));
+        }
+
+        /// <summary>Sets the sorting order <paramref name="field"/> to the value <paramref name="sameAs"/> has.</summary>
+        private void SetOrderEqualTo(string field, string sameAs)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).intValue = serialized.FindProperty(sameAs).intValue;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         private void SetString(string field, string value)
         {
             var serialized = new SerializedObject(config);

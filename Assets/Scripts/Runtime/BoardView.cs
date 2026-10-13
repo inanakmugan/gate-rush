@@ -24,7 +24,8 @@ namespace GateRush.Runtime
     /// <para><b>Hierarchy.</b> Under this transform sit two groups: <c>Board</c>,
     /// the drawn state, rebuilt from scratch on every redraw, and
     /// <c>Effects</c>, holding <c>Debris</c> — cubes and ice shards still in
-    /// flight — and <c>Stage</c>, the temporary pieces of a presentation.
+    /// flight — <c>Stage</c>, the temporary pieces of a presentation, and
+    /// <c>Preview</c>, the generator preview of a drag (Module 26).
     /// Positions are local to this transform: the board is centred on it, and
     /// both groups sit at its origin.</para>
     /// <para><b>Shapes from quarters (Module 15).</b> Blocks, the frame, gates
@@ -99,6 +100,7 @@ namespace GateRush.Runtime
         private Transform board;
         private Transform debris;
         private Transform stage;
+        private Transform preview;
 
         private int draggedBlock = -1;
 
@@ -164,7 +166,10 @@ namespace GateRush.Runtime
         /// <summary>
         /// Starts showing a drag of block <paramref name="blockIndex"/>: it
         /// lifts, with its outline, and <see cref="ShowDragged"/> and
-        /// <see cref="Settle"/> after this move that block.
+        /// <see cref="Settle"/> after this move that block. Every generator
+        /// whose next block would land on a cell it stands on previews that
+        /// block there (<see cref="ShowGeneratorPreview"/>) until
+        /// <see cref="Settle"/> or <see cref="Snap"/>.
         /// </summary>
         public void BeginDrag(int blockIndex)
         {
@@ -175,6 +180,7 @@ namespace GateRush.Runtime
             {
                 RemoveGateClip(block);
                 Lift(block);
+                ShowGeneratorPreview(blockIndex);
             }
         }
 
@@ -207,7 +213,8 @@ namespace GateRush.Runtime
         /// — a push in place, or a release exactly on a cell — is placed at once
         /// with no tween, so a presentation waiting on the settle starts without
         /// delay. <see cref="IsBusy"/> holds while the tween plays; the drop
-        /// does not hold it. The pull's glow, if any, fades out. A block
+        /// does not hold it. The pull's glow, if any, fades out, and so does
+        /// the generator preview. A block
         /// released while nudged into its gate's mouth stays clipped at the
         /// gate's inner line until the settle is over.
         /// </summary>
@@ -215,6 +222,7 @@ namespace GateRush.Runtime
         {
             KillSettle();
             ReleasePullGlow();
+            HideGeneratorPreview();
             if (!drawnBlocks.TryGetValue(draggedBlock, out var block))
             {
                 return;
@@ -242,12 +250,14 @@ namespace GateRush.Runtime
         /// Shows block <paramref name="blockIndex"/> at
         /// <paramref name="origin"/> at once, stopping any settle and dropping
         /// its lift — for a drag that is cancelled or whose move was rejected.
-        /// Does nothing for a block that is not drawn.
+        /// The generator preview, if any, fades out. A block that is not
+        /// drawn is not moved.
         /// </summary>
         public void Snap(int blockIndex, Coord origin)
         {
             KillSettle();
             ReleasePullGlow();
+            HideGeneratorPreview();
 
             if (drawnBlocks.TryGetValue(blockIndex, out var block))
             {
@@ -271,6 +281,7 @@ namespace GateRush.Runtime
             board = null;
             debris = null;
             stage = null;
+            preview = null;
         }
 
         private void OnEnable()
@@ -303,8 +314,10 @@ namespace GateRush.Runtime
             hasStagesStarted = false;
             passesInFlight = 0;
             ForgetPullGlow();
+            ForgetGeneratorPreview();
             DestroyChildren(debris);
             DestroyChildren(stage);
+            DestroyChildren(preview);
         }
 
         private void OnDestroy()
@@ -321,6 +334,7 @@ namespace GateRush.Runtime
             settleTween = null;
             draggedBlock = -1;
             ForgetPullGlow();
+            ForgetGeneratorPreview();
             ResetPresentation();
 
             // The passes died with their tweens; presentations waiting on them
@@ -385,13 +399,16 @@ namespace GateRush.Runtime
         /// The view's own redraw between the two stages of a presentation:
         /// stops the presentation's and the lift's tweens, which may still move
         /// parts of the old drawing, and replaces the <c>Board</c> group. Debris
-        /// — another id, another group — flies on.
+        /// — another id, another group — flies on, and a generator preview
+        /// still fading out, whose tween went with the others, fades on
+        /// (<see cref="ResumeGeneratorPreviewFade"/>).
         /// </summary>
         private void Redraw(BoardState state)
         {
             DOTween.Kill(this);
             settleTween = null;
             draggedBlock = -1;
+            ResumeGeneratorPreviewFade();
             ForgetDrawing();
 
             if (board != null)
@@ -419,11 +436,12 @@ namespace GateRush.Runtime
                 board.SetAsFirstSibling();
             }
 
-            if (debris == null || stage == null)
+            if (debris == null || stage == null || preview == null)
             {
                 var effects = AddGroup(transform, "Effects", Vector2.zero);
                 debris = AddGroup(effects, "Debris", Vector2.zero);
                 stage = AddGroup(effects, "Stage", Vector2.zero);
+                preview = AddGroup(effects, "Preview", Vector2.zero);
             }
         }
 

@@ -65,6 +65,18 @@ namespace GateRush.Runtime
         private Color pullGlowTint;
         private float pullGlowAlpha;
 
+        // The generator preview of the drag in progress, or of the last one
+        // while it fades out (Module 26): its pieces' root under
+        // Effects/Preview, their fade, the block whose grab showed it, the
+        // opacity shown, whether it is fading toward shown or toward gone,
+        // and the fade playing. Null and -1 when there is no preview.
+        private Transform previewSet;
+        private Fade previewFade;
+        private int previewBlock = -1;
+        private float previewOpacity;
+        private bool isPreviewShown;
+        private Tween previewTween;
+
         /// <summary>
         /// Raised when the leave stage of a presentation starts playing, with
         /// the move's changes — the moment its sounds start (Module 25). Never
@@ -977,6 +989,197 @@ namespace GateRush.Runtime
             pullGlow = null;
             pullGlowGate = -1;
             pullGlowAlpha = 0f;
+        }
+
+        /// <summary>
+        /// Shows the generator preview for a grab of block
+        /// <paramref name="blockIndex"/> (Module 26, D53): for every target
+        /// <see cref="GeneratorPreview.For"/> gives on the drawn state, one
+        /// rounded cell per board cell the generator's next block will
+        /// occupy, in that block's outer colour — the ice colour when it
+        /// would spawn frozen (M3) — fading in. Each cell is a rim piece,
+        /// inset from the cell's edges, in the lip colour of its fill, and a
+        /// fill piece inside the rim on top of it; both are translucent, so
+        /// the rim's piece shows faintly through the fill. No studs, lip or
+        /// marks: where and what colour, and the machine's screen says the
+        /// rest.
+        /// </summary>
+        /// <remarks>
+        /// <para>The pieces sit under <c>Effects/Preview</c>, which outlives
+        /// the board's redraws, and sort above the floor and an elevator's
+        /// doors and below every block part, so a block on a target cell,
+        /// the lifted block and its outline, and a closed shutter cover
+        /// them.</para>
+        /// <para>A preview still fading out from the grab before is replaced.
+        /// When that grab was of this same block, the new one starts from the
+        /// opacity the old one had reached, so a quick second grab does not
+        /// flicker; otherwise it starts clear.</para>
+        /// </remarks>
+        private void ShowGeneratorPreview(int blockIndex)
+        {
+            var from = previewSet != null && previewBlock == blockIndex ? previewOpacity : 0f;
+            DiscardGeneratorPreview();
+
+            if (preview == null || drawnState == null)
+            {
+                return;
+            }
+
+            var targets = GeneratorPreview.For(ctx, drawnState, blockIndex);
+            if (targets.Count == 0)
+            {
+                return;
+            }
+
+            var inset = config.GeneratorPreviewInsetCells;
+            var rimSide = 1f - 2f * inset;
+            var rimThickness = CellsToWorld(config.GeneratorPreviewRimCells);
+            var corner = CellsToWorld(config.GeneratorPreviewCornerCells);
+
+            previewSet = AddGroup(preview, $"Preview for block {blockIndex}", Vector2.zero);
+            for (var t = 0; t < targets.Count; t++)
+            {
+                var target = targets[t];
+
+                // M3: a block that would spawn frozen shows no colour. Its rim
+                // is the lip colour a frozen block is drawn with.
+                var face = target.IsFrozen ? config.IceColor : config.BlockFill(target.Color.Value);
+                var fill = WithOpacity(face, config.GeneratorPreviewFillAlpha);
+                var rim = WithOpacity(config.LipFill(face), config.GeneratorPreviewRimAlpha);
+
+                var group = AddGroup(previewSet, $"Generator {ctx.Generators[target.GeneratorIndex].Id}", Vector2.zero);
+                for (var c = 0; c < target.Cells.Count; c++)
+                {
+                    var cell = target.Cells[c];
+                    var outer = GridRectToLocal(new Rect(cell.X + inset, cell.Y + inset, rimSide, rimSide));
+                    var inner = outer.size - new Vector2(rimThickness, rimThickness) * 2f;
+                    AddSliced(
+                        group, $"Rim {cell}", config.RoundedRectSprite, outer.center, outer.size, corner, rim,
+                        config.GeneratorPreviewRimOrder);
+                    AddSliced(
+                        group, $"Fill {cell}", config.RoundedRectSprite, outer.center, inner, corner - rimThickness, fill,
+                        config.GeneratorPreviewOrder);
+                }
+            }
+
+            previewFade = new Fade(previewSet);
+            previewBlock = blockIndex;
+            ApplyGeneratorPreviewOpacity(from);
+            FadeGeneratorPreview(true);
+        }
+
+        /// <summary>
+        /// Fades the generator preview out and then removes it: the drag that
+        /// showed it is over, whatever its outcome. Does nothing when there is
+        /// none, or it is already fading out.
+        /// </summary>
+        private void HideGeneratorPreview()
+        {
+            if (previewSet != null && isPreviewShown)
+            {
+                FadeGeneratorPreview(false);
+            }
+        }
+
+        /// <summary>
+        /// Fades the preview from the opacity it has to full
+        /// (<paramref name="isShown"/>) or to none, at the rate of a full fade
+        /// per <see cref="RuntimeConfig.GeneratorPreviewFadeInSeconds"/> or
+        /// <see cref="RuntimeConfig.GeneratorPreviewFadeOutSeconds"/>, so a
+        /// fade that starts part-way takes that part of the time. The tween
+        /// carries this view as its id. A preview faded to none is removed.
+        /// </summary>
+        /// <remarks>
+        /// <see cref="previewTween"/> must be null or alive on entry: whoever
+        /// killed it through the view's id clears the field first
+        /// (<see cref="ResumeGeneratorPreviewFade"/>,
+        /// <see cref="ForgetGeneratorPreview"/>).
+        /// </remarks>
+        private void FadeGeneratorPreview(bool isShown)
+        {
+            previewTween?.Kill();
+            previewTween = null;
+            isPreviewShown = isShown;
+
+            var to = isShown ? 1f : 0f;
+            var fullFade = isShown ? config.GeneratorPreviewFadeInSeconds : config.GeneratorPreviewFadeOutSeconds;
+            var seconds = fullFade * Mathf.Abs(to - previewOpacity);
+            if (!(seconds > 0f))
+            {
+                ApplyGeneratorPreviewOpacity(to);
+                OnGeneratorPreviewFaded();
+                return;
+            }
+
+            // Linear: an opacity has no shape to ease.
+            previewTween = DOVirtual.Float(previewOpacity, to, seconds, ApplyGeneratorPreviewOpacity)
+                .SetEase(Ease.Linear)
+                .SetId(this)
+                .OnComplete(OnGeneratorPreviewFaded);
+        }
+
+        private void ApplyGeneratorPreviewOpacity(float opacity)
+        {
+            previewOpacity = opacity;
+            previewFade.Apply(opacity);
+        }
+
+        private void OnGeneratorPreviewFaded()
+        {
+            previewTween = null;
+            if (!isPreviewShown)
+            {
+                DiscardGeneratorPreview();
+            }
+        }
+
+        /// <summary>
+        /// The view's own redraw killed every tween carrying its id, the
+        /// preview's fade among them, and left the preview's pieces, which
+        /// are not part of the <c>Board</c> group: the fade starts again from
+        /// the opacity it had reached. Does nothing when there is no preview.
+        /// </summary>
+        private void ResumeGeneratorPreviewFade()
+        {
+            previewTween = null;
+            if (previewSet != null)
+            {
+                FadeGeneratorPreview(isPreviewShown);
+            }
+        }
+
+        /// <summary>
+        /// Removes the generator preview at once, with its fade. Not for
+        /// <see cref="OnDisable"/>, which may not change the hierarchy's
+        /// activation and destroys the group's children itself.
+        /// </summary>
+        private void DiscardGeneratorPreview()
+        {
+            previewTween?.Kill();
+            if (previewSet != null)
+            {
+                // Destroy waits for the end of the frame; off now, so it is
+                // not drawn alongside a preview shown in the same frame.
+                previewSet.gameObject.SetActive(false);
+                Destroy(previewSet.gameObject);
+            }
+
+            ForgetGeneratorPreview();
+        }
+
+        /// <summary>
+        /// Forgets the generator preview without touching its pieces or its
+        /// tween: for when the tweens carrying the view's id have just been
+        /// killed and the group it sits in is being destroyed anyway.
+        /// </summary>
+        private void ForgetGeneratorPreview()
+        {
+            previewSet = null;
+            previewFade = null;
+            previewTween = null;
+            previewBlock = -1;
+            previewOpacity = 0f;
+            isPreviewShown = false;
         }
 
         /// <summary>Ice shards fly out from the centre of a block that thawed, over its unfrozen face.</summary>
