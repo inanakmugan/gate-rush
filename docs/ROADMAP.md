@@ -211,11 +211,9 @@ taken when its area is next touched.
 - *Presentation:* `MechanicIllustration` mirrors `BoardView`'s drawing
   recipes, so the two must change together; the time-bonus mark's overlap
   check covers bonuses up to two digits.
-- *Seen in the reference game, not built yet:* when there is empty space
-  in front of a generator (M6), the board shows a preview of the block it
-  will push out next, where that block will appear. Today the next block
-  shows only on the generator's own screen (D48). The owner has
-  screenshots to share when this is specified.
+- *Generator preview:* specified in Module 26 (D53). While a held block
+  stands on a generator's next-block cells, the board shows that block's
+  footprint there.
 
 ---
 

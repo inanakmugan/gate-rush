@@ -102,6 +102,13 @@ namespace GateRush.Runtime
         private const int DefaultEffectOrder = 27;
         private const int DefaultPullGlowOrder = DefaultBlockLipOrder - 1;
 
+        // The generator preview lies inside the grid, over the floor and an
+        // elevator's doors and under every block. Sharing values with the
+        // machine's lip and body is harmless: machines lie outside the frame
+        // and never over a board cell.
+        private const int DefaultGeneratorPreviewRimOrder = DefaultElevatorBorderOrder + 1;
+        private const int DefaultGeneratorPreviewOrder = DefaultElevatorBorderOrder + 2;
+
         [Header("Assets")]
         [Tooltip("A plain white square sprite, tinted and scaled for the floor's backing, and the shape of the mask that clips a block passing through its gate.")]
         [SerializeField] private Sprite cellSprite;
@@ -467,6 +474,28 @@ namespace GateRush.Runtime
 
         [Tooltip("An easing with an overshoot, such as OutBack, settles the wave with a small bounce.")]
         [SerializeField] private Ease riseEase = Ease.OutBack;
+
+        [Header("Generator preview (D53; a generator's next block on its target cells while a block standing on them is held)")]
+        [Tooltip("Opacity of a previewed cell's fill, in the next block's colour, or the ice colour when it would spawn frozen: above 0, at most 1.")]
+        [SerializeField] private float generatorPreviewFillAlpha = 0.35f;
+
+        [Tooltip("Opacity of a previewed cell's rim, in the lip colour of its fill: above 0, at most 1. The fill is translucent, so the rim's piece shows faintly through it.")]
+        [SerializeField] private float generatorPreviewRimAlpha = 0.6f;
+
+        [Tooltip("How far a previewed cell is inset from its cell's edges, in cells: at least 0. With Generator Preview Rim Cells it must stay below 0.5.")]
+        [SerializeField] private float generatorPreviewInsetCells = 0.06f;
+
+        [Tooltip("Thickness of a previewed cell's rim, in cells: above 0.")]
+        [SerializeField] private float generatorPreviewRimCells = 0.05f;
+
+        [Tooltip("Corner radius of a previewed cell, in cells: above Generator Preview Rim Cells.")]
+        [SerializeField] private float generatorPreviewCornerCells = 0.18f;
+
+        [Tooltip("Seconds the preview takes to fade in fully when the block is grabbed.")]
+        [SerializeField] private float generatorPreviewFadeInSeconds = 0.1f;
+
+        [Tooltip("Seconds the preview takes to fade out fully when the block is released.")]
+        [SerializeField] private float generatorPreviewFadeOutSeconds = 0.12f;
 
         [Header("HUD (canvas units of a 1080 × 1920 portrait screen)")]
         [Tooltip("Space between the safe area's left and right edges and the restart button and level pill, and the least space kept between them and the timer.")]
@@ -927,6 +956,12 @@ namespace GateRush.Runtime
         [Tooltip("The glow of a gate pulling a dragged block: below Block Lip Order, so it lights the gate's mouth and never a block, and at least Gate Mark Order. Equal to Gate Mark Order is fine: the glow lies inside the grid, the marks outside it.")]
         [SerializeField] private int pullGlowOrder = DefaultPullGlowOrder;
 
+        [Tooltip("A previewed cell's rim (D53): above Floor Order and Elevator Border Order, below Generator Preview Order. Equal to a machine's order is fine: the preview lies inside the grid, machines outside the frame.")]
+        [SerializeField] private int generatorPreviewRimOrder = DefaultGeneratorPreviewRimOrder;
+
+        [Tooltip("A previewed cell's fill (D53): above Generator Preview Rim Order, and below Block Lip Order, Shutter Order and Lifted Block Order, so every block, a grabbed block's outline and a closed shutter cover it.")]
+        [SerializeField] private int generatorPreviewOrder = DefaultGeneratorPreviewOrder;
+
         /// <summary>The white square the floor's backing is drawn with, and the shape of a passing block's clip mask.</summary>
         public Sprite CellSprite => cellSprite;
 
@@ -1239,6 +1274,27 @@ namespace GateRush.Runtime
 
         /// <summary>Easing of a wave's rise.</summary>
         public Ease RiseEase => riseEase;
+
+        /// <summary>Opacity of a previewed cell's fill (Module 26, D53).</summary>
+        public float GeneratorPreviewFillAlpha => generatorPreviewFillAlpha;
+
+        /// <summary>Opacity of a previewed cell's rim.</summary>
+        public float GeneratorPreviewRimAlpha => generatorPreviewRimAlpha;
+
+        /// <summary>How far a previewed cell is inset from its cell's edges, in cells.</summary>
+        public float GeneratorPreviewInsetCells => generatorPreviewInsetCells;
+
+        /// <summary>Thickness of a previewed cell's rim, in cells.</summary>
+        public float GeneratorPreviewRimCells => generatorPreviewRimCells;
+
+        /// <summary>Corner radius of a previewed cell, in cells.</summary>
+        public float GeneratorPreviewCornerCells => generatorPreviewCornerCells;
+
+        /// <summary>Seconds the generator preview takes to fade in fully.</summary>
+        public float GeneratorPreviewFadeInSeconds => generatorPreviewFadeInSeconds;
+
+        /// <summary>Seconds the generator preview takes to fade out fully.</summary>
+        public float GeneratorPreviewFadeOutSeconds => generatorPreviewFadeOutSeconds;
 
         /// <summary>Seconds a surviving layered block's peel takes.</summary>
         public float PeelSeconds => peelSeconds;
@@ -1786,6 +1842,12 @@ namespace GateRush.Runtime
 
         /// <summary>Sorting order of a pulling gate's glow, below every block (Module 22).</summary>
         public int PullGlowOrder => pullGlowOrder;
+
+        /// <summary>Sorting order of a previewed cell's rim, above the floor and an elevator's doors (Module 26).</summary>
+        public int GeneratorPreviewRimOrder => generatorPreviewRimOrder;
+
+        /// <summary>Sorting order of a previewed cell's fill, below every block, a grabbed block's outline and a closed shutter.</summary>
+        public int GeneratorPreviewOrder => generatorPreviewOrder;
 
         /// <summary>The generated sprite for one of the four quarter pieces.</summary>
         public Sprite QuarterSprite(QuarterSpriteKind kind)
@@ -2423,6 +2485,38 @@ namespace GateRush.Runtime
                 problems.Add(
                     $"{name}: Pull Glow Order must be below Block Lip Order and at least Gate Mark Order, so the glow lights the gate's mouth and not a block.");
             }
+
+            if (!(generatorPreviewFillAlpha > 0f && generatorPreviewFillAlpha <= 1f
+                  && generatorPreviewRimAlpha > 0f && generatorPreviewRimAlpha <= 1f))
+            {
+                problems.Add($"{name}: Generator Preview Fill Alpha and Generator Preview Rim Alpha must be above 0 and at most 1.");
+            }
+
+            if (!(generatorPreviewInsetCells >= 0f && generatorPreviewRimCells > 0f
+                  && generatorPreviewInsetCells + generatorPreviewRimCells < 0.5f))
+            {
+                problems.Add($"{name}: Generator Preview Inset Cells must be at least 0, Generator Preview Rim Cells above 0, and the two together below 0.5, so a previewed cell keeps a fill inside its rim.");
+            }
+
+            if (!(generatorPreviewCornerCells > generatorPreviewRimCells) || float.IsInfinity(generatorPreviewCornerCells))
+            {
+                problems.Add($"{name}: Generator Preview Corner Cells must be above Generator Preview Rim Cells and finite, so the fill inside the rim keeps a rounded corner.");
+            }
+
+            AddIfNotPositive(problems, generatorPreviewFadeInSeconds, "Generator Preview Fade In Seconds");
+            AddIfNotPositive(problems, generatorPreviewFadeOutSeconds, "Generator Preview Fade Out Seconds");
+
+            if (!(generatorPreviewRimOrder > floorOrder && generatorPreviewRimOrder > elevatorBorderOrder
+                  && generatorPreviewOrder > generatorPreviewRimOrder))
+            {
+                problems.Add($"{name}: Generator Preview Rim Order must be above Floor Order and Elevator Border Order, and Generator Preview Order above Generator Preview Rim Order, so the preview shows on the floor and on an elevator's doors.");
+            }
+
+            if (!(generatorPreviewOrder < blockLipOrder && generatorPreviewOrder < shutterOrder
+                  && generatorPreviewOrder < liftedBlockOrder))
+            {
+                problems.Add($"{name}: Generator Preview Order must be below Block Lip Order, Shutter Order and Lifted Block Order, so every block, a grabbed block's outline and a closed shutter cover the preview.");
+            }
         }
 
         /// <summary>The constraints on the HUD's values, each message naming its field.</summary>
@@ -2646,6 +2740,8 @@ namespace GateRush.Runtime
             liftedBlockOrder = DefaultLiftedBlockOrder;
             effectOrder = DefaultEffectOrder;
             pullGlowOrder = DefaultPullGlowOrder;
+            generatorPreviewRimOrder = DefaultGeneratorPreviewRimOrder;
+            generatorPreviewOrder = DefaultGeneratorPreviewOrder;
 #if UNITY_EDITOR
             UnityEditor.EditorUtility.SetDirty(this);
 #endif
