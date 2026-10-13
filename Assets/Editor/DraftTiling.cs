@@ -48,7 +48,7 @@ namespace GateRush.Editor
                     axis: draft.Axis,
                     unfreezeAtClearCount: draft.UnfreezeAtClearCount,
                     lockId: draft.LockId,
-                    requiredKeyCount: draft.RequiredKeyCount,
+                    requiredKeyCount: LockKeyCount.For(draft.LockId, draft.RequiredKeyCount),
                     keyTargetLockId: draft.KeyTargetLockId,
                     timeBonusSeconds: draft.TimeBonusSeconds,
                     regionOrigin: draft.RegionOrigin);

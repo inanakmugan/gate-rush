@@ -8,10 +8,13 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers <see cref="DraftMetrics"/>: the packing numbers on a known board,
-    /// the opening branching factor against <see cref="MoveGenerator"/>'s own
-    /// output, ready-opening-move detection, and that the suggested time budget
-    /// rises with solution length and with available M10 bonuses (D12), prefers
-    /// a proven shortest length, and flags a budget built from an unproven one.
+    /// that they count a block spawned before the first move and are not
+    /// available without a starting board (Module 27), the opening branching
+    /// factor against <see cref="MoveGenerator"/>'s own output,
+    /// ready-opening-move detection, and that the suggested time budget rises
+    /// with solution length (D12), is the same with and without M10 bonuses
+    /// (D54), prefers a proven shortest length, and flags a budget built from
+    /// an unproven one; and that the bonus total sums every bonus in the draft.
     /// </summary>
     public class DraftMetricsTests
     {
@@ -30,6 +33,8 @@ namespace GateRush.Tests
         [Test]
         public void Compute_EmptyCellsAndFillRatio_OnAKnownBoard()
         {
+            // No generator or elevator, so the starting board is the authored
+            // blocks and the numbers are what the block list alone gave.
             var draft = LevelDraft.NewEmpty(3, 3);
             draft.StaticWalls.Add(new Coord(2, 2));
             draft.Blocks.Add(new BlockDraft
@@ -161,20 +166,136 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Compute_SuggestedTimeBudget_RisesWithSolutionLengthAndWithBonuses()
+        public void Compute_EmptyCellsAndFillRatio_CountABlockSpawnedBeforeTheFirstMove()
         {
+            // No authored block at all: whatever is occupied at the start came
+            // out of the generator (D42). Its second entry is still queued.
+            var draft = LevelDraft.NewEmpty(3, 3);
+            var spawnedCells = new[] { new Coord(0, 0), new Coord(0, 1) };
+            draft.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 0, Width = 1,
+                Queue =
+                {
+                    new SpawnedBlockDraft { Id = 1, Cells = { spawnedCells[0], spawnedCells[1] }, ColorStack = { BlockColor.Red } },
+                    new SpawnedBlockDraft { Id = 2, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red } },
+                },
+            });
+            var ctx = draft.ToContext();
+            var livingAtStart = BoardState.CreateInitial(ctx).Alive.Count(isAlive => isAlive);
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.AreEqual(1, livingAtStart, "Exactly the first queue entry must have spawned, or this proves nothing.");
+            Assert.IsTrue(metrics.HasStartingBoard);
+            Assert.AreEqual(spawnedCells.Length, metrics.OccupiedCellCount);
+            Assert.AreEqual(metrics.PlayableCellCount - spawnedCells.Length, metrics.EmptyCellCount);
+            Assert.AreEqual(spawnedCells.Length / (float)metrics.PlayableCellCount, metrics.FillRatio, 0.0001f);
+        }
+
+        [Test]
+        public void Compute_EmptyCellsAndFillRatio_NotAvailableWhenDraftIsNotAValidLevel()
+        {
+            // No level, so no starting board to count on; the draft's block
+            // list is not a stand-in for it.
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(9, 9)));
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.IsFalse(metrics.HasStartingBoard);
+            Assert.AreEqual(DraftMetrics.NotAvailable, metrics.OccupiedCellCount);
+            Assert.AreEqual(DraftMetrics.NotAvailable, metrics.EmptyCellCount);
+            Assert.AreEqual(0f, metrics.FillRatio);
+        }
+
+        [Test]
+        public void Compute_SuggestedTimeBudget_IsTheSameWithAndWithoutTimeBonuses()
+        {
+            // D54: every winning play collects every bonus, so adding them to
+            // the budget as well would give the player the same seconds twice.
+            const int Moves = 2;
             var plain = LevelDraft.NewEmpty(3, 3);
             plain.Blocks.Add(RedBlock(1, new Coord(0, 0)));
 
             var withBonus = LevelDraft.NewEmpty(3, 3);
             withBonus.Blocks.Add(RedBlock(1, new Coord(0, 0), timeBonusSeconds: 12));
 
-            var shortSolve = DraftMetrics.Compute(plain, Formula, provenShortestLength: 2).SuggestedTimeBudgetSeconds;
-            var longSolve = DraftMetrics.Compute(plain, Formula, provenShortestLength: 8).SuggestedTimeBudgetSeconds;
-            var withBonusSolve = DraftMetrics.Compute(withBonus, Formula, provenShortestLength: 2).SuggestedTimeBudgetSeconds;
+            var plainMetrics = DraftMetrics.Compute(plain, Formula, provenShortestLength: Moves);
+            var bonusMetrics = DraftMetrics.Compute(withBonus, Formula, provenShortestLength: Moves);
+
+            Assert.Greater(bonusMetrics.AvailableTimeBonusSeconds, 0, "The draft must carry a bonus, or this proves nothing.");
+            Assert.AreEqual(plainMetrics.SuggestedTimeBudgetSeconds, bonusMetrics.SuggestedTimeBudgetSeconds);
+            Assert.AreEqual(Formula.Suggest(Moves), bonusMetrics.SuggestedTimeBudgetSeconds);
+        }
+
+        [Test]
+        public void Compute_SuggestedTimeBudget_RisesWithSolutionLength()
+        {
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(0, 0)));
+
+            var shortSolve = DraftMetrics.Compute(draft, Formula, provenShortestLength: 2).SuggestedTimeBudgetSeconds;
+            var longSolve = DraftMetrics.Compute(draft, Formula, provenShortestLength: 8).SuggestedTimeBudgetSeconds;
 
             Assert.Greater(longSolve.Value, shortSolve.Value);
-            Assert.Greater(withBonusSolve.Value, shortSolve.Value);
+        }
+
+        [Test]
+        public void Compute_AvailableTimeBonusSeconds_SumsPlacedBlocksWaveBlocksAndQueueEntries()
+        {
+            const int PlacedBonus = 5;
+            const int QueuedBonus = 7;
+            const int WaveBonus = 11;
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(1, 1), timeBonusSeconds: PlacedBonus));
+            draft.Generators.Add(new GeneratorDraft
+            {
+                Id = 1, Edge = BoardEdge.Bottom, Offset = 0, Width = 1,
+                Queue =
+                {
+                    new SpawnedBlockDraft
+                    {
+                        Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red }, TimeBonusSeconds = QueuedBonus,
+                    },
+                },
+            });
+            draft.Elevators.Add(new ElevatorDraft
+            {
+                Id = 1, Min = new Coord(2, 2), Max = new Coord(2, 2),
+                Waves =
+                {
+                    new WaveDraft
+                    {
+                        Blocks =
+                        {
+                            new SpawnedBlockDraft
+                            {
+                                Id = 1, Cells = { new Coord(0, 0) }, ColorStack = { BlockColor.Red },
+                                RegionOrigin = new Coord(0, 0), TimeBonusSeconds = WaveBonus,
+                            },
+                        },
+                    },
+                },
+            });
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.AreEqual(PlacedBonus + QueuedBonus + WaveBonus, metrics.AvailableTimeBonusSeconds);
+        }
+
+        [Test]
+        public void Compute_AvailableTimeBonusSeconds_IsReportedWithoutASolveOrAValidLevel()
+        {
+            const int Bonus = 9;
+            var draft = LevelDraft.NewEmpty(3, 3);
+            draft.Blocks.Add(RedBlock(1, new Coord(9, 9), timeBonusSeconds: Bonus));
+
+            var metrics = DraftMetrics.Compute(draft, Formula);
+
+            Assert.IsFalse(metrics.HasStartingBoard, "The draft must not form a level, or this proves nothing.");
+            Assert.IsNull(metrics.SuggestedTimeBudgetSeconds);
+            Assert.AreEqual(Bonus, metrics.AvailableTimeBonusSeconds);
         }
 
         [Test]
@@ -185,7 +306,7 @@ namespace GateRush.Tests
 
             var metrics = DraftMetrics.Compute(draft, Formula, provenShortestLength: 4);
 
-            Assert.AreEqual(Formula.Suggest(4, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.AreEqual(Formula.Suggest(4), metrics.SuggestedTimeBudgetSeconds);
             Assert.IsFalse(metrics.IsTimeBudgetFromUnprovenLength);
         }
 
@@ -197,7 +318,7 @@ namespace GateRush.Tests
 
             var metrics = DraftMetrics.Compute(draft, Formula, unprovenSolutionLength: 6);
 
-            Assert.AreEqual(Formula.Suggest(6, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.AreEqual(Formula.Suggest(6), metrics.SuggestedTimeBudgetSeconds);
             Assert.IsTrue(metrics.IsTimeBudgetFromUnprovenLength);
         }
 
@@ -209,7 +330,7 @@ namespace GateRush.Tests
 
             var metrics = DraftMetrics.Compute(draft, Formula, provenShortestLength: 4, unprovenSolutionLength: 9);
 
-            Assert.AreEqual(Formula.Suggest(4, 0), metrics.SuggestedTimeBudgetSeconds);
+            Assert.AreEqual(Formula.Suggest(4), metrics.SuggestedTimeBudgetSeconds);
             Assert.IsFalse(metrics.IsTimeBudgetFromUnprovenLength);
         }
 
