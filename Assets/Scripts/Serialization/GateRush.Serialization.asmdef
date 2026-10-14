@@ -2,7 +2,8 @@
     "name": "GateRush.Serialization",
     "rootNamespace": "",
     "references": [
-        "GUID:9a84b11cf7aed4e47b171cd8bdf7c342"
+        "GUID:9a84b11cf7aed4e47b171cd8bdf7c342",
+        "GUID:a5c23bb49da6a21408d725cbeaf2b316"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

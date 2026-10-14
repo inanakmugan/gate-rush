@@ -1,3 +1,4 @@
+using System;
 using GateRush.Meta;
 using NUnit.Framework;
 
@@ -5,11 +6,13 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers Module 23's <see cref="CompletedLevels"/>: a marked level is
-    /// completed and marking it again is not news; the set survives
-    /// <see cref="CompletedLevels.ToData"/> and back; and data that cannot be
-    /// read — empty, null or garbage — gives an empty set without throwing,
-    /// with <see cref="CompletedLevels.TryFromData"/> telling garbage apart
-    /// from nothing saved.
+    /// completed and marking it again is not news; <see cref="CompletedLevels.Of"/>
+    /// and <see cref="CompletedLevels.Ids"/> round-trip, ascending, with
+    /// duplicates read as one (Module 29); the legacy text, now only read, is
+    /// read from literal strings; and legacy data that cannot be read — empty,
+    /// null or garbage — gives an empty set without throwing, with
+    /// <see cref="CompletedLevels.TryFromData"/> telling garbage apart from
+    /// nothing saved.
     /// </summary>
     public class CompletedLevelsTests
     {
@@ -53,15 +56,9 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void FromData_OfToData_GivesTheSameSet()
+        public void FromData_LegacyText_GivesThoseIds()
         {
-            var levels = new CompletedLevels();
-            foreach (var id in SomeIds)
-            {
-                levels.MarkCompleted(id);
-            }
-
-            var read = CompletedLevels.FromData(levels.ToData());
+            var read = CompletedLevels.FromData("7,0,3,12");
 
             Assert.AreEqual(SomeIds.Length, read.Count, "no level is added or lost");
             foreach (var id in SomeIds)
@@ -71,18 +68,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void FromData_OfToData_NothingCompleted_GivesAnEmptySet()
-        {
-            var data = new CompletedLevels().ToData();
-
-            var readable = CompletedLevels.TryFromData(data, out var read);
-
-            Assert.IsTrue(readable);
-            Assert.AreEqual(0, read.Count);
-        }
-
-        [Test]
-        public void ToData_SameSetMarkedInAnotherOrder_IsTheSameText()
+        public void Ids_SameSetMarkedInAnotherOrder_IsTheSameAscendingList()
         {
             var forward = new CompletedLevels();
             var backward = new CompletedLevels();
@@ -92,10 +78,45 @@ namespace GateRush.Tests
                 backward.MarkCompleted(SomeIds[SomeIds.Length - 1 - i]);
             }
 
-            var forwardData = forward.ToData();
-            var backwardData = backward.ToData();
+            var forwardIds = forward.Ids;
+            var backwardIds = backward.Ids;
 
-            Assert.AreEqual(forwardData, backwardData);
+            CollectionAssert.AreEqual(forwardIds, backwardIds);
+            CollectionAssert.IsOrdered(forwardIds);
+        }
+
+        [Test]
+        public void Ids_OfOf_RoundTripsAscending()
+        {
+            var levels = CompletedLevels.Of(SomeIds);
+
+            var ids = levels.Ids;
+
+            CollectionAssert.AreEqual(new[] { 0, 3, 7, 12 }, ids);
+            CollectionAssert.AreEqual(ids, CompletedLevels.Of(ids).Ids);
+        }
+
+        [Test]
+        public void Of_DuplicateIds_ReadsThemAsOne()
+        {
+            var levels = CompletedLevels.Of(new[] { 3, 1, 3, 1 });
+
+            var ids = levels.Ids;
+
+            CollectionAssert.AreEqual(new[] { 1, 3 }, ids);
+            Assert.AreEqual(2, levels.Count);
+        }
+
+        [Test]
+        public void Of_Null_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => CompletedLevels.Of(null));
+        }
+
+        [Test]
+        public void LegacySaveKey_IsTheSpecified()
+        {
+            Assert.AreEqual("GateRush.CompletedLevels", CompletedLevels.LegacySaveKey);
         }
 
         [TestCase(null)]
