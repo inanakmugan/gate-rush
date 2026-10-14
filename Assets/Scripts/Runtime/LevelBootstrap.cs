@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using GateRush.Core;
 using GateRush.Meta;
-using GateRush.Platform;
+using GateRush.Serialization;
 using UnityEngine;
 
 namespace GateRush.Runtime
@@ -23,8 +23,9 @@ namespace GateRush.Runtime
     /// Play starts the level <see cref="MenuLevels.TryGetStartLevel"/> picks;
     /// the level select starts any level. Menu, from the HUD or the result
     /// panel, abandons the level (<see cref="GoToMenu"/>). A level that is
-    /// won is recorded in <see cref="CompletedLevels"/> and saved through
-    /// <see cref="ISaveStore"/> at once. With no usable level order the
+    /// won is recorded in <see cref="CompletedLevels"/>, and the whole save
+    /// is saved through <see cref="SaveRepository"/> at once. With no usable
+    /// level order the
     /// select is hidden and Play starts <see cref="level"/>.</para>
     /// <para>A level or config that cannot be used logs the reason and draws
     /// nothing. A level whose time budget is not positive logs an error and
@@ -54,11 +55,18 @@ namespace GateRush.Runtime
     /// stage of its presentation starts, the timer's from
     /// <see cref="TimerTicks"/>. Voices are stopped on a restart, a level
     /// change and the way to the menu. The menu's sound button flips
-    /// <see cref="SoundSetting"/>, saved through <see cref="ISaveStore"/> at
-    /// once. With no Sound Player or Sound Config assigned, one error is
+    /// <see cref="SoundSetting"/>, and the whole save is saved at once. With no Sound Player or Sound Config assigned, one error is
     /// logged and the game runs silently; the config's problems — a fresh
     /// one has no clips — are logged once, at start, and never stop the
     /// game.</para>
+    /// <para><b>Save (Module 29, D56).</b> Everything kept is one
+    /// <see cref="SaveData"/>, loaded once at start through
+    /// <see cref="SaveRepository"/> over <see cref="PlayerPrefsSaveStore"/>
+    /// and <see cref="JsonSaveCodec"/>. What the load could not read is
+    /// logged as a warning and played at its default; a save carried over
+    /// from the old keys is logged once. The whole save is saved when a
+    /// level is newly completed and when the sound is toggled; a save that
+    /// fails is logged and the change lasts until the game is closed.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
@@ -115,11 +123,10 @@ namespace GateRush.Runtime
         private bool isUsable;
         private LevelCatalog catalog;
 
-        // Where the completed levels and the sound setting are kept, and the
-        // two themselves. All are made in Awake and stay for the scene's life.
-        private ISaveStore saveStore;
-        private CompletedLevels completed;
-        private SoundSetting soundSetting;
+        // Where the save is kept, and the save itself. Both are made in Awake
+        // and stay for the scene's life.
+        private SaveRepository saves;
+        private SaveData save;
 
         // True once the sound player has been initialised; false leaves the
         // game silent (no Sound Player or no Sound Config assigned).
@@ -172,10 +179,10 @@ namespace GateRush.Runtime
             boardCamera.backgroundColor = config.BackgroundBottom;
 
             BuildCatalog();
-            saveStore = new PlayerPrefsSaveStore();
-            LoadCompletedLevels();
+            saves = new SaveRepository(new PlayerPrefsSaveStore(), new JsonSaveCodec());
+            LoadSave();
             InitializeSound();
-            LoadSoundSetting();
+            ApplySoundSetting();
 
             if (!TryGetOverrideLevel(hasOverride, overrideName, out var overrideLevel) || !Load(overrideLevel))
             {
@@ -212,22 +219,25 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Reads the completed levels from the save store. Nothing saved yet
-        /// is no level completed; so is data that cannot be read, with a
-        /// warning — it never stops the game.
+        /// Loads the save, once. What could not be read or written is logged
+        /// as a warning, each problem naming its key and the default used — it
+        /// never stops the game. A save read from the old keys is logged once,
+        /// in words that stay true when writing it under the new key failed.
         /// </summary>
-        private void LoadCompletedLevels()
+        private void LoadSave()
         {
-            if (!saveStore.TryLoad(CompletedLevels.SaveKey, out var data))
+            var load = saves.Load();
+            save = load.Data;
+
+            foreach (var problem in load.Problems)
             {
-                completed = new CompletedLevels();
-                return;
+                Debug.LogWarning(problem, this);
             }
 
-            if (!CompletedLevels.TryFromData(data, out completed))
+            if (load.Outcome == SaveLoadOutcome.CarriedOver)
             {
-                Debug.LogWarning(
-                    $"The completed levels saved under '{CompletedLevels.SaveKey}' cannot be read ('{data}'); no level counts as completed.",
+                Debug.Log(
+                    $"The save was read from the old keys '{CompletedLevels.LegacySaveKey}' and '{SoundSetting.LegacySaveKey}'; they are left as they are.",
                     this);
             }
         }
@@ -258,37 +268,15 @@ namespace GateRush.Runtime
             hasSound = true;
         }
 
-        /// <summary>
-        /// Reads the sound setting from the save store and applies it to the
-        /// sound player and the menu's sound button. Nothing saved yet is on;
-        /// so is data that cannot be read, with a warning — it never stops
-        /// the game.
-        /// </summary>
-        private void LoadSoundSetting()
-        {
-            if (!saveStore.TryLoad(SoundSetting.SaveKey, out var data))
-            {
-                soundSetting = new SoundSetting();
-            }
-            else if (!SoundSetting.TryFromData(data, out soundSetting))
-            {
-                Debug.LogWarning(
-                    $"The sound setting saved under '{SoundSetting.SaveKey}' cannot be read ('{data}'); sound is on.",
-                    this);
-            }
-
-            ApplySoundSetting();
-        }
-
-        /// <summary>Makes the sound player and the menu's sound button follow <see cref="soundSetting"/>.</summary>
+        /// <summary>Makes the sound player and the menu's sound button follow the save's sound setting.</summary>
         private void ApplySoundSetting()
         {
             if (hasSound)
             {
-                soundPlayer.IsOn = soundSetting.IsOn;
+                soundPlayer.IsOn = save.Sound.IsOn;
             }
 
-            menuScreen.ShowSound(soundSetting.IsOn);
+            menuScreen.ShowSound(save.Sound.IsOn);
         }
 
         /// <summary>
@@ -300,18 +288,26 @@ namespace GateRush.Runtime
         /// </summary>
         private void OnSoundToggleRequested()
         {
-            soundSetting.IsOn = !soundSetting.IsOn;
+            save.Sound.IsOn = !save.Sound.IsOn;
             ApplySoundSetting();
+            SaveOrWarn("The sound setting was changed, but saving it failed; it is remembered until the game is closed.");
+        }
 
+        /// <summary>
+        /// Saves the whole save at once. A save that fails logs
+        /// <paramref name="failureMessage"/>, which says what changed, with the
+        /// store's reason, and the game goes on: the change lasts until the
+        /// game is closed.
+        /// </summary>
+        private void SaveOrWarn(string failureMessage)
+        {
             try
             {
-                saveStore.Save(SoundSetting.SaveKey, soundSetting.ToData());
+                saves.Save(save);
             }
             catch (PlayerPrefsException e)
             {
-                Debug.LogWarning(
-                    $"The sound setting was changed, but saving it failed; it is remembered until the game is closed. {e.Message}",
-                    this);
+                Debug.LogWarning($"{failureMessage} {e.Message}", this);
             }
         }
 
@@ -408,21 +404,12 @@ namespace GateRush.Runtime
         private void MarkLevelCompleted()
         {
             if (catalog == null || !catalog.TryGetNumber(levelName, out _)
-                || !completed.MarkCompleted(run.Session.Context.LevelId))
+                || !save.Completed.MarkCompleted(run.Session.Context.LevelId))
             {
                 return;
             }
 
-            try
-            {
-                saveStore.Save(CompletedLevels.SaveKey, completed.ToData());
-            }
-            catch (PlayerPrefsException e)
-            {
-                Debug.LogWarning(
-                    $"Level '{levelName}' is completed, but saving that failed; it is remembered until the game is closed. {e.Message}",
-                    this);
-            }
+            SaveOrWarn($"Level '{levelName}' is completed, but saving that failed; it is remembered until the game is closed.");
         }
 
         /// <summary>
@@ -435,7 +422,7 @@ namespace GateRush.Runtime
         {
             hudView.Hide();
             var entries = catalog != null
-                ? MenuLevels.Entries(catalog, completed)
+                ? MenuLevels.Entries(catalog, save.Completed)
                 : Array.Empty<MenuLevelEntry>();
             menuScreen.ShowTitle(entries);
 
@@ -486,7 +473,7 @@ namespace GateRush.Runtime
         {
             // Every name in the catalog is a level that loaded, kept in
             // levelAssets under that name (BuildCatalog), so this cannot miss.
-            var start = catalog != null && MenuLevels.TryGetStartLevel(catalog, completed, out var startName)
+            var start = catalog != null && MenuLevels.TryGetStartLevel(catalog, save.Completed, out var startName)
                 ? levelAssets[startName]
                 : level;
             Load(start);
