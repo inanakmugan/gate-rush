@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Core;
 using GateRush.Solver;
 using NUnit.Framework;
@@ -200,6 +201,172 @@ namespace GateRush.Tests
             var state = BoardState.CreateInitial(ctx);
 
             Assert.Throws<InvalidOperationException>(() => ExitCandidates.Of(ctx, state).FewestBlockers(ctx, state));
+        }
+
+        // ----- Against the search it replaced (Module 28) ----------------------
+
+        [Test]
+        public void RouteCosts_MatchTheScanningSearch_OverTheSearchCorpus()
+        {
+            var tally = new Tally();
+
+            foreach (var (name, ctx, _) in WholeCorpus())
+            {
+                CompareEveryStratum(ctx, name, tally);
+            }
+
+            CompareEveryStratum(StepAsideBeforeFirstClearBoard(), "step aside before the first clear", tally);
+            CompareEveryStratum(AxisBlockReturnsToCrossAxisGateBoard(), "axis block returns to its gate", tally);
+            CompareEveryStratum(AxisBlockBoxedAboveCrossAxisGateBoard(), "axis block boxed in", tally);
+
+            // Fifteen solvable corpus boards have no generator or elevator, so
+            // each is compared at its starting state at least; and the
+            // step-aside board starts with one blocker in the way.
+            Assert.GreaterOrEqual(tally.States, MinCorpusStates, "states compared");
+            Assert.GreaterOrEqual(tally.CostsAboveZero, 1, "route costs above zero compared");
+        }
+
+        [TestCase(4, 60, 20261013)]
+        [TestCase(5, 30, 20261014)]
+        public void RouteCosts_MatchTheScanningSearch_OverSeededRandomBoards(int maxSide, int boardCount, int seed)
+        {
+            var rng = new Random(seed);
+            var tally = new Tally();
+
+            for (var b = 0; b < boardCount; b++)
+            {
+                CompareEveryStratum(RandomBoards.Next(rng, maxSide), $"board {b} (seed {seed}, side {maxSide})", tally);
+            }
+
+            Assert.GreaterOrEqual(tally.States, boardCount, "states compared");
+            Assert.GreaterOrEqual(
+                tally.CostsAboveZero, boardCount / RandomBoardsPerCostAboveZero, "route costs above zero compared");
+        }
+
+        /// <summary>The solvable corpus boards without a generator or an elevator: each is modelled from its first state.</summary>
+        private const int MinCorpusStates = 15;
+
+        /// <summary>At least one route cost above zero is compared per this many random boards.</summary>
+        private const int RandomBoardsPerCostAboveZero = 4;
+
+        /// <summary>How many strata of one board are compared; keeps a large random board cheap.</summary>
+        private const int MaxStrataPerBoard = 12;
+
+        /// <summary>How many states of one stratum are visited, compared or walked.</summary>
+        private const int MaxStatesPerStratum = 120;
+
+        /// <summary>What a comparison covered, for its floors.</summary>
+        private sealed class Tally
+        {
+            public int States { get; set; }
+
+            public int CostsAboveZero { get; set; }
+        }
+
+        /// <summary>
+        /// Walks <paramref name="ctx"/> stratum by stratum from its first
+        /// state. Wherever the nearest-next-clear strategy would build an
+        /// <see cref="ExitCandidates"/> — a stratum with no spawn pending, on
+        /// its <see cref="NextClearAbstraction"/> — builds the scanning copy
+        /// beside it and holds every state of the stratum to the same answers.
+        /// </summary>
+        private static void CompareEveryStratum(LevelContext ctx, string label, Tally tally)
+        {
+            var generator = new MoveGenerator();
+            var resolver = new MoveResolver();
+
+            var roots = new Queue<BoardState>();
+            var seenRoots = new HashSet<BoardState>();
+            var first = BoardState.CreateInitial(ctx);
+            roots.Enqueue(first);
+            seenRoots.Add(first);
+
+            for (var strata = 0; roots.Count > 0 && strata < MaxStrataPerBoard; strata++)
+            {
+                var root = roots.Dequeue();
+                if (NextClearAbstraction.CanModel(ctx, root))
+                {
+                    CompareStratum(NextClearAbstraction.Of(ctx, root), label, tally, generator, resolver);
+                }
+
+                // The real board finds the strata that follow: every state a
+                // clear or a spawn leads to starts one.
+                var vector = root.ProgressVector;
+                var frontier = new Queue<BoardState>();
+                var seen = new HashSet<BoardState> { root };
+                frontier.Enqueue(root);
+                while (frontier.Count > 0)
+                {
+                    var state = frontier.Dequeue();
+                    foreach (var move in generator.Generate(ctx, state, MoveGenMode.Exhaustive))
+                    {
+                        Assert.IsTrue(resolver.TryApplyMove(ctx, state, move, out var next, out _), $"{label}: {move}");
+                        if (next.ProgressVector != vector)
+                        {
+                            if (seenRoots.Add(next))
+                            {
+                                roots.Enqueue(next);
+                            }
+                        }
+                        else if (seen.Count < MaxStatesPerStratum && seen.Add(next))
+                        {
+                            frontier.Enqueue(next);
+                        }
+                    }
+                }
+            }
+        }
+
+        private static void CompareStratum(
+            NextClearAbstraction abstraction, string label, Tally tally, MoveGenerator generator, MoveResolver resolver)
+        {
+            var ctx = abstraction.Context;
+            var root = abstraction.Initial;
+            var candidates = ExitCandidates.Of(ctx, root);
+            var legacy = LegacyExitCandidates.Of(ctx, root);
+
+            Assert.AreEqual(legacy.IsEmpty, candidates.IsEmpty, $"{label}: IsEmpty");
+            Assert.AreEqual(legacy.CandidateCount, candidates.CandidateCount, $"{label}: candidate count");
+            if (candidates.IsEmpty)
+            {
+                return;
+            }
+
+            var frontier = new Queue<BoardState>();
+            var seen = new HashSet<BoardState> { root };
+            frontier.Enqueue(root);
+            while (frontier.Count > 0)
+            {
+                var state = frontier.Dequeue();
+                tally.States++;
+
+                var expectedFewest = legacy.FewestBlockers(ctx, state);
+                var fewest = candidates.FewestBlockers(ctx, state);
+                Assert.AreEqual(expectedFewest, fewest, $"{label}: FewestBlockers");
+
+                for (var k = 0; k < candidates.CandidateCount; k++)
+                {
+                    var expected = legacy.RouteCost(ctx, state, k);
+                    var actual = candidates.RouteCost(ctx, state, k);
+                    Assert.AreEqual(expected, actual, $"{label}: route cost of candidate {k}");
+                    if (expected > 0 && expected != int.MaxValue)
+                    {
+                        tally.CostsAboveZero++;
+                    }
+                }
+
+                foreach (var move in generator.Generate(ctx, state, MoveGenMode.Exhaustive))
+                {
+                    Assert.IsTrue(resolver.TryApplyMove(ctx, state, move, out var next, out _), $"{label}: {move}");
+
+                    // A clear ends the stratum; the copy is not valid past it.
+                    if (next.TotalClearCount == root.TotalClearCount
+                        && seen.Count < MaxStatesPerStratum && seen.Add(next))
+                    {
+                        frontier.Enqueue(next);
+                    }
+                }
+            }
         }
     }
 }

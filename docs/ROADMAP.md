@@ -197,22 +197,13 @@ most levels and is easy to lose in input handling.
 **Known debt.** Small items found along the way, none blocking; each is
 taken when its area is next touched.
 
-- *Level Editor:* specified in Module 27, together with D54 (the suggested
-  time budget leaves bonuses out): the fill metric from the starting
-  board, no stale key count, an error state on the solver line, the
-  validator summary, the shutter-threshold test, and the remaining canvas
-  magic numbers.
-- *Solver:* `SolveStatus`, `ISearchStrategy` and `SearchBudget` XML
-  comments are out of date; `ExitCandidates`' Dijkstra is slower than it
-  needs to be; two floors in `NearestNextClearStrategyTests` now count the
-  same boards; a joker test's message still says "effect clear"; a
-  `<summary>` in `SearchCorpus` sits above the wrong board.
-- *Presentation:* `MechanicIllustration` mirrors `BoardView`'s drawing
-  recipes, so the two must change together; the time-bonus mark's overlap
-  check covers bonuses up to two digits.
-- *Generator preview:* specified in Module 26 (D53). While a held block
-  stands on a generator's next-block cells, the board shows that block's
-  footprint there.
+- *Level Editor:* done in Module 27 (D54).
+- *Solver and presentation:* specified in Module 28: the solver's stale
+  comments, a faster `ExitCandidates` Dijkstra, the test-suite blemishes,
+  one shared drawing recipe for `BoardView` and `MechanicIllustration`,
+  and a check that no level's time bonus outgrows the mark's overlap
+  check.
+- *Generator preview:* done in Module 26 (D53).
 
 ---
 

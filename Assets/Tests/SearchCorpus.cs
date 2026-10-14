@@ -8,9 +8,10 @@ namespace GateRush.Tests
     /// <summary>
     /// The boards every <c>ISearchStrategy</c> is tested against: solvable
     /// boards with a hand-verified shortest solution, and boards with no
-    /// solution at all. Shared so <c>BreadthFirstStrategyTests</c> and
-    /// <c>AStarStrategyTests</c> run the same corpus — the A\*/breadth-first
-    /// equivalence test means nothing if the two suites could drift apart.
+    /// solution at all. Shared so <c>BreadthFirstStrategyTests</c>,
+    /// <c>AStarStrategyTests</c> and <c>NearestNextClearStrategyTests</c> run
+    /// the same corpus — the A\*/breadth-first equivalence test means nothing
+    /// if the suites could drift apart.
     /// </summary>
     /// <remarks>
     /// Every solvable board is chosen so canonical pruning does not lengthen the
@@ -225,8 +226,8 @@ namespace GateRush.Tests
         /// Four identical red blocks on an open 3x3 grid with one red gate at the
         /// bottom of the left edge. Optimum 4: the block already at (0, 0) clears
         /// in place, and each of the other three reaches that cell in a single
-        /// move once it is free. Four colours with no key means four moves is
-        /// also the lower bound.
+        /// move once it is free. Four colours, each costing a move of its own,
+        /// make four moves the lower bound as well.
         /// </summary>
         /// <remarks>
         /// The D35 board. All four blocks share one spec, so the labelled state
@@ -251,7 +252,7 @@ namespace GateRush.Tests
         /// <summary>
         /// A fully packed 3x2 board: three green blocks on the bottom row, three
         /// purple on the top, one green gate at (0, 0)'s left edge and one purple
-        /// gate at (2, 1)'s right edge. Optimum 6 — the six colours, no key, so
+        /// gate at (2, 1)'s right edge. Optimum 6 — the six colours, since
         /// every clear costs its own move.
         /// </summary>
         /// <remarks>
@@ -364,14 +365,6 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// A 4x2 board: one horizontal-only red block at (1, 0), flush above the
-        /// red bottom gate at offset 1, with a static wall at (3, 0). Optimum 2:
-        /// the block cannot be pushed down into the gate in place (D39), so it
-        /// slides away and back, and arriving clears it. The wall makes (2, 0) a
-        /// resting position, so canonical pruning keeps the slide away and both
-        /// modes agree on the optimum.
-        /// </summary>
-        /// <summary>
         /// 3x2. A red key block (index 0, a key for lock 1) sits flush against a
         /// red gate on the left, row 0; a green block (index 1) sits flush
         /// against a green gate on the right, row 1, on the cell a top-edge
@@ -431,6 +424,14 @@ namespace GateRush.Tests
                 });
         }
 
+        /// <summary>
+        /// A 4x2 board: one horizontal-only red block at (1, 0), flush above the
+        /// red bottom gate at offset 1, with a static wall at (3, 0). Optimum 2:
+        /// the block cannot be pushed down into the gate in place (D39), so it
+        /// slides away and back, and arriving clears it. The wall makes (2, 0) a
+        /// resting position, so canonical pruning keeps the slide away and both
+        /// modes agree on the optimum.
+        /// </summary>
         internal static LevelContext AxisBlockReturnsToCrossAxisGateBoard()
         {
             return Ctx(

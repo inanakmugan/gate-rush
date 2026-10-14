@@ -255,11 +255,6 @@ namespace GateRush.Tests
                     }
 
                     Count("nonMonotone");
-                    if (ctx.Generators.Count > 0 || ctx.Elevators.Count > 0)
-                    {
-                        Count("spawner");
-                    }
-
                     continue;
                 }
 
@@ -283,19 +278,17 @@ namespace GateRush.Tests
                 Assert.GreaterOrEqual(coverage.TryGetValue(key, out var n) ? n : 0, minimum, $"boards compared with: {key}");
             }
 
-            // Only a generator or an elevator makes a board non-monotone (D45);
-            // such boards get their own, lower floor.
+            // A board is non-monotone exactly when it has a generator or an
+            // elevator (LevelContext.IsClearMonotone, since D45), so one floor
+            // covers both readings: that the non-monotone branch above is
+            // exercised, and that the random corpus puts spawners (D42) in
+            // front of both searches rather than drawing them only to see them
+            // redrawn. There used to be a floor for each; they counted the
+            // same boards. Such boards get their own, lower floor.
             var nonMonotoneMinimum = boardCount / NonMonotoneCoverageDivisor;
             Assert.GreaterOrEqual(
                 coverage.TryGetValue("nonMonotone", out var nonMonotone) ? nonMonotone : 0, nonMonotoneMinimum,
-                "boards compared that are not clear-monotone");
-
-            // Generators and elevators (D42) make a board non-monotone too; this
-            // floor shows the random corpus actually puts some in front of both
-            // searches, rather than drawing them only to see them redrawn.
-            Assert.GreaterOrEqual(
-                coverage.TryGetValue("spawner", out var spawner) ? spawner : 0, nonMonotoneMinimum,
-                "boards compared with a generator or an elevator");
+                "boards compared that are not clear-monotone: those with a generator or an elevator");
         }
 
         [TestCase(3, 300, 20260927)]

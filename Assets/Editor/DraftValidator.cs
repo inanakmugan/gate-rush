@@ -90,6 +90,15 @@ namespace GateRush.Editor
         /// reported while a current suggestion exists.
         /// </summary>
         TimeBudgetBelowSuggested,
+
+        /// <summary>
+        /// A block's time bonus (M10) is above
+        /// <see cref="GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked"/>,
+        /// the longest the game checks its time-bonus mark for: the mark
+        /// widens with the number, so a longer one may overlap the block's
+        /// other marks.
+        /// </summary>
+        TimeBonusBeyondMarkCheck,
     }
 
     /// <summary>One thing wrong with a draft, cheap to compute and shown live.</summary>
@@ -201,6 +210,7 @@ namespace GateRush.Editor
             AddAxisRestrictionWarnings(draft, blockLikes, warnings);
             AddThresholdWarnings(draft, blockLikes, warnings);
             AddLockKeyWarnings(blockLikes, warnings);
+            AddTimeBonusWarnings(blockLikes, warnings);
             AddGateOntoWallWarnings(draft, warnings);
             AddElevatorTilingWarnings(draft, warnings);
             AddShutterCoverageWarnings(draft, warnings);
@@ -471,6 +481,32 @@ namespace GateRush.Editor
                     warnings.Add(new DraftWarning(
                         DraftWarningCategory.LockHasTooFewKeys,
                         $"Lock {pair.Key} requires {pair.Value} key(s) but only {have} target it."));
+                }
+            }
+        }
+
+        // -- Time bonuses -----------------------------------------
+
+        /// <summary>
+        /// Reports every block — placed, queued in a generator or in an
+        /// elevator wave — whose time bonus is above
+        /// <see cref="GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked"/>.
+        /// The game checks that a time-bonus mark cannot overlap a padlock,
+        /// key or layer badge on the same block only up to that bonus. A bonus
+        /// equal to it is covered and not reported.
+        /// </summary>
+        private static void AddTimeBonusWarnings(IReadOnlyList<BlockLike> blockLikes, List<DraftWarning> warnings)
+        {
+            const int widest = GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked;
+
+            foreach (var block in blockLikes)
+            {
+                if (block.TimeBonusSeconds > widest)
+                {
+                    warnings.Add(new DraftWarning(
+                        DraftWarningCategory.TimeBonusBeyondMarkCheck,
+                        $"{block.Label} has a time bonus of {block.TimeBonusSeconds}s, above {widest}s: its mark is " +
+                        "wider than the game checks for and may overlap the block's other marks (M10)."));
                 }
             }
         }
@@ -794,6 +830,7 @@ namespace GateRush.Editor
             public int? LockId { get; }
             public int RequiredKeyCount { get; }
             public int? KeyTargetLockId { get; }
+            public int TimeBonusSeconds { get; }
 
             /// <summary>
             /// The absolute grid origin <see cref="Cells"/> are relative to, when
@@ -816,6 +853,7 @@ namespace GateRush.Editor
                 int? lockId,
                 int requiredKeyCount,
                 int? keyTargetLockId,
+                int timeBonusSeconds,
                 Coord? origin)
             {
                 Label = label;
@@ -826,6 +864,7 @@ namespace GateRush.Editor
                 LockId = lockId;
                 RequiredKeyCount = requiredKeyCount;
                 KeyTargetLockId = keyTargetLockId;
+                TimeBonusSeconds = timeBonusSeconds;
                 Origin = origin;
             }
         }
@@ -843,7 +882,7 @@ namespace GateRush.Editor
             {
                 yield return new BlockLike(
                     $"Block {b.Id}", b.Cells, b.ColorStack, b.Axis, b.UnfreezeAtClearCount,
-                    b.LockId, b.RequiredKeyCount, b.KeyTargetLockId, b.StartOrigin);
+                    b.LockId, b.RequiredKeyCount, b.KeyTargetLockId, b.TimeBonusSeconds, b.StartOrigin);
             }
 
             for (var gi = 0; gi < draft.Generators.Count; gi++)
@@ -854,7 +893,7 @@ namespace GateRush.Editor
                     var s = g.Queue[i];
                     yield return new BlockLike(
                         $"Generator {g.Id} queue entry {i}", s.Cells, s.ColorStack, s.Axis,
-                        s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId,
+                        s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId, s.TimeBonusSeconds,
                         ctx != null ? ctx.GeneratorSpawnOrigin(gi, i) : (Coord?)null);
                 }
             }
@@ -869,7 +908,7 @@ namespace GateRush.Editor
                         var s = wave.Blocks[i];
                         yield return new BlockLike(
                             $"Elevator {e.Id} wave {w} block {i}", s.Cells, s.ColorStack, s.Axis,
-                            s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId,
+                            s.UnfreezeAtClearCount, s.LockId, s.RequiredKeyCount, s.KeyTargetLockId, s.TimeBonusSeconds,
                             s.RegionOrigin.HasValue ? e.Min + s.RegionOrigin.Value : (Coord?)null);
                     }
                 }

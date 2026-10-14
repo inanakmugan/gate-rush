@@ -5,24 +5,33 @@ namespace GateRush.Solver
 {
     /// <summary>
     /// The limits one <see cref="ISearchStrategy.Search"/> call runs under, plus
-    /// the <see cref="MoveGenMode"/> it branches on. Every limit is a hard stop
-    /// that yields <see cref="SolveStatus.Indeterminate"/>; none of them changes
-    /// the answer on a board the search can finish within them.
+    /// the <see cref="MoveGenMode"/> it branches on. A search that a limit cut
+    /// short and that found no solution reports
+    /// <see cref="SolveStatus.Indeterminate"/>, never
+    /// <see cref="SolveStatus.Unsolvable"/>; none of the limits changes the
+    /// answer on a board the search can finish within them.
     /// </summary>
     public sealed class SearchBudget
     {
         /// <summary>
-        /// The greatest solution length the search may return. A node at this
-        /// depth is still tested for a solution but is not expanded further, so a
-        /// solution of exactly this many moves is found while anything longer
-        /// makes the search report <see cref="SolveStatus.Indeterminate"/>.
+        /// The greatest solution length the search may return: a solution of
+        /// exactly this many moves is found, and one that would be longer is
+        /// not. <see cref="BreadthFirstStrategy"/> and
+        /// <see cref="AStarStrategy"/> do not expand a node at this depth and
+        /// go on with the shallower ones, and A\* also drops a successor whose
+        /// moves so far plus its heuristic exceed it.
+        /// <see cref="NearestNextClearStrategy"/> holds the total length of the
+        /// routes it has committed to against it. A search that this limit cut
+        /// and that found no solution reports
+        /// <see cref="SolveStatus.Indeterminate"/>.
         /// </summary>
         public int MaxDepth { get; }
 
         /// <summary>
-        /// The greatest number of states the search may expand — dequeue and
-        /// generate the successors of. Reaching it stops the search with
-        /// <see cref="SolveStatus.Indeterminate"/>.
+        /// The greatest number of states the search may take from its frontier
+        /// to expand, over the whole search — across every stratum for
+        /// <see cref="NearestNextClearStrategy"/>. Reaching it stops the search
+        /// with <see cref="SolveStatus.Indeterminate"/>.
         /// </summary>
         public int MaxExploredStates { get; }
 
@@ -54,11 +63,14 @@ namespace GateRush.Solver
         internal const int WallClockPollInterval = 1024;
 
         /// <summary>
-        /// Which move set the search branches on. The editor runs
-        /// <see cref="MoveGenMode.Canonical"/> first and falls back to
-        /// <see cref="MoveGenMode.Exhaustive"/> with a larger budget only when the
-        /// first pass finds nothing; the strategy itself does not decide this
-        /// (see <c>DECISIONS.md</c> D5).
+        /// Which move set the search branches on. The caller decides it, not
+        /// the strategy (see <c>DECISIONS.md</c> D5), except that
+        /// <see cref="NearestNextClearStrategy"/> rejects
+        /// <see cref="MoveGenMode.Canonical"/>. The editor's Validate runs A\*
+        /// under <see cref="MoveGenMode.Exhaustive"/> at a small budget, then
+        /// nearest-next-clear, and cross-checks an unsolvable verdict of that
+        /// with A\* under <see cref="MoveGenMode.Canonical"/> first and
+        /// <see cref="MoveGenMode.Exhaustive"/> after (D37, D38).
         /// </summary>
         public MoveGenMode Mode { get; }
 
