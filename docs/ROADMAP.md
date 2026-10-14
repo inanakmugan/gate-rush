@@ -197,12 +197,10 @@ most levels and is easy to lose in input handling.
 **Known debt.** Small items found along the way, none blocking; each is
 taken when its area is next touched.
 
+No item is open; the last ones were cleared by Modules 24 to 28.
+
 - *Level Editor:* done in Module 27 (D54).
-- *Solver and presentation:* specified in Module 28: the solver's stale
-  comments, a faster `ExitCandidates` Dijkstra, the test-suite blemishes,
-  one shared drawing recipe for `BoardView` and `MechanicIllustration`,
-  and a check that no level's time bonus outgrows the mark's overlap
-  check.
+- *Solver and presentation:* done in Module 28.
 - *Generator preview:* done in Module 26 (D53).
 
 ---

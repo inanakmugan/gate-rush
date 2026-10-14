@@ -16,7 +16,8 @@ Android
 **Status:** work in progress. The puzzle core, the solver and the level editor
 are built (Phase 1). The game has 15 hand-made levels that introduce every
 mechanic in turn, a title screen and a level select (Phase 2), and the first
-web build is live on itch.io (Phase 3). See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+web build is live on itch.io (Phase 3). Sound effects and haptics came forward
+from Phase 7. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -118,7 +119,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-1,463 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+1,686 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 

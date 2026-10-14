@@ -131,3 +131,37 @@ same next-block rule the resolver and `VisibilityLayer` use, is not.
 - Moving the block away spawns the real block where the preview was.
 - Grabbing an unrelated block shows nothing.
 - Restart, Menu and Next during a drag leave no preview behind.
+
+---
+
+## Resolved during implementation
+
+- **Targets.** `GeneratorPreview.For` reads each generator's next block,
+  its colour and whether it would spawn frozen from
+  `VisibilityLayer.Generator`, so the preview cannot disagree with the
+  machine's screen, and places it at `LevelContext.GeneratorSpawnOrigin`
+  for the current queue index. The held block is tested at its origin in
+  the state it was grabbed from. A block that is not alive gives an empty
+  list; a null argument or an out-of-range index throws. A test checks
+  that the previewed cells are the cells `MoveResolver` spawns the block
+  on, at queue index 0 and 1.
+- **Look.** Each target cell is two 9-sliced rounded rectangles: a rim
+  inset from the cell in `LipFill` of the face colour, and a fill inside
+  it. A frozen next block uses `IceColor` and `LipFill(IceColor)`, as a
+  frozen block's lip does. Both pieces are translucent, so the rim shows
+  faintly through the fill; accepted and tuned through the alphas.
+  Generator Preview Corner Cells must exceed Generator Preview Rim Cells,
+  or the fill's corner would vanish.
+- **Sorting.** Two orders, rim 4 and fill 5, shared with the machine lip
+  and body, which sit outside the frame and never overlap a board cell, as
+  Pull Glow already shares an order. The preview sits above the elevator
+  border, below every block part and the lift outline; a closed shutter
+  covers it.
+- **Lifetime.** The pieces sit under `Effects/Preview`, not `Board`, so
+  the redraw between a move's stages does not destroy them; `Redraw` kills
+  the view's tweens and restarts the fade-out from the opacity reached.
+  The fade is linear at a constant rate, so a partial fade takes
+  proportionally less time. A grab during a fade-out replaces the preview;
+  a re-grab of the same block continues from its opacity, another block
+  starts clear. `Clear`, `Rebuild` and disable remove everything, so
+  restart, menu, level load and loss during a drag leave nothing behind.

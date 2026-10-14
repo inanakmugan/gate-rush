@@ -162,3 +162,41 @@ use, is not.
   metric counts that block.
 - Remove a lock from a block: the key count resets.
 - The canvas looks the same as before.
+
+---
+
+## Resolved during implementation
+
+- **Time budget.** `TimeBudgetFormula.Suggest(int solutionMoves)`; the
+  bonus parameter is gone. `DraftMetrics.AvailableTimeBonusSeconds` sums
+  placed blocks, wave blocks and queue entries, and the Level panel and
+  solver line show it after the suggestion only when it is above zero.
+- **Fill metric.** Occupied cells, empty cells and fill come from
+  `BoardState.CreateInitial(ctx)`, which `Compute` already built for the
+  branching factor. Without a valid context `HasStartingBoard` is false
+  and the counts are `NotAvailable` (-1), shown as n/a.
+- **Key count.** `LockKeyCount` holds the rule: `Default` 0,
+  `MinimumForLock` 1, `For` (the count only while a lock id is set) and
+  `AfterLockIdChange` (clearing a lock gives 0; setting one where there
+  was none raises the count to at least 1). `SetLockId` on `BlockDraft`
+  and `SpawnedBlockDraft` applies it, both `ToDto` paths save it, and
+  `DraftTiling`, which builds Core blocks without `ToDto`, uses it too. A
+  stale count can no longer make two identical boards differ. No level
+  file held one.
+- **Solver line.** `SolverLineKind.Error` and `SolverLineKinds.Of(verdict,
+  hasError)`. A failed solve keeps its HelpBox, dialog and log, and the
+  solver line reads "Solver: error" with the message in the new magenta
+  Solver Error Color.
+- **Validator comments.** Three checks read inputs from outside the draft,
+  over two inputs; the queued blocks' axis check also needs a valid
+  context; the threshold category covers frozen blocks as well as gates
+  and shutters. The comment naming `ElevatorTiling.Check` is accurate,
+  since `DraftTiling.Check` delegates to it.
+- **Canvas.** Twenty-four canvas values moved into `LevelEditorSettings`
+  under a Canvas header, with defaults equal to the old literals and alpha
+  or range checks in `Problems()`; one more, the free-draw outline
+  thickness, had been hidden in `EditorGrid.DrawOutline`'s default.
+  Halves, both-sides factors and the first marker lane are named
+  constants. `EditorGrid`, `GateMarker` and the block palette stay as they
+  were. The window's mutable statics (`markerLabelStyle`,
+  `solverLineStyle`, the warning icon) became instance fields.

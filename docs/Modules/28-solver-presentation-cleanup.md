@@ -142,3 +142,53 @@ the cards look exactly as they do today, is not.
 - Play a few levels and open every mechanic card: board and cards look
   exactly as before.
 - Validate a level in the editor with a bonus of 100: the warning shows.
+
+---
+
+## Resolved during implementation
+
+- **Solver comments.** `SolveStatus` now says nearest-next-clear can
+  report Unsolvable from one dead-end stratum on a clear-monotone level
+  and Indeterminate on a level with a generator or elevator.
+  `ISearchStrategy` names three strategies, not two, drops "A* arrives in
+  phase 1.11", and lists the exceptions that exist. `SearchBudget` says
+  MaxDepth is not a hard stop for BFS and A*, describes each limit per
+  strategy, and describes Validate's order as it runs today.
+- **`ExitCandidates`.** The next origin came from a scan of every cell,
+  O(V) per settled node; it now comes from a reused array-backed binary
+  heap ordered by cost, then origin index, with stale entries skipped and
+  hopeless relaxations not pushed. The tie-break is the node the scan
+  picked, so the settle order and the results are identical. An internal
+  seam (`CandidateCount`, `RouteCost`) lets a test compare every
+  candidate's unpruned cost with `LegacyExitCandidates`, a test-local copy
+  of the old class, over every `SearchCorpus` stratum and seeded random
+  boards, capped at 12 strata per board and 120 states per stratum. Its
+  floors were reasoned, not measured.
+- **Tests.** `IsClearMonotone` is exactly "no generators and no
+  elevators", so the two floors that counted the same boards are merged,
+  with a comment. The joker message names the rocket clear and the key
+  block's own exit (D45). The axis board's summary moved to its board, the
+  class summary names all three suites, and two "no key" bound
+  justifications that stopped mattering with D45 were corrected.
+- **Shared recipes.** `BoardRecipes<TGroup, TPiece>` holds every recipe
+  the cards copied, in cells, and draws through `IRecipeSurface<TGroup,
+  TPiece>` (group, quarters, sprite, sliced, tiled, label). `BoardView`
+  implements it over its existing SpriteRenderer helpers;
+  `MechanicIllustration` over Images in hierarchy order. Recipes return
+  the parts the effects animate. Board-only drawing (floor, frame,
+  outline, glow, preview, bursts) and the How to Play arrow stay where
+  they were. No recipe is left mirrored.
+- **Board unchanged.** Every object name and sorting order the board
+  creates is the same as before; a script comparison of the old and new
+  code found no name or order added or lost. Mark positions are now
+  computed in cells and scaled once, so `OpenLock` converts the padlock
+  position; positions may differ in the last float bit. On the cards, a
+  block's face pieces sit under a Face group, the machine's body lip sits
+  under a Lip group named Body, and a layered block's studs are scaled by
+  `localScale`, all invisible.
+- **Time bonuses.** `RuntimeConfig.WidestBonusSecondsChecked` is a public
+  const. `DraftValidator` reports `TimeBonusBeyondMarkCheck` for placed
+  blocks, wave blocks and queue entries above it. `ShippedLevelsTests`,
+  the first test to read the real level files, loads them through
+  `Resources.LoadAll` and `LevelSerializer.FromJson` as the game does and
+  checks every slot of every level.
