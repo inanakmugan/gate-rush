@@ -1488,6 +1488,10 @@ useful part of each forward for the build.
 that unlock in order: the real game's feel, but a reviewer would not see
 past the first few.
 
+**Later (D58).** The level select moves into a settings page and becomes
+free play: every level stays open there, with no lives, gold or streak.
+Play starts the campaign, which follows the reference game.
+
 ---
 
 ## D51 — The first build is published on itch.io
@@ -1607,5 +1611,148 @@ run out before reaching a bonus that the solution clears late, and the
 solver cannot see it. Subtracting a share of them: a tunable with no clear
 right value; a designer who wants a tighter level edits the budget by
 hand.
+
+---
+
+## D55 — Phase 4 is the meta core in four modules, visible from the start
+
+**Decision.** Phase 4 is built as Modules 29 to 32: the save model (29),
+the wallet and lives with `ITimeProvider` (30), the win streak, the joker
+inventory, the store's rules and one `MetaGame` facade that a level result
+is reported to (31), and the wiring into `Runtime` (32). Module 32 shows
+gold and lives as plain text on the HUD and the menu, keeps a campaign
+level from starting without a life, asks before an action that costs one
+(D57), and moves the level select into a settings page as free play (D58).
+
+**Why.** The roadmap planned Phase 4 with no UI, but a meta game nobody
+can see adds nothing to the build a studio opens. Plain text and one
+prompt are enough to show that the rules run; Phase 6 replaces them.
+Splitting by subject keeps each module to one session, and each spec is
+written when the module before it is merged, so no spec encodes guesses
+about code that does not exist yet.
+
+**Not in Phase 4.**
+- Unlimited lives for a while (D20's invincibility): nothing grants it
+  yet. It comes with the first reward or product that does, on the same
+  timestamps as regeneration.
+- Using jokers on the board: Phase 5. Phase 4 only counts them.
+- The store, Home and the other screens, and insufficient-funds routing:
+  Phase 6.
+- Notifications, such as lives being full again: Phase 7.
+
+**Rejected.** Pure C# only, wired in with Phase 6: the next build would
+look unchanged after a whole phase. One large module: too big to plan and
+review in one session.
+
+---
+
+## D56 — One versioned save, its rules in Meta and its JSON in Serialization
+
+**Decision.** Everything the game keeps is one `SaveData`, saved under one
+key as JSON with a `formatVersion` (D17). `Meta` owns the model and the
+rules for loading it: what a missing, unreadable or too new save gives,
+and how the two keys of Modules 23 and 25 are carried over. It reads and
+writes the JSON through an `ISaveCodec` interface that `Meta` declares and
+`Serialization` implements with `JsonUtility`. `Serialization` gains a
+reference to `Meta`.
+
+**Why.** One key is written in one step, so the wallet and the lives can
+never be saved half. `Meta` has no engine references and therefore no JSON
+reader; inverting the dependency keeps the loading rules in the tested
+pure layer and the parsing in the one layer allowed to use `UnityEngine`
+(D17). A key per subject would multiply the version and carry-over
+handling.
+
+**Consequences.**
+- A section added later (the wallet and lives in Module 30, the streak and
+  inventory in Module 31) raises `formatVersion`. A save written by an
+  older version reads with that section at its default; a version newer
+  than the game knows reads as unreadable and is never misread.
+- The legacy keys `GateRush.CompletedLevels` and `GateRush.SoundOn` are
+  read only when no new save exists, and the new save is written at once.
+  They stay in the store and are ignored afterwards; `ISaveStore` gains no
+  delete.
+- Unreadable data gives the defaults with a logged warning, as in Module
+  23, and loading never overwrites it; the next change does.
+- D51 still applies: a new itch.io upload starts with an empty save.
+
+**Rejected.** A codec in `Runtime`: the loading rules would leave the pure
+layer. A hand-written text format in `Meta`, as `CompletedLevels` has:
+fine for a list of ids, fragile for nested sections. A JSON library in
+`Meta`: against `noEngineReferences` and D17's choice of `JsonUtility`.
+
+---
+
+## D57 — An attempt that is not won costs one life, when it ends
+
+**Decision.** In the campaign (D58), a life is lost when the countdown
+runs out, when the player leaves a level being played through Menu, and
+when the player restarts a level being played. Starting an attempt needs
+at least one life and spends none. Restarting from the result panel costs
+nothing more: a loss has already cost its life, and a win costs none.
+Leaving or restarting while playing asks first, stating that a life will
+be lost (MECHANICS, Win and loss). Lives come back one at a time on UTC
+timestamps, up to a cap (D20); the cap and the interval are configuration.
+
+**Why.** The owner's account of the reference game: an abandoned attempt
+counts as a lost one, whether the player leaves or starts over. Charging
+when the attempt ends means a won level costs nothing and no attempt is
+ever charged twice.
+
+**Consequences.**
+- With no life left, Play, Next and the loss panel's Restart do not start
+  a campaign level; Module 32 says so in plain text until Phase 6 builds
+  the real prompt. Free play is never blocked and never costs a life.
+- The keyboard restart (R) follows the same rule as the button. The
+  development keys (Page Down and Page Up, Module 21) and a level started
+  from the editor tools cost nothing and need no life.
+- Closing the tab during a level costs nothing. Accepted: the game cannot
+  charge for an attempt it never sees end.
+
+**Rejected.** Spending a life on starting and giving it back on a win: it
+would also charge a closed tab, but every way a level can end well would
+need a refund path. A free restart: the reference game charges for it.
+
+---
+
+## D58 — Campaign and free play: only the campaign counts
+
+**Decision.** The game has two ways to play. In the **campaign**, Play
+starts the campaign level, the next level in order not yet won in the
+campaign, and Next goes on to the one after it. A campaign attempt costs
+lives (D57), and a win pays the level's `goldReward` into the wallet and
+into lifetime gold (D22) and counts for the win streak. In **free play**,
+the level select, moved from the title screen into settings, starts any
+level. Free play needs no life, costs none, pays nothing and leaves the
+streak alone, and Next after a free-play win stays in free play. Where an
+attempt was started decides which it is, not which level it is.
+
+**Why.** In the reference game a won level is never played again: there is
+only Next. This build is a portfolio piece, and someone reviewing it must
+reach and replay any mechanic at once (D50), without being stopped by
+lives and without farming gold and jokers through replays. Keeping the two
+apart lets the campaign follow the reference game exactly.
+
+**Consequences.**
+- Campaign progress is its own section of the save (Module 31): the
+  position of the campaign level in the level order. It is separate from
+  the completed marks, so winning level 7 in free play neither skips it in
+  the campaign nor takes away its gold.
+- A level won either way is marked completed in the level select.
+- After the last level the campaign is over: Play shows "All Levels
+  Played" (Module 23), and free play stays open.
+- Levels completed before Phase 4, carried over by D56, keep their
+  completed marks; the campaign still starts at the first level.
+- The level files' `goldReward` values are still placeholders; they are
+  tuned together with the store prices in Module 31.
+- Until Phase 6 builds the settings screen, Module 32 gives the title
+  screen a Settings page holding the sound toggle and the level select.
+  During free play the HUD shows "Free Play" where the lives would be.
+
+**Rejected.** Every level open with the full meta game: replays would farm
+gold and jokers, and a reviewer who loses a few times would be locked out
+until lives come back. Paying only a level's first win: it stops the gold
+farm, but not the streak farm or the lock-out. A hidden unlimited-lives
+switch: a reviewer would neither find it nor see the meta game at work.
 
 ---

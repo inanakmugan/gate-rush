@@ -237,9 +237,24 @@ its loading bar and stops is first worth a fresh ZIP, with `index.html`,
 
 ## Phase 4 — Meta core
 
-Wallet, lives, streak, inventory, progression, save model, configuration assets.
-Pure C#, fully tested, no UI. Verify "win three, lose one, wait forty minutes"
-against a fake clock.
+Wallet, lives, streak, inventory, progression, save model, configuration
+assets. Pure C#, fully tested, shown in the build only as plain text and
+one prompt (D55). Verify "win three, lose one, wait forty minutes" against
+a fake clock.
+
+Four modules (D55). Each spec is written when the module before it is
+merged.
+
+| # | Module | Spec | Status |
+|---|---|---|---|
+| 4.1 | Save model: one versioned save, the old keys carried over (D56) | `Modules/29-save-model.md` | Planned |
+| 4.2 | Wallet, lives and `ITimeProvider` (D20, D22, D57) | — | Planned |
+| 4.3 | Win streak, joker inventory, store rules, campaign progress, `MetaGame` (D58) | — | Planned |
+| 4.4 | Runtime wiring: gold and lives as text, the life prompt, free play in settings (D58) | — | Planned |
+
+Not in Phase 4: unlimited lives for a while, until something grants it;
+jokers on the board (Phase 5); the screens (Phase 6); notifications (Phase
+7).
 
 ---
 
