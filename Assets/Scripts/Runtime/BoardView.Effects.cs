@@ -1397,7 +1397,7 @@ namespace GateRush.Runtime
             var marks = MarksOf(
                 cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0,
                 hasLayers: shown.LayerNumeral.HasValue);
-            var icon = marks.Icon;
+            var icon = marks.Icon * layout.CellSize;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);
             DrawLock(frame, cells, marks, null);
