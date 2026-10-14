@@ -5,9 +5,9 @@ namespace GateRush.Solver
     /// </summary>
     /// <remarks>
     /// <see cref="Indeterminate"/> is not a softer <see cref="Unsolvable"/>: it
-    /// means a budget limit stopped the search before it could prove anything.
-    /// The editor renders the three in three colours so a designer never reads a
-    /// timeout as a broken level. A boolean plus a separate "timed out" flag was
+    /// means the search stopped before it could prove anything. The editor
+    /// renders the three in three colours so a designer never reads a timeout
+    /// as a broken level. A boolean plus a separate "timed out" flag was
     /// rejected — callers forget to check the flag.
     /// </remarks>
     public enum SolveStatus
@@ -17,13 +17,20 @@ namespace GateRush.Solver
         /// <see cref="SolveResult.ProvenShortestLength"/>'s job.</summary>
         Solvable,
 
-        /// <summary>The search exhausted the reachable state space (within the
-        /// requested <see cref="MoveGenMode"/>) without a solution and without
-        /// hitting any budget limit.</summary>
+        /// <summary>The search proved there is no solution within the requested
+        /// <see cref="MoveGenMode"/>, without hitting any budget limit.
+        /// <see cref="BreadthFirstStrategy"/> and <see cref="AStarStrategy"/>
+        /// prove it by exhausting the reachable state space;
+        /// <see cref="NearestNextClearStrategy"/> by exhausting one stratum
+        /// with no clear reachable from it, on a level where
+        /// <see cref="GateRush.Core.LevelContext.IsClearMonotone"/> holds.</summary>
         Unsolvable,
 
-        /// <summary>A budget limit — depth, explored-state count, or wall clock —
-        /// stopped the search first. Says nothing about whether the level is
+        /// <summary>The search stopped without a solution and without a proof
+        /// that there is none: a budget limit — depth, explored-state count, or
+        /// wall clock — cut it short, or <see cref="NearestNextClearStrategy"/>
+        /// reached a dead end on a level that is not clear-monotone, where a
+        /// dead end proves nothing. Says nothing about whether the level is
         /// solvable.</summary>
         Indeterminate
     }

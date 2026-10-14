@@ -58,6 +58,7 @@ namespace GateRush.Solver
         private readonly int[] occupancy;
         private readonly int[] cost;
         private readonly bool[] settled;
+        private readonly OriginHeap open;
         private readonly int[] fromBlockers;
         private readonly int[] toBlockers;
 
@@ -72,6 +73,7 @@ namespace GateRush.Solver
             occupancy = new int[cellCount];
             cost = new int[cellCount];
             settled = new bool[cellCount];
+            open = new OriginHeap(cellCount);
             fromBlockers = new int[maxFootprint];
             toBlockers = new int[maxFootprint];
         }
@@ -203,11 +205,37 @@ namespace GateRush.Solver
             return fewest;
         }
 
+        /// <summary>How many candidate blocks the stratum has. Test seam, with <see cref="RouteCost"/>.</summary>
+        internal int CandidateCount => candidates.Length;
+
+        /// <summary>
+        /// Test seam: the cheapest route of candidate <paramref name="candidateIndex"/>
+        /// alone to any of its exits in <paramref name="state"/>, searched to
+        /// the end rather than cut off at another candidate's cost as
+        /// <see cref="FewestBlockers"/> cuts it; <see cref="int.MaxValue"/>
+        /// when it has none. Lets a test compare every candidate's cost, not
+        /// only the cheapest one's.
+        /// </summary>
+        internal int RouteCost(LevelContext ctx, BoardState state, int candidateIndex)
+        {
+            FillOccupancy(ctx, state);
+
+            var candidate = candidates[candidateIndex];
+            var start = state.Origins[candidate.BlockIndex];
+            return CheapestRouteToAnExit(candidate, start.Y * width + start.X, int.MaxValue);
+        }
+
         /// <summary>
         /// Dijkstra over the candidate's origins. Stops at the first exit
         /// settled, or once nothing cheaper than the best route found so far —
-        /// initially <paramref name="toBeat"/> — is left. Positions number at
-        /// most a few dozen, so the unvisited minimum is found by a plain scan.
+        /// initially <paramref name="toBeat"/> — is left. The next origin to
+        /// settle comes off a binary heap (<see cref="OriginHeap"/>) ordered by
+        /// cost and then by origin index, which is the origin a scan of every
+        /// cell for the cheapest unsettled one would pick, without the scan. A
+        /// cheaper route to an origin pushes a second entry rather than moving
+        /// the first; the dearer one is skipped when it comes off. A route no
+        /// cheaper than the best found so far is never pushed: it could only
+        /// end the search with that best.
         /// <para>The block's current origin is special: standing there is not
         /// arriving there. It counts as an exit at cost zero only when it is the
         /// candidate's <see cref="Candidate.InPlaceExit"/>; otherwise the route
@@ -229,27 +257,29 @@ namespace GateRush.Solver
             }
 
             cost[start] = 0;
+            open.Clear();
+            open.Push(0, start);
             var best = toBeat;
 
-            while (true)
+            while (open.Count > 0)
             {
-                var current = -1;
-                for (var i = 0; i < cost.Length; i++)
+                var current = open.Pop(out var currentCost);
+
+                // Superseded by a cheaper route to the same origin, which has
+                // settled it or will.
+                if (settled[current] || currentCost != cost[current])
                 {
-                    if (!settled[i] && cost[i] != int.MaxValue && (current < 0 || cost[i] < cost[current]))
-                    {
-                        current = i;
-                    }
+                    continue;
                 }
 
-                if (current < 0 || cost[current] >= best)
+                if (currentCost >= best)
                 {
                     return best;
                 }
 
                 if (candidate.IsExit[current] && current != start)
                 {
-                    return cost[current];
+                    return currentCost;
                 }
 
                 settled[current] = true;
@@ -281,19 +311,22 @@ namespace GateRush.Solver
                         }
                     }
 
-                    var total = cost[current] + newlyMet;
+                    var total = currentCost + newlyMet;
                     if (arrivesBackAtStart)
                     {
                         best = Math.Min(best, total);
                         continue;
                     }
 
-                    if (total < cost[index])
+                    if (total < cost[index] && total < best)
                     {
                         cost[index] = total;
+                        open.Push(total, index);
                     }
                 }
             }
+
+            return best;
         }
 
         /// <summary>Writes the distinct other blocks the candidate's footprint overlaps at <paramref name="origin"/> into <paramref name="buffer"/>; returns how many.</summary>
@@ -394,6 +427,103 @@ namespace GateRush.Solver
         {
             var shutter = ctx.ShutterPositionAt(cell);
             return shutter.HasValue && !state.ShutterOpen[shutter.Value];
+        }
+
+        /// <summary>
+        /// Array-backed binary min-heap of origins waiting to be settled, each
+        /// with the cost of the route that reached it, ordered by cost and then
+        /// by origin index — a total order over the entries one search pushes,
+        /// since a cheaper route to an origin always carries a different cost.
+        /// Its arrays are kept between searches, so a search allocates nothing
+        /// once they have grown to fit.
+        /// </summary>
+        private sealed class OriginHeap
+        {
+            private int[] costs;
+            private int[] origins;
+
+            /// <param name="capacity">The starting array length; the arrays double when full. A growth seed, not a limit.</param>
+            public OriginHeap(int capacity)
+            {
+                costs = new int[capacity];
+                origins = new int[capacity];
+            }
+
+            public int Count { get; private set; }
+
+            public void Clear() => Count = 0;
+
+            public void Push(int cost, int origin)
+            {
+                if (Count == costs.Length)
+                {
+                    Array.Resize(ref costs, costs.Length * 2);
+                    Array.Resize(ref origins, origins.Length * 2);
+                }
+
+                var index = Count++;
+                while (index > 0)
+                {
+                    var parent = (index - 1) / 2;
+                    if (!Precedes(cost, origin, costs[parent], origins[parent]))
+                    {
+                        break;
+                    }
+
+                    costs[index] = costs[parent];
+                    origins[index] = origins[parent];
+                    index = parent;
+                }
+
+                costs[index] = cost;
+                origins[index] = origin;
+            }
+
+            /// <summary>Removes the first entry and returns its origin, with its <paramref name="cost"/>.</summary>
+            public int Pop(out int cost)
+            {
+                cost = costs[0];
+                var origin = origins[0];
+                Count--;
+                var lastCost = costs[Count];
+                var lastOrigin = origins[Count];
+
+                if (Count > 0)
+                {
+                    var index = 0;
+                    while (true)
+                    {
+                        var child = 2 * index + 1;
+                        if (child >= Count)
+                        {
+                            break;
+                        }
+
+                        var right = child + 1;
+                        if (right < Count && Precedes(costs[right], origins[right], costs[child], origins[child]))
+                        {
+                            child = right;
+                        }
+
+                        if (!Precedes(costs[child], origins[child], lastCost, lastOrigin))
+                        {
+                            break;
+                        }
+
+                        costs[index] = costs[child];
+                        origins[index] = origins[child];
+                        index = child;
+                    }
+
+                    costs[index] = lastCost;
+                    origins[index] = lastOrigin;
+                }
+
+                return origin;
+            }
+
+            private static bool Precedes(int costA, int originA, int costB, int originB) =>
+                costA != costB ? costA < costB : originA < originB;
         }
 
         /// <summary>One movable block with at least one reachable exit, and which of its origins are exits.</summary>

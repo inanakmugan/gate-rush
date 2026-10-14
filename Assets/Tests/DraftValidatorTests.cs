@@ -1110,6 +1110,61 @@ namespace GateRush.Tests
             StringAssert.DoesNotContain("unproven", warning.Message);
         }
 
+        // -- TimeBonusBeyondMarkCheck ----------------------------
+
+        [Test]
+        public void TimeBonusBeyondMarkCheck_PlacedBlockOneSecondAboveTheWidestChecked_FiresNamingTheBlock()
+        {
+            var draft = Draft(3, 3, d => d.Blocks.Add(BonusBlock(7, GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked + 1)));
+
+            Assert.IsTrue(Warns(draft, DraftWarningCategory.TimeBonusBeyondMarkCheck));
+            StringAssert.Contains("Block 7", Message(draft, DraftWarningCategory.TimeBonusBeyondMarkCheck));
+        }
+
+        [Test]
+        public void TimeBonusBeyondMarkCheck_BonusExactlyTheWidestChecked_Silent()
+        {
+            var draft = Draft(3, 3, d => d.Blocks.Add(BonusBlock(7, GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked)));
+
+            Assert.IsFalse(Warns(draft, DraftWarningCategory.TimeBonusBeyondMarkCheck));
+        }
+
+        [Test]
+        public void TimeBonusBeyondMarkCheck_QueueEntryAndWaveBlockAboveTheWidestChecked_EachFire()
+        {
+            const int tooLong = GateRush.Runtime.RuntimeConfig.WidestBonusSecondsChecked + 1;
+            var draft = Draft(3, 3, d =>
+            {
+                var queued = SpawnedCell(new Coord(0, 0));
+                queued.RegionOrigin = null;
+                queued.TimeBonusSeconds = tooLong;
+                d.Generators.Add(new GeneratorDraft { Id = 1, Edge = BoardEdge.Top, Offset = 0, Width = 1, Queue = { queued } });
+
+                var inWave = SpawnedCell(new Coord(0, 0));
+                inWave.TimeBonusSeconds = tooLong;
+                d.Elevators.Add(new ElevatorDraft
+                {
+                    Id = 2, Min = new Coord(0, 0), Max = new Coord(0, 0),
+                    Waves = { new WaveDraft { Blocks = { inWave } } },
+                });
+            });
+
+            var messages = new DraftValidator().Validate(draft)
+                .Where(w => w.Category == DraftWarningCategory.TimeBonusBeyondMarkCheck)
+                .Select(w => w.Message)
+                .ToList();
+
+            Assert.IsTrue(messages.Any(m => m.Contains("Generator 1 queue entry 0")), "the queue entry");
+            Assert.IsTrue(messages.Any(m => m.Contains("Elevator 2 wave 0 block 0")), "the wave block");
+        }
+
+        private static BlockDraft BonusBlock(int id, int timeBonusSeconds)
+        {
+            var block = RedBlock(id, new Coord(0, 0));
+            block.TimeBonusSeconds = timeBonusSeconds;
+            return block;
+        }
+
         private static string Message(LevelDraft draft, DraftWarningCategory category) =>
             new DraftValidator().Validate(draft).First(w => w.Category == category).Message;
 

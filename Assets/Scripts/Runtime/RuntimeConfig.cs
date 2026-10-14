@@ -79,9 +79,12 @@ namespace GateRush.Runtime
         /// The longest time bonus <see cref="Problems"/> sizes a time-bonus
         /// mark for when it checks that two marks sharing a block cannot
         /// overlap: two digits. Not a tunable; a longer bonus widens its mark
-        /// past what was checked.
+        /// past what was checked. Public so that nothing goes past it
+        /// unnoticed: the Level Editor's validator warns about a block whose
+        /// bonus is above it, and a test holds every shipped level to it
+        /// (Module 28).
         /// </summary>
-        private const int WidestBonusSecondsChecked = 99;
+        public const int WidestBonusSecondsChecked = 99;
 
         /// <summary>
         /// The deepest layer count <see cref="Problems"/> sizes a layer badge

@@ -1444,7 +1444,7 @@ namespace GateRush.Tests
             Assert.IsTrue(moved);
             Assert.IsTrue(result.KeyConsumed[1], "the key is still spent");
             Assert.IsFalse(result.Alive[1], "it still leaves only through its own gate");
-            Assert.AreEqual(2, result.TotalClearCount, "rocket clear + key clear only; no effect clear on a dead owner");
+            Assert.AreEqual(2, result.TotalClearCount, "the rocket's clear and the key block's own exit; a key never clears its lock's block (D45)");
         }
 
         [Test]
