@@ -38,7 +38,7 @@ This is not stylistic. It buys three concrete things:
                               └──────────────────┘
 
   ┌──────────┐                    ┌──────────────────┐
-  │  Solver  │ ──► Core           │  Serialization   │ ──► Core
+  │  Solver  │ ──► Core           │  Serialization   │ ──► Core, Meta
   │ (editor  │                    │  (JsonUtility)   │
   │  only)   │                    └──────────────────┘
   └──────────┘
@@ -67,8 +67,11 @@ Pure C#. Wallet, lives, streak, inventory, level progress, store catalog,
 persistence model. Completely independent of `Core` — the two meet only inside
 `Runtime`, when a level ends and its result is reported.
 
-So far it holds only `CompletedLevels`, the set of won levels (Module 23); the
-rest arrives with Phase 4.
+Everything it keeps is one `SaveData` (Module 29, D56): so far the
+completed levels (Module 23) and the sound setting (Module 25).
+`SaveRepository` owns the rules for loading and carrying over the save,
+and reads and writes its text through `ISaveCodec`, an interface `Meta`
+declares and `Serialization` implements. The rest arrives with Phase 4.
 
 ### Serialization — level and save data
 
@@ -76,6 +79,10 @@ Depends on `Core` and on `UnityEngine` (for `JsonUtility`). A **deliberate
 exception** to the engine-agnostic rule, isolated to one small layer of
 data-transfer objects. `Core` types never carry serialization attributes; the
 DTO layer converts between them.
+
+It also references `Meta`, to implement `Meta`'s `ISaveCodec` as
+`JsonSaveCodec` (D56). The dependency is inverted on purpose: the save's
+rules stay in the pure layer, and only the JSON lives here.
 
 ### Platform — engine and OS boundaries
 
@@ -261,7 +268,7 @@ small project than a finished one.
 | `GateRush.Core` | — | All |
 | `GateRush.Meta` | `GateRush.Platform` | All |
 | `GateRush.Platform` | — | All |
-| `GateRush.Serialization` | `GateRush.Core` | All |
+| `GateRush.Serialization` | `GateRush.Core`, `GateRush.Meta` | All |
 | `GateRush.Solver` | `GateRush.Core` | **Editor only** |
 | `GateRush.Runtime` | Core, Meta, Serialization, Platform, DOTween | All |
 | `GateRush.Editor` | All of the above incl. Solver | Editor only |

@@ -205,3 +205,42 @@ Names are negotiable. That the loading rules live in `Meta` behind
 - Toggle sound, complete a level, then reload (a new Play in the Editor,
   and a reload of a web build): both are kept.
 - After Edit → Clear All PlayerPrefs: no level completed, sound on.
+
+---
+
+## Resolved during implementation
+
+- **Surface.** As specified, with: a public `SaveData` constructor, which
+  the codec needs, throwing on a null section; `SaveLoad` as a sealed
+  class with an internal constructor; `SaveRepository.Save` and
+  `CompletedLevels.Of` throwing on null. `SoundSetting` gained no
+  constructor: an object initialiser sets `IsOn`. `SaveHeaderDto` is
+  internal.
+- **A failed carry-over write.** Not in the spec. If writing the
+  carried-over save throws, for example on a full WebGL quota, `Load`
+  would have stopped `Awake` before the menu. `SaveRepository` catches any
+  exception from that one write, since `Meta` cannot name
+  `PlayerPrefsException`, and still returns the data as `CarriedOver` with
+  a problem. Until a save succeeds, the old keys are read again at the
+  next start. A store that throws while reading still reaches the caller.
+- **Logging.** Each problem is logged as a warning. A carry-over logs one
+  info line naming both old keys, worded to stay true when the write
+  failed. The problem for an unreadable save names the defaults of version
+  1; Module 30 makes it general.
+- **Codec.** The header DTO is read first; an exception from `JsonUtility`
+  or a null result is refused, and so are whitespace and a JSON array.
+  `Encode` is pretty-printed, as `LevelSerializer` is. `FromDto` takes the
+  version but has one branch until Module 30 adds a section.
+- **Bootstrap.** `LoadSave` replaces `LoadCompletedLevels` and
+  `LoadSoundSetting`, and `SaveOrWarn` keeps the two failure messages
+  unchanged. The bootstrap no longer uses `GateRush.Platform` directly.
+- **Assemblies.** The reference to `GateRush.Meta` was added to
+  `GateRush.Serialization.asmdef` by its GUID.
+- **Tests.** `MemorySaveStore` records every saved key, seeds old data
+  without counting a save, and can fail its saves.
+  `SaveFixture.EveryField` and `AssertSameSave` cover every field of the
+  save; Modules 30 and 31 add their sections to both. The `ToData` round
+  trips were replaced by reads of literal strings in the old formats.
+- **By hand.** The carry-over, keeping changes across a new Play and a web
+  reload, and a clean start after Clear All PlayerPrefs all behave as
+  specified.
