@@ -254,3 +254,42 @@ codec builds missing sections from the rules, is not.
   version 2.
 - With the Meta Config field cleared on the bootstrap: Play logs one error
   naming it, and nothing is drawn. Assign it again afterwards.
+
+---
+
+## Resolved during implementation
+
+- **Surface.** As specified, with: `FromDto` renamed `TryFromDto`, since
+  version 2 can refuse values; `Wallet.Starting` and `Lives.Full` throwing
+  on null rules; `TrySpend(0)` true; `Lives.Full` keeping a wait start of
+  `DateTime.MinValue` in UTC, which is never read at the cap and saves
+  like any other time. `MetaConfig` is at
+  `Assets/Config/MetaConfig.asset`, assigned on the Level Bootstrap of
+  `Game` in the Level scene, menu Create → Gate Rush → Meta Config.
+- **Every member settles, the queries included.** The spec had only the
+  members that change the lives settle. Review found that this locks a
+  player out: with the clock ahead, all lives lost and the clock then
+  corrected, nothing that changes the lives can run at 0, so the wait
+  would never restart. `CountAt`, `IsFullAt` and `UntilNextLifeAt`
+  therefore settle and store too, and may change `StoredCount` and
+  `RegenStartUtc`; the codec reads those without settling. After a clock
+  is set back, the next life is exactly one interval away. `TryLose` at 0
+  still settles before returning false.
+- **Unreadable save.** The problem now says the defaults of a new player
+  are used, so it stays true as sections are added.
+- **No time provider on the bootstrap yet.** A field assigned and never
+  read would raise warning CS0414. `SystemTimeProvider` and its test
+  exist; Module 32 creates it where lives are shown and spent.
+- **Tests.** `SaveFixture.Rules` (cap 4, 15 minutes, 300 gold) differ from
+  the config's defaults, so a codec or repository with numbers of its own
+  would fail. `MetaConfigTests` destroy their assets in a TearDown. Added
+  beyond the spec: a version-2 read of gold and lives, zero starting gold
+  allowed, null rules for `Wallet.Starting` and `Lives.Full`, spending the
+  whole balance, and the lock-out regression
+  `CountAt_ClockSetBackWithNoLives_GivesALifeOneIntervalLater`. 1777 Edit
+  Mode tests pass.
+- **By hand.** The version-1 save of Module 29 read and was written back
+  as version 2 with no warning; a cleared Meta Config logged one error and
+  drew nothing.
+- **Branch.** Module 30 was committed and pushed straight to main by
+  mistake, so it has no PR; the commits are complete and tested.

@@ -68,10 +68,13 @@ persistence model. Completely independent of `Core` — the two meet only inside
 `Runtime`, when a level ends and its result is reported.
 
 Everything it keeps is one `SaveData` (Module 29, D56): so far the
-completed levels (Module 23) and the sound setting (Module 25).
-`SaveRepository` owns the rules for loading and carrying over the save,
-and reads and writes its text through `ISaveCodec`, an interface `Meta`
-declares and `Serialization` implements. The rest arrives with Phase 4.
+completed levels (Module 23), the sound setting (Module 25), the wallet
+and the lives (Module 30). `SaveRepository` owns the rules for loading and
+carrying over the save, and reads and writes its text through
+`ISaveCodec`, an interface `Meta` declares and `Serialization` implements.
+Every default comes from `MetaRules`, built from the `MetaConfig` asset
+(D60), and lives are read against a time passed in, never the system clock
+(D59). The rest arrives with Phase 4.
 
 ### Serialization — level and save data
 
@@ -93,12 +96,13 @@ implementations supplied at startup:
 |---|---|---|
 | `ILevelSource` | Retrieve level JSON by index | In-memory dictionary |
 | `ISaveStore` | Persist and load a string blob | In-memory dictionary |
-| `ITimeProvider` | Current UTC time and frame delta | Manually advanced clock |
+| `ITimeProvider` | Current UTC time; the frame delta stays in `Runtime` | Manually advanced clock |
 | `IHaptics` | Vibration feedback | No-op |
 
-`ISaveStore` (Module 23) and `IHaptics` (Module 25) exist so far; their
-implementations, `PlayerPrefsSaveStore` and `WebHaptics`, live in `Runtime`.
-The others arrive when `Meta` needs them.
+`ISaveStore` (Module 23), `IHaptics` (Module 25) and `ITimeProvider`
+(Module 30) exist so far; their implementations, `PlayerPrefsSaveStore`,
+`WebHaptics` and `SystemTimeProvider`, live in `Runtime`. `ILevelSource`
+arrives when something needs it.
 
 ### Runtime — presentation
 
