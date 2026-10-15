@@ -1814,3 +1814,83 @@ configuration. A separate "section missing" flag returned to the
 repository: more surface for the same result.
 
 ---
+
+## D61 — The win streak pays jokers at thresholds
+
+**Decision.** Each campaign win adds one to the win streak; any campaign
+loss (D57: the countdown running out, leaving or restarting while playing)
+sets it back to 0. Free play never touches it (D58). When the streak
+reaches a threshold, the player gets that threshold's jokers: 1 Clock at 3
+wins, 1 Rocket at 5, 1 Broom at 10. Past the last threshold the streak
+keeps counting with no further reward. The best streak is kept beside it.
+The table is configuration.
+
+**Why.** Jokers are the reward that matters to a player who is on a run,
+and they make the inventory real before Phase 5 lets them be used. A fixed
+table is easy to read and to test; reaching a threshold again after a loss
+pays again, which is what a streak is for.
+
+**Consequences.**
+- A new player starts with 1 of each joker, so Phase 5 can show them at
+  once; this too is configuration.
+- Phase 4 only counts jokers. Using one on the board is Phase 5.
+
+**Rejected.** Gold for every win of a streak: gold already comes from each
+win (D58). A table that repeats after the last threshold: it would make
+long streaks a farm. A streak counted in free play: replays would farm it
+(D58).
+
+---
+
+## D62 — The store sells jokers and a refill for gold
+
+**Decision.** The store's rules are in `Meta`: a Clock costs 100 gold, a
+Rocket 200, a Broom 300, and refilling the lives to the cap costs 300. A
+purchase that the balance cannot pay changes nothing. Refilling full lives
+is refused and costs nothing. Every level pays 50 gold for a campaign win;
+that value is level data, set in the Level Editor. The prices are
+configuration.
+
+**Why.** The store's screen is Phase 6, but whether a player can afford
+something is a rule, and screens ask `Meta` (ARCHITECTURE, UI). With 500
+starting gold and 750 from the whole campaign, a player can buy a few
+jokers or refills, and gold is worth something without being scarce in a
+portfolio build.
+
+**Consequences.**
+- Module 32 shows no store yet; the rules are tested and wait for Phase 6.
+- The refill price is the same whatever the number of lives missing.
+
+**Rejected.** A refill priced per missing life: harder to read on a button
+for little gain. Real-money products: not in a portfolio build.
+
+---
+
+## D63 — One MetaGame object takes every campaign result and purchase
+
+**Decision.** `Runtime` changes the meta game only through `MetaGame`,
+which holds the save and the rules and reads the time from
+`ITimeProvider`. It reports a campaign win with the level's gold reward, a
+campaign loss, a joker bought and a refill; free play reports nothing.
+Each call returns what changed, and the caller saves the whole save after
+any call that changed it (D56). The campaign's position in the level order
+is a section of the save, advanced by a campaign win.
+
+**Why.** One entry point keeps the rules of D57, D58, D61 and D62 together
+and testable without a scene: "win three, lose one, wait forty minutes" is
+a unit test. Returning results instead of saving inside keeps `MetaGame`
+free of the store and lets `Runtime` keep its one save path
+(`SaveOrWarn`).
+
+**Consequences.**
+- `Meta` still knows nothing of `Core`: the gold reward is passed in, and
+  whether the position is past the last level is the catalog's question.
+- Format version 3 adds the streak, the best streak, the campaign position
+  and the jokers. An older save reads them as a new player has them (D60):
+  a streak of 0, the campaign at its start and the starting jokers.
+
+**Rejected.** Saving inside `MetaGame`: it would need the store and
+duplicate the bootstrap's handling of a failed save. Separate services for
+each subject: more wiring for the same rules.
+
+---
