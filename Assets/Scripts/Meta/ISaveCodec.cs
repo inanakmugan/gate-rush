@@ -16,13 +16,17 @@ namespace GateRush.Meta
         string Encode(SaveData data);
 
         /// <summary>
-        /// Reads <paramref name="text"/> into <paramref name="data"/>. False
-        /// for text <see cref="Encode"/> would not have written, a missing or
-        /// non-positive format version, or a version newer than this codec
-        /// knows: <paramref name="data"/> is then null and
+        /// Reads <paramref name="text"/> into <paramref name="data"/>. A
+        /// section the text's version did not have takes the value a new
+        /// player gets, built from <paramref name="rules"/> through the
+        /// section's own factory, never from numbers of the codec's (D60).
+        /// False for text <see cref="Encode"/> would not have written, a
+        /// missing or non-positive format version, or a version newer than
+        /// this codec knows: <paramref name="data"/> is then null and
         /// <paramref name="problem"/> says why. True leaves
         /// <paramref name="problem"/> null. Never throws for any text.
         /// </summary>
-        bool TryDecode(string text, out SaveData data, out string problem);
+        /// <exception cref="System.ArgumentNullException"><paramref name="rules"/> is null.</exception>
+        bool TryDecode(string text, MetaRules rules, out SaveData data, out string problem);
     }
 }

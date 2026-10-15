@@ -66,7 +66,12 @@ namespace GateRush.Runtime
     /// logged as a warning and played at its default; a save carried over
     /// from the old keys is logged once. The whole save is saved when a
     /// level is newly completed and when the sound is toggled; a save that
-    /// fails is logged and the change lasts until the game is closed.</para>
+    /// fails is logged and the change lasts until the game is closed. The
+    /// repository is given the <see cref="MetaRules"/> of
+    /// <see cref="MetaConfig"/> (Module 30), from which every default of the
+    /// save is built (D60); with no Meta Config assigned, or one with
+    /// problems, an error is logged and nothing is drawn, as for a missing
+    /// Runtime Config.</para>
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
@@ -84,6 +89,9 @@ namespace GateRush.Runtime
         [SerializeField] private TextAsset level;
 
         [SerializeField] private RuntimeConfig config;
+
+        [Tooltip("The life cap, the minutes a life takes to come back and a new player's gold: Assets/Config/MetaConfig.asset. The save cannot be read without them, so left empty, or with a problem, it logs an error and nothing is drawn.")]
+        [SerializeField] private MetaConfig metaConfig;
 
         [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
         [SerializeField] private Camera boardCamera;
@@ -179,7 +187,7 @@ namespace GateRush.Runtime
             boardCamera.backgroundColor = config.BackgroundBottom;
 
             BuildCatalog();
-            saves = new SaveRepository(new PlayerPrefsSaveStore(), new JsonSaveCodec());
+            saves = new SaveRepository(new PlayerPrefsSaveStore(), new JsonSaveCodec(), metaConfig.ToRules());
             LoadSave();
             InitializeSound();
             ApplySoundSetting();
@@ -1117,6 +1125,20 @@ namespace GateRush.Runtime
             {
                 Debug.LogError($"{problem} Nothing is drawn.", this);
                 isAssigned = false;
+            }
+
+            if (metaConfig == null)
+            {
+                Debug.LogError("LevelBootstrap: Meta Config is not assigned; nothing is drawn.", this);
+                isAssigned = false;
+            }
+            else
+            {
+                foreach (var problem in metaConfig.Problems())
+                {
+                    Debug.LogError($"{problem} Nothing is drawn.", metaConfig);
+                    isAssigned = false;
+                }
             }
 
             if (level == null)

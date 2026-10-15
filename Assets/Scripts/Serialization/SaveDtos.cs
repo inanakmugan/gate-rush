@@ -11,13 +11,27 @@ namespace GateRush.Serialization
     // ascending; an id written twice reads as one.
     //
     // {
-    //     "formatVersion": 1,
+    //     "formatVersion": 2,
     //     "completedLevelIds": [0, 1, 3],
-    //     "soundOn": true
+    //     "soundOn": true,
+    //     "gold": 640,
+    //     "lifetimeGold": 140,
+    //     "lives": 3,
+    //     "livesRegenStartUtcTicks": 638640000000000000
     // }
     //
-    // A later section (the wallet and lives in Module 30, the streak and the
-    // inventory in Module 31) adds its fields here and raises formatVersion.
+    // gold is the spendable balance and lifetimeGold all gold ever earned (D22).
+    // lives is the count as last settled and livesRegenStartUtcTicks the UTC
+    // moment, in DateTime ticks, the wait for the next life started (D59);
+    // it means nothing while lives is at the cap.
+    //
+    // Version 2 added the four fields after soundOn (Module 30). A version-1
+    // save has none of them and reads with the starting gold and full lives,
+    // built from the game's rules (D60). In version 2 a negative count or
+    // ticks outside DateTime's range make the save unreadable.
+    //
+    // A later section (the streak and the inventory in Module 31) adds its
+    // fields here and raises formatVersion.
     // ---------------------------------------------------------------------------
 
     /// <summary>
@@ -36,6 +50,22 @@ namespace GateRush.Serialization
 
         /// <summary>True when sound and vibration are on.</summary>
         public bool soundOn;
+
+        /// <summary>The spendable gold; never negative. Since version 2.</summary>
+        public int gold;
+
+        /// <summary>All the gold ever earned; never negative. Since version 2.</summary>
+        public int lifetimeGold;
+
+        /// <summary>The count of lives as last settled; never negative. Since version 2.</summary>
+        public int lives;
+
+        /// <summary>
+        /// When the wait for the next life started, as UTC
+        /// <see cref="DateTime.Ticks"/>, within <see cref="DateTime"/>'s
+        /// range. Since version 2.
+        /// </summary>
+        public long livesRegenStartUtcTicks;
     }
 
     /// <summary>

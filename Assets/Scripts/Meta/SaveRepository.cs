@@ -21,7 +21,8 @@ namespace GateRush.Meta
     /// <item>Otherwise the old keys, <see cref="CompletedLevels.LegacySaveKey"/>
     /// and <see cref="SoundSetting.LegacySaveKey"/>, are read when either
     /// exists. One that cannot be read gives its default and a problem; the
-    /// other is kept. The save is written under <see cref="SaveKey"/> at once:
+    /// other is kept. Every section they never held, the wallet and the lives
+    /// among them, is a new player's. The save is written under <see cref="SaveKey"/> at once:
     /// <see cref="SaveLoadOutcome.CarriedOver"/>.</item>
     /// <item>Otherwise the defaults and <see cref="SaveLoadOutcome.Fresh"/>,
     /// and nothing is written.</item>
@@ -44,13 +45,20 @@ namespace GateRush.Meta
 
         private readonly ISaveStore store;
         private readonly ISaveCodec codec;
+        private readonly MetaRules rules;
 
-        /// <summary>A repository keeping the save in <paramref name="store"/>, as text from <paramref name="codec"/>.</summary>
-        /// <exception cref="ArgumentNullException"><paramref name="store"/> or <paramref name="codec"/> is null.</exception>
-        public SaveRepository(ISaveStore store, ISaveCodec codec)
+        /// <summary>
+        /// A repository keeping the save in <paramref name="store"/>, as text
+        /// from <paramref name="codec"/>. Every default it gives — a new
+        /// player's, an unreadable save's, and that of a section an older save
+        /// lacks (D60) — is built from <paramref name="rules"/>.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="store"/>, <paramref name="codec"/> or <paramref name="rules"/> is null.</exception>
+        public SaveRepository(ISaveStore store, ISaveCodec codec, MetaRules rules)
         {
             this.store = store ?? throw new ArgumentNullException(nameof(store));
             this.codec = codec ?? throw new ArgumentNullException(nameof(codec));
+            this.rules = rules ?? throw new ArgumentNullException(nameof(rules));
         }
 
         /// <summary>
@@ -68,7 +76,7 @@ namespace GateRush.Meta
             var hasSound = store.TryLoad(SoundSetting.LegacySaveKey, out var soundData);
             if (!hasCompleted && !hasSound)
             {
-                return new SaveLoad(SaveData.CreateDefault(), SaveLoadOutcome.Fresh, Array.Empty<string>());
+                return new SaveLoad(SaveData.CreateDefault(rules), SaveLoadOutcome.Fresh, Array.Empty<string>());
             }
 
             return CarryOver(hasCompleted, completedData, hasSound, soundData);
@@ -92,17 +100,17 @@ namespace GateRush.Meta
 
         private SaveLoad Decode(string text)
         {
-            if (codec.TryDecode(text, out var data, out var problem))
+            if (codec.TryDecode(text, rules, out var data, out var problem))
             {
                 return new SaveLoad(data, SaveLoadOutcome.Loaded, Array.Empty<string>());
             }
 
             var problems = new[]
             {
-                $"The save under '{SaveKey}' cannot be read: {problem} No level counts as completed and sound is on; " +
+                $"The save under '{SaveKey}' cannot be read: {problem} The defaults of a new player are used; " +
                 "the saved text is left as it is until the next change replaces it.",
             };
-            return new SaveLoad(SaveData.CreateDefault(), SaveLoadOutcome.Unreadable, problems);
+            return new SaveLoad(SaveData.CreateDefault(rules), SaveLoadOutcome.Unreadable, problems);
         }
 
         private SaveLoad CarryOver(bool hasCompleted, string completedData, bool hasSound, string soundData)
@@ -124,7 +132,7 @@ namespace GateRush.Meta
                     $"The sound setting saved under '{SoundSetting.LegacySaveKey}' cannot be read ('{soundData}'); sound is on.");
             }
 
-            var data = new SaveData(completed, sound);
+            var data = new SaveData(completed, sound, Wallet.Starting(rules), Lives.Full(rules));
             try
             {
                 Save(data);

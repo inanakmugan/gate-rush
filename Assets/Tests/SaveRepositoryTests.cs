@@ -6,13 +6,14 @@ using NUnit.Framework;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Module 29's <see cref="SaveRepository"/> over a
+    /// Covers Modules 29 and 30's <see cref="SaveRepository"/> over a
     /// <see cref="MemorySaveStore"/> and the real <see cref="JsonSaveCodec"/>:
     /// a save survives a new repository; the old keys are carried over only
     /// while no save exists under the new key, which then always wins; one
     /// unreadable old key leaves the other; an unreadable or too new save gives
-    /// the defaults and is left in the store; and a carried-over save whose
-    /// write fails is still played.
+    /// the defaults and is left in the store; a carried-over save whose
+    /// write fails is still played; and a fresh store, a carry-over and a
+    /// version-1 save all give a new player's gold and lives by the rules.
     /// </summary>
     public class SaveRepositoryTests
     {
@@ -26,7 +27,8 @@ namespace GateRush.Tests
             var load = Repository(store).Load();
 
             Assert.AreEqual(SaveLoadOutcome.Fresh, load.Outcome);
-            SaveFixture.AssertSameSave(SaveData.CreateDefault(), load.Data);
+            SaveFixture.AssertSameSave(SaveData.CreateDefault(SaveFixture.Rules), load.Data);
+            AssertNewPlayerGoldAndLives(load.Data);
             CollectionAssert.IsEmpty(load.Problems);
             CollectionAssert.IsEmpty(store.SavedKeys);
         }
@@ -59,10 +61,11 @@ namespace GateRush.Tests
             Assert.AreEqual(SaveLoadOutcome.CarriedOver, load.Outcome);
             CollectionAssert.AreEqual(new[] { 0, 2 }, load.Data.Completed.Ids);
             Assert.IsFalse(load.Data.Sound.IsOn);
+            AssertNewPlayerGoldAndLives(load.Data);
             CollectionAssert.IsEmpty(load.Problems);
             CollectionAssert.AreEqual(new[] { SaveRepository.SaveKey }, store.SavedKeys, "exactly one save, under the new key");
             Assert.IsTrue(store.TryLoad(SaveRepository.SaveKey, out var written));
-            Assert.IsTrue(new JsonSaveCodec().TryDecode(written, out var writtenSave, out var problem), problem);
+            Assert.IsTrue(new JsonSaveCodec().TryDecode(written, SaveFixture.Rules, out var writtenSave, out var problem), problem);
             SaveFixture.AssertSameSave(load.Data, writtenSave);
         }
 
@@ -151,9 +154,26 @@ namespace GateRush.Tests
             var load = Repository(store).Load();
 
             Assert.AreEqual(SaveLoadOutcome.Unreadable, load.Outcome);
-            SaveFixture.AssertSameSave(SaveData.CreateDefault(), load.Data);
+            SaveFixture.AssertSameSave(SaveData.CreateDefault(SaveFixture.Rules), load.Data);
             Assert.AreEqual(1, load.Problems.Count);
+            StringAssert.Contains(SaveRepository.SaveKey, load.Problems[0], "the problem names the key it could not read");
             AssertStoredUnchanged(store, Unreadable);
+        }
+
+        [Test]
+        public void Load_VersionOneSave_IsLoadedWithStartingGoldAndFullLives()
+        {
+            var store = new MemorySaveStore();
+            store.Seed(SaveRepository.SaveKey, "{\"formatVersion\":1,\"completedLevelIds\":[0,1,3],\"soundOn\":false}");
+
+            var load = Repository(store).Load();
+
+            Assert.AreEqual(SaveLoadOutcome.Loaded, load.Outcome);
+            CollectionAssert.AreEqual(new[] { 0, 1, 3 }, load.Data.Completed.Ids);
+            Assert.IsFalse(load.Data.Sound.IsOn);
+            AssertNewPlayerGoldAndLives(load.Data);
+            CollectionAssert.IsEmpty(load.Problems);
+            CollectionAssert.IsEmpty(store.SavedKeys, "Load writes nothing; the next change writes version 2");
         }
 
         [Test]
@@ -166,7 +186,7 @@ namespace GateRush.Tests
             var load = Repository(store).Load();
 
             Assert.AreEqual(SaveLoadOutcome.Unreadable, load.Outcome);
-            SaveFixture.AssertSameSave(SaveData.CreateDefault(), load.Data);
+            SaveFixture.AssertSameSave(SaveData.CreateDefault(SaveFixture.Rules), load.Data);
             Assert.AreEqual(1, load.Problems.Count);
             AssertStoredUnchanged(store, future);
         }
@@ -194,7 +214,7 @@ namespace GateRush.Tests
             var codec = new JsonSaveCodec();
             var save = SaveFixture.EveryField();
 
-            new SaveRepository(store, codec).Save(save);
+            new SaveRepository(store, codec, SaveFixture.Rules).Save(save);
 
             CollectionAssert.AreEqual(new[] { SaveRepository.SaveKey }, store.SavedKeys);
             Assert.IsTrue(store.TryLoad(SaveRepository.SaveKey, out var written));
@@ -210,10 +230,11 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Constructor_NullStoreOrCodec_Throws()
+        public void Constructor_NullStoreCodecOrRules_Throws()
         {
-            Assert.Throws<ArgumentNullException>(() => new SaveRepository(null, new JsonSaveCodec()));
-            Assert.Throws<ArgumentNullException>(() => new SaveRepository(new MemorySaveStore(), null));
+            Assert.Throws<ArgumentNullException>(() => new SaveRepository(null, new JsonSaveCodec(), SaveFixture.Rules));
+            Assert.Throws<ArgumentNullException>(() => new SaveRepository(new MemorySaveStore(), null, SaveFixture.Rules));
+            Assert.Throws<ArgumentNullException>(() => new SaveRepository(new MemorySaveStore(), new JsonSaveCodec(), null));
         }
 
         [Test]
@@ -222,7 +243,20 @@ namespace GateRush.Tests
             Assert.AreEqual("GateRush.Save", SaveRepository.SaveKey);
         }
 
-        private static SaveRepository Repository(MemorySaveStore store) => new SaveRepository(store, new JsonSaveCodec());
+        private static SaveRepository Repository(MemorySaveStore store) =>
+            new SaveRepository(store, new JsonSaveCodec(), SaveFixture.Rules);
+
+        /// <summary>
+        /// Asserts the gold and lives a new player gets by
+        /// <see cref="SaveFixture.Rules"/>: the starting gold, none of it
+        /// earned, and lives at the cap.
+        /// </summary>
+        private static void AssertNewPlayerGoldAndLives(SaveData data)
+        {
+            Assert.AreEqual(SaveFixture.Rules.StartingGold, data.Wallet.Balance, "starting gold");
+            Assert.AreEqual(0, data.Wallet.LifetimeEarned, "lifetime gold");
+            Assert.AreEqual(SaveFixture.Rules.LifeCap, data.Lives.StoredCount, "full lives");
+        }
 
         private static void AssertStoredUnchanged(MemorySaveStore store, string expected)
         {
