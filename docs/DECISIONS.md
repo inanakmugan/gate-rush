@@ -1756,3 +1756,61 @@ farm, but not the streak farm or the lock-out. A hidden unlimited-lives
 switch: a reviewer would neither find it nor see the meta game at work.
 
 ---
+
+## D59 — Lives are a count and a timestamp, read against a clock
+
+**Decision.** The lives are saved as a count and the UTC moment the next
+life started to come back (D20). Every question about them takes the
+current time from `ITimeProvider`: how many there are now, whether one can
+be spent, how long until the next. The lives that came back while the game
+was closed are counted when it is next asked. The cap is 5, a life comes
+back every 20 minutes, and a new player starts with 500 gold (D22); all
+three are configuration, in a `MetaConfig` asset.
+
+**Why.** A running timer stops with the tab; a timestamp does not, and it
+makes the rules testable by moving a fake clock instead of waiting (D19).
+Settling the count only when asked keeps the saved state small and exact.
+
+**The rules.**
+- At the cap no life is coming back. Losing one at the cap starts the wait
+  at that moment; losing one below the cap leaves the wait running.
+- Each full interval since the wait started gives one life, up to the cap;
+  the part of an interval already waited is kept.
+- A clock that reads earlier than the wait's start gives nothing and
+  starts the wait again from the current time (D20's guard). Setting the
+  clock back can cost a part of an interval, never gain a life.
+- A saved count above the cap, after the cap is lowered, reads as the cap.
+
+**Rejected.** Saving a "lives full at" moment instead: it is the same
+information, but a lowered cap or a changed interval would make it wrong.
+Counting down a timer in `Update`: it stops when the tab closes. Taking
+`DateTime.UtcNow` directly in `Meta`: untestable, and it hides the
+dependency D19 makes explicit.
+
+---
+
+## D60 — A section missing from an older save takes its default from the rules
+
+**Decision.** Format version 2 adds the wallet and the lives. When a save
+of an older version is read, every section that version did not have takes
+the value a new player would get, built from the same `MetaRules` the game
+runs with: the starting gold and full lives. The codec is given the rules
+for this, and builds those defaults through the `Meta` types themselves,
+not with numbers of its own.
+
+**Why.** "Full lives" depends on the configured cap, which the codec
+cannot know otherwise. Passing the rules in keeps one source for every
+default, so a save read from version 1 and a save created fresh can never
+disagree. It is the rule D56 left for this module.
+
+**Consequences.**
+- A player who played before Module 30 starts it with 500 gold and full
+  lives.
+- Values a codec would never write, such as negative gold or lives, read
+  as unreadable rather than being corrected.
+
+**Rejected.** Defaults hard-coded in the codec: a second copy of the
+configuration. A separate "section missing" flag returned to the
+repository: more surface for the same result.
+
+---
