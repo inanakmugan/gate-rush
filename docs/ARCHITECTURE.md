@@ -67,14 +67,20 @@ Pure C#. Wallet, lives, streak, inventory, level progress, store catalog,
 persistence model. Completely independent of `Core` — the two meet only inside
 `Runtime`, when a level ends and its result is reported.
 
-Everything it keeps is one `SaveData` (Module 29, D56): so far the
-completed levels (Module 23), the sound setting (Module 25), the wallet
-and the lives (Module 30). `SaveRepository` owns the rules for loading and
+Everything it keeps is one `SaveData` (Module 29, D56): the completed
+levels (Module 23), the sound setting (Module 25), the wallet and the
+lives (Module 30), and the jokers, the win streak and the campaign
+position (Module 31). `SaveRepository` owns the rules for loading and
 carrying over the save, and reads and writes its text through
 `ISaveCodec`, an interface `Meta` declares and `Serialization` implements.
-Every default comes from `MetaRules`, built from the `MetaConfig` asset
-(D60), and lives are read against a time passed in, never the system clock
-(D59). The rest arrives with Phase 4.
+Every default and price comes from `MetaRules`, built from the
+`MetaConfig` asset (D60), and lives are read against a time passed in,
+never the system clock (D59).
+
+`Runtime` changes all of it through one object, `MetaGame` (D63): campaign
+wins and losses, and store purchases. It never saves; the caller saves
+after every call that changed the save. Free play reports nothing to it
+(D58).
 
 ### Serialization — level and save data
 

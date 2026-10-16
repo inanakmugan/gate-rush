@@ -281,3 +281,43 @@ spends no life and needs none: a win costs nothing (D57).
   are kept.
 - In the Inspector, `Assets/Config/MetaConfig` shows the new fields with
   their defaults.
+
+---
+
+## Resolved during implementation
+
+- **Surface.** As specified. `MetaRules` takes seven arguments, the
+  per-kind prices and starting counts grouped in a `JokerAmounts` struct.
+  `StreakReward` and `JokerAmounts` are plain readonly structs;
+  `CampaignWin` has an internal constructor, like `SaveLoad`.
+  `WinStreak.Starting()` and `CampaignProgress.Starting()` exist so the
+  codec and the repository build a new player's sections through `Meta`,
+  never zeros of their own (D60). `RecordWin`, `Reset` and `Advance` are
+  public, like `Wallet.Earn`. An internal `JokerKinds` helper holds the
+  kind range and the one exception for an undefined kind.
+- **One table check.** `StreakReward.ProblemsOf` is the only check of a
+  reward table: `MetaRules` throws on its first problem and
+  `MetaConfig.Problems()` reports them all, so an empty `Problems()` still
+  guarantees `ToRules()` cannot throw. An empty table is allowed and gives
+  no rewards.
+- **A loss always changes the save.** `ReportCampaignLoss` resets the
+  streak and settles the lives even when it returns false at 0 lives, so
+  Module 32 saves after every loss.
+- **Joker purchases.** One joker per purchase is a private constant of
+  `MetaGame`: a rule of D62, not a tunable.
+- **Configuration.** `MetaConfig` groups its fields under Lives and gold,
+  Store, Starting jokers and Win streak. The table is an array of a
+  private serializable `StreakRewardEntry`, shown as a list in the
+  Inspector. The existing asset was saved once in the Editor so it stores
+  the new fields. `LevelBootstrap` is unchanged; its Meta Config tooltip
+  still names only the Module 30 values, for Module 32 to update.
+- **Tests.** `MetaRulesFixture.Build()` takes named optional values, every
+  default different from `MetaConfig`'s, including the reward table (3
+  Rocket x2, 5 Clock x3, 8 Broom x1); `SaveFixture.Rules` comes from it.
+  Each reward-table problem has its own test. Added beyond the spec: zero
+  prices and starting jokers allowed, an empty table accepted by
+  `MetaRules`, `MetaConfig` and `MetaGame`, and a version-2 save carrying
+  later fields that are ignored. 1878 Edit Mode tests pass.
+- **By hand.** The new `MetaConfig` fields showed their defaults, a reward
+  element could be added and removed, and the version-2 save of Module 30
+  read and was written back as version 3 with no warning.
