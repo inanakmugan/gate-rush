@@ -4,10 +4,11 @@ using System.Collections.Generic;
 namespace GateRush.Meta
 {
     /// <summary>
-    /// The numbers the meta game runs on (Modules 30 and 31): how many lives a
-    /// player can hold and how long one takes to come back (D59), the gold and
-    /// jokers a new player starts with (D59, D61), the store's prices (D62)
-    /// and the win streak's reward table (D61). Built by <c>Runtime</c> from
+    /// The numbers the meta game runs on (Modules 30, 31 and 33): how many
+    /// lives a player can hold and how long one takes to come back (D59), the
+    /// gold and jokers a new player starts with (D59, D61), the store's prices
+    /// (D62), the win streak's reward table (D61) and the seconds a Clock adds
+    /// (D65). Built by <c>Runtime</c> from
     /// its configuration asset; this assembly holds no default of its own, so
     /// every default — a new player's, and that of a section an older save
     /// lacks (D60) — comes from one instance of this class.
@@ -21,8 +22,9 @@ namespace GateRush.Meta
         /// <summary>Rules with the given values, every one of them checked.</summary>
         /// <exception cref="ArgumentOutOfRangeException">
         /// <paramref name="lifeCap"/> is below 1, <paramref name="lifeRegenInterval"/>
-        /// is not positive, or <paramref name="startingGold"/>, a joker price,
-        /// <paramref name="livesRefillPrice"/> or a starting count is negative.
+        /// is not positive, <paramref name="startingGold"/>, a joker price,
+        /// <paramref name="livesRefillPrice"/> or a starting count is negative,
+        /// or <paramref name="clockBonusSeconds"/> is below 1.
         /// </exception>
         /// <exception cref="ArgumentNullException"><paramref name="streakRewards"/> is null.</exception>
         /// <exception cref="ArgumentException">
@@ -35,7 +37,8 @@ namespace GateRush.Meta
             JokerAmounts jokerPrices,
             int livesRefillPrice,
             JokerAmounts startingJokers,
-            IReadOnlyList<StreakReward> streakRewards)
+            IReadOnlyList<StreakReward> streakRewards,
+            int clockBonusSeconds)
         {
             if (lifeCap < 1)
             {
@@ -84,6 +87,12 @@ namespace GateRush.Meta
                 throw new ArgumentException($"The streak reward table is invalid: {problems[0]}", nameof(streakRewards));
             }
 
+            if (clockBonusSeconds < 1)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(clockBonusSeconds), clockBonusSeconds, "The Clock's bonus seconds must be positive.");
+            }
+
             var rewards = new StreakReward[streakRewards.Count];
             for (var i = 0; i < rewards.Length; i++)
             {
@@ -97,6 +106,7 @@ namespace GateRush.Meta
             LivesRefillPrice = livesRefillPrice;
             this.startingJokers = startingJokers;
             StreakRewards = Array.AsReadOnly(rewards);
+            ClockBonusSeconds = clockBonusSeconds;
         }
 
         /// <summary>The most lives a player holds; lives never come back above it. At least 1.</summary>
@@ -117,6 +127,12 @@ namespace GateRush.Meta
         /// be empty: no streak pays anything.
         /// </summary>
         public IReadOnlyList<StreakReward> StreakRewards { get; }
+
+        /// <summary>
+        /// The seconds one Clock adds to the countdown (D65). Positive, so a
+        /// Clock whose use was checked always adds time.
+        /// </summary>
+        public int ClockBonusSeconds { get; }
 
         /// <summary>What one <paramref name="kind"/> costs in the store (D62). Never negative.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>

@@ -6,10 +6,10 @@ namespace GateRush.Meta
 {
     /// <summary>
     /// The one way <c>Runtime</c> changes the meta game (Module 31, D63): it
-    /// reports campaign wins and losses here, and buys here. One object keeps
-    /// the rules of D57 (a loss costs one life, starting costs none), D58
-    /// (only the campaign counts), D61 (the streak and its rewards) and D62
-    /// (the store) together.
+    /// reports campaign wins and losses here, buys here, and spends jokers
+    /// here. One object keeps the rules of D57 (a loss costs one life,
+    /// starting costs none), D58 (only the campaign counts), D61 (the streak
+    /// and its rewards), D62 (the store) and D65 (spending a joker) together.
     /// </summary>
     /// <remarks>
     /// <para><b>It never saves.</b> It changes the <see cref="SaveData"/> it
@@ -124,6 +124,36 @@ namespace GateRush.Meta
 
             Save.Jokers.Add(kind, JokersPerPurchase);
             return PurchaseResult.Bought;
+        }
+
+        /// <summary>
+        /// Spends one <paramref name="kind"/> on the board (D65): one from the
+        /// inventory when it holds one, <see cref="JokerUse.Used"/>; otherwise
+        /// its store price when the balance covers it,
+        /// <see cref="JokerUse.BoughtAndUsed"/>, bought and used in one step so
+        /// it never enters the inventory; otherwise
+        /// <see cref="JokerUse.NotEnoughGold"/> with nothing changed. The
+        /// lifetime gold, the streak, the campaign position and the lives
+        /// never change.
+        /// <para>It does not check the target: the caller asks whether the use
+        /// is valid first and applies the joker only after
+        /// <see cref="JokerUse.Used"/> or <see cref="JokerUse.BoughtAndUsed"/>,
+        /// then saves.</para>
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind; nothing changes.</exception>
+        public JokerUse TryUseJoker(JokerKind kind)
+        {
+            if (Save.Jokers.TryUse(kind))
+            {
+                return JokerUse.Used;
+            }
+
+            if (!Save.Wallet.TrySpend(rules.JokerPrice(kind)))
+            {
+                return JokerUse.NotEnoughGold;
+            }
+
+            return JokerUse.BoughtAndUsed;
         }
 
         /// <summary>

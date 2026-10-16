@@ -42,6 +42,9 @@ namespace GateRush.Tests
         /// <summary>The Brooms a new player holds by the test rules.</summary>
         public const int StartingBrooms = 3;
 
+        /// <summary>The seconds a Clock adds by the test rules.</summary>
+        public const int ClockBonusSeconds = 12;
+
         /// <summary>
         /// The reward table of the test rules: 2 Rockets at 3 wins, 3 Clocks
         /// at 5, 1 Broom at 8. A new array on each call.
@@ -61,7 +64,8 @@ namespace GateRush.Tests
             JokerAmounts? jokerPrices = null,
             int livesRefillPrice = LivesRefillPrice,
             JokerAmounts? startingJokers = null,
-            IReadOnlyList<StreakReward> streakRewards = null) =>
+            IReadOnlyList<StreakReward> streakRewards = null,
+            int clockBonusSeconds = ClockBonusSeconds) =>
             new MetaRules(
                 lifeCap,
                 lifeRegenInterval ?? TimeSpan.FromMinutes(LifeRegenMinutes),
@@ -69,6 +73,7 @@ namespace GateRush.Tests
                 jokerPrices ?? new JokerAmounts(ClockPrice, RocketPrice, BroomPrice),
                 livesRefillPrice,
                 startingJokers ?? new JokerAmounts(StartingClocks, StartingRockets, StartingBrooms),
-                streakRewards ?? StreakRewards());
+                streakRewards ?? StreakRewards(),
+                clockBonusSeconds);
     }
 }

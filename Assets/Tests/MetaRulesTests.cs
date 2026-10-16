@@ -9,14 +9,15 @@ namespace GateRush.Tests
     /// Covers Modules 30 and 31's <see cref="MetaRules"/>: a cap below 1, an
     /// interval that is not positive, and negative starting gold, prices or
     /// starting jokers each throw; a reward table out of order, with a
-    /// repeated or non-positive Wins, or a count below 1 throws; an empty
-    /// table is allowed; and valid values are carried as given, the table as
-    /// a copy.
+    /// repeated or non-positive Wins, or a count below 1 throws; Module 33's
+    /// Clock seconds that are not positive throw; an empty table is allowed;
+    /// and valid values are carried as given, the table as a copy.
     /// </summary>
     public class MetaRulesTests
     {
         private const int Cap = 3;
         private const int StartingGold = 250;
+        private const int ClockSeconds = 18;
 
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(7);
 
@@ -83,7 +84,14 @@ namespace GateRush.Tests
         public void Constructor_NullRewards_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null));
+                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null, ClockSeconds));
+        }
+
+        [TestCase(0)]
+        [TestCase(-1)]
+        public void Constructor_ClockBonusSecondsNotPositive_Throws(int seconds)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => MetaRulesFixture.Build(clockBonusSeconds: seconds));
         }
 
         [Test]
@@ -99,7 +107,8 @@ namespace GateRush.Tests
         {
             var table = new[] { new StreakReward(2, JokerKind.Broom, 4), new StreakReward(9, JokerKind.Clock, 1) };
 
-            var rules = new MetaRules(Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table);
+            var rules = new MetaRules(
+                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds);
 
             Assert.AreEqual(Cap, rules.LifeCap);
             Assert.AreEqual(Interval, rules.LifeRegenInterval);
@@ -112,6 +121,7 @@ namespace GateRush.Tests
             Assert.AreEqual(16, rules.StartingJokers(JokerKind.Rocket));
             Assert.AreEqual(17, rules.StartingJokers(JokerKind.Broom));
             CollectionAssert.AreEqual(table, rules.StreakRewards);
+            Assert.AreEqual(ClockSeconds, rules.ClockBonusSeconds);
         }
 
         [Test]

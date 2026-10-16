@@ -9,8 +9,8 @@ namespace GateRush.Meta
     /// </summary>
     /// <remarks>
     /// <para>Counts come in from streak rewards and the store, through
-    /// <c>MetaGame</c>. <see cref="TryUse"/> takes one out; nothing calls it
-    /// before Phase 5 uses jokers on the board.</para>
+    /// <c>MetaGame</c>. <see cref="TryUse"/> takes one out when
+    /// <c>MetaGame.TryUseJoker</c> spends one on the board (D65).</para>
     /// <para>A negative count is a bug in the caller and throws. Sums stop at
     /// <see cref="int.MaxValue"/> rather than overflowing.</para>
     /// </remarks>

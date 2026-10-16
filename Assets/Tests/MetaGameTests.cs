@@ -11,8 +11,11 @@ namespace GateRush.Tests
     /// object applies D57, D58 and D61 together; a win pays gold, counts for
     /// the streak, pays its threshold's jokers, advances the campaign and
     /// spends no life; a loss costs one life and resets the streak, keeping
-    /// the best and the position; and the store (D62) spends only what the
-    /// balance covers and never touches the lifetime gold.
+    /// the best and the position; the store (D62) spends only what the
+    /// balance covers and never touches the lifetime gold; and Module 33's
+    /// <see cref="MetaGame.TryUseJoker"/> takes a held joker, else buys and
+    /// uses one without adding it to the inventory, else changes nothing,
+    /// never touching the streak, the position or the lives (D65).
     /// </summary>
     public class MetaGameTests
     {
@@ -20,6 +23,12 @@ namespace GateRush.Tests
         private const int FirstReward = 40;
         private const int SecondReward = 55;
         private const int ThirdReward = 65;
+        private const int HeldOfTheUsedKind = 2;
+        private const int OtherKindsHeld = 5;
+        private const int LivesHeld = 2;
+        private const int StreakCurrent = 4;
+        private const int StreakBest = 6;
+        private const int Position = 3;
 
         private static readonly DateTime Noon = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc);
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
@@ -230,6 +239,85 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void TryUseJoker_OneInInventory_IsUsedTakesOneAndSpendsNoGold([Values] JokerKind kind)
+        {
+            var balance = rules.JokerPrice(kind);
+            var save = Save(new Wallet(balance, Reward), Lives.Full(rules), WinStreak.Starting(), CampaignProgress.Starting(),
+                Holding(kind, HeldOfTheUsedKind));
+            var game = Game(save);
+
+            var result = game.TryUseJoker(kind);
+
+            Assert.AreEqual(JokerUse.Used, result);
+            AssertSameJokers(Holding(kind, HeldOfTheUsedKind - 1), save.Jokers);
+            Assert.AreEqual(balance, save.Wallet.Balance, "a held joker costs no gold");
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
+        }
+
+        [Test]
+        public void TryUseJoker_NoneAndEnoughGold_IsBoughtAndUsedSpendsThePriceAndLeavesTheInventoryAtZero([Values] JokerKind kind)
+        {
+            var save = Save(new Wallet(rules.JokerPrice(kind), Reward), Lives.Full(rules), WinStreak.Starting(), CampaignProgress.Starting(),
+                Holding(kind, 0));
+            var game = Game(save);
+
+            var result = game.TryUseJoker(kind);
+
+            Assert.AreEqual(JokerUse.BoughtAndUsed, result);
+            Assert.AreEqual(0, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned, "lifetime gold never changes when buying");
+            AssertSameJokers(Holding(kind, 0), save.Jokers);
+        }
+
+        [Test]
+        public void TryUseJoker_NoneAndTooLittleGold_IsNotEnoughGoldAndChangesNothing([Values] JokerKind kind)
+        {
+            var balance = rules.JokerPrice(kind) - 1;
+            var save = Save(new Wallet(balance, Reward), Lives.Full(rules), WinStreak.Starting(), CampaignProgress.Starting(),
+                Holding(kind, 0));
+            var game = Game(save);
+
+            var result = game.TryUseJoker(kind);
+
+            Assert.AreEqual(JokerUse.NotEnoughGold, result);
+            Assert.AreEqual(balance, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
+            AssertSameJokers(Holding(kind, 0), save.Jokers);
+        }
+
+        [TestCase(HeldOfTheUsedKind, true, TestName = "TryUseJoker_Used_LeavesStreakPositionAndLives")]
+        [TestCase(0, true, TestName = "TryUseJoker_BoughtAndUsed_LeavesStreakPositionAndLives")]
+        [TestCase(0, false, TestName = "TryUseJoker_NotEnoughGold_LeavesStreakPositionAndLives")]
+        public void TryUseJoker_EveryOutcome_LeavesStreakPositionAndLives(int held, bool canPay)
+        {
+            const JokerKind kind = JokerKind.Rocket;
+            var balance = canPay ? rules.JokerPrice(kind) : rules.JokerPrice(kind) - 1;
+            var save = Save(new Wallet(balance, Reward), new Lives(rules, LivesHeld, clock.UtcNow),
+                new WinStreak(StreakCurrent, StreakBest), new CampaignProgress(Position), Holding(kind, held));
+            var game = Game(save);
+
+            game.TryUseJoker(kind);
+
+            Assert.AreEqual(StreakCurrent, save.Streak.Current);
+            Assert.AreEqual(StreakBest, save.Streak.Best);
+            Assert.AreEqual(Position, game.CampaignPosition);
+            Assert.AreEqual(LivesHeld, save.Lives.CountAt(clock.UtcNow));
+        }
+
+        [Test]
+        public void TryUseJoker_UndefinedKind_ThrowsAndChangesNothing()
+        {
+            var save = SaveData.CreateDefault(rules);
+            var game = Game(save);
+            var jokersBefore = Snapshot(save.Jokers);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => game.TryUseJoker((JokerKind)99));
+
+            Assert.AreEqual(rules.StartingGold, save.Wallet.Balance);
+            AssertSameJokers(jokersBefore, save.Jokers);
+        }
+
+        [Test]
         public void TryRefillLives_Full_IsAlreadyFullAndSpendsNothing()
         {
             var save = SaveData.CreateDefault(rules);
@@ -282,8 +370,17 @@ namespace GateRush.Tests
 
         private MetaGame Game(SaveData save) => new MetaGame(save, rules, clock);
 
-        private SaveData Save(Wallet wallet, Lives lives, WinStreak streak, CampaignProgress campaign) =>
-            new SaveData(new CompletedLevels(), new SoundSetting(), wallet, lives, JokerInventory.Starting(rules), streak, campaign);
+        private SaveData Save(
+            Wallet wallet, Lives lives, WinStreak streak, CampaignProgress campaign, JokerInventory jokers = null) =>
+            new SaveData(
+                new CompletedLevels(), new SoundSetting(), wallet, lives, jokers ?? JokerInventory.Starting(rules), streak, campaign);
+
+        /// <summary>An inventory holding <paramref name="count"/> of <paramref name="kind"/> and <see cref="OtherKindsHeld"/> of every other kind.</summary>
+        private static JokerInventory Holding(JokerKind kind, int count) =>
+            new JokerInventory(
+                kind == JokerKind.Clock ? count : OtherKindsHeld,
+                kind == JokerKind.Rocket ? count : OtherKindsHeld,
+                kind == JokerKind.Broom ? count : OtherKindsHeld);
 
         /// <summary>Reports <paramref name="wins"/> campaign wins of <see cref="Reward"/>, at least one, and returns the last.</summary>
         private static CampaignWin WinTimes(MetaGame game, int wins)

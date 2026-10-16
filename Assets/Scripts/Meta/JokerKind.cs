@@ -5,7 +5,8 @@ namespace GateRush.Meta
     /// <summary>
     /// The three jokers (MECHANICS, Jokers): a Clock adds time, a Rocket
     /// clears one block's colour, a Broom clears a colour from every block
-    /// showing it. Phase 4 only counts them (D61); using one is Phase 5.
+    /// showing it. Held in the campaign's inventory (D61) and spent through
+    /// <c>MetaGame.TryUseJoker</c> (D65).
     /// </summary>
     public enum JokerKind
     {
