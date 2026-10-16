@@ -486,6 +486,179 @@ namespace GateRush.Tests
                 string.Join(" | ", problems));
         }
 
+        [Test]
+        public void Problems_DefaultMetaWiringValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            // Every message about Module 32's values names one of these.
+            Assert.That(problems, Has.None.Contains("Meta "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Format"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Confirm "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Menu Notice "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Menu Wide "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Defaults_MetaTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("Leave level?", config.LeaveLevelTitle);
+            Assert.AreEqual("Restart level?", config.RestartLevelTitle);
+            Assert.AreEqual("You will lose a life.", config.LoseLifeMessage);
+            Assert.AreEqual("Lose a life", config.LoseLifeLabel);
+            Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
+            Assert.AreEqual("No lives left", config.NoLivesTitle);
+            Assert.AreEqual("Free Play", config.FreePlayLabel);
+            Assert.AreEqual("All levels played. Play any level from Settings.", config.CampaignDoneNotice);
+            Assert.AreEqual("Settings", config.SettingsLabel);
+        }
+
+        [TestCase("settingsLabel", "Settings Label")]
+        [TestCase("settingsTitle", "Settings Title")]
+        [TestCase("freePlayLabel", "Free Play Label")]
+        [TestCase("campaignDoneNotice", "Campaign Done Notice")]
+        [TestCase("noLivesTitle", "No Lives Title")]
+        [TestCase("leaveLevelTitle", "Leave Level Title")]
+        [TestCase("restartLevelTitle", "Restart Level Title")]
+        [TestCase("loseLifeMessage", "Lose Life Message")]
+        [TestCase("loseLifeLabel", "Lose Life Label")]
+        [TestCase("keepPlayingLabel", "Keep Playing Label")]
+        [TestCase("goldFormat", "Gold Format")]
+        [TestCase("livesFullFormat", "Lives Full Format")]
+        [TestCase("livesWaitingFormat", "Lives Waiting Format")]
+        [TestCase("goldEarnedFormat", "Gold Earned Format")]
+        [TestCase("nextLifeFormat", "Next Life Format")]
+        [TestCase("refillFormat", "Refill Format")]
+        public void Problems_EmptyMetaText_IsReportedByName(string field, string shownName)
+        {
+            SetString(field, "  ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_EmptyMetaSeparator_IsReportedByName()
+        {
+            SetString("metaSeparator", string.Empty);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Meta Separator is empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_MetaSeparatorOfSpacesOnly_IsAllowed()
+        {
+            SetString("metaSeparator", "   ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Meta Separator"), string.Join(" | ", problems));
+        }
+
+        // Each format is given one placeholder more than it is formatted with.
+        [TestCase("goldFormat", "Gold Format", "{1}")]
+        [TestCase("livesFullFormat", "Lives Full Format", "{0}/{2}")]
+        [TestCase("livesWaitingFormat", "Lives Waiting Format", "{0}/{1} {3}")]
+        [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
+        [TestCase("nextLifeFormat", "Next Life Format", "{1}")]
+        [TestCase("refillFormat", "Refill Format", "({1})")]
+        [TestCase("goldFormat", "Gold Format", "Gold {0")]
+        public void Problems_UnusableMetaFormat_IsReportedByName(string field, string shownName, string format)
+        {
+            SetString(field, format);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be a format"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LivesWaitingFormatUsingEveryPlaceholder_IsAllowed()
+        {
+            SetString("livesWaitingFormat", "{2} {1} {0}");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Lives Waiting Format"), string.Join(" | ", problems));
+        }
+
+        [TestCase("menuMetaHeightUnits", "Menu Meta Height Units")]
+        [TestCase("menuMetaFontSize", "Menu Meta Font Size")]
+        [TestCase("menuNoticeHeightUnits", "Menu Notice Height Units")]
+        [TestCase("menuNoticeFontSize", "Menu Notice Font Size")]
+        [TestCase("hudMetaHeightUnits", "Hud Meta Height Units")]
+        [TestCase("hudMetaFontSize", "Hud Meta Font Size")]
+        public void Problems_NonPositiveMetaSize_IsReportedByName(string field, string shownName)
+        {
+            SetFloat(field, 0f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [TestCase("menuWideButtonSizeUnits", "Menu Wide Button Size Units")]
+        [TestCase("confirmPanelSizeUnits", "Confirm Panel Size Units")]
+        public void Problems_NonPositiveMetaVectorSize_IsReportedByName(string field, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).vector2Value = new Vector2(0f, 1f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NegativeHudMetaGap_IsReportedByName()
+        {
+            SetFloat("hudMetaGapUnits", -1f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Hud Meta Gap Units must be at least 0"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ConfirmPanelTooShort_IsReportedByName()
+        {
+            // Two stacked buttons' height alone: no room for the line, the
+            // title or the padding.
+            var serialized = new SerializedObject(config);
+            var buttonHeight = serialized.FindProperty("menuButtonSizeUnits").vector2Value.y;
+            var panel = serialized.FindProperty("confirmPanelSizeUnits");
+            panel.vector2Value = new Vector2(panel.vector2Value.x, 2f * buttonHeight);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Confirm Panel Size Units must hold"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ResultPanelWithoutRoomForBothLines_IsReportedByName()
+        {
+            // Exactly the height that held the title and one line before the
+            // gold line: no longer enough for the gold and the closing message.
+            var serialized = new SerializedObject(config);
+            var button = serialized.FindProperty("resultButtonSizeUnits").vector2Value;
+            var gap = serialized.FindProperty("resultButtonGapUnits").floatValue;
+            var padding = serialized.FindProperty("resultPaddingUnits").floatValue;
+            var line = serialized.FindProperty("resultMessageHeightUnits").floatValue;
+            var panel = serialized.FindProperty("resultPanelSizeUnits");
+            panel.vector2Value = new Vector2(panel.vector2Value.x, 2f * button.y + gap + 3f * padding + 1.5f * line);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
+        }
+
         /// <summary>Sets the sorting order <paramref name="field"/> to the value <paramref name="sameAs"/> has.</summary>
         private void SetOrderEqualTo(string field, string sameAs)
         {

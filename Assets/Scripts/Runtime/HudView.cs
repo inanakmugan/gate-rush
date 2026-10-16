@@ -10,7 +10,8 @@ namespace GateRush.Runtime
     /// <summary>
     /// The HUD in the top band: a restart button and a menu button on the
     /// left, the timer pill with a clock icon in the centre, and a "Level N"
-    /// pill on the right. Builds its hierarchy from code, in the game's style,
+    /// pill on the right, and under them a meta line with the lives and the
+    /// gold (Module 32). Builds its hierarchy from code, in the game's style,
     /// and holds no rules — the bootstrap decides what to show and handles the
     /// restart and the menu it asks for.
     /// </summary>
@@ -39,11 +40,14 @@ namespace GateRush.Runtime
     {
         private static readonly Vector2 LeftMiddle = new Vector2(0f, 0.5f);
         private static readonly Vector2 RightMiddle = new Vector2(1f, 0.5f);
+        private static readonly Vector2 TopRight = new Vector2(1f, 1f);
 
         private RuntimeConfig config;
         private RectTransform band;
         private RectTransform row;
+        private RectTransform main;
         private Vector2 rowSize;
+        private TMP_Text metaLabel;
         private Button restartButton;
         private Button menuButton;
         private GameObject timerPill;
@@ -110,20 +114,28 @@ namespace GateRush.Runtime
             row = UiBuilder.CreateRect("Row", band);
             row.anchorMin = row.anchorMax = new Vector2(0.5f, 0.5f);
 
+            // The timer is centred, so each side must hold the wider of the
+            // two outer groups — the two buttons, or the level pill — with
+            // padding at the edge and next to it. Under the buttons and pills
+            // sits the meta line (Module 32); the two are centred together.
+            var buttons = 2f * config.HudRestartSizeUnits + config.HudButtonGapUnits;
+            var side = Mathf.Max(buttons, config.LevelPillWidthUnits) + 2f * config.HudSidePaddingUnits;
+            var mainHeight = Mathf.Max(config.HudRestartSizeUnits, config.HudPillHeightUnits);
+            var underMain = config.HudMetaGapUnits + config.HudMetaHeightUnits;
+            rowSize = new Vector2(config.TimerPillWidthUnits + 2f * side, mainHeight + underMain);
+
+            main = UiBuilder.CreateRect("Main", row);
+            main.anchorMin = new Vector2(0f, 0.5f);
+            main.anchorMax = new Vector2(1f, 0.5f);
+            main.sizeDelta = new Vector2(0f, mainHeight);
+            main.anchoredPosition = new Vector2(0f, underMain * 0.5f);
+
             BuildRestart(referencePixelsPerUnit);
             BuildMenu(referencePixelsPerUnit);
             BuildTimer(referencePixelsPerUnit);
             BuildLevel(referencePixelsPerUnit);
             BuildTimeBonus();
-
-            // The timer is centred, so each side must hold the wider of the
-            // two outer groups — the two buttons, or the level pill — with
-            // padding at the edge and next to it.
-            var buttons = 2f * config.HudRestartSizeUnits + config.HudButtonGapUnits;
-            var side = Mathf.Max(buttons, config.LevelPillWidthUnits) + 2f * config.HudSidePaddingUnits;
-            rowSize = new Vector2(
-                config.TimerPillWidthUnits + 2f * side,
-                Mathf.Max(config.HudRestartSizeUnits, config.HudPillHeightUnits));
+            BuildMeta(rowSize.y * 0.5f - mainHeight - config.HudMetaGapUnits);
 
             shownSeconds = -1;
             placedScreenWidth = 0;
@@ -167,6 +179,17 @@ namespace GateRush.Runtime
         {
             levelLabel.text = string.Format(CultureInfo.InvariantCulture, config.LevelLabelFormat, levelNumber);
             levelPill.SetActive(true);
+        }
+
+        /// <summary>
+        /// Shows <paramref name="text"/> on the meta line under the level pill
+        /// (Module 32): the lives and the gold in the campaign, Free Play and
+        /// the gold in free play. Builds no text of its own; the caller calls
+        /// it only when the text changes.
+        /// </summary>
+        public void ShowMeta(string text)
+        {
+            metaLabel.text = text;
         }
 
         /// <summary>Hides the level pill, for a level that has no number.</summary>
@@ -331,7 +354,7 @@ namespace GateRush.Runtime
 
         private void BuildRestart(float referencePixelsPerUnit)
         {
-            var rect = UiBuilder.CreateRect("Restart", row);
+            var rect = UiBuilder.CreateRect("Restart", main);
             var size = Vector2.one * config.HudRestartSizeUnits;
             UiBuilder.Place(rect, LeftMiddle, new Vector2(config.HudSidePaddingUnits, 0f), size);
             var face = UiBuilder.AddRoundedBox(
@@ -350,7 +373,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void BuildMenu(float referencePixelsPerUnit)
         {
-            var rect = UiBuilder.CreateRect("Menu", row);
+            var rect = UiBuilder.CreateRect("Menu", main);
             var size = Vector2.one * config.HudRestartSizeUnits;
             var left = config.HudSidePaddingUnits + config.HudRestartSizeUnits + config.HudButtonGapUnits;
             UiBuilder.Place(rect, LeftMiddle, new Vector2(left, 0f), size);
@@ -374,7 +397,7 @@ namespace GateRush.Runtime
 
         private void BuildTimer(float referencePixelsPerUnit)
         {
-            var rect = UiBuilder.CreateRect("Timer", row);
+            var rect = UiBuilder.CreateRect("Timer", main);
             var height = config.HudPillHeightUnits;
             var size = new Vector2(config.TimerPillWidthUnits, height);
             UiBuilder.PlaceCentered(rect, size);
@@ -399,7 +422,7 @@ namespace GateRush.Runtime
 
         private void BuildLevel(float referencePixelsPerUnit)
         {
-            var rect = UiBuilder.CreateRect("Level", row);
+            var rect = UiBuilder.CreateRect("Level", main);
             var height = config.HudPillHeightUnits;
             var size = new Vector2(config.LevelPillWidthUnits, height);
             UiBuilder.Place(rect, RightMiddle, new Vector2(-config.HudSidePaddingUnits, 0f), size);
@@ -419,7 +442,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void BuildTimeBonus()
         {
-            bonusRect = UiBuilder.CreateRect("Time bonus", row);
+            bonusRect = UiBuilder.CreateRect("Time bonus", main);
             bonusRect.anchorMin = bonusRect.anchorMax = new Vector2(0.5f, 0.5f);
             bonusRect.pivot = LeftMiddle;
             bonusRestPosition = new Vector2(config.TimerPillWidthUnits * 0.5f + config.TimeBonusGapUnits, 0f);
@@ -428,6 +451,22 @@ namespace GateRush.Runtime
             bonusLabel = UiBuilder.AddLabel(bonusRect, config.LabelFont, config.TimeBonusFontSize, config.TimeBonusColor, false);
             bonusLabel.alignment = TextAlignmentOptions.Left;
             bonusRect.gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// The meta line: one right-aligned line under the buttons and pills,
+        /// its top <paramref name="top"/> above the row's centre and its right
+        /// end in line with the level pill's.
+        /// </summary>
+        private void BuildMeta(float top)
+        {
+            var rect = UiBuilder.CreateRect("Meta", row);
+            rect.anchorMin = rect.anchorMax = new Vector2(1f, 0.5f);
+            rect.pivot = TopRight;
+            rect.anchoredPosition = new Vector2(-config.HudSidePaddingUnits, top);
+            rect.sizeDelta = new Vector2(rowSize.x - 2f * config.HudSidePaddingUnits, config.HudMetaHeightUnits);
+            metaLabel = UiBuilder.AddLabel(rect, config.LabelFont, config.HudMetaFontSize, config.HudTextColor, false);
+            metaLabel.alignment = TextAlignmentOptions.Right;
         }
 
         /// <summary>
