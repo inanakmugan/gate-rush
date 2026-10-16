@@ -1937,3 +1937,65 @@ it would punish reading it. A campaign for the development tools: testing
 a level would cost lives.
 
 ---
+
+## D65 — A joker is spent only on a valid use, and bought at once when none is left
+
+**Decision.** Phase 5 is built as Module 33, the rules (tests for the
+existing joker entry points of D9, `MetaGame` spending jokers, the session
+applying them), and Module 34, the joker bar, targeting and presentation.
+In the campaign a joker comes from the inventory (D61). When none of that
+kind is left, its button shows the store price (D62) and pressing it buys
+one and uses it at once, if the balance covers it. A joker is spent only
+when its use is valid: a Rocket needs a targetable block (D11), a Broom
+needs at least one targetable block showing the chosen colour, and a Clock
+needs a level being played with a countdown. The Clock adds 20 seconds. A
+Rocket or Broom is aimed by tapping a block: the Rocket clears that
+block's outer colour; the Broom sweeps that block's colour. The countdown
+keeps running while the player aims.
+
+**Why.** Spending a joker on a tap that does nothing would feel like a
+theft. Buying on the spot is how the genre sells boosters, and the store's
+rules already exist. Aiming by tapping keeps one gesture for both targeted
+jokers, and leaving the clock running keeps the pressure the countdown
+exists for (D12).
+
+**Consequences.**
+- A frozen block can be hit by a Rocket and swept by a Broom (D11), but
+  tapping it cannot choose the Broom's colour, since that colour is hidden
+  from the player (M3, D13).
+- Using a joker does not touch the win streak, and a level won with jokers
+  is an ordinary win.
+- The Clock's seconds are configuration in `MetaConfig`.
+
+**Rejected.** A Broom colour palette: a second control for the same
+choice. Pausing while aiming: the player could stop the clock at will.
+Spending the joker before checking the target: an invalid tap would cost a
+joker.
+
+---
+
+## D66 — Free play has its own jokers, three of each per level
+
+**Decision.** A level played in free play (D58) starts with 3 of each
+joker, its own allowance, separate from the campaign inventory. The
+allowance is not saved, comes back full on Restart and on every new level,
+and cannot be topped up: at 0 the button is unavailable. Free play never
+reads or spends the campaign inventory or gold. The count is
+configuration.
+
+**Why.** Someone reviewing the build should be able to try every joker on
+any mechanic, which free play exists for, without draining the campaign's
+economy or being given an endless supply that hides what a joker costs.
+
+**Consequences.**
+- The allowance lives in `Runtime`; `MetaGame` still hears nothing of free
+  play.
+- The development tools play free play (D64), so they get the allowance
+  too.
+
+**Rejected.** Unlimited jokers in free play: nothing would show that they
+are scarce. Sharing the campaign inventory: a reviewer would spend the
+campaign's jokers on replays. A saved free-play inventory: more state for
+a convenience.
+
+---

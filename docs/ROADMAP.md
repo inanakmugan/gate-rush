@@ -268,6 +268,14 @@ jokers on the board (Phase 5); the screens (Phase 6); notifications (Phase
 Where Phase 1 and Phase 4 meet. Clock, rocket, broom wired into the existing
 resolution pipeline. Targeting predicates. Broom chain-reaction tests.
 
+Two modules (D65). Each spec is written when the module before it is
+merged.
+
+| # | Module | Spec | Status |
+|---|---|---|---|
+| 5.1 | Joker rules: Core tests, spending and buying jokers, the session, free play's allowance (D65, D66) | `Modules/33-joker-rules.md` | Planned |
+| 5.2 | Joker bar, aiming and the presentation of joker clears (D65) | — | Planned |
+
 ---
 
 ## Phase 6 — User interface
