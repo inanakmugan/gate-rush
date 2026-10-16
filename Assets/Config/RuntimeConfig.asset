@@ -150,6 +150,13 @@ MonoBehaviour:
   riseStartScale: 0.85
   riseDropCells: 0.2
   riseEase: 27
+  generatorPreviewFillAlpha: 0.35
+  generatorPreviewRimAlpha: 0.6
+  generatorPreviewInsetCells: 0.06
+  generatorPreviewRimCells: 0.05
+  generatorPreviewCornerCells: 0.18
+  generatorPreviewFadeInSeconds: 0.1
+  generatorPreviewFadeOutSeconds: 0.12
   hudSidePaddingUnits: 40
   hudRestartSizeUnits: 120
   hudRestartCornerUnits: 30
@@ -175,9 +182,18 @@ MonoBehaviour:
   timeBonusEase: 6
   timerPulseScale: 1.15
   timerPulseSeconds: 0.25
+  hudButtonGapUnits: 20
+  hudMenuBarSizeUnits: {x: 60, y: 10}
+  hudMenuBarGapUnits: 12
   winTitle: Level Complete
   allDoneTitle: All Levels Played
+  allDoneMessage: Thanks for playing!
   lossTitle: Time's Up
+  resultMessageHeightUnits: 80
+  resultMessageFontSize: 56
+  resultMessageColor: {r: 1, g: 1, b: 1, a: 1}
+  menuLabel: Menu
+  menuButtonColor: {r: 0.33, g: 0.4, b: 0.62, a: 1}
   resultBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
   resultPanelSizeUnits: {x: 860, y: 860}
   resultPanelCornerUnits: 60
@@ -196,6 +212,61 @@ MonoBehaviour:
   resultPopSeconds: 0.25
   resultPopEase: 27
   resultPopStartScale: 0.8
+  gameTitle: Gate Rush
+  playLabel: Play
+  levelsLabel: Levels
+  soundOnLabel: 'Sound: On'
+  soundOffLabel: 'Sound: Off'
+  levelSelectTitle: Levels
+  backLabel: Back
+  menuPaddingUnits: 60
+  menuTitleHeightUnits: 240
+  menuTitleWidthUnits: 900
+  menuTitleFontSize: 170
+  levelSelectTitleFontSize: 120
+  menuTitleColor: {r: 1, g: 1, b: 1, a: 1}
+  menuSectionGapUnits: 90
+  menuButtonSizeUnits: {x: 520, y: 150}
+  menuButtonCornerUnits: 46
+  menuButtonFontSize: 76
+  menuButtonGapUnits: 40
+  levelSelectColumns: 4
+  levelTileSizeUnits: 190
+  levelTileCornerUnits: 44
+  levelTileGapUnits: 30
+  levelTileFontSize: 84
+  levelTileColor: {r: 0.2, g: 0.24, b: 0.44, a: 1}
+  levelTileCompletedColor: {r: 0.3, g: 0.78, b: 0.32, a: 1}
+  levelTickSizeUnits: 60
+  levelTickThicknessUnits: 12
+  levelTickColor: {r: 1, g: 1, b: 1, a: 1}
+  levelTickInsetUnits: 10
+  settingsLabel: Settings
+  settingsTitle: Settings
+  metaSeparator: ' | '
+  goldFormat: Gold {0}
+  livesFullFormat: Lives {0}/{1}
+  livesWaitingFormat: Lives {0}/{1} | next {2}
+  freePlayLabel: Free Play
+  goldEarnedFormat: +{0} gold
+  campaignDoneNotice: All levels played. Play any level from Settings.
+  noLivesTitle: No lives left
+  nextLifeFormat: Next life in {0}
+  refillFormat: Refill lives ({0} gold)
+  leaveLevelTitle: Leave level?
+  restartLevelTitle: Restart level?
+  loseLifeMessage: You will lose a life.
+  loseLifeLabel: Lose a life
+  keepPlayingLabel: Keep playing
+  menuMetaHeightUnits: 90
+  menuMetaFontSize: 50
+  menuNoticeHeightUnits: 140
+  menuNoticeFontSize: 48
+  menuWideButtonSizeUnits: {x: 860, y: 150}
+  hudMetaHeightUnits: 60
+  hudMetaFontSize: 40
+  hudMetaGapUnits: 12
+  confirmPanelSizeUnits: {x: 860, y: 900}
   mechanicIntroductions:
   - mechanic: 0
     title: How to Play
@@ -345,3 +416,5 @@ MonoBehaviour:
   liftedBlockOrder: 26
   effectOrder: 27
   pullGlowOrder: 11
+  generatorPreviewRimOrder: 4
+  generatorPreviewOrder: 5
