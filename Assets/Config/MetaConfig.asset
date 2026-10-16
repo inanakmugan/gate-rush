@@ -15,3 +15,20 @@ MonoBehaviour:
   lifeCap: 5
   lifeRegenMinutes: 20
   startingGold: 500
+  clockPrice: 100
+  rocketPrice: 200
+  broomPrice: 300
+  livesRefillPrice: 300
+  startingClocks: 1
+  startingRockets: 1
+  startingBrooms: 1
+  streakRewards:
+  - wins: 3
+    joker: 0
+    count: 1
+  - wins: 5
+    joker: 1
+    count: 1
+  - wins: 10
+    joker: 2
+    count: 1
