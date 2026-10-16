@@ -7,8 +7,10 @@ namespace GateRush.Runtime
     /// One level being played: the immutable <see cref="LevelContext"/> and the
     /// current <see cref="BoardState"/>. The drawn board is always
     /// <see cref="State"/>, and the only way it changes is a resolution through
-    /// <see cref="MoveResolver"/> (or <see cref="Restart"/>), so the runtime can
-    /// never hold a board the rules did not produce.
+    /// <see cref="MoveResolver"/> — a move, a Rocket or a Broom (D9) — or
+    /// <see cref="Restart"/>, so the runtime can never hold a board the rules
+    /// did not produce. The Clock needs nothing here: its seconds go to the
+    /// run's countdown.
     /// </summary>
     /// <remarks>
     /// Owns its own <see cref="MoveResolver"/>: a resolver keeps reusable
@@ -71,13 +73,83 @@ namespace GateRush.Runtime
                 return false;
             }
 
-            State = next;
-            if (timeBonusSeconds > 0)
+            Commit(next, timeBonusSeconds);
+            return true;
+        }
+
+        /// <summary>
+        /// True when a Rocket may hit block <paramref name="blockIndex"/>: it
+        /// is within the level and <see cref="BoardState.CanBeTargeted"/> —
+        /// alive and not under a closed shutter; frozen and locked blocks can
+        /// be hit (D11). Exactly the check <see cref="MoveResolver.TryClearBlock"/>
+        /// refuses on, so after a true, <see cref="TryRocket"/> on the same
+        /// <see cref="State"/> succeeds. Changes nothing.
+        /// </summary>
+        public bool CanRocket(int blockIndex) =>
+            blockIndex >= 0
+            && blockIndex < Context.TotalBlockCapacity
+            && State.CanBeTargeted(Context, blockIndex);
+
+        /// <summary>
+        /// True when a Broom of <paramref name="color"/> would clear something:
+        /// some block that <see cref="BoardState.CanBeTargeted"/> currently
+        /// shows that colour. Exactly the selection
+        /// <see cref="MoveResolver.TrySweepColor"/> refuses on, so after a
+        /// true, <see cref="TrySweep"/> on the same <see cref="State"/>
+        /// succeeds. Changes nothing.
+        /// </summary>
+        public bool CanSweep(BlockColor color)
+        {
+            for (var i = 0; i < Context.TotalBlockCapacity; i++)
             {
-                TimeBonusEarned?.Invoke(timeBonusSeconds);
+                if (State.CanBeTargeted(Context, i) && State.CurrentColorOf(Context, i) == color)
+                {
+                    return true;
+                }
             }
 
-            StateChanged?.Invoke();
+            return false;
+        }
+
+        /// <summary>
+        /// A Rocket on block <paramref name="blockIndex"/>, through
+        /// <see cref="MoveResolver.TryClearBlock"/>: on success replaces
+        /// <see cref="State"/>, raises <see cref="TimeBonusEarned"/> with the
+        /// seconds of every block the resolution destroyed when positive, and
+        /// raises <see cref="StateChanged"/> once, as <see cref="TryApply"/>
+        /// does. False, changing and raising nothing, exactly when
+        /// <see cref="CanRocket"/> is false. Spend the joker only after
+        /// <see cref="CanRocket"/> (D65).
+        /// </summary>
+        public bool TryRocket(int blockIndex)
+        {
+            if (!resolver.TryClearBlock(Context, State, blockIndex, out var next, out var timeBonusSeconds))
+            {
+                return false;
+            }
+
+            Commit(next, timeBonusSeconds);
+            return true;
+        }
+
+        /// <summary>
+        /// A Broom of <paramref name="color"/>, through
+        /// <see cref="MoveResolver.TrySweepColor"/>: on success replaces
+        /// <see cref="State"/>, raises <see cref="TimeBonusEarned"/> once with
+        /// the summed seconds when positive, and raises
+        /// <see cref="StateChanged"/> once, as <see cref="TryApply"/> does.
+        /// False, changing and raising nothing, exactly when
+        /// <see cref="CanSweep"/> is false. Spend the joker only after
+        /// <see cref="CanSweep"/> (D65).
+        /// </summary>
+        public bool TrySweep(BlockColor color)
+        {
+            if (!resolver.TrySweepColor(Context, State, color, out var next, out var timeBonusSeconds))
+            {
+                return false;
+            }
+
+            Commit(next, timeBonusSeconds);
             return true;
         }
 
@@ -89,6 +161,22 @@ namespace GateRush.Runtime
         public void Restart()
         {
             State = BoardState.CreateInitial(Context);
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// The one way a resolution's result lands, for moves and jokers
+        /// alike: replace <see cref="State"/>, raise <see cref="TimeBonusEarned"/>
+        /// when the seconds are positive, then <see cref="StateChanged"/>.
+        /// </summary>
+        private void Commit(BoardState next, int timeBonusSeconds)
+        {
+            State = next;
+            if (timeBonusSeconds > 0)
+            {
+                TimeBonusEarned?.Invoke(timeBonusSeconds);
+            }
+
             StateChanged?.Invoke();
         }
     }

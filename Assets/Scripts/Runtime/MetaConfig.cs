@@ -6,11 +6,14 @@ using UnityEngine;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Every tunable number of the meta game (Modules 30 and 31): the life
+    /// Every tunable number of the meta game (Modules 30, 31 and 33): the life
     /// cap, how long a life takes to come back, a new player's gold and
-    /// jokers, the store's prices and the win streak's reward table. Nothing
-    /// in <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
-    /// hands them over as <see cref="MetaRules"/>.
+    /// jokers, the store's prices, the win streak's reward table, the seconds
+    /// a Clock adds and free play's jokers per level. Nothing in
+    /// <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
+    /// hands them over as <see cref="MetaRules"/>, all but free play's
+    /// allowance, which <c>Meta</c> knows nothing of (D66) and
+    /// <see cref="FreePlayJokersPerLevel"/> gives to <c>Runtime</c>.
     /// </summary>
     /// <remarks>
     /// The save cannot be read without these rules — an older save takes the
@@ -62,6 +65,20 @@ namespace GateRush.Runtime
             new StreakRewardEntry(10, JokerKind.Broom, 1),
         };
 
+        [Header("Jokers")]
+        [Tooltip("Seconds one Clock joker adds to the level's countdown. Positive.")]
+        [SerializeField] private int clockBonusSeconds = 20;
+
+        [Tooltip("Jokers of each kind a level played in free play starts with, apart from the campaign's inventory. Not saved; full again on Restart and on every new level. At least 0.")]
+        [SerializeField] private int freePlayJokersPerLevel = 3;
+
+        /// <summary>
+        /// How many of each joker a level played in free play starts with
+        /// (D66). Never negative when <see cref="Problems"/> is empty. Not part
+        /// of <see cref="MetaRules"/>: <c>Meta</c> knows nothing of free play.
+        /// </summary>
+        public int FreePlayJokersPerLevel => freePlayJokersPerLevel;
+
         /// <summary>
         /// Everything wrong with this asset, each message naming its field;
         /// empty when <see cref="ToRules"/> can be called.
@@ -94,6 +111,13 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Streak Rewards {problem}");
             }
 
+            if (clockBonusSeconds <= 0)
+            {
+                problems.Add($"{name}: Clock Bonus Seconds must be positive.");
+            }
+
+            AddIfNegative(problems, freePlayJokersPerLevel, "Free Play Jokers Per Level");
+
             return problems;
         }
 
@@ -110,7 +134,8 @@ namespace GateRush.Runtime
                 new JokerAmounts(clockPrice, rocketPrice, broomPrice),
                 livesRefillPrice,
                 new JokerAmounts(startingClocks, startingRockets, startingBrooms),
-                StreakRewards());
+                StreakRewards(),
+                clockBonusSeconds);
 
         private StreakReward[] StreakRewards()
         {

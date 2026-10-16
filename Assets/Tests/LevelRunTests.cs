@@ -9,7 +9,8 @@ namespace GateRush.Tests
     /// Covers Module 12's <see cref="LevelRun"/>: whichever of winning and
     /// running out of time comes first decides the level and the other never
     /// follows; time bonuses (M10) reach the countdown; restart starts over
-    /// with the whole budget; a level without a countdown can still be won.
+    /// with the whole budget; a level without a countdown can still be won;
+    /// and a Rocket that clears the last block wins as a move does (Module 33).
     /// </summary>
     /// <remarks>
     /// Every board is a 3x1 row with a red block at (0, 0) pre-aligned with a
@@ -38,6 +39,19 @@ namespace GateRush.Tests
             Assert.AreEqual(LevelOutcome.Won, run.Outcome);
             Assert.IsFalse(run.Countdown.IsRunning);
             Assert.IsFalse(run.Countdown.HasExpired);
+        }
+
+        [Test]
+        public void TryRocket_LastBlock_WinsAndStopsTheCountdown()
+        {
+            // Module 33: a joker's resolution reaches the run as a move's does.
+            var run = new LevelRun(new LevelSession(OneBlockLevel()), new Countdown(Budget));
+            run.Start();
+
+            Assert.IsTrue(run.Session.TryRocket(OpeningPush.BlockIndex));
+
+            Assert.AreEqual(LevelOutcome.Won, run.Outcome);
+            Assert.IsFalse(run.Countdown.IsRunning);
         }
 
         [Test]

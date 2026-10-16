@@ -32,3 +32,5 @@ MonoBehaviour:
   - wins: 10
     joker: 2
     count: 1
+  clockBonusSeconds: 20
+  freePlayJokersPerLevel: 3

@@ -13,8 +13,10 @@ namespace GateRush.Tests
     /// negative starting gold, price or starting joker count, and a reward
     /// table out of order, with a repeated or non-positive Wins or with a
     /// count below 1, are each reported by <see cref="MetaConfig.Problems"/>,
-    /// naming the field; an empty table is accepted; and
-    /// <see cref="MetaConfig.ToRules"/> carries the values over.
+    /// naming the field; so are Module 33's Clock seconds that are not
+    /// positive and a negative free-play allowance, where 0 is accepted; an
+    /// empty table is accepted; <see cref="MetaConfig.ToRules"/> carries the
+    /// values over; and the free-play allowance is read back as set.
     /// </summary>
     public class MetaConfigTests
     {
@@ -22,6 +24,8 @@ namespace GateRush.Tests
         private const string LifeRegenMinutesField = "lifeRegenMinutes";
         private const string StartingGoldField = "startingGold";
         private const string StreakRewardsField = "streakRewards";
+        private const string ClockBonusSecondsField = "clockBonusSeconds";
+        private const string FreePlayJokersPerLevelField = "freePlayJokersPerLevel";
         private const string StreakRewardsLabel = "Streak Rewards";
 
         private MetaConfig config;
@@ -128,6 +132,48 @@ namespace GateRush.Tests
             CollectionAssert.IsEmpty(config.ToRules().StreakRewards);
         }
 
+        [TestCase(0)]
+        [TestCase(-1)]
+        public void Problems_ClockBonusSecondsNotPositive_IsReported(int seconds)
+        {
+            SetInt(ClockBonusSecondsField, seconds);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Clock Bonus Seconds"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NegativeFreePlayJokersPerLevel_IsReported()
+        {
+            SetInt(FreePlayJokersPerLevelField, -1);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Free Play Jokers Per Level"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ZeroFreePlayJokersPerLevel_IsEmpty()
+        {
+            SetInt(FreePlayJokersPerLevelField, 0);
+
+            var problems = config.Problems();
+
+            CollectionAssert.IsEmpty(problems, string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void FreePlayJokersPerLevel_SetValue_IsReadBack()
+        {
+            const int perLevel = 7;
+            SetInt(FreePlayJokersPerLevelField, perLevel);
+
+            var read = config.FreePlayJokersPerLevel;
+
+            Assert.AreEqual(perLevel, read);
+        }
+
         [Test]
         public void ToRules_SetValues_CarriesThemOver()
         {
@@ -145,6 +191,7 @@ namespace GateRush.Tests
             SetInt("startingClocks", 31);
             SetInt("startingRockets", 32);
             SetInt("startingBrooms", 33);
+            SetInt(ClockBonusSecondsField, 41);
             SetRewards(table);
 
             var rules = config.ToRules();
@@ -160,6 +207,7 @@ namespace GateRush.Tests
             Assert.AreEqual(32, rules.StartingJokers(JokerKind.Rocket));
             Assert.AreEqual(33, rules.StartingJokers(JokerKind.Broom));
             CollectionAssert.AreEqual(table, rules.StreakRewards);
+            Assert.AreEqual(41, rules.ClockBonusSeconds);
         }
 
         private void SetInt(string field, int value)
