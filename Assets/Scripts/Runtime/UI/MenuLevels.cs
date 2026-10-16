@@ -29,42 +29,12 @@ namespace GateRush.Runtime
     }
 
     /// <summary>
-    /// The two rules of the prototype menu (Module 23), as plain code: which
-    /// level Play starts, and what the level select lists.
+    /// The level select's rule (Module 23), as plain code: what it lists.
+    /// Which level Play starts is the campaign's (<see cref="CampaignLevels"/>,
+    /// Module 32).
     /// </summary>
     public static class MenuLevels
     {
-        /// <summary>
-        /// The level Play starts: the first in <paramref name="catalog"/>'s
-        /// order that is not in <paramref name="completed"/>, or the first
-        /// level when every one is. False only for a catalog with no level.
-        /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="catalog"/> or <paramref name="completed"/> is null.</exception>
-        public static bool TryGetStartLevel(LevelCatalog catalog, CompletedLevels completed, out string name)
-        {
-            Require(catalog, completed);
-
-            var names = catalog.Names;
-            var ids = catalog.Ids;
-            for (var i = 0; i < ids.Count; i++)
-            {
-                if (!completed.IsCompleted(ids[i]))
-                {
-                    name = names[i];
-                    return true;
-                }
-            }
-
-            if (names.Count > 0)
-            {
-                name = names[0];
-                return true;
-            }
-
-            name = null;
-            return false;
-        }
-
         /// <summary>
         /// The level select's entries: every level of
         /// <paramref name="catalog"/>, in its order, with the number

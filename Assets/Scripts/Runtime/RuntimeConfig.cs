@@ -632,16 +632,16 @@ namespace GateRush.Runtime
         [Tooltip("The game's name on the title screen.")]
         [SerializeField] private string gameTitle = "Gate Rush";
 
-        [Tooltip("Label of the title screen's Play button, which is tinted Next Button Color. It starts the first level not yet completed.")]
+        [Tooltip("Label of the title screen's Play button, which is tinted Next Button Color. It starts the campaign level (Module 32).")]
         [SerializeField] private string playLabel = "Play";
 
-        [Tooltip("Label of the title screen's Levels button, which opens the level select.")]
+        [Tooltip("Label of the Settings page's Levels button, which opens the level select (free play).")]
         [SerializeField] private string levelsLabel = "Levels";
 
-        [Tooltip("Label of the title screen's sound button while sound and vibration are on. The button has the Levels button's tint and turns them off.")]
+        [Tooltip("Label of the Settings page's sound button while sound and vibration are on. The button has the Levels button's tint and turns them off.")]
         [SerializeField] private string soundOnLabel = "Sound: On";
 
-        [Tooltip("Label of the title screen's sound button while sound and vibration are off. The button turns them on.")]
+        [Tooltip("Label of the Settings page's sound button while sound and vibration are off. The button turns them on.")]
         [SerializeField] private string soundOffLabel = "Sound: Off";
 
         [Tooltip("Heading of the level select.")]
@@ -666,13 +666,13 @@ namespace GateRush.Runtime
         [Tooltip("Space between the title or heading and what is under it, and between the level grid and Back.")]
         [SerializeField] private float menuSectionGapUnits = 90f;
 
-        [Tooltip("Size of the Play, Levels and Back buttons.")]
+        [Tooltip("Size of the menu's buttons — Play, Settings, Levels, the sound button and Back — and of the confirmation's two buttons.")]
         [SerializeField] private Vector2 menuButtonSizeUnits = new Vector2(520f, 150f);
 
         [SerializeField] private float menuButtonCornerUnits = 46f;
         [SerializeField] private float menuButtonFontSize = 76f;
 
-        [Tooltip("Space between Play, Levels and the sound button.")]
+        [Tooltip("Space between the buttons of a menu page, and between the confirmation's two buttons.")]
         [SerializeField] private float menuButtonGapUnits = 40f;
 
         [Tooltip("How many level buttons the level select puts in a row.")]
@@ -704,6 +704,83 @@ namespace GateRush.Runtime
 
         [Tooltip("Space between the tick's square and the level button's top and right edges.")]
         [SerializeField] private float levelTickInsetUnits = 10f;
+
+        [Header("Meta game (Module 32; the label font holds ASCII only, so no '·' in these texts)")]
+        [Tooltip("Label of the title screen's Settings button, which opens the page holding the sound button and Levels.")]
+        [SerializeField] private string settingsLabel = "Settings";
+
+        [Tooltip("Heading of the Settings page.")]
+        [SerializeField] private string settingsTitle = "Settings";
+
+        [Tooltip("Put between the parts of a meta line: the gold and the lives on the title screen, the lives (or Free Play Label) and the gold on the HUD.")]
+        [SerializeField] private string metaSeparator = " | ";
+
+        [Tooltip("The gold balance; {0} is the balance.")]
+        [SerializeField] private string goldFormat = "Gold {0}";
+
+        [Tooltip("The lives while they are full; {0} is the count and {1} the cap.")]
+        [SerializeField] private string livesFullFormat = "Lives {0}/{1}";
+
+        [Tooltip("The lives while one is coming back; {0} is the count, {1} the cap and {2} the time to the next life as mm:ss.")]
+        [SerializeField] private string livesWaitingFormat = "Lives {0}/{1} | next {2}";
+
+        [Tooltip("Shown on the HUD where the lives would be, during free play.")]
+        [SerializeField] private string freePlayLabel = "Free Play";
+
+        [Tooltip("The line under a campaign win's title; {0} is the gold the level paid.")]
+        [SerializeField] private string goldEarnedFormat = "+{0} gold";
+
+        [Tooltip("Shown on the title screen when Play is pressed after the last campaign level.")]
+        [SerializeField] private string campaignDoneNotice = "All levels played. Play any level from Settings.";
+
+        [Tooltip("Heading of the page Play opens with no life left.")]
+        [SerializeField] private string noLivesTitle = "No lives left";
+
+        [Tooltip("The line under No Lives Title; {0} is the time to the next life as mm:ss.")]
+        [SerializeField] private string nextLifeFormat = "Next life in {0}";
+
+        [Tooltip("Label of the refill button on the no-lives page; {0} is the refill price from the Meta Config.")]
+        [SerializeField] private string refillFormat = "Refill lives ({0} gold)";
+
+        [Tooltip("Title of the confirmation Menu opens while a campaign level is played.")]
+        [SerializeField] private string leaveLevelTitle = "Leave level?";
+
+        [Tooltip("Title of the confirmation Restart and R open while a campaign level is played.")]
+        [SerializeField] private string restartLevelTitle = "Restart level?";
+
+        [Tooltip("The line under the confirmation's title.")]
+        [SerializeField] private string loseLifeMessage = "You will lose a life.";
+
+        [Tooltip("Label of the confirmation's button that loses a life and then leaves or restarts. Tinted Restart Button Color.")]
+        [SerializeField] private string loseLifeLabel = "Lose a life";
+
+        [Tooltip("Label of the confirmation's button that closes it and resumes the countdown. Tinted Next Button Color.")]
+        [SerializeField] private string keepPlayingLabel = "Keep playing";
+
+        [Tooltip("Height of the title screen's meta line and of the no-lives page's next-life line.")]
+        [SerializeField] private float menuMetaHeightUnits = 90f;
+
+        [Tooltip("Font size of the title screen's meta line and of the no-lives page's next-life line.")]
+        [SerializeField] private float menuMetaFontSize = 50f;
+
+        [Tooltip("Height kept on the title screen for the notice after the last campaign level; it wraps within it.")]
+        [SerializeField] private float menuNoticeHeightUnits = 140f;
+
+        [SerializeField] private float menuNoticeFontSize = 48f;
+
+        [Tooltip("Size of the no-lives page's refill button, wider than the other menu buttons for its price.")]
+        [SerializeField] private Vector2 menuWideButtonSizeUnits = new Vector2(860f, 150f);
+
+        [Tooltip("Height of the HUD's meta line, under the row of buttons and pills, right-aligned to the level pill.")]
+        [SerializeField] private float hudMetaHeightUnits = 60f;
+
+        [SerializeField] private float hudMetaFontSize = 40f;
+
+        [Tooltip("Space between the HUD's row and its meta line.")]
+        [SerializeField] private float hudMetaGapUnits = 12f;
+
+        [Tooltip("Size of the confirmation's panel. It holds the title, the line under it and two menu buttons stacked, inside Result Padding Units, and uses the result panel's fonts and backdrop.")]
+        [SerializeField] private Vector2 confirmPanelSizeUnits = new Vector2(860f, 900f);
 
         [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
         [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
@@ -1359,10 +1436,10 @@ namespace GateRush.Runtime
         /// <summary>Label of the title screen's Levels button.</summary>
         public string LevelsLabel => levelsLabel;
 
-        /// <summary>Label of the title screen's sound button while sound and vibration are on (Module 25).</summary>
+        /// <summary>Label of the Settings page's sound button while sound and vibration are on (Module 25).</summary>
         public string SoundOnLabel => soundOnLabel;
 
-        /// <summary>Label of the title screen's sound button while sound and vibration are off (Module 25).</summary>
+        /// <summary>Label of the Settings page's sound button while sound and vibration are off (Module 25).</summary>
         public string SoundOffLabel => soundOffLabel;
 
         /// <summary>Heading of the level select.</summary>
@@ -1436,6 +1513,84 @@ namespace GateRush.Runtime
 
         /// <summary>Space between the tick's square and the level button's top and right edges, in canvas units.</summary>
         public float LevelTickInsetUnits => levelTickInsetUnits;
+
+        /// <summary>Label of the title screen's Settings button (Module 32).</summary>
+        public string SettingsLabel => settingsLabel;
+
+        /// <summary>Heading of the Settings page.</summary>
+        public string SettingsTitle => settingsTitle;
+
+        /// <summary>Put between the parts of a meta line (<see cref="MetaText.Joined"/>).</summary>
+        public string MetaSeparator => metaSeparator;
+
+        /// <summary>The gold balance; {0} is the balance.</summary>
+        public string GoldFormat => goldFormat;
+
+        /// <summary>The lives while full; {0} is the count, {1} the cap.</summary>
+        public string LivesFullFormat => livesFullFormat;
+
+        /// <summary>The lives while one is coming back; {0} the count, {1} the cap, {2} the wait as mm:ss.</summary>
+        public string LivesWaitingFormat => livesWaitingFormat;
+
+        /// <summary>Shown on the HUD where the lives would be, during free play.</summary>
+        public string FreePlayLabel => freePlayLabel;
+
+        /// <summary>The line under a campaign win's title; {0} is the gold paid.</summary>
+        public string GoldEarnedFormat => goldEarnedFormat;
+
+        /// <summary>The title screen's notice when Play is pressed after the last campaign level.</summary>
+        public string CampaignDoneNotice => campaignDoneNotice;
+
+        /// <summary>Heading of the no-lives page.</summary>
+        public string NoLivesTitle => noLivesTitle;
+
+        /// <summary>The no-lives page's line; {0} is the wait as mm:ss.</summary>
+        public string NextLifeFormat => nextLifeFormat;
+
+        /// <summary>The refill button's label; {0} is the price.</summary>
+        public string RefillFormat => refillFormat;
+
+        /// <summary>Title of the confirmation before leaving a campaign level.</summary>
+        public string LeaveLevelTitle => leaveLevelTitle;
+
+        /// <summary>Title of the confirmation before restarting a campaign level.</summary>
+        public string RestartLevelTitle => restartLevelTitle;
+
+        /// <summary>The line under the confirmation's title.</summary>
+        public string LoseLifeMessage => loseLifeMessage;
+
+        /// <summary>Label of the confirmation's button that loses a life.</summary>
+        public string LoseLifeLabel => loseLifeLabel;
+
+        /// <summary>Label of the confirmation's button that resumes the level.</summary>
+        public string KeepPlayingLabel => keepPlayingLabel;
+
+        /// <summary>Height of the menu's meta and next-life lines, in canvas units.</summary>
+        public float MenuMetaHeightUnits => menuMetaHeightUnits;
+
+        /// <summary>Font size of the menu's meta and next-life lines.</summary>
+        public float MenuMetaFontSize => menuMetaFontSize;
+
+        /// <summary>Height kept for the title screen's notice, in canvas units.</summary>
+        public float MenuNoticeHeightUnits => menuNoticeHeightUnits;
+
+        /// <summary>Font size of the title screen's notice.</summary>
+        public float MenuNoticeFontSize => menuNoticeFontSize;
+
+        /// <summary>Size of the refill button, in canvas units.</summary>
+        public Vector2 MenuWideButtonSizeUnits => menuWideButtonSizeUnits;
+
+        /// <summary>Height of the HUD's meta line, in canvas units.</summary>
+        public float HudMetaHeightUnits => hudMetaHeightUnits;
+
+        /// <summary>Font size of the HUD's meta line.</summary>
+        public float HudMetaFontSize => hudMetaFontSize;
+
+        /// <summary>Space between the HUD's row and its meta line, in canvas units.</summary>
+        public float HudMetaGapUnits => hudMetaGapUnits;
+
+        /// <summary>Size of the confirmation's panel, in canvas units.</summary>
+        public Vector2 ConfirmPanelSizeUnits => confirmPanelSizeUnits;
 
         /// <summary>Space from the safe area's sides to the HUD's outer elements, and the least space beside the timer, in canvas units.</summary>
         public float HudSidePaddingUnits => hudSidePaddingUnits;
@@ -2156,6 +2311,7 @@ namespace GateRush.Runtime
             AddHudProblems(problems);
             AddResultPanelProblems(problems);
             AddMenuProblems(problems);
+            AddMetaProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
             return problems;
@@ -2599,10 +2755,10 @@ namespace GateRush.Runtime
 
             if (!(resultPaddingUnits >= 0f && resultButtonGapUnits >= 0f
                   && 2f * resultButtonSizeUnits.x + resultButtonGapUnits <= resultPanelSizeUnits.x - 2f * resultPaddingUnits
-                  && 2f * resultButtonSizeUnits.y + resultButtonGapUnits + 3f * resultPaddingUnits + resultMessageHeightUnits
-                  < resultPanelSizeUnits.y))
+                  && 2f * resultButtonSizeUnits.y + resultButtonGapUnits + 3f * resultPaddingUnits
+                  + ResultPanel.MaxLinesUnderTitle * resultMessageHeightUnits < resultPanelSizeUnits.y))
             {
-                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side and two rows of them, with Result Button Gap Units between them, and leave room for Result Message Height Units and the title, inside Result Padding Units.");
+                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side and two rows of them, with Result Button Gap Units between them, and leave room for {ResultPanel.MaxLinesUnderTitle} lines of Result Message Height Units and the title, inside Result Padding Units.");
             }
 
             AddIfBlank(problems, allDoneMessage, "All Done Message");
@@ -2665,6 +2821,74 @@ namespace GateRush.Runtime
             }
         }
 
+        /// <summary>
+        /// The constraints on the meta game's values (Module 32), each message
+        /// naming its field: every text is there to read, every format takes
+        /// the numbers it is given, every size is positive, and the
+        /// confirmation's panel holds what it shows.
+        /// </summary>
+        private void AddMetaProblems(List<string> problems)
+        {
+            AddIfBlank(problems, settingsLabel, "Settings Label");
+            AddIfBlank(problems, settingsTitle, "Settings Title");
+            AddIfBlank(problems, freePlayLabel, "Free Play Label");
+            AddIfBlank(problems, campaignDoneNotice, "Campaign Done Notice");
+            AddIfBlank(problems, noLivesTitle, "No Lives Title");
+            AddIfBlank(problems, leaveLevelTitle, "Leave Level Title");
+            AddIfBlank(problems, restartLevelTitle, "Restart Level Title");
+            AddIfBlank(problems, loseLifeMessage, "Lose Life Message");
+            AddIfBlank(problems, loseLifeLabel, "Lose Life Label");
+            AddIfBlank(problems, keepPlayingLabel, "Keep Playing Label");
+
+            // Spaces alone are a usable separator; only no text at all is not.
+            if (string.IsNullOrEmpty(metaSeparator))
+            {
+                problems.Add($"{name}: Meta Separator is empty.");
+            }
+
+            AddIfUnusableFormat(problems, goldFormat, 1, "Gold Format", "{0} for the balance");
+            AddIfUnusableFormat(problems, livesFullFormat, 2, "Lives Full Format", "{0} for the count and {1} for the cap");
+            AddIfUnusableFormat(problems, livesWaitingFormat, 3, "Lives Waiting Format", "{0} for the count, {1} for the cap and {2} for the wait");
+            AddIfUnusableFormat(problems, goldEarnedFormat, 1, "Gold Earned Format", "{0} for the gold paid");
+            AddIfUnusableFormat(problems, nextLifeFormat, 1, "Next Life Format", "{0} for the wait");
+            AddIfUnusableFormat(problems, refillFormat, 1, "Refill Format", "{0} for the price");
+
+            AddIfNotPositive(problems, menuMetaHeightUnits, "Menu Meta Height Units");
+            AddIfNotPositive(problems, menuMetaFontSize, "Menu Meta Font Size");
+            AddIfNotPositive(problems, menuNoticeHeightUnits, "Menu Notice Height Units");
+            AddIfNotPositive(problems, menuNoticeFontSize, "Menu Notice Font Size");
+            AddIfNotPositive(problems, menuWideButtonSizeUnits, "Menu Wide Button Size Units");
+            AddIfNotPositive(problems, hudMetaHeightUnits, "Hud Meta Height Units");
+            AddIfNotPositive(problems, hudMetaFontSize, "Hud Meta Font Size");
+            AddIfNotPositive(problems, confirmPanelSizeUnits, "Confirm Panel Size Units");
+
+            if (!(hudMetaGapUnits >= 0f) || float.IsInfinity(hudMetaGapUnits))
+            {
+                problems.Add($"{name}: Hud Meta Gap Units must be at least 0 and finite.");
+            }
+
+            // From the panel's foot: Keep playing, the gap, Lose a life, the
+            // padding, the line, the title; padding at the foot and the top.
+            if (!(menuButtonSizeUnits.x + 2f * resultPaddingUnits <= confirmPanelSizeUnits.x
+                  && 2f * menuButtonSizeUnits.y + menuButtonGapUnits + 3f * resultPaddingUnits + resultMessageHeightUnits
+                  < confirmPanelSizeUnits.y))
+            {
+                problems.Add($"{name}: Confirm Panel Size Units must hold a Menu Button Size Units button across and two of them stacked with Menu Button Gap Units between, and leave room for Result Message Height Units and the title, inside Result Padding Units.");
+            }
+        }
+
+        private void AddIfUnusableFormat(List<string> problems, string format, int argumentCount, string field, string placeholders)
+        {
+            if (string.IsNullOrWhiteSpace(format))
+            {
+                problems.Add($"{name}: {field} is empty.");
+            }
+            else if (!IsUsableFormat(format, argumentCount))
+            {
+                problems.Add($"{name}: {field} must be a format with at most these placeholders: {placeholders}.");
+            }
+        }
+
         private void AddIfBlank(List<string> problems, string text, string field)
         {
             if (string.IsNullOrWhiteSpace(text))
@@ -2681,16 +2905,29 @@ namespace GateRush.Runtime
             }
         }
 
-        private static bool IsUsableFormat(string format)
+        private static bool IsUsableFormat(string format) => IsUsableFormat(format, 1);
+
+        /// <summary>
+        /// True when <paramref name="format"/> formats with
+        /// <paramref name="argumentCount"/> numbers: every placeholder it has
+        /// is one of {0} to {argumentCount - 1}, and its braces are balanced.
+        /// </summary>
+        private static bool IsUsableFormat(string format, int argumentCount)
         {
             if (format == null)
             {
                 return false;
             }
 
+            var arguments = new object[argumentCount];
+            for (var i = 0; i < argumentCount; i++)
+            {
+                arguments[i] = 1;
+            }
+
             try
             {
-                string.Format(CultureInfo.InvariantCulture, format, 1);
+                string.Format(CultureInfo.InvariantCulture, format, arguments);
                 return true;
             }
             catch (FormatException)

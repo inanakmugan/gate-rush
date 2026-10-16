@@ -8,8 +8,10 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The end-of-level panel: a full-screen backdrop and a rounded panel with
-    /// a title, Restart, Menu and, after a win with a level to follow, Next;
-    /// after the last level a smaller line sits under the title (Module 23).
+    /// a title, Menu, Restart unless the win was a campaign win, and, after a
+    /// win with a level to follow, Next. Smaller lines sit under the title: the
+    /// gold a campaign win paid (Module 32), and the closing message after the
+    /// last level (Module 23).
     /// Builds its hierarchy from code
     /// and opens with a short fade-and-scale pop. Holds no rules — the
     /// bootstrap decides what to show and handles what the buttons ask for.
@@ -31,6 +33,13 @@ namespace GateRush.Runtime
     /// </remarks>
     public sealed class ResultPanel : MonoBehaviour
     {
+        /// <summary>
+        /// The most lines under the title at once: a campaign win's gold and
+        /// the closing message after the last level. <c>RuntimeConfig</c>
+        /// checks that the panel has room for this many.
+        /// </summary>
+        public const int MaxLinesUnderTitle = 2;
+
         private static readonly Vector2 BottomMiddle = new Vector2(0.5f, 0f);
 
         private RuntimeConfig config;
@@ -40,6 +49,7 @@ namespace GateRush.Runtime
         private RectTransform titleRect;
         private TMP_Text title;
         private TMP_Text message;
+        private TMP_Text gold;
 
         // The title's bottom edge above the panel's foot when no message
         // shows, in canvas units; a message sits there and pushes it up.
@@ -116,12 +126,12 @@ namespace GateRush.Runtime
             var buttonSize = config.ResultButtonSizeUnits;
 
             // From the panel's foot: Menu, then the row of Next and Restart,
-            // then the line under the title when there is one, then the title.
+            // then the lines under the title that show, then the title.
             var rowBottom = padding + buttonSize.y + config.ResultButtonGapUnits;
             titleBottom = rowBottom + buttonSize.y + padding;
 
-            // The title fills the panel above the buttons — above the message
-            // when one shows (Show) — inside the padding, and wraps there if
+            // The title fills the panel above the buttons — above the lines
+            // that show (Show) — inside the padding, and wraps there if
             // it is too long for one line.
             titleRect = UiBuilder.CreateRect("Title", panel);
             UiBuilder.Stretch(titleRect);
@@ -129,14 +139,11 @@ namespace GateRush.Runtime
             titleRect.offsetMax = new Vector2(-padding, -padding);
             title = UiBuilder.AddLabel(titleRect, config.LabelFont, config.ResultTitleFontSize, config.ResultTitleColor, true);
 
-            var messageRect = UiBuilder.CreateRect("Message", panel);
-            messageRect.anchorMin = Vector2.zero;
-            messageRect.anchorMax = Vector2.right;
-            messageRect.pivot = BottomMiddle;
-            messageRect.anchoredPosition = new Vector2(0f, titleBottom);
-            messageRect.sizeDelta = new Vector2(-2f * padding, config.ResultMessageHeightUnits);
-            message = UiBuilder.AddLabel(
-                messageRect, config.LabelFont, config.ResultMessageFontSize, config.ResultMessageColor, false);
+            // The lines under the title: the gold a campaign win paid, then
+            // the closing message. Show places them; neither, either or both
+            // may show.
+            message = BuildLine("Message", padding);
+            gold = BuildLine("Gold", padding);
 
             // The buttons are laid out centred in a row, so Restart alone sits
             // in the middle when Next is hidden.
@@ -170,20 +177,23 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Shows the win result with Restart and Menu, and Next only when
-        /// there is a next level. <paramref name="messageText"/> is the
-        /// smaller line under the title — the closing message after the last
-        /// level; null or empty for no line, as after any other win.
+        /// Shows the win result with Menu, Next only when
+        /// <paramref name="hasNext"/>, and Restart only when
+        /// <paramref name="hasRestart"/> — a campaign win has none, since a
+        /// won campaign level is never replayed (D58). Under the title, in
+        /// this order: <paramref name="goldText"/>, the gold a campaign win
+        /// paid (Module 32), and <paramref name="messageText"/>, the closing
+        /// message after the last level. Null or empty for no line.
         /// </summary>
-        public void ShowWin(string titleText, string messageText, bool hasNext)
+        public void ShowWin(string titleText, string messageText, string goldText, bool hasNext, bool hasRestart)
         {
-            Show(titleText, messageText, hasNext);
+            Show(titleText, goldText, messageText, hasNext, hasRestart);
         }
 
         /// <summary>Shows the loss result, with Restart and Menu and no line under the title.</summary>
         public void ShowLoss(string titleText)
         {
-            Show(titleText, null, false);
+            Show(titleText, null, null, false, true);
         }
 
         /// <summary>Hides the panel, stopping its pop. Does nothing before <see cref="Initialize"/>.</summary>
@@ -199,20 +209,55 @@ namespace GateRush.Runtime
             root.gameObject.SetActive(false);
         }
 
-        private void Show(string titleText, string messageText, bool showsNext)
+        private void Show(string titleText, string goldText, string messageText, bool showsNext, bool showsRestart)
         {
             title.text = titleText;
 
-            // The title gives up the message's height only when a message shows.
-            var showsMessage = !string.IsNullOrEmpty(messageText);
-            message.text = showsMessage ? messageText : string.Empty;
-            message.gameObject.SetActive(showsMessage);
-            var bottom = showsMessage ? titleBottom + config.ResultMessageHeightUnits : titleBottom;
+            // The lines stack up from the title's lowest edge, the last line
+            // lowest; the title gives up a line's height for each that shows.
+            var bottom = titleBottom;
+            bottom = PlaceLine(message, messageText, bottom);
+            bottom = PlaceLine(gold, goldText, bottom);
             titleRect.offsetMin = new Vector2(titleRect.offsetMin.x, bottom);
 
             nextButton.gameObject.SetActive(showsNext);
+            restartButton.gameObject.SetActive(showsRestart);
             root.gameObject.SetActive(true);
             PlayPop();
+        }
+
+        /// <summary>
+        /// Shows <paramref name="line"/> reading <paramref name="text"/> with
+        /// its foot at <paramref name="bottom"/>, and answers the height above
+        /// it; hides it and answers <paramref name="bottom"/> for no text.
+        /// </summary>
+        private float PlaceLine(TMP_Text line, string text, float bottom)
+        {
+            var shows = !string.IsNullOrEmpty(text);
+            line.text = shows ? text : string.Empty;
+            line.gameObject.SetActive(shows);
+            if (!shows)
+            {
+                return bottom;
+            }
+
+            var rect = line.rectTransform;
+            rect.anchoredPosition = new Vector2(rect.anchoredPosition.x, bottom);
+            return bottom + config.ResultMessageHeightUnits;
+        }
+
+        /// <summary>One hidden line under the title, as wide as the panel inside the padding.</summary>
+        private TMP_Text BuildLine(string lineName, float padding)
+        {
+            var rect = UiBuilder.CreateRect(lineName, panel);
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.right;
+            rect.pivot = BottomMiddle;
+            rect.anchoredPosition = new Vector2(0f, titleBottom);
+            rect.sizeDelta = new Vector2(-2f * padding, config.ResultMessageHeightUnits);
+            var line = UiBuilder.AddLabel(rect, config.LabelFont, config.ResultMessageFontSize, config.ResultMessageColor, false);
+            rect.gameObject.SetActive(false);
+            return line;
         }
 
         private void PlayPop()

@@ -9,13 +9,33 @@ using UnityEngine.UI;
 
 namespace GateRush.Runtime
 {
+    /// <summary>The page <see cref="MenuScreen"/> shows.</summary>
+    public enum MenuPage
+    {
+        /// <summary>The game's name, the meta line, Play and Settings.</summary>
+        Title,
+
+        /// <summary>The sound button, Levels and Back.</summary>
+        Settings,
+
+        /// <summary>The level select: one button per level, and Back to Settings.</summary>
+        Levels,
+
+        /// <summary>No lives left: the time to the next life, Refill and Back.</summary>
+        NoLives
+    }
+
     /// <summary>
-    /// The prototype menu (Module 23, D50): a title page with the game's name,
-    /// Play, Levels and the sound button (Module 25), and a level-select page
-    /// with one button per level and Back. An overlay in the Level scene, drawn over the background while no
-    /// level is loaded. Builds its hierarchy from code and holds no rules — the
-    /// bootstrap says which levels to list (<see cref="MenuLevels.Entries"/>)
-    /// and starts the level a button asks for.
+    /// The prototype menu (Module 23, D50; Module 32, D58, D64): a title page
+    /// with the game's name, a meta line with the gold and the lives, Play
+    /// and Settings; a Settings page with the sound button (Module 25),
+    /// Levels and Back; a level-select page with one button per level and
+    /// Back; and a no-lives page with the time to the next life, a refill
+    /// button and Back. An overlay in the Level scene, drawn over the
+    /// background while no level is loaded. Builds its hierarchy from code
+    /// and holds no rules — the bootstrap says which levels to list
+    /// (<see cref="MenuLevels.Entries"/>), writes every meta text, says
+    /// whether the refill is affordable, and acts on what a button asks for.
     /// </summary>
     /// <remarks>
     /// <para>Put this component on the screen-space canvas, which stays
@@ -24,12 +44,16 @@ namespace GateRush.Runtime
     /// <see cref="Initialize"/> before anything else.</para>
     /// <para><b>No level is locked.</b> Every entry gets a button that asks
     /// for its level, completed or not; a completed one only looks different:
-    /// its own tint and a tick.</para>
-    /// <para><b>Sound button.</b> It reads whether sound is on
-    /// (<see cref="ShowSound"/>) and asks for the other
-    /// (<see cref="SoundToggleRequested"/>); the bootstrap owns the setting.
-    /// It sits under Levels, or in Levels' row while that button is
-    /// hidden.</para>
+    /// its own tint and a tick. A level started from the select is free
+    /// play (D58).</para>
+    /// <para><b>Pages.</b> Settings, the level select and every Back move
+    /// between pages here; nothing for the bootstrap to decide. Play,
+    /// a level's button, the sound button and Refill ask the bootstrap.
+    /// Without a level to list, Levels is hidden and Back moves up into its
+    /// row.</para>
+    /// <para><b>Texts.</b> The meta line and the no-lives page's line are set
+    /// by the bootstrap, only when they change; this component formats
+    /// nothing.</para>
     /// <para><b>Fit.</b> Each page has a fixed size in canvas units and is
     /// scaled down uniformly to the safe area less the menu's padding
     /// (<see cref="ScreenBands.ContentScale"/>), so it fits a portrait phone
@@ -59,13 +83,16 @@ namespace GateRush.Runtime
         private const float TickShortStrokeDegrees = 135f;
         private const float TickLongStrokeDegrees = 45f;
 
-        // The title page's rows of buttons, from the top. Not tunables: they
-        // are the page's order. The sound button moves up into Levels' row
+        // The rows of buttons on each page, from the top. Not tunables: they
+        // are the pages' order. Settings' Back moves up into Levels' row
         // while Levels is hidden.
         private const int PlayRow = 0;
+        private const int SettingsRow = 1;
+        private const int TitleButtonRows = 2;
+        private const int SoundRow = 0;
         private const int LevelsRow = 1;
-        private const int SoundRow = 2;
-        private const int TitleButtonRows = 3;
+        private const int SettingsBackRow = 2;
+        private const int SettingsButtonRows = 3;
 
         private readonly List<LevelButton> levelButtons = new List<LevelButton>();
 
@@ -75,30 +102,38 @@ namespace GateRush.Runtime
         private CanvasGroup group;
         private RectTransform safe;
 
-        private RectTransform titleFit;
-        private RectTransform titlePage;
-        private Vector2 titlePageSize;
+        private PageView titlePage;
         private Button playButton;
-        private Button levelsButton;
+        private Button settingsButton;
+        private TMP_Text metaLabel;
+        private TMP_Text noticeLabel;
+
+        private PageView settingsPage;
         private Button soundButton;
+        private Button levelsButton;
+        private Button settingsBackButton;
         private TMP_Text soundLabel;
 
         // What the sound button reads; kept so a menu built again reads the same.
         private bool isSoundOn = true;
 
+        private PageView noLivesPage;
+        private TMP_Text nextLifeLabel;
+        private Button refillButton;
+        private TMP_Text refillLabel;
+        private Button noLivesBackButton;
+
         // Null while there is no level to list.
-        private RectTransform levelsFit;
-        private RectTransform levelsPage;
-        private Vector2 levelsPageSize;
-        private Button backButton;
+        private PageView levelsPage;
+        private Button levelsBackButton;
 
         private Vector2 fittedSafeSize;
         private bool isSubscribed;
 
-        /// <summary>Raised when the player presses Play.</summary>
+        /// <summary>Raised when the player presses Play: the campaign (D58).</summary>
         public event Action PlayRequested;
 
-        /// <summary>Raised when the player presses a level's button, with that level's file name.</summary>
+        /// <summary>Raised when the player presses a level's button, with that level's file name: free play (D58).</summary>
         public event Action<string> LevelRequested;
 
         /// <summary>
@@ -106,6 +141,13 @@ namespace GateRush.Runtime
         /// listener changes the setting and answers with <see cref="ShowSound"/>.
         /// </summary>
         public event Action SoundToggleRequested;
+
+        /// <summary>
+        /// Raised when the player presses the no-lives page's refill button,
+        /// which is only pressable when <see cref="ShowNoLives"/> said the
+        /// refill is affordable (D62).
+        /// </summary>
+        public event Action RefillRequested;
 
         /// <summary>
         /// Raised when the player presses any button of the menu, after the
@@ -116,6 +158,9 @@ namespace GateRush.Runtime
 
         /// <summary>True from <see cref="ShowTitle"/> until <see cref="Hide"/>.</summary>
         public bool IsOpen => root != null && root.gameObject.activeSelf;
+
+        /// <summary>The page showing; meaningful only while <see cref="IsOpen"/>.</summary>
+        public MenuPage Page { get; private set; }
 
         /// <summary>
         /// A message saying this screen is not on or under a canvas; empty
@@ -138,8 +183,7 @@ namespace GateRush.Runtime
             DOTween.Kill(this);
             Unsubscribe();
             levelButtons.Clear();
-            backButton = null;
-            levelsFit = null;
+            levelsBackButton = null;
             levelsPage = null;
             if (root != null)
             {
@@ -158,6 +202,8 @@ namespace GateRush.Runtime
             safe.gameObject.AddComponent<SafeArea>();
 
             BuildTitlePage();
+            BuildSettingsPage();
+            BuildNoLivesPage();
 
             fittedSafeSize = Vector2.negativeInfinity;
             root.gameObject.SetActive(false);
@@ -169,34 +215,97 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Opens the menu on its title page, with the level select rebuilt
-        /// from <paramref name="entries"/> — one button per entry, in order.
-        /// With no entries the Levels button is hidden: there is nothing to
-        /// select.
+        /// Opens the menu on its title page reading
+        /// <paramref name="metaLine"/>, with no notice, and with the level
+        /// select rebuilt from <paramref name="entries"/> — one button per
+        /// entry, in order. With no entries the Levels button is hidden:
+        /// there is nothing to select.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="entries"/> is null.</exception>
         /// <exception cref="InvalidOperationException"><see cref="Initialize"/> has not been called.</exception>
-        public void ShowTitle(IReadOnlyList<MenuLevelEntry> entries)
+        public void ShowTitle(IReadOnlyList<MenuLevelEntry> entries, string metaLine)
         {
             if (entries == null)
             {
                 throw new ArgumentNullException(nameof(entries));
             }
 
-            if (root == null)
-            {
-                throw new InvalidOperationException($"{name}: MenuScreen.ShowTitle was called before Initialize.");
-            }
+            RequireInitialized(nameof(ShowTitle));
 
             BuildLevelsPage(entries);
             var hasLevels = entries.Count > 0;
             levelsButton.gameObject.SetActive(hasLevels);
-            PlaceTitleButton(soundButton, hasLevels ? SoundRow : LevelsRow);
+            PlaceButton(settingsBackButton, SettingsButtonTop, hasLevels ? SettingsBackRow : LevelsRow, config.MenuButtonSizeUnits);
+
+            metaLabel.text = metaLine;
+            noticeLabel.text = string.Empty;
 
             fittedSafeSize = Vector2.negativeInfinity;
             root.gameObject.SetActive(true);
             Fit();
-            ShowPage(titlePage);
+            ShowPage(MenuPage.Title);
+        }
+
+        /// <summary>
+        /// Sets the title page's meta line, on whichever page shows, so the
+        /// title page reads it when it is next shown. Does nothing before
+        /// <see cref="Initialize"/>.
+        /// </summary>
+        public void ShowMeta(string metaLine)
+        {
+            if (metaLabel != null)
+            {
+                metaLabel.text = metaLine;
+            }
+        }
+
+        /// <summary>
+        /// Opens the title page with <paramref name="text"/> under the meta
+        /// line — the notice after the last campaign level. It stays until
+        /// the title page is left or opened again by <see cref="ShowTitle"/>.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The menu is not open.</exception>
+        public void ShowNotice(string text)
+        {
+            RequireOpen(nameof(ShowNotice));
+            if (Page != MenuPage.Title)
+            {
+                ShowPage(MenuPage.Title);
+            }
+
+            noticeLabel.text = text;
+        }
+
+        /// <summary>
+        /// Opens the no-lives page reading <paramref name="nextLifeLine"/>,
+        /// with the refill button labelled <paramref name="refillText"/> and
+        /// pressable only when <paramref name="canRefill"/>.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The menu is not open.</exception>
+        public void ShowNoLives(string nextLifeLine, string refillText, bool canRefill)
+        {
+            RequireOpen(nameof(ShowNoLives));
+            nextLifeLabel.text = nextLifeLine;
+            refillLabel.text = refillText;
+            refillButton.interactable = canRefill;
+            ShowPage(MenuPage.NoLives);
+        }
+
+        /// <summary>Sets the no-lives page's line, for the once-a-second refresh. Does nothing before <see cref="Initialize"/>.</summary>
+        public void ShowNextLife(string nextLifeLine)
+        {
+            if (nextLifeLabel != null)
+            {
+                nextLifeLabel.text = nextLifeLine;
+            }
+        }
+
+        /// <summary>Opens the title page, as its Back buttons do.</summary>
+        /// <exception cref="InvalidOperationException">The menu is not open.</exception>
+        public void ShowTitlePage()
+        {
+            RequireOpen(nameof(ShowTitlePage));
+            ShowPage(MenuPage.Title);
         }
 
         /// <summary>
@@ -254,8 +363,24 @@ namespace GateRush.Runtime
             }
         }
 
+        private void RequireInitialized(string member)
+        {
+            if (root == null)
+            {
+                throw new InvalidOperationException($"{name}: MenuScreen.{member} was called before Initialize.");
+            }
+        }
+
+        private void RequireOpen(string member)
+        {
+            if (!IsOpen)
+            {
+                throw new InvalidOperationException($"{name}: MenuScreen.{member} was called while the menu is not open; call ShowTitle first.");
+            }
+        }
+
         /// <summary>
-        /// Scales both pages down to the safe area less the padding, when the
+        /// Scales every page down to the safe area less the padding, when the
         /// safe area's size has changed. Its size in canvas units follows the
         /// canvas scaler as well as the screen, so it is compared on its own.
         /// </summary>
@@ -269,90 +394,169 @@ namespace GateRush.Runtime
 
             fittedSafeSize = safeSize;
             var available = safeSize - 2f * config.MenuPaddingUnits * Vector2.one;
-            ScaleToFit(titleFit, available, titlePageSize);
-            if (levelsFit != null)
-            {
-                ScaleToFit(levelsFit, available, levelsPageSize);
-            }
+            titlePage.ScaleToFit(available);
+            settingsPage.ScaleToFit(available);
+            noLivesPage.ScaleToFit(available);
+            levelsPage?.ScaleToFit(available);
         }
 
-        private static void ScaleToFit(RectTransform fit, Vector2 available, Vector2 pageSize)
+        /// <summary>Shows <paramref name="page"/> alone and opens it with the pop. The title page's notice goes when the page changes.</summary>
+        private void ShowPage(MenuPage page)
         {
-            var scale = ScreenBands.ContentScale(available, pageSize);
-            fit.localScale = new Vector3(scale, scale, 1f);
-        }
-
-        /// <summary>Shows <paramref name="page"/> alone and opens it with the pop.</summary>
-        private void ShowPage(RectTransform page)
-        {
-            titleFit.gameObject.SetActive(page == titlePage);
-            if (levelsFit != null)
+            if (page != Page)
             {
-                levelsFit.gameObject.SetActive(page == levelsPage);
+                noticeLabel.text = string.Empty;
             }
+
+            Page = page;
+            var shown = PageOf(page);
+            titlePage.SetActive(shown == titlePage);
+            settingsPage.SetActive(shown == settingsPage);
+            noLivesPage.SetActive(shown == noLivesPage);
+            levelsPage?.SetActive(shown == levelsPage);
 
             DOTween.Kill(this);
             ShowAtRest();
             group.alpha = 0f;
-            page.localScale = Vector3.one * config.ResultPopStartScale;
+            shown.Content.localScale = Vector3.one * config.ResultPopStartScale;
 
             DOTween.To(() => group.alpha, alpha => group.alpha = alpha, 1f, config.ResultPopSeconds)
                 .SetEase(config.ResultPopEase)
                 .SetUpdate(true)
                 .SetId(this);
-            page.DOScale(1f, config.ResultPopSeconds)
+            shown.Content.DOScale(1f, config.ResultPopSeconds)
                 .SetEase(config.ResultPopEase)
                 .SetUpdate(true)
                 .SetId(this);
+        }
+
+        private PageView PageOf(MenuPage page)
+        {
+            switch (page)
+            {
+                case MenuPage.Title:
+                    return titlePage;
+                case MenuPage.Settings:
+                    return settingsPage;
+                case MenuPage.NoLives:
+                    return noLivesPage;
+                case MenuPage.Levels:
+                    // The Levels button is hidden while there is no page.
+                    return levelsPage ?? settingsPage;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(page), page, "Not a menu page.");
+            }
         }
 
         /// <summary>The menu's look once a pop has finished.</summary>
         private void ShowAtRest()
         {
             group.alpha = 1f;
-            titlePage.localScale = Vector3.one;
+            titlePage.Content.localScale = Vector3.one;
+            settingsPage.Content.localScale = Vector3.one;
+            noLivesPage.Content.localScale = Vector3.one;
             if (levelsPage != null)
             {
-                levelsPage.localScale = Vector3.one;
+                levelsPage.Content.localScale = Vector3.one;
             }
         }
 
-        /// <summary>The title page, rows from the top: the game's name, Play, Levels, the sound button.</summary>
+        /// <summary>The top of the title page's first button row, from the page's top.</summary>
+        private float TitleButtonTop =>
+            config.MenuTitleHeightUnits + config.MenuMetaHeightUnits + config.MenuNoticeHeightUnits + config.MenuSectionGapUnits;
+
+        /// <summary>The top of the Settings and no-lives pages' first button row, from the page's top.</summary>
+        private float SettingsButtonTop => config.MenuTitleHeightUnits + config.MenuSectionGapUnits;
+
+        private float NoLivesButtonTop => config.MenuTitleHeightUnits + config.MenuMetaHeightUnits + config.MenuSectionGapUnits;
+
+        /// <summary>
+        /// The title page, rows from the top: the game's name, the meta line,
+        /// the notice (empty until set), Play, Settings.
+        /// </summary>
         private void BuildTitlePage()
         {
             var buttonSize = config.MenuButtonSizeUnits;
-            titlePageSize = new Vector2(
+            var size = new Vector2(
                 Mathf.Max(config.MenuTitleWidthUnits, buttonSize.x),
-                config.MenuTitleHeightUnits + config.MenuSectionGapUnits
-                + TitleButtonRows * buttonSize.y + (TitleButtonRows - 1) * config.MenuButtonGapUnits);
+                TitleButtonTop + ButtonRowsHeight(TitleButtonRows));
+            titlePage = new PageView("Title", safe, size);
 
-            // Fit scales the page down to the safe area; the pop scales Page.
-            titleFit = UiBuilder.CreateRect("Title fit", safe);
-            UiBuilder.PlaceCentered(titleFit, titlePageSize);
-            titlePage = UiBuilder.CreateRect("Title page", titleFit);
-            UiBuilder.PlaceCentered(titlePage, titlePageSize);
+            BuildHeading(titlePage.Content, size.x, config.GameTitle, config.MenuTitleFontSize);
+            metaLabel = BuildLine(
+                titlePage.Content, "Meta", config.MenuTitleHeightUnits, size.x, config.MenuMetaHeightUnits, config.MenuMetaFontSize, false);
+            noticeLabel = BuildLine(
+                titlePage.Content, "Notice", config.MenuTitleHeightUnits + config.MenuMetaHeightUnits, size.x,
+                config.MenuNoticeHeightUnits, config.MenuNoticeFontSize, true);
 
-            BuildHeading(titlePage, titlePageSize.x, config.GameTitle, config.MenuTitleFontSize);
+            playButton = BuildButton(titlePage.Content, "Play", config.NextButtonColor, config.PlayLabel, buttonSize, out _);
+            PlaceButton(playButton, TitleButtonTop, PlayRow, buttonSize);
 
-            playButton = BuildButton(titlePage, "Play", config.NextButtonColor, config.PlayLabel);
-            PlaceTitleButton(playButton, PlayRow);
-
-            levelsButton = BuildButton(titlePage, "Levels", config.MenuButtonColor, config.LevelsLabel);
-            PlaceTitleButton(levelsButton, LevelsRow);
-
-            soundButton = BuildButton(titlePage, "Sound", config.MenuButtonColor, config.SoundOnLabel);
-            soundLabel = soundButton.GetComponentInChildren<TMP_Text>(true);
-            PlaceTitleButton(soundButton, SoundRow);
-            ShowSound(isSoundOn);
+            settingsButton = BuildButton(titlePage.Content, "Settings", config.MenuButtonColor, config.SettingsLabel, buttonSize, out _);
+            PlaceButton(settingsButton, TitleButtonTop, SettingsRow, buttonSize);
         }
 
-        /// <summary>Places a title page button in row <paramref name="row"/> of the buttons under the game's name.</summary>
-        private void PlaceTitleButton(Button button, int row)
+        /// <summary>The Settings page, rows from the top: its heading, the sound button, Levels, Back.</summary>
+        private void BuildSettingsPage()
         {
             var buttonSize = config.MenuButtonSizeUnits;
-            var top = config.MenuTitleHeightUnits + config.MenuSectionGapUnits
-                      + row * (buttonSize.y + config.MenuButtonGapUnits);
-            UiBuilder.Place((RectTransform)button.transform, TopMiddle, new Vector2(0f, -top), buttonSize);
+            var size = new Vector2(
+                Mathf.Max(config.MenuTitleWidthUnits, buttonSize.x),
+                SettingsButtonTop + ButtonRowsHeight(SettingsButtonRows));
+            settingsPage = new PageView("Settings", safe, size);
+
+            BuildHeading(settingsPage.Content, size.x, config.SettingsTitle, config.LevelSelectTitleFontSize);
+
+            soundButton = BuildButton(settingsPage.Content, "Sound", config.MenuButtonColor, config.SoundOnLabel, buttonSize, out soundLabel);
+            PlaceButton(soundButton, SettingsButtonTop, SoundRow, buttonSize);
+            ShowSound(isSoundOn);
+
+            levelsButton = BuildButton(settingsPage.Content, "Levels", config.MenuButtonColor, config.LevelsLabel, buttonSize, out _);
+            PlaceButton(levelsButton, SettingsButtonTop, LevelsRow, buttonSize);
+
+            settingsBackButton = BuildButton(settingsPage.Content, "Back", config.MenuButtonColor, config.BackLabel, buttonSize, out _);
+            PlaceButton(settingsBackButton, SettingsButtonTop, SettingsBackRow, buttonSize);
+        }
+
+        /// <summary>The no-lives page, rows from the top: its heading, the time to the next life, Refill, Back.</summary>
+        private void BuildNoLivesPage()
+        {
+            var buttonSize = config.MenuButtonSizeUnits;
+            var wideSize = config.MenuWideButtonSizeUnits;
+            var size = new Vector2(
+                Mathf.Max(config.MenuTitleWidthUnits, Mathf.Max(buttonSize.x, wideSize.x)),
+                NoLivesButtonTop + wideSize.y + config.MenuButtonGapUnits + buttonSize.y);
+            noLivesPage = new PageView("No lives", safe, size);
+
+            BuildHeading(noLivesPage.Content, size.x, config.NoLivesTitle, config.LevelSelectTitleFontSize);
+            nextLifeLabel = BuildLine(
+                noLivesPage.Content, "Next life", config.MenuTitleHeightUnits, size.x, config.MenuMetaHeightUnits,
+                config.MenuMetaFontSize, false);
+
+            refillButton = BuildButton(noLivesPage.Content, "Refill", config.NextButtonColor, string.Empty, wideSize, out refillLabel);
+            PlaceButton(refillButton, NoLivesButtonTop, 0, wideSize);
+
+            // Refill may be taller than the other buttons, so Back is placed
+            // from Refill's foot rather than by row.
+            noLivesBackButton = BuildButton(noLivesPage.Content, "Back", config.MenuButtonColor, config.BackLabel, buttonSize, out _);
+            PlaceButton(noLivesBackButton, NoLivesButtonTop + wideSize.y + config.MenuButtonGapUnits, 0, buttonSize);
+        }
+
+        private float ButtonRowsHeight(int rows)
+        {
+            var buttonSize = config.MenuButtonSizeUnits;
+            return rows * buttonSize.y + (rows - 1) * config.MenuButtonGapUnits;
+        }
+
+        /// <summary>
+        /// Places a button of <paramref name="size"/> in row
+        /// <paramref name="row"/> of a column of menu-button rows whose first
+        /// row's top is <paramref name="top"/> below the page's top.
+        /// </summary>
+        private void PlaceButton(Button button, float top, int row, Vector2 size)
+        {
+            var rowTop = top + row * (config.MenuButtonSizeUnits.y + config.MenuButtonGapUnits);
+            UiBuilder.Place((RectTransform)button.transform, TopMiddle, new Vector2(0f, -rowTop), size);
         }
 
         /// <summary>
@@ -366,11 +570,10 @@ namespace GateRush.Runtime
             var wasSubscribed = isSubscribed;
             Unsubscribe();
             levelButtons.Clear();
-            backButton = null;
-            if (levelsFit != null)
+            levelsBackButton = null;
+            if (levelsPage != null)
             {
-                Destroy(levelsFit.gameObject);
-                levelsFit = null;
+                levelsPage.Destroy();
                 levelsPage = null;
             }
 
@@ -385,18 +588,14 @@ namespace GateRush.Runtime
                     rows * tile + (rows - 1) * config.LevelTileGapUnits);
                 var buttonSize = config.MenuButtonSizeUnits;
 
-                levelsPageSize = new Vector2(
+                var size = new Vector2(
                     Mathf.Max(gridSize.x, buttonSize.x),
                     config.MenuTitleHeightUnits + gridSize.y + buttonSize.y + 2f * config.MenuSectionGapUnits);
+                levelsPage = new PageView("Levels", safe, size);
 
-                levelsFit = UiBuilder.CreateRect("Levels fit", safe);
-                UiBuilder.PlaceCentered(levelsFit, levelsPageSize);
-                levelsPage = UiBuilder.CreateRect("Levels page", levelsFit);
-                UiBuilder.PlaceCentered(levelsPage, levelsPageSize);
+                BuildHeading(levelsPage.Content, size.x, config.LevelSelectTitle, config.LevelSelectTitleFontSize);
 
-                BuildHeading(levelsPage, levelsPageSize.x, config.LevelSelectTitle, config.LevelSelectTitleFontSize);
-
-                var grid = UiBuilder.CreateRect("Grid", levelsPage);
+                var grid = UiBuilder.CreateRect("Grid", levelsPage.Content);
                 UiBuilder.Place(
                     grid, TopMiddle, new Vector2(0f, -(config.MenuTitleHeightUnits + config.MenuSectionGapUnits)), gridSize);
                 for (var i = 0; i < entries.Count; i++)
@@ -405,10 +604,11 @@ namespace GateRush.Runtime
                     BuildLevelButton(grid, entries[i], position);
                 }
 
-                backButton = BuildButton(levelsPage, "Back", config.MenuButtonColor, config.BackLabel);
-                UiBuilder.Place((RectTransform)backButton.transform, BottomMiddle, Vector2.zero, buttonSize);
+                levelsBackButton = BuildButton(levelsPage.Content, "Back", config.MenuButtonColor, config.BackLabel, buttonSize, out _);
+                UiBuilder.Place((RectTransform)levelsBackButton.transform, BottomMiddle, Vector2.zero, buttonSize);
 
-                levelsFit.gameObject.SetActive(false);
+                levelsPage.SetActive(false);
+                fittedSafeSize = Vector2.negativeInfinity;
             }
 
             if (wasSubscribed)
@@ -423,6 +623,16 @@ namespace GateRush.Runtime
             var rect = UiBuilder.CreateRect("Heading", page);
             UiBuilder.Place(rect, TopMiddle, Vector2.zero, new Vector2(width, config.MenuTitleHeightUnits));
             UiBuilder.AddLabel(rect, config.LabelFont, fontSize, config.MenuTitleColor, false).text = text;
+        }
+
+        /// <summary>An empty line of text across <paramref name="page"/>, <paramref name="top"/> below its top.</summary>
+        private TMP_Text BuildLine(RectTransform page, string lineName, float top, float width, float height, float fontSize, bool wraps)
+        {
+            var rect = UiBuilder.CreateRect(lineName, page);
+            UiBuilder.Place(rect, TopMiddle, new Vector2(0f, -top), new Vector2(width, height));
+            var label = UiBuilder.AddLabel(rect, config.LabelFont, fontSize, config.MenuTitleColor, wraps);
+            label.text = string.Empty;
+            return label;
         }
 
         /// <summary>
@@ -480,17 +690,17 @@ namespace GateRush.Runtime
                 .raycastTarget = false;
         }
 
-        private Button BuildButton(RectTransform parent, string buttonName, Color color, string label)
+        private Button BuildButton(RectTransform parent, string buttonName, Color color, string label, Vector2 size, out TMP_Text labelText)
         {
             var rect = UiBuilder.CreateRect(buttonName, parent);
-            var size = config.MenuButtonSizeUnits;
             rect.sizeDelta = size;
             var face = UiBuilder.AddRoundedBox(
                 rect, size, config.RoundedRectSprite, color, config.MenuButtonCornerUnits, referencePixelsPerUnit);
 
             var text = UiBuilder.CreateRect("Label", rect);
             UiBuilder.Stretch(text);
-            UiBuilder.AddLabel(text, config.LabelFont, config.MenuButtonFontSize, config.ResultButtonTextColor, false).text = label;
+            labelText = UiBuilder.AddLabel(text, config.LabelFont, config.MenuButtonFontSize, config.ResultButtonTextColor, false);
+            labelText.text = label;
 
             return UiBuilder.AddButton(rect, face);
         }
@@ -502,17 +712,21 @@ namespace GateRush.Runtime
         /// </summary>
         private void Subscribe()
         {
-            if (isSubscribed || playButton == null || levelsButton == null || soundButton == null)
+            if (isSubscribed || playButton == null)
             {
                 return;
             }
 
             playButton.onClick.AddListener(OnPlayClicked);
-            levelsButton.onClick.AddListener(OnLevelsClicked);
+            settingsButton.onClick.AddListener(OnSettingsClicked);
             soundButton.onClick.AddListener(OnSoundClicked);
-            if (backButton != null)
+            levelsButton.onClick.AddListener(OnLevelsClicked);
+            settingsBackButton.onClick.AddListener(OnTitleBackClicked);
+            refillButton.onClick.AddListener(OnRefillClicked);
+            noLivesBackButton.onClick.AddListener(OnTitleBackClicked);
+            if (levelsBackButton != null)
             {
-                backButton.onClick.AddListener(OnBackClicked);
+                levelsBackButton.onClick.AddListener(OnSettingsClicked);
             }
 
             for (var i = 0; i < levelButtons.Count; i++)
@@ -530,35 +744,30 @@ namespace GateRush.Runtime
                 return;
             }
 
-            if (playButton != null)
-            {
-                playButton.onClick.RemoveListener(OnPlayClicked);
-            }
-
-            if (levelsButton != null)
-            {
-                levelsButton.onClick.RemoveListener(OnLevelsClicked);
-            }
-
-            if (soundButton != null)
-            {
-                soundButton.onClick.RemoveListener(OnSoundClicked);
-            }
-
-            if (backButton != null)
-            {
-                backButton.onClick.RemoveListener(OnBackClicked);
-            }
+            RemoveListener(playButton, OnPlayClicked);
+            RemoveListener(settingsButton, OnSettingsClicked);
+            RemoveListener(soundButton, OnSoundClicked);
+            RemoveListener(levelsButton, OnLevelsClicked);
+            RemoveListener(settingsBackButton, OnTitleBackClicked);
+            RemoveListener(refillButton, OnRefillClicked);
+            RemoveListener(noLivesBackButton, OnTitleBackClicked);
+            RemoveListener(levelsBackButton, OnSettingsClicked);
 
             for (var i = 0; i < levelButtons.Count; i++)
             {
-                if (levelButtons[i].Button != null)
-                {
-                    levelButtons[i].Button.onClick.RemoveListener(levelButtons[i].OnClick);
-                }
+                RemoveListener(levelButtons[i].Button, levelButtons[i].OnClick);
             }
 
             isSubscribed = false;
+        }
+
+        /// <summary>Removes <paramref name="listener"/> from <paramref name="button"/>, which may be gone with the scene.</summary>
+        private static void RemoveListener(Button button, UnityAction listener)
+        {
+            if (button != null)
+            {
+                button.onClick.RemoveListener(listener);
+            }
         }
 
         private void OnPlayClicked()
@@ -567,11 +776,17 @@ namespace GateRush.Runtime
             ButtonPressed?.Invoke();
         }
 
+        private void OnSettingsClicked()
+        {
+            ShowPage(MenuPage.Settings);
+            ButtonPressed?.Invoke();
+        }
+
         private void OnLevelsClicked()
         {
             if (levelsPage != null)
             {
-                ShowPage(levelsPage);
+                ShowPage(MenuPage.Levels);
             }
 
             ButtonPressed?.Invoke();
@@ -583,9 +798,15 @@ namespace GateRush.Runtime
             ButtonPressed?.Invoke();
         }
 
-        private void OnBackClicked()
+        private void OnRefillClicked()
         {
-            ShowPage(titlePage);
+            RefillRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnTitleBackClicked()
+        {
+            ShowPage(MenuPage.Title);
             ButtonPressed?.Invoke();
         }
 
@@ -593,6 +814,39 @@ namespace GateRush.Runtime
         {
             LevelRequested?.Invoke(levelName);
             ButtonPressed?.Invoke();
+        }
+
+        /// <summary>
+        /// One page of the menu: a rect the fit scales down to the safe area,
+        /// and inside it the content the pop scales.
+        /// </summary>
+        private sealed class PageView
+        {
+            private readonly RectTransform fit;
+            private readonly Vector2 size;
+
+            public PageView(string pageName, RectTransform parent, Vector2 size)
+            {
+                this.size = size;
+                fit = UiBuilder.CreateRect($"{pageName} fit", parent);
+                UiBuilder.PlaceCentered(fit, size);
+                Content = UiBuilder.CreateRect($"{pageName} page", fit);
+                UiBuilder.PlaceCentered(Content, size);
+                fit.gameObject.SetActive(false);
+            }
+
+            /// <summary>What the page shows; the pop scales it.</summary>
+            public RectTransform Content { get; }
+
+            public void SetActive(bool isActive) => fit.gameObject.SetActive(isActive);
+
+            public void ScaleToFit(Vector2 available)
+            {
+                var scale = ScreenBands.ContentScale(available, size);
+                fit.localScale = new Vector3(scale, scale, 1f);
+            }
+
+            public void Destroy() => UnityEngine.Object.Destroy(fit.gameObject);
         }
 
         /// <summary>A level's button with the listener made for it, kept so the listener can be removed again.</summary>

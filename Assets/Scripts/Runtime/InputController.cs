@@ -21,9 +21,10 @@ namespace GateRush.Runtime
     /// construction — so it is logged as an error, never swallowed.</para>
     /// <para>No drag starts while the view is busy — a block settling, or a
     /// move being presented — or once the level has ended. While the level is
-    /// held for an introduction card (Module 19) no input is read at all,
-    /// <b>R</b> included — except, in the editor and development builds, the
-    /// level keys of <c>DevKeys</c> (Module 21).</para>
+    /// held for an introduction card (Module 19) or the confirmation (Module
+    /// 32) no input is read at all, <b>R</b> included — except, in the editor
+    /// and development builds, the level keys of <c>DevKeys</c> (Module
+    /// 21).</para>
     /// <para><b>UI first.</b> A press on the HUD or the result panel belongs to
     /// the UI and never also starts a drag. On the frame of a press the
     /// pointer's position is raycast against the UI directly, rather than asked
@@ -88,10 +89,10 @@ namespace GateRush.Runtime
         /// input.
         /// </summary>
         /// <param name="isHeld">
-        /// Asked every frame: while it answers true — an introduction card is
-        /// open (Module 19) — neither <b>R</b> nor the pointer is read. The
-        /// caller must not start holding during a drag; it cancels any drag
-        /// first.
+        /// Asked every frame: while it answers true — an introduction card or
+        /// the confirmation is open (Modules 19, 32) — neither <b>R</b> nor the
+        /// pointer is read. The caller must not start holding during a drag;
+        /// it cancels any drag first.
         /// </param>
         /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
         public void Initialize(
