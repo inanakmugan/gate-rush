@@ -265,6 +265,12 @@ jokers on the board (Phase 5); the screens (Phase 6); notifications (Phase
 
 ## Phase 5 — Jokers
 
+*Status: done.* The joker rules are tested in Core, spent through
+`MetaGame` or free play's allowance, and played from a bar under the
+board: the Clock on its button, the Rocket and the Broom selected and used
+with one tap, presented in place with the board's existing effects
+(Modules 33 and 34, D65 to D67).
+
 Where Phase 1 and Phase 4 meet. Clock, rocket, broom wired into the existing
 resolution pipeline. Targeting predicates. Broom chain-reaction tests.
 
@@ -274,7 +280,7 @@ merged.
 | # | Module | Spec | Status |
 |---|---|---|---|
 | 5.1 | Joker rules: Core tests, spending and buying jokers, the session, free play's allowance (D65, D66) | `Modules/33-joker-rules.md` | Done |
-| 5.2 | Joker bar, selecting and using jokers, and the presentation of joker clears (D65, D66, D67) | `Modules/34-joker-bar.md` | Planned |
+| 5.2 | Joker bar, selecting and using jokers, and the presentation of joker clears (D65, D66, D67) | `Modules/34-joker-bar.md` | Done |
 
 ---
 

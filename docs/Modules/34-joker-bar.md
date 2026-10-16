@@ -249,3 +249,33 @@ through the same `Present` call as a move, is not.
   after Restart and on the next level; at 0 the button cannot be pressed.
 - Persistence: jokers spent and gold spent on them survive stopping and
   pressing Play again.
+
+---
+
+## Resolved during implementation
+
+- **Frozen blocks.** A joker can clear a frozen layered block that
+  survives, a state no move reaches, and a peel would have shown the
+  colour it exposes. A block drawn frozen before the joker only bursts its
+  ice and stays drawn in ice; a thaw in the same resolution reveals it in
+  the arrive stage. A destroyed frozen block breaks into ice-coloured
+  shards. Its cue is still `Peel`, left for later.
+- **No gate on an in-place clear.** `ClearedBlock.InPlace` makes the
+  clear; `GateIndex` and `GateEdge` throw on one, and every reader is
+  reached only for a gate clear.
+- **Surface.** `JokerBar` has `MissingCanvas()`, as the HUD does.
+  `InputController.Initialize` takes an `isAiming` query beside `isHeld`.
+  `DragController.BlockAt` is public, so a tap finds its block as a drag
+  does. `ScreenBands.BottomBandAnchors` places the bar. `BurstKind.Break`
+  was added last, so earlier bursts keep their seeds; a frozen survivor's
+  shards use it too, so a thaw in the same presentation does not repeat
+  the same pieces.
+- **Saving.** A campaign joker saves after its spend; a joker that wins
+  saves again when the win is recorded.
+- **Free play's allowance** is refilled on every load and restart,
+  whatever the mode; the campaign never reads it.
+- **The win** is recorded in the one path after a state change, once its
+  changes are worked out.
+- **`RuntimeConfig.asset`** was not re-saved; its new fields take the code
+  defaults.
+- **Tests.** 46 new; 2,021 in all.

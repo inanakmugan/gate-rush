@@ -19,8 +19,10 @@ mechanic in turn, a title screen and a level select (Phase 2), and the first
 web build is live on itch.io (Phase 3). The meta game is built (Phase 4):
 gold, lives that come back on a real-time clock, a win streak that pays
 jokers, the store's rules and a campaign, shown in plain text, with every
-level open in free play from Settings. Sound effects and haptics came
-forward from Phase 7. The itch.io build predates Phase 4. See
+level open in free play from Settings. The jokers are playable (Phase 5):
+a bar under the board, the Clock on a press, the Rocket and the Broom on a
+tap of a block. Sound effects and haptics came forward from Phase 7. The
+itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
@@ -130,7 +132,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-1,975 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,021 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
