@@ -1894,3 +1894,46 @@ duplicate the bootstrap's handling of a failed save. Separate services for
 each subject: more wiring for the same rules.
 
 ---
+
+## D64 — The prototype front end shows the meta game in plain text
+
+**Decision.** Module 32 wires `MetaGame` into the prototype front end of
+Module 23 (D50) without Phase 6's screens:
+
+- The title page shows the gold and the lives as text, with the time to
+  the next life, and has Play and Settings. Settings holds the sound
+  button and the level select, which starts free play (D58).
+- Play starts the campaign level. With no life it shows "No lives" with
+  the time to the next life and a refill button priced from the rules,
+  unavailable when the balance is short (D62).
+- During a campaign level the HUD shows the gold and the lives; during
+  free play it shows "Free Play" where the lives would be.
+- Menu and Restart while a campaign level is being played open a
+  confirmation that a life will be lost (D57). While it is open the
+  countdown and the board stop; "Keep playing" resumes.
+- A campaign win's result panel adds one line, the gold earned. The streak
+  and its rewards are not shown until Phase 6's Win Streak screen.
+- The development tools (a level started from the editor, Page Down and
+  Page Up) play free play: no life needed, none spent, no gold or streak.
+
+**Why.** The meta game has to be seen to be judged, and a refill button is
+the one store action that a player out of lives needs, so it shows the
+store's rules at work without building the store. Pausing during the
+confirmation keeps the prompt from costing the player time they did not
+choose to spend. The development tools must never drain the owner's lives
+while testing.
+
+**Consequences.**
+- Every text, size and colour of the new elements lives in
+  `RuntimeConfig`, with checks in `Problems()`, as Module 23's do.
+- The bootstrap saves after every `MetaGame` call that changed the save,
+  through `SaveOrWarn`; a win saves once for its completed mark and its
+  gold.
+- Phase 6 replaces these screens; their rules stay in `Meta`.
+
+**Rejected.** Showing the streak on the result panel: the owner prefers
+the panel to stay simple. Keeping the countdown running behind the prompt:
+it would punish reading it. A campaign for the development tools: testing
+a level would cost lives.
+
+---

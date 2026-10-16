@@ -250,7 +250,7 @@ merged.
 | 4.1 | Save model: one versioned save, the old keys carried over (D56) | `Modules/29-save-model.md` | Done |
 | 4.2 | Wallet, lives and `ITimeProvider` (D20, D22, D59, D60) | `Modules/30-wallet-and-lives.md` | Done |
 | 4.3 | Win streak, joker inventory, store rules, campaign progress, `MetaGame` (D58, D61 to D63) | `Modules/31-meta-game.md` | Done |
-| 4.4 | Runtime wiring: gold and lives as text, the life prompt, free play in settings (D58) | — | Planned |
+| 4.4 | Runtime wiring: gold and lives as text, the life prompt, free play in settings (D58, D64) | `Modules/32-meta-wiring.md` | Planned |
 
 Not in Phase 4: unlimited lives for a while, until something grants it;
 jokers on the board (Phase 5); the screens (Phase 6); notifications (Phase
