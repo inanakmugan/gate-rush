@@ -186,3 +186,31 @@ never reaches `MetaGame`, is not.
 - A Clock bonus that is not positive is refused by `MetaRules` and
   reported by `Problems()`; a negative free-play allowance is reported by
   `Problems()`.
+
+---
+
+## Resolved during implementation
+
+- **Existing coverage.** Phase 1 had already written joker tests in
+  `MoveResolverTests.cs`: a frozen block hit, a shuttered block refused,
+  the Broom's selection and refusal, several thresholds crossed by one
+  sweep, the summed bonus, and the lock and key cases. They stay;
+  `MoveResolverJokerTests.cs`, another part of the same partial class,
+  adds only the cases they did not cover.
+- **The chain reaction.** The spec's wording, an opened shutter's region
+  emptying an elevator, cannot happen: a closed shutter keeps its blocks
+  out of the sweep, and an empty region under one takes its wave at level
+  start (D42). The test puts the elevator outside the shutter instead. One
+  sweep of red clears a block and the elevator's first wave, crosses a
+  gate's, a shutter's and a frozen block's threshold at once, and brings
+  the next wave. The red block under the shutter survives, since the sweep
+  chose its targets before the shutter opened, and is targetable
+  afterwards. The earlier
+  `TrySweepColor_CrossesSeveralThresholdsInOneResolution` stays unchanged.
+- **Core unchanged.** No test found a bug.
+- **The session.** Moves and jokers land through one private `Commit`.
+  `CanRocket` and `CanSweep` use exactly the checks `MoveResolver` refuses
+  on, and are tested to agree with it for every block index and colour.
+- **Free play's allowance** keeps its counts in a `JokerInventory` of its
+  own, so it cannot reach the campaign's.
+- **Tests.** 55 new; 1,975 in all.

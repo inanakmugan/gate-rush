@@ -130,7 +130,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-1,920 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+1,975 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
