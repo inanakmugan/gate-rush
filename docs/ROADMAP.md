@@ -274,7 +274,7 @@ merged.
 | # | Module | Spec | Status |
 |---|---|---|---|
 | 5.1 | Joker rules: Core tests, spending and buying jokers, the session, free play's allowance (D65, D66) | `Modules/33-joker-rules.md` | Done |
-| 5.2 | Joker bar, aiming and the presentation of joker clears (D65) | — | Planned |
+| 5.2 | Joker bar, selecting and using jokers, and the presentation of joker clears (D65, D66, D67) | `Modules/34-joker-bar.md` | Planned |
 
 ---
 

@@ -1999,3 +1999,35 @@ campaign's jokers on replays. A saved free-play inventory: more state for
 a convenience.
 
 ---
+
+## D67 — A Rocket or Broom button selects the joker; a tap on a block uses it
+
+**Decision.** Pressing the Rocket or Broom button selects that joker, and
+the next tap on a valid block uses it at once, with no confirmation.
+Pressing the same button again unselects it; pressing the other one
+switches. A tap that is not a valid use (an empty cell, a block under a
+closed shutter, a frozen block for the Broom) does nothing and keeps the
+selection. Menu, Restart, the confirmation, the end of the level and a new
+level clear the selection. Nothing is spent until the tap is valid (D65).
+The Clock has no target: its button uses it at once. While a joker is
+selected, a press on the board never starts a drag.
+
+**Why.** The reference game puts a joker to work the moment its button is
+pressed, so a button pressed by mistake is a joker lost, one of its more
+irritating sides. A confirmation step would slow a game built on quick
+moves. Selecting without spending keeps the same two taps and makes a
+mistaken press free: press again, or simply keep playing.
+
+**Consequences.**
+- A selected joker is shown on its button; the countdown keeps running
+  while one is selected (D65).
+- In the campaign, a joker the player holds none of is bought on the valid
+  tap, not on the button press.
+- The selection belongs to the level being played and is never saved.
+
+**Rejected.** Using the joker on the button press, as the reference game
+does: a mistaken press costs a joker. A confirmation after the tap: a
+third step in a fast game. A tap elsewhere cancelling the selection: a
+near miss on a small block would throw the choice away.
+
+---
