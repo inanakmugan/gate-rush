@@ -16,8 +16,12 @@ Android
 **Status:** work in progress. The puzzle core, the solver and the level editor
 are built (Phase 1). The game has 15 hand-made levels that introduce every
 mechanic in turn, a title screen and a level select (Phase 2), and the first
-web build is live on itch.io (Phase 3). Sound effects and haptics came forward
-from Phase 7. See [`docs/ROADMAP.md`](docs/ROADMAP.md).
+web build is live on itch.io (Phase 3). The meta game is built (Phase 4):
+gold, lives that come back on a real-time clock, a win streak that pays
+jokers, the store's rules and a campaign, shown in plain text, with every
+level open in free play from Settings. Sound effects and haptics came
+forward from Phase 7. The itch.io build predates Phase 4. See
+[`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ---
 
@@ -31,11 +35,11 @@ restrictions, lock-and-key pairs, and time bonuses.
 
 ## What is interesting about it
 
-**The rules do not know Unity exists.** Board logic and search — and, once it
-is built, the economy — are plain C# in assemblies compiled with engine
-references disabled, so the layer boundary is a compile error, not a
-convention. The entire rule set runs in an Edit Mode test suite in
-milliseconds, without loading a scene.
+**The rules do not know Unity exists.** Board logic, search and the
+economy are plain C# in assemblies compiled with engine references
+disabled, so the layer boundary is a compile error, not a convention. The
+entire rule set runs in an Edit Mode test suite in milliseconds, without
+loading a scene.
 
 **Levels are proved solvable before they ship.** A custom editor window
 validates every level on demand: an exhaustive A\* search first, then — for
@@ -60,6 +64,13 @@ visited set on advance, bounding memory to the largest single stratum rather
 than the whole space; nearest-next-clear searches one stratum at a time. This
 is the structural difference from Rush Hour–style puzzles, where nothing is ever
 removed.
+
+**The economy is a unit test.** Lives come back on UTC timestamps read
+against a clock passed in, never the system clock, so "win three, lose
+one, wait forty minutes" runs in milliseconds against a clock the test
+moves. One `MetaGame` object takes every campaign result and purchase and
+never saves; the save is one versioned JSON blob whose loader carries
+older versions forward.
 
 ## The level editor
 
@@ -119,12 +130,12 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-1,878 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+1,920 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
 ## Note on the web build
 
-Completed levels are stored in browser storage. Clearing site data resets
-them, and so does a new upload of the build on itch.io, since each upload is
-served from a new path.
+Progress (completed levels, gold, lives and the campaign) is stored in
+browser storage. Clearing site data resets it, and so does a new upload of
+the build on itch.io, since each upload is served from a new path.

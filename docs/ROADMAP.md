@@ -237,6 +237,11 @@ its loading bar and stops is first worth a fresh ZIP, with `index.html`,
 
 ## Phase 4 — Meta core
 
+*Status: done.* The save model, gold and lives on a real-time clock, the
+win streak with its joker rewards, the store's rules and the campaign are
+pure C# behind one `MetaGame`, and the prototype menu and HUD show them in
+plain text, with free play from Settings (Modules 29 to 32).
+
 Wallet, lives, streak, inventory, progression, save model, configuration
 assets. Pure C#, fully tested, shown in the build only as plain text and
 one prompt (D55). Verify "win three, lose one, wait forty minutes" against
@@ -250,7 +255,7 @@ merged.
 | 4.1 | Save model: one versioned save, the old keys carried over (D56) | `Modules/29-save-model.md` | Done |
 | 4.2 | Wallet, lives and `ITimeProvider` (D20, D22, D59, D60) | `Modules/30-wallet-and-lives.md` | Done |
 | 4.3 | Win streak, joker inventory, store rules, campaign progress, `MetaGame` (D58, D61 to D63) | `Modules/31-meta-game.md` | Done |
-| 4.4 | Runtime wiring: gold and lives as text, the life prompt, free play in settings (D58, D64) | `Modules/32-meta-wiring.md` | Planned |
+| 4.4 | Runtime wiring: gold and lives as text, the life prompt, free play in settings (D58, D64) | `Modules/32-meta-wiring.md` | Done |
 
 Not in Phase 4: unlimited lives for a while, until something grants it;
 jokers on the board (Phase 5); the screens (Phase 6); notifications (Phase

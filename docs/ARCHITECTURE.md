@@ -122,8 +122,8 @@ Home, Store, Leaderboard, Profile, Settings, Win Streak. Screens hold no rules.
 A screen never computes whether the player can afford something; it asks `Meta`.
 
 Not created yet: it arrives with Phase 6. Until then the only screens, the
-prototype menu (Module 23, D50), live in `Runtime/UI` inside the `Runtime`
-assembly.
+prototype menu (Modules 23 and 32, D50, D64) and the confirmation prompt
+(Module 32), live in `Runtime/UI` inside the `Runtime` assembly.
 
 ---
 

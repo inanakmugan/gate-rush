@@ -237,3 +237,56 @@ saved through `SaveOrWarn`, is not.
   Page Down and Page Up play free play.
 - Persistence: gold, lives, the campaign position and the completed marks
   survive stopping and pressing Play again, and a web build reload.
+
+---
+
+## Resolved during implementation
+
+- **Surface.** `MenuScreen` gained a `MenuPage` enum (Title, Settings,
+  Levels, NoLives), `ShowMeta`, `ShowNotice`, `ShowNoLives`,
+  `ShowNextLife` and `ShowTitlePage`, and the `RefillRequested` event. Two
+  members of the spec were left out: `SettingsRequested`, because Settings
+  opens inside the menu as Levels does and the bootstrap has nothing to
+  decide there, and `HudView.HideMeta`, because a loaded level always
+  shows the line and the menu hides the whole HUD. `ResultPanel.ShowWin`
+  takes the gold line and whether Restart is shown. `MetaText` also
+  formats the separator, the gold earned, the next life and the refill
+  label, and gives the rounded second the refresh compares.
+- **Meta unchanged.** `MetaGame` has no queries for the lives, the gold or
+  the price, so the bootstrap reads them from `MetaGame.Save` and
+  `MetaRules`; whether the refill is affordable is decided there and the
+  menu gets a bool.
+- **A campaign win is never replayed.** Not in the spec: Restart on a
+  campaign win's panel would have paid the gold again and moved the
+  campaign past a level. Following the reference game (D58), that panel
+  shows Next and Menu only and R does nothing there; a free-play win keeps
+  Restart.
+- **One campaign query.** Next after a campaign win loads the level from
+  `CampaignLevels.TryGetLevel(CampaignPosition)`, and the same call
+  decides whether Next shows and whether the title is All Levels Played,
+  so the two never disagree. The last campaign win shows that title, the
+  gold line and Thanks for playing!; afterwards Play shows the
+  campaign-done notice, even with no life left.
+- **The no-lives page** returns to the title page as soon as the first
+  life comes back. A refill pressed without enough gold, which the
+  disabled button should make impossible, logs an error.
+- **Holding.** One query, `IsHeld()`, covers an introduction card and the
+  confirmation, and holds the pointer, R and the HUD's buttons. A
+  development key while the prompt is open loads its level as free play
+  and costs no life.
+- **Guards.** A negative gold reward in level data logs an error, the win
+  is not reported and the campaign stays on that level, but the completed
+  mark is saved. An empty level order counts as unusable, so Play falls
+  back to the scene's level as free play.
+- **Texts and layout.** The label font has no middle dot, so the separator
+  defaults to " | ". The title page keeps room for its notice row so it
+  does not jump. The HUD's meta line is a second row under the level
+  number. `RuntimeConfig.asset` was saved once after a field was changed
+  and changed back, since an unchanged asset is not written.
+- **Removed.** `MenuLevels.TryGetStartLevel` (the first-uncompleted rule
+  D58 replaced) and `ResultTitle.ForWin`, with their tests; nothing called
+  them any more.
+- **Tests.** `CampaignLevelsTests`, `MetaTextTests` and the new
+  `RuntimeConfigTests` cases. 1920 Edit Mode tests pass.
+- **By hand.** Every check in the list above passed from a cleared save,
+  including the hidden Restart on a campaign win and the web build reload.
