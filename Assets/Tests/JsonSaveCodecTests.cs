@@ -8,14 +8,16 @@ using UnityEngine;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Modules 29 and 30's <see cref="JsonSaveCodec"/>:
+    /// Covers Modules 29 to 31's <see cref="JsonSaveCodec"/>:
     /// <c>formatVersion</c> is written first and the ids ascending; every save
     /// survives <see cref="JsonSaveCodec.Encode"/> and back; duplicate ids read
-    /// as one; a version-1 save reads with the starting gold and full lives of
-    /// the rules it is given (D60); and text it would not have written — not
-    /// JSON, empty, with a missing, non-positive or too new version, negative
-    /// gold or lives, ticks outside a date's range — is refused with a problem
-    /// and no data, never misread or corrected.
+    /// as one; version-1 and version-2 saves read the sections they lack as a
+    /// new player has them, by the rules they are given (D60); a version-3
+    /// save reads its streak, campaign and jokers; and text it would not have
+    /// written — not JSON, empty, with a missing, non-positive or too new
+    /// version, negative gold, lives, streaks, position or jokers, a best
+    /// streak below the streak, ticks outside a date's range — is refused
+    /// with a problem and no data, never misread or corrected.
     /// </summary>
     public class JsonSaveCodecTests
     {
@@ -23,10 +25,18 @@ namespace GateRush.Tests
         // these literals name the version they were written in.
         private const int VersionOne = 1;
         private const int VersionTwo = 2;
+        private const int VersionThree = 3;
 
         private const int Gold = 640;
         private const int LifetimeGold = 140;
         private const int SomeLives = 2;
+
+        private const int Streak = 2;
+        private const int BestStreak = 6;
+        private const int Position = 4;
+        private const int Clocks = 1;
+        private const int Rockets = 5;
+        private const int Brooms = 7;
 
         private static readonly long SomeTicks = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc).Ticks;
 
@@ -52,7 +62,7 @@ namespace GateRush.Tests
                 completed.MarkCompleted(id);
             }
 
-            var text = new JsonSaveCodec().Encode(new SaveData(completed, new SoundSetting(), Wallet.Starting(SaveFixture.Rules), Lives.Full(SaveFixture.Rules)));
+            var text = new JsonSaveCodec().Encode(NewPlayerSave(completed, new SoundSetting()));
 
             var written = JsonUtility.FromJson<SaveDataDto>(text);
             CollectionAssert.AreEqual(new[] { 0, 3, 7, 12 }, written.completedLevelIds);
@@ -74,7 +84,7 @@ namespace GateRush.Tests
         public void TryDecode_OfEncode_GivesTheSameSave(bool hasCompletedLevels, bool isSoundOn)
         {
             var completed = hasCompletedLevels ? CompletedLevels.Of(new[] { 4, 1 }) : new CompletedLevels();
-            var save = new SaveData(completed, new SoundSetting { IsOn = isSoundOn }, Wallet.Starting(SaveFixture.Rules), Lives.Full(SaveFixture.Rules));
+            var save = NewPlayerSave(completed, new SoundSetting { IsOn = isSoundOn });
             var codec = new JsonSaveCodec();
 
             var isReadable = codec.TryDecode(codec.Encode(save), SaveFixture.Rules, out var read, out var problem);
@@ -138,13 +148,13 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void CurrentFormatVersion_IsTwo()
+        public void CurrentFormatVersion_IsThree()
         {
-            Assert.AreEqual(VersionTwo, JsonSaveCodec.CurrentFormatVersion);
+            Assert.AreEqual(VersionThree, JsonSaveCodec.CurrentFormatVersion);
         }
 
         [Test]
-        public void TryDecode_VersionOneSave_ReadsLevelsSoundStartingGoldAndFullLives()
+        public void TryDecode_VersionOneSave_ReadsLevelsSoundAndANewPlayersOtherSections()
         {
             var text = $"{{\"formatVersion\":{VersionOne},\"completedLevelIds\":[0,1,3],\"soundOn\":false}}";
 
@@ -156,13 +166,11 @@ namespace GateRush.Tests
             Assert.AreEqual(SaveFixture.Rules.StartingGold, read.Wallet.Balance, "starting gold, from the rules");
             Assert.AreEqual(0, read.Wallet.LifetimeEarned, "the starting gold is not earned");
             Assert.AreEqual(SaveFixture.Rules.LifeCap, read.Lives.StoredCount, "full lives, from the rules");
-            SaveFixture.AssertSameSave(
-                new SaveData(read.Completed, read.Sound, Wallet.Starting(SaveFixture.Rules), Lives.Full(SaveFixture.Rules)),
-                read);
+            SaveFixture.AssertSameSave(NewPlayerSave(read.Completed, read.Sound), read);
         }
 
         [Test]
-        public void TryDecode_VersionTwoSave_ReadsGoldAndLives()
+        public void TryDecode_VersionTwoSave_ReadsGoldAndLivesWithNewPlayerStreakCampaignAndJokers()
         {
             var text = VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks);
 
@@ -174,6 +182,67 @@ namespace GateRush.Tests
             Assert.AreEqual(SomeLives, read.Lives.StoredCount);
             Assert.AreEqual(SomeTicks, read.Lives.RegenStartUtc.Ticks);
             Assert.AreEqual(DateTimeKind.Utc, read.Lives.RegenStartUtc.Kind);
+            AssertNewPlayerStreakCampaignAndJokers(read);
+        }
+
+        [Test]
+        public void TryDecode_VersionTwoSaveWithLaterFields_IgnoresThem()
+        {
+            var text = VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks).TrimEnd('}')
+                + ",\"winStreak\":-1,\"bestWinStreak\":-1,\"campaignPosition\":-1,\"clocks\":-1,\"rockets\":-1,\"brooms\":-1}";
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+
+            Assert.IsTrue(isReadable, problem);
+            AssertNewPlayerStreakCampaignAndJokers(read);
+        }
+
+        [Test]
+        public void TryDecode_VersionThreeSave_ReadsStreakCampaignAndJokers()
+        {
+            var text = VersionThreeText(Streak, BestStreak, Position, Clocks, Rockets, Brooms);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+
+            Assert.IsTrue(isReadable, problem);
+            Assert.AreEqual(Gold, read.Wallet.Balance);
+            Assert.AreEqual(SomeLives, read.Lives.StoredCount);
+            Assert.AreEqual(Streak, read.Streak.Current);
+            Assert.AreEqual(BestStreak, read.Streak.Best);
+            Assert.AreEqual(Position, read.Campaign.Position);
+            Assert.AreEqual(Clocks, read.Jokers.CountOf(JokerKind.Clock));
+            Assert.AreEqual(Rockets, read.Jokers.CountOf(JokerKind.Rocket));
+            Assert.AreEqual(Brooms, read.Jokers.CountOf(JokerKind.Broom));
+        }
+
+        [TestCase(-1, BestStreak, Position, Clocks, Rockets, Brooms, "winStreak")]
+        [TestCase(Streak, -1, Position, Clocks, Rockets, Brooms, "bestWinStreak")]
+        [TestCase(Streak, BestStreak, -1, Clocks, Rockets, Brooms, "campaignPosition")]
+        [TestCase(Streak, BestStreak, Position, -1, Rockets, Brooms, "clocks")]
+        [TestCase(Streak, BestStreak, Position, Clocks, -1, Brooms, "rockets")]
+        [TestCase(Streak, BestStreak, Position, Clocks, Rockets, -1, "brooms")]
+        public void TryDecode_NegativeVersionThreeField_IsFalseWithAProblem(
+            int winStreak, int bestWinStreak, int campaignPosition, int clocks, int rockets, int brooms, string field)
+        {
+            var text = VersionThreeText(winStreak, bestWinStreak, campaignPosition, clocks, rockets, brooms);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+
+            Assert.IsFalse(isReadable);
+            Assert.IsNull(read);
+            StringAssert.Contains(field, problem, "the problem names the field");
+        }
+
+        [Test]
+        public void TryDecode_BestStreakBelowStreak_IsFalseWithAProblem()
+        {
+            var text = VersionThreeText(BestStreak, Streak, Position, Clocks, Rockets, Brooms);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+
+            Assert.IsFalse(isReadable);
+            Assert.IsNull(read);
+            StringAssert.Contains("bestWinStreak", problem, "the problem names the field");
         }
 
         [TestCase(-1, LifetimeGold, SomeLives, "gold")]
@@ -223,10 +292,40 @@ namespace GateRush.Tests
             Assert.Throws<ArgumentNullException>(() => new JsonSaveCodec().TryDecode(text, null, out _, out _));
         }
 
+        /// <summary>A save holding <paramref name="completed"/> and <paramref name="sound"/>, and every other section a new player's by <see cref="SaveFixture.Rules"/>.</summary>
+        private static SaveData NewPlayerSave(CompletedLevels completed, SoundSetting sound) =>
+            new SaveData(
+                completed,
+                sound,
+                Wallet.Starting(SaveFixture.Rules),
+                Lives.Full(SaveFixture.Rules),
+                JokerInventory.Starting(SaveFixture.Rules),
+                WinStreak.Starting(),
+                CampaignProgress.Starting());
+
+        /// <summary>Asserts the streak, campaign and jokers a new player gets by <see cref="SaveFixture.Rules"/>.</summary>
+        private static void AssertNewPlayerStreakCampaignAndJokers(SaveData read)
+        {
+            Assert.AreEqual(0, read.Streak.Current, "no streak");
+            Assert.AreEqual(0, read.Streak.Best, "no best streak");
+            Assert.AreEqual(0, read.Campaign.Position, "the campaign at its start");
+            foreach (JokerKind kind in Enum.GetValues(typeof(JokerKind)))
+            {
+                Assert.AreEqual(SaveFixture.Rules.StartingJokers(kind), read.Jokers.CountOf(kind), $"starting {kind} jokers, from the rules");
+            }
+        }
+
         private static string VersionTwoText(int gold, int lifetimeGold, int lives, long ticks) =>
             string.Format(
                 CultureInfo.InvariantCulture,
                 "{{\"formatVersion\":{0},\"completedLevelIds\":[1],\"soundOn\":true,\"gold\":{1},\"lifetimeGold\":{2},\"lives\":{3},\"livesRegenStartUtcTicks\":{4}}}",
                 VersionTwo, gold, lifetimeGold, lives, ticks);
+
+        private static string VersionThreeText(int winStreak, int bestWinStreak, int campaignPosition, int clocks, int rockets, int brooms) =>
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "{{\"formatVersion\":{0},\"completedLevelIds\":[1],\"soundOn\":true,\"gold\":{1},\"lifetimeGold\":{2},\"lives\":{3},\"livesRegenStartUtcTicks\":{4}," +
+                "\"winStreak\":{5},\"bestWinStreak\":{6},\"campaignPosition\":{7},\"clocks\":{8},\"rockets\":{9},\"brooms\":{10}}}",
+                VersionThree, Gold, LifetimeGold, SomeLives, SomeTicks, winStreak, bestWinStreak, campaignPosition, clocks, rockets, brooms);
     }
 }

@@ -6,19 +6,21 @@ using UnityEngine;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Every tunable number of the meta game (Module 30, D59): the life cap,
-    /// how long a life takes to come back, and a new player's gold. Nothing in
-    /// <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/> hands
-    /// them over as <see cref="MetaRules"/>.
+    /// Every tunable number of the meta game (Modules 30 and 31): the life
+    /// cap, how long a life takes to come back, a new player's gold and
+    /// jokers, the store's prices and the win streak's reward table. Nothing
+    /// in <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
+    /// hands them over as <see cref="MetaRules"/>.
     /// </summary>
     /// <remarks>
-    /// The save cannot be read without these rules — a version-1 save takes
-    /// its gold and lives from them (D60) — so a missing config, or one with
+    /// The save cannot be read without these rules — an older save takes the
+    /// sections it lacks from them (D60) — so a missing config, or one with
     /// <see cref="Problems"/>, stops the bootstrap.
     /// </remarks>
     [CreateAssetMenu(fileName = "MetaConfig", menuName = "Gate Rush/Meta Config")]
     public sealed class MetaConfig : ScriptableObject
     {
+        [Header("Lives and gold")]
         [Tooltip("The most lives a player holds; lives come back one at a time up to it. At least 1. A saved count above a lowered cap reads as the cap.")]
         [SerializeField] private int lifeCap = 5;
 
@@ -27,6 +29,38 @@ namespace GateRush.Runtime
 
         [Tooltip("The gold a new player starts with, and what a save from before Module 30 gets. It is not earned gold, so it is not in the lifetime gold the leaderboard ranks on. At least 0.")]
         [SerializeField] private int startingGold = 500;
+
+        [Header("Store")]
+        [Tooltip("Gold for one Clock joker in the store. At least 0.")]
+        [SerializeField] private int clockPrice = 100;
+
+        [Tooltip("Gold for one Rocket joker in the store. At least 0.")]
+        [SerializeField] private int rocketPrice = 200;
+
+        [Tooltip("Gold for one Broom joker in the store. At least 0.")]
+        [SerializeField] private int broomPrice = 300;
+
+        [Tooltip("Gold to refill the lives to the cap, however many are missing. Refilling full lives is refused and costs nothing. At least 0.")]
+        [SerializeField] private int livesRefillPrice = 300;
+
+        [Header("Starting jokers")]
+        [Tooltip("Clock jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
+        [SerializeField] private int startingClocks = 1;
+
+        [Tooltip("Rocket jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
+        [SerializeField] private int startingRockets = 1;
+
+        [Tooltip("Broom jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
+        [SerializeField] private int startingBrooms = 1;
+
+        [Header("Win streak")]
+        [Tooltip("The jokers given when the campaign win streak becomes exactly Wins; reaching it again after a loss pays again, and past the last entry nothing more is paid. Wins positive and strictly ascending, Count at least 1. May be empty.")]
+        [SerializeField] private StreakRewardEntry[] streakRewards =
+        {
+            new StreakRewardEntry(3, JokerKind.Clock, 1),
+            new StreakRewardEntry(5, JokerKind.Rocket, 1),
+            new StreakRewardEntry(10, JokerKind.Broom, 1),
+        };
 
         /// <summary>
         /// Everything wrong with this asset, each message naming its field;
@@ -46,9 +80,18 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Life Regen Minutes must be positive.");
             }
 
-            if (startingGold < 0)
+            AddIfNegative(problems, startingGold, "Starting Gold");
+            AddIfNegative(problems, clockPrice, "Clock Price");
+            AddIfNegative(problems, rocketPrice, "Rocket Price");
+            AddIfNegative(problems, broomPrice, "Broom Price");
+            AddIfNegative(problems, livesRefillPrice, "Lives Refill Price");
+            AddIfNegative(problems, startingClocks, "Starting Clocks");
+            AddIfNegative(problems, startingRockets, "Starting Rockets");
+            AddIfNegative(problems, startingBrooms, "Starting Brooms");
+
+            foreach (var problem in StreakReward.ProblemsOf(StreakRewards()))
             {
-                problems.Add($"{name}: Starting Gold may not be negative.");
+                problems.Add($"{name}: Streak Rewards {problem}");
             }
 
             return problems;
@@ -58,7 +101,53 @@ namespace GateRush.Runtime
         /// The rules these values describe. Call only when
         /// <see cref="Problems"/> is empty.
         /// </summary>
-        /// <exception cref="ArgumentOutOfRangeException">A value <see cref="Problems"/> reports.</exception>
-        public MetaRules ToRules() => new MetaRules(lifeCap, TimeSpan.FromMinutes(lifeRegenMinutes), startingGold);
+        /// <exception cref="ArgumentException">A value <see cref="Problems"/> reports.</exception>
+        public MetaRules ToRules() =>
+            new MetaRules(
+                lifeCap,
+                TimeSpan.FromMinutes(lifeRegenMinutes),
+                startingGold,
+                new JokerAmounts(clockPrice, rocketPrice, broomPrice),
+                livesRefillPrice,
+                new JokerAmounts(startingClocks, startingRockets, startingBrooms),
+                StreakRewards());
+
+        private StreakReward[] StreakRewards()
+        {
+            var entries = streakRewards ?? Array.Empty<StreakRewardEntry>();
+            var rewards = new StreakReward[entries.Length];
+            for (var i = 0; i < entries.Length; i++)
+            {
+                rewards[i] = entries[i].ToReward();
+            }
+
+            return rewards;
+        }
+
+        private void AddIfNegative(List<string> problems, int value, string field)
+        {
+            if (value < 0)
+            {
+                problems.Add($"{name}: {field} may not be negative.");
+            }
+        }
+
+        /// <summary>One row of the win streak's reward table, as the Inspector edits it.</summary>
+        [Serializable]
+        private sealed class StreakRewardEntry
+        {
+            [SerializeField] private int wins;
+            [SerializeField] private JokerKind joker;
+            [SerializeField] private int count;
+
+            public StreakRewardEntry(int wins, JokerKind joker, int count)
+            {
+                this.wins = wins;
+                this.joker = joker;
+                this.count = count;
+            }
+
+            public StreakReward ToReward() => new StreakReward(wins, joker, count);
+        }
     }
 }
