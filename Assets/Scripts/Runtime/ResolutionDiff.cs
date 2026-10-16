@@ -5,19 +5,35 @@ using GateRush.Core;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// A block whose outer colour a move removed at a gate: what the clear
-    /// effect needs to show it leaving.
+    /// A block whose outer colour a move removed at a gate, or a joker removed
+    /// where it stands (D9): what the clear effect needs to show it leaving.
     /// </summary>
+    /// <remarks>
+    /// A gate clear is built with the constructor and carries the gate it went
+    /// through. An in-place clear is built with <see cref="InPlace"/> and has
+    /// no gate at all, so <see cref="GateIndex"/> and <see cref="GateEdge"/>
+    /// throw for it rather than answer with a value that names no gate.
+    /// </remarks>
     public readonly struct ClearedBlock
     {
-        /// <summary>A cleared block. <paramref name="exposedColor"/> is null exactly when it was destroyed.</summary>
+        private readonly int gateIndex;
+        private readonly BoardEdge gateEdge;
+
+        /// <summary>A block cleared through a gate. <paramref name="exposedColor"/> is null exactly when it was destroyed.</summary>
         public ClearedBlock(int blockIndex, BlockColor removedColor, BlockColor? exposedColor, int gateIndex, BoardEdge gateEdge)
+            : this(blockIndex, removedColor, exposedColor, gateIndex, gateEdge, false)
+        {
+        }
+
+        private ClearedBlock(
+            int blockIndex, BlockColor removedColor, BlockColor? exposedColor, int gateIndex, BoardEdge gateEdge, bool isInPlace)
         {
             BlockIndex = blockIndex;
             RemovedColor = removedColor;
             ExposedColor = exposedColor;
-            GateIndex = gateIndex;
-            GateEdge = gateEdge;
+            this.gateIndex = gateIndex;
+            this.gateEdge = gateEdge;
+            IsInPlace = isInPlace;
         }
 
         /// <summary>The block's slot in <c>LevelContext</c>.</summary>
@@ -32,11 +48,29 @@ namespace GateRush.Runtime
         /// <summary>True when the removed colour was the block's last and the block is gone.</summary>
         public bool IsDestroyed => !ExposedColor.HasValue;
 
+        /// <summary>
+        /// True when a joker cleared the block where it stands (D9), through no
+        /// gate; false for a clear through a gate.
+        /// </summary>
+        public bool IsInPlace { get; }
+
         /// <summary>The gate it was cleared through, as an index into <c>LevelContext.Gates</c>.</summary>
-        public int GateIndex { get; }
+        /// <exception cref="InvalidOperationException">The clear is <see cref="IsInPlace"/>: it went through no gate.</exception>
+        public int GateIndex => IsInPlace ? throw NoGate() : gateIndex;
 
         /// <summary>The edge that gate sits on: the way a destroyed block leaves.</summary>
-        public BoardEdge GateEdge { get; }
+        /// <exception cref="InvalidOperationException">The clear is <see cref="IsInPlace"/>: it went through no gate.</exception>
+        public BoardEdge GateEdge => IsInPlace ? throw NoGate() : gateEdge;
+
+        /// <summary>
+        /// A block a joker cleared where it stands (D9).
+        /// <paramref name="exposedColor"/> is null exactly when it was destroyed.
+        /// </summary>
+        public static ClearedBlock InPlace(int blockIndex, BlockColor removedColor, BlockColor? exposedColor) =>
+            new ClearedBlock(blockIndex, removedColor, exposedColor, default, default, true);
+
+        private InvalidOperationException NoGate() =>
+            new InvalidOperationException($"Block slot {BlockIndex} was cleared in place by a joker; it went through no gate.");
     }
 
     /// <summary>

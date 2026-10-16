@@ -97,7 +97,9 @@ namespace GateRush.Runtime
     /// down, and blocks that spawned with the spawner they came from.
     /// </summary>
     /// <remarks>
-    /// <para><b>Clears</b> are <see cref="ResolutionDiff"/>'s, unchanged.</para>
+    /// <para><b>Clears</b> of a move are <see cref="ResolutionDiff"/>'s,
+    /// unchanged; a joker's are worked out by <see cref="ForJoker"/>, in
+    /// place, with no gate.</para>
     /// <para><b>Everything else</b> compares what <see cref="VisibilityLayer"/>
     /// shows before and after the move, so an animation follows exactly what
     /// the player sees: a block under a closed shutter is not shown, so it
@@ -136,7 +138,11 @@ namespace GateRush.Runtime
             Array.Empty<ClearedBlock>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(),
             Array.Empty<int>(), Array.Empty<CountPop>(), Array.Empty<BlockSpawn>());
 
-        /// <summary>The clear the move made, exactly as <see cref="ResolutionDiff.Between"/> reports it.</summary>
+        /// <summary>
+        /// The clear a move made, exactly as <see cref="ResolutionDiff.Between"/>
+        /// reports it; or, for a joker, every block it cleared in place
+        /// (<see cref="ForJoker"/>).
+        /// </summary>
         public IReadOnlyList<ClearedBlock> Clears { get; }
 
         /// <summary>Blocks shown frozen before and shown unfrozen after (M3), by slot.</summary>
@@ -193,22 +199,32 @@ namespace GateRush.Runtime
         /// </exception>
         public static MoveChanges WithoutClears(LevelContext ctx, BoardState before, BoardState after)
         {
-            if (ctx == null)
-            {
-                throw new ArgumentNullException(nameof(ctx));
-            }
-
-            if (before == null)
-            {
-                throw new ArgumentNullException(nameof(before));
-            }
-
-            if (after == null)
-            {
-                throw new ArgumentNullException(nameof(after));
-            }
-
+            RequireArguments(ctx, before, after);
             return Build(ctx, before, after, Array.Empty<ClearedBlock>());
+        }
+
+        /// <summary>
+        /// What a Rocket or a Broom changed between <paramref name="before"/>
+        /// and <paramref name="after"/> (D9, Module 34). Every block whose outer
+        /// colour the joker removed is one clear, <see cref="ClearedBlock.IsInPlace"/>,
+        /// in slot order, with the colour removed and the one exposed; a joker
+        /// moves nothing and uses no gate. Everything else is worked out
+        /// exactly as for a move (<see cref="Between"/>).
+        /// </summary>
+        /// <param name="ctx">The level.</param>
+        /// <param name="before">The state the joker was applied to.</param>
+        /// <param name="after">The fully resolved state the joker produced.</param>
+        /// <exception cref="ArgumentNullException">An argument is null.</exception>
+        /// <exception cref="InvalidOperationException">
+        /// A block lost more than one colour — a joker clears one layer of a
+        /// block (D26) — or a block appeared that neither a spawner nor an
+        /// opened shutter explains: in both cases the states do not belong to
+        /// one joker.
+        /// </exception>
+        public static MoveChanges ForJoker(LevelContext ctx, BoardState before, BoardState after)
+        {
+            RequireArguments(ctx, before, after);
+            return Build(ctx, before, after, InPlaceClears(ctx, before, after));
         }
 
         /// <summary>
@@ -216,8 +232,9 @@ namespace GateRush.Runtime
         /// and nothing checked against a board. For Edit Mode tests of what
         /// reads a <see cref="MoveChanges"/> (<see cref="MoveCues"/>), which
         /// need changes no board produces: in play only the moved block
-        /// clears. The game itself builds changes through
-        /// <see cref="Between"/> and <see cref="WithoutClears"/> only.
+        /// clears, or the blocks a joker hits. The game itself builds changes
+        /// through <see cref="Between"/>, <see cref="ForJoker"/> and
+        /// <see cref="WithoutClears"/> only.
         /// </summary>
         /// <exception cref="ArgumentNullException">An argument is null.</exception>
         internal static MoveChanges Of(
@@ -237,6 +254,57 @@ namespace GateRush.Runtime
                 unlockedBlocks ?? throw new ArgumentNullException(nameof(unlockedBlocks)),
                 countPops ?? throw new ArgumentNullException(nameof(countPops)),
                 spawns ?? throw new ArgumentNullException(nameof(spawns)));
+        }
+
+        private static void RequireArguments(LevelContext ctx, BoardState before, BoardState after)
+        {
+            if (ctx == null)
+            {
+                throw new ArgumentNullException(nameof(ctx));
+            }
+
+            if (before == null)
+            {
+                throw new ArgumentNullException(nameof(before));
+            }
+
+            if (after == null)
+            {
+                throw new ArgumentNullException(nameof(after));
+            }
+        }
+
+        /// <summary>
+        /// One in-place clear for every slot whose cleared-colour count rose
+        /// from <paramref name="before"/> to <paramref name="after"/>, in slot
+        /// order.
+        /// </summary>
+        private static IReadOnlyList<ClearedBlock> InPlaceClears(LevelContext ctx, BoardState before, BoardState after)
+        {
+            List<ClearedBlock> clears = null;
+            for (var i = 0; i < ctx.TotalBlockCapacity; i++)
+            {
+                int clearedBefore = before.ClearedColors[i];
+                int clearedAfter = after.ClearedColors[i];
+                if (clearedAfter == clearedBefore)
+                {
+                    continue;
+                }
+
+                if (clearedAfter != clearedBefore + 1)
+                {
+                    throw new InvalidOperationException(
+                        $"Level {ctx.LevelId}: block slot {i} went from {clearedBefore} to {clearedAfter} cleared colours, " +
+                        "but a joker clears exactly one colour of a block.");
+                }
+
+                var stack = ctx.SpecAt(i).ColorStack;
+                BlockColor? exposed = clearedAfter < stack.Count ? stack[clearedAfter] : (BlockColor?)null;
+                clears = clears ?? new List<ClearedBlock>();
+                clears.Add(ClearedBlock.InPlace(i, stack[clearedBefore], exposed));
+            }
+
+            return clears ?? (IReadOnlyList<ClearedBlock>)Array.Empty<ClearedBlock>();
         }
 
         private static MoveChanges Build(
