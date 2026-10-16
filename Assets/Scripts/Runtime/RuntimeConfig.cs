@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using GateRush.Core;
+using GateRush.Meta;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -353,6 +354,11 @@ namespace GateRush.Runtime
 
         [Tooltip("Easing of the bump's way in, and mirrored, of its way back.")]
         [SerializeField] private Ease peelBumpEase = Ease.OutQuad;
+
+        [Tooltip("Seconds a block a Rocket or Broom destroyed takes to fade where it stands while its shards fly (Module 34). Input never waits for it; a win's panel does.")]
+        [SerializeField] private float breakFadeSeconds = 0.2f;
+
+        [SerializeField] private Ease breakFadeEase = Ease.OutQuad;
 
         [Header("Exit cubes (stream out beneath the gate while a destroyed block passes through it)")]
         [Tooltip("Cubes per cell of the block, before the cap.")]
@@ -781,6 +787,33 @@ namespace GateRush.Runtime
 
         [Tooltip("Size of the confirmation's panel. It holds the title, the line under it and two menu buttons stacked, inside Result Padding Units, and uses the result panel's fonts and backdrop.")]
         [SerializeField] private Vector2 confirmPanelSizeUnits = new Vector2(860f, 900f);
+
+        [Header("Joker bar (Module 34; canvas units, in the bottom band; face, corner, text colour and font are the menu buttons')")]
+        [Tooltip("The Clock's name on its button.")]
+        [SerializeField] private string clockLabel = "Clock";
+
+        [Tooltip("The Rocket's name on its button.")]
+        [SerializeField] private string rocketLabel = "Rocket";
+
+        [Tooltip("The Broom's name on its button.")]
+        [SerializeField] private string broomLabel = "Broom";
+
+        [Tooltip("A joker's button while some are held, or left in free play; {0} is the joker's name and {1} the count.")]
+        [SerializeField] private string jokerCountFormat = "{0} {1}";
+
+        [Tooltip("A joker's button in the campaign while none is held; {0} is the joker's name and {1} its price from the Meta Config.")]
+        [SerializeField] private string jokerPriceFormat = "{0} {1} gold";
+
+        [Tooltip("Size of each joker button. The row of three is scaled down when the band is too small for it.")]
+        [SerializeField] private Vector2 jokerButtonSizeUnits = new Vector2(300f, 130f);
+
+        [Tooltip("Space between two joker buttons.")]
+        [SerializeField] private float jokerButtonGapUnits = 30f;
+
+        [SerializeField] private float jokerButtonFontSize = 44f;
+
+        [Tooltip("Face of the selected Rocket or Broom button, in place of the frame's colour.")]
+        [SerializeField] private Color jokerSelectedColor = new Color(1f, 0.76f, 0.2f, 1f);
 
         [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
         [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
@@ -1391,6 +1424,12 @@ namespace GateRush.Runtime
         /// <summary>Easing of each half of a peeling block's bump.</summary>
         public Ease PeelBumpEase => peelBumpEase;
 
+        /// <summary>Seconds a block a joker destroyed takes to fade where it stands (Module 34).</summary>
+        public float BreakFadeSeconds => breakFadeSeconds;
+
+        /// <summary>Easing of that fade.</summary>
+        public Ease BreakFadeEase => breakFadeEase;
+
         /// <summary>Result panel title after a win.</summary>
         public string WinTitle => winTitle;
 
@@ -1591,6 +1630,41 @@ namespace GateRush.Runtime
 
         /// <summary>Size of the confirmation's panel, in canvas units.</summary>
         public Vector2 ConfirmPanelSizeUnits => confirmPanelSizeUnits;
+
+        /// <summary>A joker button's text while some are held or left; {0} is the name, {1} the count.</summary>
+        public string JokerCountFormat => jokerCountFormat;
+
+        /// <summary>A campaign joker button's text while none is held; {0} is the name, {1} the price.</summary>
+        public string JokerPriceFormat => jokerPriceFormat;
+
+        /// <summary>Size of each joker button, in canvas units.</summary>
+        public Vector2 JokerButtonSizeUnits => jokerButtonSizeUnits;
+
+        /// <summary>Space between two joker buttons, in canvas units.</summary>
+        public float JokerButtonGapUnits => jokerButtonGapUnits;
+
+        /// <summary>Font size of the joker buttons' text.</summary>
+        public float JokerButtonFontSize => jokerButtonFontSize;
+
+        /// <summary>Face of the selected Rocket or Broom button.</summary>
+        public Color JokerSelectedColor => jokerSelectedColor;
+
+        /// <summary>The name a joker's button shows.</summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public string JokerName(JokerKind kind)
+        {
+            switch (kind)
+            {
+                case JokerKind.Clock:
+                    return clockLabel;
+                case JokerKind.Rocket:
+                    return rocketLabel;
+                case JokerKind.Broom:
+                    return broomLabel;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind, $"{(int)kind} is not a joker kind.");
+            }
+        }
 
         /// <summary>Space from the safe area's sides to the HUD's outer elements, and the least space beside the timer, in canvas units.</summary>
         public float HudSidePaddingUnits => hudSidePaddingUnits;
@@ -2312,6 +2386,7 @@ namespace GateRush.Runtime
             AddResultPanelProblems(problems);
             AddMenuProblems(problems);
             AddMetaProblems(problems);
+            AddJokerBarProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
             return problems;
@@ -2874,6 +2949,35 @@ namespace GateRush.Runtime
                   < confirmPanelSizeUnits.y))
             {
                 problems.Add($"{name}: Confirm Panel Size Units must hold a Menu Button Size Units button across and two of them stacked with Menu Button Gap Units between, and leave room for Result Message Height Units and the title, inside Result Padding Units.");
+            }
+        }
+
+        /// <summary>
+        /// The constraints on the joker bar's values and the joker break
+        /// (Module 34), each message naming its field: every name is there to
+        /// read, both formats take a name and a number, every size and time
+        /// is positive, the gap is not negative, and the highlight can be
+        /// seen.
+        /// </summary>
+        private void AddJokerBarProblems(List<string> problems)
+        {
+            AddIfBlank(problems, clockLabel, "Clock Label");
+            AddIfBlank(problems, rocketLabel, "Rocket Label");
+            AddIfBlank(problems, broomLabel, "Broom Label");
+            AddIfUnusableFormat(problems, jokerCountFormat, 2, "Joker Count Format", "{0} for the name and {1} for the count");
+            AddIfUnusableFormat(problems, jokerPriceFormat, 2, "Joker Price Format", "{0} for the name and {1} for the price");
+            AddIfNotPositive(problems, jokerButtonSizeUnits, "Joker Button Size Units");
+            AddIfNotPositive(problems, jokerButtonFontSize, "Joker Button Font Size");
+            AddIfNotPositive(problems, breakFadeSeconds, "Break Fade Seconds");
+
+            if (!(jokerButtonGapUnits >= 0f) || float.IsInfinity(jokerButtonGapUnits))
+            {
+                problems.Add($"{name}: Joker Button Gap Units must be at least 0 and finite.");
+            }
+
+            if (!(jokerSelectedColor.a > 0f))
+            {
+                problems.Add($"{name}: Joker Selected Color must not be fully transparent.");
             }
         }
 

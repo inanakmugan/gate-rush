@@ -259,6 +259,33 @@ namespace GateRush.Tests
             return true;
         }
 
+        // ----- The block under a cell (shared with a joker's tap, Module 34) -----
+
+        [Test]
+        public void BlockAt_CellOfABlock_IsThatBlocksSlot()
+        {
+            var ctx = Ctx(3, 2, new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(1, 0), cells: Cells1x2Vertical) });
+            var state = BoardState.CreateInitial(ctx);
+
+            var upper = DragController.BlockAt(ctx, state, new Coord(1, 1));
+
+            Assert.AreEqual(1, upper, "the second cell of the vertical block");
+        }
+
+        [Test]
+        public void BlockAt_EmptyCellAndADestroyedBlocksCell_IsMinusOne()
+        {
+            var ctx = Ctx(3, 1, new[] { Block(1, new Coord(0, 0)), Block(2, new Coord(2, 0), colors: new[] { BlockColor.Blue }) });
+            var initial = BoardState.CreateInitial(ctx);
+            Assert.IsTrue(new MoveResolver().TryClearBlock(ctx, initial, 0, out var state, out _));
+
+            var empty = DragController.BlockAt(ctx, state, new Coord(1, 0));
+            var destroyed = DragController.BlockAt(ctx, state, new Coord(0, 0));
+
+            Assert.AreEqual(-1, empty);
+            Assert.AreEqual(-1, destroyed);
+        }
+
         // ----- Legality -----
 
         [Test]

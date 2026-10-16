@@ -789,12 +789,25 @@ namespace GateRush.Runtime
             !float.IsNaN(v.x) && !float.IsInfinity(v.x) && !float.IsNaN(v.y) && !float.IsInfinity(v.y);
 
         /// <summary>
-        /// The living block covering <paramref name="cell"/>, or -1. A linear
-        /// scan over the block slots: it runs once per pointer press, not in a
-        /// search.
+        /// The living block covering <paramref name="cell"/>, or -1 — a cell
+        /// outside the grid included. The one lookup for the block under the
+        /// pointer: the drag's grab and a joker's tap (Module 34) both use it.
+        /// A linear scan over the block slots: it runs once per pointer press,
+        /// not in a search.
         /// </summary>
-        private static int BlockAt(LevelContext ctx, BoardState state, Coord cell)
+        /// <exception cref="ArgumentNullException"><paramref name="ctx"/> or <paramref name="state"/> is null.</exception>
+        public static int BlockAt(LevelContext ctx, BoardState state, Coord cell)
         {
+            if (ctx == null)
+            {
+                throw new ArgumentNullException(nameof(ctx));
+            }
+
+            if (state == null)
+            {
+                throw new ArgumentNullException(nameof(state));
+            }
+
             for (var i = 0; i < ctx.TotalBlockCapacity; i++)
             {
                 if (!state.Alive[i])

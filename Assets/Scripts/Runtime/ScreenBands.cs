@@ -49,6 +49,20 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// The joker bar's band as anchors (Module 34): as wide as the safe
+        /// area, from its bottom up by <paramref name="bottomBandScreenFraction"/>
+        /// of the screen's height — the strip the camera keeps free below the
+        /// board when <see cref="TryAddInsets"/> succeeds. Never reaches above
+        /// the screen.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A screen dimension is not positive.</exception>
+        public static Rect BottomBandAnchors(Rect safeArea, int screenWidth, int screenHeight, float bottomBandScreenFraction)
+        {
+            var safe = SafeAnchors(safeArea, screenWidth, screenHeight);
+            return Rect.MinMaxRect(safe.xMin, safe.yMin, safe.xMax, Math.Min(safe.yMin + bottomBandScreenFraction, 1f));
+        }
+
+        /// <summary>
         /// The top and bottom bands the camera must keep free: each band plus
         /// the unsafe strip on its side, as fractions of the screen's height.
         /// False when together they would leave no room for the board (1 or

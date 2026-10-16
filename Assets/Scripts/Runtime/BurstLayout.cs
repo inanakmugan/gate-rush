@@ -22,7 +22,13 @@ namespace GateRush.Runtime
         /// beneath its gate as it peels. Last, so the kinds before it keep
         /// their seeds.
         /// </summary>
-        Peel
+        Peel,
+
+        /// <summary>
+        /// A block a joker destroyed breaking apart where it stands (Module
+        /// 34). Last, so the kinds before it keep their seeds.
+        /// </summary>
+        Break
     }
 
     /// <summary>One piece of a burst, in cell units: where it starts, how far it goes, and how it looks.</summary>
