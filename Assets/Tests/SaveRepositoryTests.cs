@@ -6,14 +6,16 @@ using NUnit.Framework;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Modules 29 and 30's <see cref="SaveRepository"/> over a
+    /// Covers Modules 29 to 31's <see cref="SaveRepository"/> over a
     /// <see cref="MemorySaveStore"/> and the real <see cref="JsonSaveCodec"/>:
     /// a save survives a new repository; the old keys are carried over only
     /// while no save exists under the new key, which then always wins; one
     /// unreadable old key leaves the other; an unreadable or too new save gives
     /// the defaults and is left in the store; a carried-over save whose
-    /// write fails is still played; and a fresh store, a carry-over and a
-    /// version-1 save all give a new player's gold and lives by the rules.
+    /// write fails is still played; a fresh store, a carry-over and a
+    /// version-1 save all give a new player's gold, lives, jokers, streak and
+    /// campaign by the rules; and a version-2 save keeps its gold and lives
+    /// with a new player's jokers, streak and campaign.
     /// </summary>
     public class SaveRepositoryTests
     {
@@ -28,7 +30,7 @@ namespace GateRush.Tests
 
             Assert.AreEqual(SaveLoadOutcome.Fresh, load.Outcome);
             SaveFixture.AssertSameSave(SaveData.CreateDefault(SaveFixture.Rules), load.Data);
-            AssertNewPlayerGoldAndLives(load.Data);
+            AssertNewPlayerMetaSections(load.Data);
             CollectionAssert.IsEmpty(load.Problems);
             CollectionAssert.IsEmpty(store.SavedKeys);
         }
@@ -61,7 +63,7 @@ namespace GateRush.Tests
             Assert.AreEqual(SaveLoadOutcome.CarriedOver, load.Outcome);
             CollectionAssert.AreEqual(new[] { 0, 2 }, load.Data.Completed.Ids);
             Assert.IsFalse(load.Data.Sound.IsOn);
-            AssertNewPlayerGoldAndLives(load.Data);
+            AssertNewPlayerMetaSections(load.Data);
             CollectionAssert.IsEmpty(load.Problems);
             CollectionAssert.AreEqual(new[] { SaveRepository.SaveKey }, store.SavedKeys, "exactly one save, under the new key");
             Assert.IsTrue(store.TryLoad(SaveRepository.SaveKey, out var written));
@@ -161,7 +163,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Load_VersionOneSave_IsLoadedWithStartingGoldAndFullLives()
+        public void Load_VersionOneSave_IsLoadedWithNewPlayerMetaSections()
         {
             var store = new MemorySaveStore();
             store.Seed(SaveRepository.SaveKey, "{\"formatVersion\":1,\"completedLevelIds\":[0,1,3],\"soundOn\":false}");
@@ -171,9 +173,29 @@ namespace GateRush.Tests
             Assert.AreEqual(SaveLoadOutcome.Loaded, load.Outcome);
             CollectionAssert.AreEqual(new[] { 0, 1, 3 }, load.Data.Completed.Ids);
             Assert.IsFalse(load.Data.Sound.IsOn);
-            AssertNewPlayerGoldAndLives(load.Data);
+            AssertNewPlayerMetaSections(load.Data);
             CollectionAssert.IsEmpty(load.Problems);
-            CollectionAssert.IsEmpty(store.SavedKeys, "Load writes nothing; the next change writes version 2");
+            CollectionAssert.IsEmpty(store.SavedKeys, "Load writes nothing; the next change writes the current version");
+        }
+
+        [Test]
+        public void Load_VersionTwoSave_IsLoadedWithNewPlayerStreakCampaignAndJokers()
+        {
+            var store = new MemorySaveStore();
+            store.Seed(
+                SaveRepository.SaveKey,
+                "{\"formatVersion\":2,\"completedLevelIds\":[0,1,3],\"soundOn\":false,\"gold\":640,\"lifetimeGold\":140,\"lives\":2,\"livesRegenStartUtcTicks\":638640000000000000}");
+
+            var load = Repository(store).Load();
+
+            Assert.AreEqual(SaveLoadOutcome.Loaded, load.Outcome);
+            CollectionAssert.AreEqual(new[] { 0, 1, 3 }, load.Data.Completed.Ids);
+            Assert.IsFalse(load.Data.Sound.IsOn);
+            Assert.AreEqual(640, load.Data.Wallet.Balance);
+            Assert.AreEqual(140, load.Data.Wallet.LifetimeEarned);
+            Assert.AreEqual(2, load.Data.Lives.StoredCount);
+            AssertNewPlayerStreakCampaignAndJokers(load.Data);
+            CollectionAssert.IsEmpty(load.Problems);
         }
 
         [Test]
@@ -247,15 +269,32 @@ namespace GateRush.Tests
             new SaveRepository(store, new JsonSaveCodec(), SaveFixture.Rules);
 
         /// <summary>
-        /// Asserts the gold and lives a new player gets by
+        /// Asserts the meta sections a new player gets by
         /// <see cref="SaveFixture.Rules"/>: the starting gold, none of it
-        /// earned, and lives at the cap.
+        /// earned, lives at the cap, and the streak, campaign and jokers of
+        /// <see cref="AssertNewPlayerStreakCampaignAndJokers"/>.
         /// </summary>
-        private static void AssertNewPlayerGoldAndLives(SaveData data)
+        private static void AssertNewPlayerMetaSections(SaveData data)
         {
             Assert.AreEqual(SaveFixture.Rules.StartingGold, data.Wallet.Balance, "starting gold");
             Assert.AreEqual(0, data.Wallet.LifetimeEarned, "lifetime gold");
             Assert.AreEqual(SaveFixture.Rules.LifeCap, data.Lives.StoredCount, "full lives");
+            AssertNewPlayerStreakCampaignAndJokers(data);
+        }
+
+        /// <summary>
+        /// Asserts no streak and no best, the campaign at its start, and the
+        /// starting jokers of <see cref="SaveFixture.Rules"/>.
+        /// </summary>
+        private static void AssertNewPlayerStreakCampaignAndJokers(SaveData data)
+        {
+            Assert.AreEqual(0, data.Streak.Current, "no streak");
+            Assert.AreEqual(0, data.Streak.Best, "no best streak");
+            Assert.AreEqual(0, data.Campaign.Position, "the campaign at its start");
+            foreach (JokerKind kind in Enum.GetValues(typeof(JokerKind)))
+            {
+                Assert.AreEqual(SaveFixture.Rules.StartingJokers(kind), data.Jokers.CountOf(kind), $"starting {kind} jokers");
+            }
         }
 
         private static void AssertStoredUnchanged(MemorySaveStore store, string expected)

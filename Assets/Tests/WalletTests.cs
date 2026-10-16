@@ -20,7 +20,7 @@ namespace GateRush.Tests
         [Test]
         public void Starting_AnyRules_HoldsStartingGoldWithLifetimeZero()
         {
-            var rules = new MetaRules(3, TimeSpan.FromMinutes(7), 321);
+            var rules = MetaRulesFixture.Build(startingGold: 321);
 
             var wallet = Wallet.Starting(rules);
 

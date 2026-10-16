@@ -21,8 +21,8 @@ namespace GateRush.Meta
     /// <item>Otherwise the old keys, <see cref="CompletedLevels.LegacySaveKey"/>
     /// and <see cref="SoundSetting.LegacySaveKey"/>, are read when either
     /// exists. One that cannot be read gives its default and a problem; the
-    /// other is kept. Every section they never held, the wallet and the lives
-    /// among them, is a new player's. The save is written under <see cref="SaveKey"/> at once:
+    /// other is kept. Every section they never held — the wallet, the lives,
+    /// the jokers, the streak and the campaign — is a new player's. The save is written under <see cref="SaveKey"/> at once:
     /// <see cref="SaveLoadOutcome.CarriedOver"/>.</item>
     /// <item>Otherwise the defaults and <see cref="SaveLoadOutcome.Fresh"/>,
     /// and nothing is written.</item>
@@ -132,7 +132,14 @@ namespace GateRush.Meta
                     $"The sound setting saved under '{SoundSetting.LegacySaveKey}' cannot be read ('{soundData}'); sound is on.");
             }
 
-            var data = new SaveData(completed, sound, Wallet.Starting(rules), Lives.Full(rules));
+            var data = new SaveData(
+                completed,
+                sound,
+                Wallet.Starting(rules),
+                Lives.Full(rules),
+                JokerInventory.Starting(rules),
+                WinStreak.Starting(),
+                CampaignProgress.Starting());
             try
             {
                 Save(data);

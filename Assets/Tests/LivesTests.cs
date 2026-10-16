@@ -27,7 +27,7 @@ namespace GateRush.Tests
         [SetUp]
         public void SetUp()
         {
-            rules = new MetaRules(Cap, Interval, StartingGold);
+            rules = MetaRulesFixture.Build(lifeCap: Cap, lifeRegenInterval: Interval, startingGold: StartingGold);
             clock = new ManualClock(Noon);
         }
 
