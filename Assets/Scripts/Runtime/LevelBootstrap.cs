@@ -95,6 +95,17 @@ namespace GateRush.Runtime
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
     /// screen's size or safe area changes.</para>
+    /// <para><b>Jokers (Module 34, D65, D66, D67).</b> The joker bar shows
+    /// with the HUD. The Clock's button uses it at once; the Rocket's and the
+    /// Broom's select it (<see cref="JokerSelection"/>), and the next valid
+    /// tap on a block uses it. Every use runs in one order: check, spend
+    /// (<see cref="MetaGame.TryUseJoker"/> in the campaign, the level's
+    /// <see cref="FreePlayJokers"/> in free play), apply, save in the
+    /// campaign, then present — a joker through the same
+    /// <see cref="PresentStateChange"/> as a move. An invalid tap does
+    /// nothing and keeps the selection. Menu, Restart, the confirmation, the
+    /// end of the level and a new level clear it. The free-play allowance is
+    /// full again on every load and restart.</para>
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
@@ -135,6 +146,9 @@ namespace GateRush.Runtime
 
         [Tooltip("The confirmation on the canvas before Menu or Restart costs a life while a campaign level is played (Module 32). Drawn over everything else on the canvas.")]
         [SerializeField] private ConfirmPrompt confirmPrompt;
+
+        [Tooltip("The joker bar on the canvas: the Clock, Rocket and Broom buttons in the bottom band, shown with the HUD (Module 34). Drawn under the introduction card, the result panel, the menu and the confirmation.")]
+        [SerializeField] private JokerBar jokerBar;
 
         [Tooltip("Plays the sound cues and vibration pulses (Module 25). Left empty, the game runs silently and logs one error.")]
         [SerializeField] private SoundPlayer soundPlayer;
@@ -193,7 +207,28 @@ namespace GateRush.Runtime
         // listening, so a subscription is never made twice or left behind.
         private LevelSession listenedSession;
 
-        // Moves applied in this attempt at the level; seeds the bursts.
+        // The Rocket or Broom selected and not yet used (D67); never saved.
+        private readonly JokerSelection jokerSelection = new JokerSelection();
+
+        // The joker bar's buttons, left to right, and what each last showed,
+        // so the bar is rebuilt only when it changes (RefreshJokerBar).
+        private readonly JokerKind[] barKinds = { JokerKind.Clock, JokerKind.Rocket, JokerKind.Broom };
+        private int[] shownJokerCounts;
+        private bool hasShownJokers;
+        private PlayMode shownJokerMode;
+        private bool shownJokersUsable;
+        private bool shownClockUsable;
+        private int shownJokerGold;
+
+        // Free play's jokers for the level being played (D66), made in Awake
+        // and refilled on every load and restart.
+        private FreePlayJokers freePlayJokers;
+
+        // What the player sees of the level being played: shared with the
+        // board view, and what decides the Broom's colour on a tap.
+        private VisibilityLayer visibility;
+
+        // Moves and jokers applied in this attempt at the level; seeds the bursts.
         private int moveNumber;
         private BoardLayout layout;
         private string levelName;
@@ -220,6 +255,10 @@ namespace GateRush.Runtime
             hudView.HideTime();
             hudView.HideLevel();
 
+            // Right after the HUD: everything initialised below goes over it.
+            jokerBar.Initialize(config);
+            shownJokerCounts = new int[barKinds.Length];
+
             // Each puts what it builds last among the canvas's children, so
             // this order — after the HUD, which puts itself first — leaves the
             // card over the HUD, the result panel over the card, and the menu
@@ -241,6 +280,7 @@ namespace GateRush.Runtime
             LoadSave();
             clock = new SystemTimeProvider();
             metaGame = new MetaGame(save, metaRules, clock);
+            freePlayJokers = new FreePlayJokers(metaConfig.FreePlayJokersPerLevel);
             InitializeSound();
             ApplySoundSetting();
 
@@ -578,6 +618,7 @@ namespace GateRush.Runtime
         private void ShowMenu()
         {
             hudView.Hide();
+            jokerBar.Hide();
             var entries = catalog != null
                 ? MenuLevels.Entries(catalog, save.Completed)
                 : Array.Empty<MenuLevelEntry>();
@@ -623,6 +664,7 @@ namespace GateRush.Runtime
             }
 
             inputController.Unbind();
+            ClearJokerSelection();
             StopSounds();
             StopListeningForTimeBonus();
             run.Release();
@@ -781,6 +823,9 @@ namespace GateRush.Runtime
             resultPanel.ButtonPressed += OnButtonPressed;
             menuScreen.ButtonPressed += OnButtonPressed;
             confirmPrompt.ButtonPressed += OnButtonPressed;
+            inputController.BoardTapped += OnBoardTapped;
+            jokerBar.JokerPressed += OnJokerPressed;
+            jokerBar.ButtonPressed += OnButtonPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested += OnDevLevelStep;
 #endif
@@ -816,6 +861,9 @@ namespace GateRush.Runtime
             resultPanel.ButtonPressed -= OnButtonPressed;
             menuScreen.ButtonPressed -= OnButtonPressed;
             confirmPrompt.ButtonPressed -= OnButtonPressed;
+            inputController.BoardTapped -= OnBoardTapped;
+            jokerBar.JokerPressed -= OnJokerPressed;
+            jokerBar.ButtonPressed -= OnButtonPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested -= OnDevLevelStep;
 #endif
@@ -846,6 +894,7 @@ namespace GateRush.Runtime
             if (wasPlaying && run.Outcome == LevelOutcome.Lost)
             {
                 inputController.CancelDrag();
+                ClearJokerSelection();
                 if (mode == PlayMode.Campaign)
                 {
                     ReportCampaignLoss();
@@ -865,6 +914,7 @@ namespace GateRush.Runtime
 
             ShowRemainingTime();
             RefreshMeta();
+            RefreshJokerBar();
         }
 
         /// <summary>
@@ -889,7 +939,10 @@ namespace GateRush.Runtime
             menuScreen.Hide();
             confirmPrompt.Hide();
             hudView.Show();
+            jokerBar.Show();
             inputController.CancelDrag();
+            ClearJokerSelection();
+            freePlayJokers.Refill();
             StopSounds();
 
             // Cards of the level being left go, without starting its run.
@@ -926,7 +979,8 @@ namespace GateRush.Runtime
             var machine = config.CreateGeneratorMachine();
             layout = new BoardLayout(ctx.Width, ctx.Height, config.CellSize, config.FrameThicknessCells, machine.Reach(ctx));
 
-            boardView.Initialize(config, ctx, layout, new VisibilityLayer(ctx), machine);
+            visibility = new VisibilityLayer(ctx);
+            boardView.Initialize(config, ctx, layout, visibility, machine);
             boardView.Rebuild(session.State);
             inputController.Initialize(
                 run,
@@ -934,7 +988,8 @@ namespace GateRush.Runtime
                 layout,
                 boardView,
                 boardCamera,
-                IsHeld);
+                IsHeld,
+                IsAiming);
 
             fittedScreenWidth = 0;
             fittedScreenHeight = 0;
@@ -950,6 +1005,8 @@ namespace GateRush.Runtime
             ShowRemainingTime();
             ForgetShownMeta();
             RefreshMeta();
+            ForgetShownJokers();
+            RefreshJokerBar();
 
             // The run is not started while a card is open: an unstarted
             // countdown ignores every tick, so the timer stands at the whole
@@ -1066,6 +1123,7 @@ namespace GateRush.Runtime
         private void AskToConfirm(ConfirmedAction action)
         {
             inputController.CancelDrag();
+            ClearJokerSelection();
             run.Countdown?.Stop();
             pendingConfirm = action;
             confirmPrompt.Show(action == ConfirmedAction.Leave ? config.LeaveLevelTitle : config.RestartLevelTitle);
@@ -1138,13 +1196,17 @@ namespace GateRush.Runtime
             }
 
             inputController.CancelDrag();
+            ClearJokerSelection();
             StopSounds();
             run.Restart();
             moveNumber = 0;
+            freePlayJokers.Refill();
             hudView.CancelTimeBonus();
             boardView.Rebuild(run.Session.State);
             resultPanel.Hide();
             ShowRemainingTime();
+            ForgetShownJokers();
+            RefreshJokerBar();
         }
 
         /// <summary>
@@ -1224,14 +1286,6 @@ namespace GateRush.Runtime
             var session = run.Session;
             var ctx = session.Context;
             var after = session.State;
-            moveNumber++;
-
-            // The win was decided when the move was applied; it is recorded
-            // now, not when the panel opens.
-            if (run.Outcome == LevelOutcome.Won)
-            {
-                RecordWin();
-            }
 
             MoveChanges changes;
             try
@@ -1258,7 +1312,304 @@ namespace GateRush.Runtime
                 PlayCue(SoundCue.Drop);
             }
 
+            PresentStateChange(after, changes);
+        }
+
+        /// <summary>
+        /// The one path after a move or a joker changed the session's state:
+        /// counts it for the bursts' seeds, records a win, and presents the
+        /// new state. The win was decided when the state was applied; it is
+        /// recorded now, not when the panel opens, and the panel opens once
+        /// the presentation is done (<see cref="OnPresentationDone"/>).
+        /// </summary>
+        private void PresentStateChange(BoardState after, MoveChanges changes)
+        {
+            moveNumber++;
+            if (run.Outcome == LevelOutcome.Won)
+            {
+                ClearJokerSelection();
+                RecordWin();
+            }
+
             boardView.Present(after, changes, moveNumber, OnPresentationDone);
+        }
+
+        /// <summary>
+        /// A press of a joker's button (Module 34). The Clock is used at once
+        /// (<see cref="UseClock"/>). The Rocket and the Broom are selected,
+        /// unselected or switched (<see cref="JokerSelection.Press"/>) and
+        /// nothing is spent (D67). The buttons are not pressable while the
+        /// level is not being played or is held; a press that comes then
+        /// anyway changes nothing.
+        /// </summary>
+        private void OnJokerPressed(JokerKind kind)
+        {
+            if (kind == JokerKind.Clock)
+            {
+                UseClock();
+                return;
+            }
+
+            if (!IsBeingPlayed() || IsHeld())
+            {
+                return;
+            }
+
+            jokerSelection.Press(kind);
+            jokerBar.ShowSelected(jokerSelection.Selected);
+        }
+
+        /// <summary>
+        /// Uses a Clock (D65): clears any selection, then checks that the
+        /// level is being played, is not held and has a countdown; spends one;
+        /// adds <see cref="MetaRules.ClockBonusSeconds"/> to the countdown;
+        /// saves in the campaign; and shows the seconds beside the timer with
+        /// the time bonus's cue.
+        /// </summary>
+        private void UseClock()
+        {
+            ClearJokerSelection();
+            if (!IsBeingPlayed() || IsHeld() || run.Countdown == null)
+            {
+                return;
+            }
+
+            if (!TrySpendJoker(JokerKind.Clock))
+            {
+                RefreshJokerBar();
+                return;
+            }
+
+            var seconds = metaRules.ClockBonusSeconds;
+            run.Countdown.AddBonus(seconds);
+            SaveJokerSpend(JokerKind.Clock);
+            ShowTimeBonus(seconds);
+            RefreshJokerBar();
+        }
+
+        /// <summary>
+        /// A press on the board while a Rocket or a Broom is selected (D67).
+        /// The block is the one the drag would grab there
+        /// (<see cref="DragController.BlockAt"/>). A Rocket needs
+        /// <see cref="LevelSession.CanRocket"/>; a Broom takes the colour the
+        /// player sees on that block — none for a frozen block or one not
+        /// shown — and needs <see cref="LevelSession.CanSweep"/>. A tap that
+        /// is not a valid use does nothing, the selection staying. A valid one
+        /// spends the joker, clears the selection, applies it, saves in the
+        /// campaign — after a spend, whatever the apply did — and presents
+        /// it. A resolver that refuses after a valid check is a bug: it is
+        /// logged, and the joker stays spent.
+        /// </summary>
+        private void OnBoardTapped(Coord cell)
+        {
+            var selected = jokerSelection.Selected;
+            if (!selected.HasValue || !IsBeingPlayed() || IsHeld())
+            {
+                return;
+            }
+
+            var kind = selected.Value;
+            var session = run.Session;
+            var before = session.State;
+            var blockIndex = DragController.BlockAt(session.Context, before, cell);
+            if (blockIndex < 0)
+            {
+                return;
+            }
+
+            var color = default(BlockColor);
+            if (kind == JokerKind.Rocket)
+            {
+                if (!session.CanRocket(blockIndex))
+                {
+                    return;
+                }
+            }
+            else
+            {
+                var shown = visibility.Block(before, blockIndex);
+                if (!shown.IsShown || !shown.OuterColor.HasValue)
+                {
+                    return;
+                }
+
+                color = shown.OuterColor.Value;
+                if (!session.CanSweep(color))
+                {
+                    return;
+                }
+            }
+
+            if (!TrySpendJoker(kind))
+            {
+                ClearJokerSelection();
+                RefreshJokerBar();
+                return;
+            }
+
+            ClearJokerSelection();
+            var isApplied = kind == JokerKind.Rocket ? session.TryRocket(blockIndex) : session.TrySweep(color);
+            SaveJokerSpend(kind);
+            if (isApplied)
+            {
+                OnJokerApplied(before, kind);
+            }
+            else
+            {
+                Debug.LogError(
+                    $"Level '{levelName}': the {kind} on block slot {blockIndex} passed its check but the resolver refused it; " +
+                    "the joker stays spent and the board is unchanged.",
+                    this);
+            }
+
+            RefreshJokerBar();
+        }
+
+        /// <summary>
+        /// Presents the state a joker produced, as <see cref="OnMoveApplied"/>
+        /// does a move's: what changed is <see cref="MoveChanges.ForJoker"/>'s,
+        /// and when that fails — a bug — it is logged and the board is
+        /// presented with what could still be worked out.
+        /// </summary>
+        private void OnJokerApplied(BoardState before, JokerKind kind)
+        {
+            var ctx = run.Session.Context;
+            var after = run.Session.State;
+
+            MoveChanges changes;
+            try
+            {
+                changes = MoveChanges.ForJoker(ctx, before, after);
+            }
+            catch (InvalidOperationException e)
+            {
+                changes = FallbackChanges(ctx, before, after);
+                var shown = changes.HasArrivals
+                    ? "the other changes play, without the clear effects"
+                    : "the board is redrawn from the new state with no effects";
+                Debug.LogError($"Level '{levelName}': what the {kind} changed could not be worked out; {shown}. {e.Message}", this);
+            }
+
+            PresentStateChange(after, changes);
+        }
+
+        /// <summary>
+        /// Spends one <paramref name="kind"/> (D65, D66): in the campaign
+        /// through <see cref="MetaGame.TryUseJoker"/>, from the inventory or
+        /// bought at once; in free play from the level's allowance. False,
+        /// with nothing spent, when there is none to spend — the button was
+        /// not pressable then, so that is logged as a bug.
+        /// </summary>
+        private bool TrySpendJoker(JokerKind kind)
+        {
+            if (mode == PlayMode.Campaign)
+            {
+                if (metaGame.TryUseJoker(kind) != JokerUse.NotEnoughGold)
+                {
+                    return true;
+                }
+
+                Debug.LogError($"A {kind} was used with none held and too little gold to buy one; nothing is spent or used.", this);
+                return false;
+            }
+
+            if (freePlayJokers.TryUse(kind))
+            {
+                return true;
+            }
+
+            Debug.LogError($"A {kind} was used in free play with none left in this level; nothing is used.", this);
+            return false;
+        }
+
+        /// <summary>
+        /// Saves after a joker was spent in the campaign, where the spend
+        /// changed the inventory or the gold. Free play saves nothing (D66).
+        /// </summary>
+        private void SaveJokerSpend(JokerKind kind)
+        {
+            if (mode == PlayMode.Campaign)
+            {
+                SaveOrWarn($"A {kind} was used, but saving the joker or the gold it cost failed; the change is remembered until the game is closed.");
+            }
+        }
+
+        /// <summary>Unselects any joker and shows no button highlighted.</summary>
+        private void ClearJokerSelection()
+        {
+            jokerSelection.Clear();
+            jokerBar.ShowSelected(null);
+        }
+
+        /// <summary>
+        /// True while a Rocket or a Broom is selected: the one query that
+        /// turns a press on the board into a tap (<see cref="InputController"/>).
+        /// </summary>
+        private bool IsAiming() => jokerSelection.Selected.HasValue;
+
+        /// <summary>
+        /// Rebuilds the joker bar's buttons when what they show has changed:
+        /// the mode, whether the level can use a joker now — being played and
+        /// not held — and the Clock too — with a countdown —, the counts held
+        /// or left, and in the campaign the gold. So every use, purchase, win,
+        /// loss, restart, change of gold, and card or confirmation opening or
+        /// closing shows at once. Allocates nothing when nothing changed, so it
+        /// runs every frame a level is loaded.
+        /// </summary>
+        private void RefreshJokerBar()
+        {
+            if (run == null)
+            {
+                return;
+            }
+
+            var isUsable = IsBeingPlayed() && !IsHeld();
+            var isClockUsable = isUsable && run.Countdown != null;
+            var gold = metaGame.Save.Wallet.Balance;
+            var isCampaign = mode == PlayMode.Campaign;
+
+            var isChanged = !hasShownJokers || mode != shownJokerMode || isUsable != shownJokersUsable
+                            || isClockUsable != shownClockUsable || (isCampaign && gold != shownJokerGold);
+            for (var i = 0; i < barKinds.Length; i++)
+            {
+                var count = JokerCount(barKinds[i]);
+                if (count != shownJokerCounts[i])
+                {
+                    isChanged = true;
+                    shownJokerCounts[i] = count;
+                }
+            }
+
+            if (!isChanged)
+            {
+                return;
+            }
+
+            hasShownJokers = true;
+            shownJokerMode = mode;
+            shownJokersUsable = isUsable;
+            shownClockUsable = isClockUsable;
+            shownJokerGold = gold;
+
+            for (var i = 0; i < barKinds.Length; i++)
+            {
+                var kind = barKinds[i];
+                var isKindUsable = kind == JokerKind.Clock ? isClockUsable : isUsable;
+                var button = isCampaign
+                    ? JokerButtons.Campaign(kind, shownJokerCounts[i], metaRules.JokerPrice(kind), gold, isKindUsable, config)
+                    : JokerButtons.FreePlay(kind, shownJokerCounts[i], isKindUsable, config);
+                jokerBar.ShowButton(kind, button);
+            }
+        }
+
+        /// <summary>How many <paramref name="kind"/> the level being played can use: held in the campaign, left in free play.</summary>
+        private int JokerCount(JokerKind kind) =>
+            mode == PlayMode.Campaign ? metaGame.Save.Jokers.CountOf(kind) : freePlayJokers.CountOf(kind);
+
+        /// <summary>Makes the next <see cref="RefreshJokerBar"/> rebuild every button, for a new level or a restart.</summary>
+        private void ForgetShownJokers()
+        {
+            hasShownJokers = false;
         }
 
         /// <summary>
@@ -1311,9 +1662,19 @@ namespace GateRush.Runtime
         {
             if (run != null && run.Countdown != null && run.Outcome == LevelOutcome.None)
             {
-                hudView.ShowTimeBonus(seconds);
-                PlayCue(SoundCue.TimeBonus);
+                ShowTimeBonus(seconds);
             }
+        }
+
+        /// <summary>
+        /// Shows <paramref name="seconds"/> beside the timer and plays the
+        /// time bonus's cue: the one look for a time-bonus block (M10) and a
+        /// Clock (Module 34).
+        /// </summary>
+        private void ShowTimeBonus(int seconds)
+        {
+            hudView.ShowTimeBonus(seconds);
+            PlayCue(SoundCue.TimeBonus);
         }
 
         /// <summary>
@@ -1587,13 +1948,20 @@ namespace GateRush.Runtime
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
                 || hudView == null || introductionCard == null || resultPanel == null || menuScreen == null
-                || confirmPrompt == null)
+                || confirmPrompt == null || jokerBar == null)
             {
                 Debug.LogError(
                     "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card, " +
-                    "Result Panel, Menu Screen and Confirm Prompt must all be assigned; nothing is drawn.",
+                    "Result Panel, Menu Screen, Confirm Prompt and Joker Bar must all be assigned; nothing is drawn.",
                     this);
                 return false;
+            }
+
+            var barProblem = jokerBar.MissingCanvas();
+            if (barProblem.Length > 0)
+            {
+                Debug.LogError($"{barProblem} Nothing is drawn.", jokerBar);
+                isAssigned = false;
             }
 
             var menuProblem = menuScreen.MissingCanvas();

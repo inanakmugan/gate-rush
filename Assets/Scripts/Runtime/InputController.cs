@@ -31,6 +31,10 @@ namespace GateRush.Runtime
     /// of the input module, whose state on the first frame of a touch may still
     /// be the previous frame's, depending on script order. With no
     /// EventSystem, nothing is UI.</para>
+    /// <para><b>Jokers (Module 34, D67).</b> While a Rocket or a Broom is
+    /// selected, a press on the board raises <see cref="BoardTapped"/> with
+    /// its cell instead of starting a drag; which block that is, and whether
+    /// the tap is a valid use, is the listener's question.</para>
     /// <para>The drag advances on <see cref="Time.unscaledDeltaTime"/>, the
     /// clock the countdown runs on.</para>
     /// </remarks>
@@ -47,6 +51,7 @@ namespace GateRush.Runtime
         private BoardView view;
         private Camera boardCamera;
         private Func<bool> isHeld;
+        private Func<bool> isAiming;
 
         /// <summary>
         /// Raised after a move from a drag has been applied, with the state it
@@ -72,6 +77,15 @@ namespace GateRush.Runtime
         /// </summary>
         public event Action DragDropped;
 
+        /// <summary>
+        /// Raised, with the grid cell under the pointer, when the board is
+        /// pressed while a joker is selected (D67) — in place of starting a
+        /// drag. The cell may lie outside the grid. Raised under the same
+        /// conditions a drag would start: the view not busy, the press not on
+        /// the UI, the level being played and not held.
+        /// </summary>
+        public event Action<Coord> BoardTapped;
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         /// <summary>
         /// Raised when a development level key (<see cref="DevKeys"/>) goes
@@ -94,11 +108,19 @@ namespace GateRush.Runtime
         /// pointer is read. The caller must not start holding during a drag;
         /// it cancels any drag first.
         /// </param>
-        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
+        /// <param name="isAiming">
+        /// Asked on every press of the board: while it answers true — a Rocket
+        /// or a Broom is selected (D67) — the press raises
+        /// <see cref="BoardTapped"/> and never starts a drag. A drag already in
+        /// progress is not affected.
+        /// </param>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> or <paramref name="isAiming"/> is null.</exception>
         public void Initialize(
-            LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera, Func<bool> isHeld)
+            LevelRun run, DragController drag, BoardLayout layout, BoardView view, Camera boardCamera, Func<bool> isHeld,
+            Func<bool> isAiming)
         {
             this.isHeld = isHeld ?? throw new ArgumentNullException(nameof(isHeld));
+            this.isAiming = isAiming ?? throw new ArgumentNullException(nameof(isAiming));
             this.run = run;
             this.drag = drag;
             this.layout = layout;
@@ -123,6 +145,7 @@ namespace GateRush.Runtime
             view = null;
             boardCamera = null;
             isHeld = null;
+            isAiming = null;
         }
 
         /// <summary>
@@ -198,13 +221,18 @@ namespace GateRush.Runtime
             var screen = pointer.position.ReadValue();
             var grid = ScreenToGrid(screen);
 
-            if (pointer.press.wasPressedThisFrame
-                && !view.IsBusy
-                && !IsOverUi(screen)
-                && drag.TryBegin(run.Session.Context, run.Session.State, grid))
+            if (pointer.press.wasPressedThisFrame && !view.IsBusy && !IsOverUi(screen))
             {
-                view.BeginDrag(drag.BlockIndex);
-                DragStarted?.Invoke();
+                if (isAiming())
+                {
+                    // A selected joker takes the press (D67): no drag starts.
+                    BoardTapped?.Invoke(BoardLayout.CellOf(grid));
+                }
+                else if (drag.TryBegin(run.Session.Context, run.Session.State, grid))
+                {
+                    view.BeginDrag(drag.BlockIndex);
+                    DragStarted?.Invoke();
+                }
             }
 
             if (!drag.IsDragging)
