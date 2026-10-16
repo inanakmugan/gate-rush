@@ -659,6 +659,90 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
         }
 
+        // ----- Module 34: the joker bar and the joker break ------------------
+
+        [Test]
+        public void Problems_DefaultJokerBarValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            // Every message about Module 34's values names one of these.
+            Assert.That(problems, Has.None.Contains("Joker "), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Clock Label"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Rocket Label"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Broom Label"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Break Fade"), string.Join(" | ", problems));
+        }
+
+        [TestCase("clockLabel", "Clock Label")]
+        [TestCase("rocketLabel", "Rocket Label")]
+        [TestCase("broomLabel", "Broom Label")]
+        public void Problems_EmptyJokerName_IsReportedByName(string field, string shownName)
+        {
+            SetString(field, "  ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
+        }
+
+        // Each format is given one placeholder more than it is formatted with.
+        [TestCase("jokerCountFormat", "Joker Count Format")]
+        [TestCase("jokerPriceFormat", "Joker Price Format")]
+        public void Problems_UnusableJokerFormat_IsReportedByName(string field, string shownName)
+        {
+            SetString(field, "{0} {2}");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be a format"), string.Join(" | ", problems));
+        }
+
+        [TestCase("jokerButtonFontSize", "Joker Button Font Size")]
+        [TestCase("breakFadeSeconds", "Break Fade Seconds")]
+        public void Problems_NonPositiveJokerSizeOrTime_IsReportedByName(string field, string shownName)
+        {
+            SetFloat(field, 0f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NonPositiveJokerButtonSize_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("jokerButtonSizeUnits").vector2Value = new Vector2(1f, 0f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Joker Button Size Units must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NegativeJokerButtonGap_IsReportedByName()
+        {
+            SetFloat("jokerButtonGapUnits", -1f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Joker Button Gap Units must be at least 0"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_TransparentJokerSelectedColor_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("jokerSelectedColor").colorValue = new Color(1f, 1f, 1f, 0f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Joker Selected Color must not be fully transparent"), string.Join(" | ", problems));
+        }
+
         /// <summary>Sets the sorting order <paramref name="field"/> to the value <paramref name="sameAs"/> has.</summary>
         private void SetOrderEqualTo(string field, string sameAs)
         {

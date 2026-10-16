@@ -227,6 +227,14 @@ namespace GateRush.Runtime
         /// (<see cref="PlayPeelDebris"/>), which do not hold the stage either.
         /// Then the arrive stage, at once when there is no peel or bump to
         /// wait for.
+        /// <para><b>A joker's clears (Module 34)</b> are in place
+        /// (<see cref="ClearedBlock.IsInPlace"/>) and all start together: a
+        /// destroyed block breaks apart where it stands
+        /// (<see cref="BreakApart"/>); a surviving one peels with no bump,
+        /// glow or cubes, since no gate is involved — unless it was drawn
+        /// frozen, whose colours the player may not see (M3, D13): its ice
+        /// only bursts, and it stays drawn in ice until the arrive stage
+        /// redraws it, thawed or not.</para>
         /// </summary>
         private void PlayLeave()
         {
@@ -244,20 +252,44 @@ namespace GateRush.Runtime
 
                 if (clear.IsDestroyed)
                 {
-                    PassThroughGate(block, clear);
+                    if (clear.IsInPlace)
+                    {
+                        BreakApart(block, clear);
+                    }
+                    else
+                    {
+                        PassThroughGate(block, clear);
+                    }
+
                     continue;
                 }
 
-                // The glow, the cubes and the bump play for every surviving
-                // clear, also for a block drawn without an inner shape, whose
-                // peel is null.
-                PlayPeelDebris(block, clear);
+                if (clear.IsInPlace && block.IsIce)
+                {
+                    // Only a joker clears a frozen block, and only in place; a
+                    // peel would show the colour it exposes (M3).
+                    ShatterBlock(clear.BlockIndex, leftState.Origins[clear.BlockIndex], BurstKind.Break, config.IceColor);
+                    continue;
+                }
+
+                // A gate clear's glow, cubes and bump play for every surviving
+                // block, also one drawn without an inner shape, whose peel is
+                // null. A clear in place has no gate, so it only peels.
+                if (!clear.IsInPlace)
+                {
+                    PlayPeelDebris(block, clear);
+                }
 
                 var peel = PeelEffect(block, clear.ExposedColor.Value);
                 if (peel != null)
                 {
                     leave = leave ?? DOTween.Sequence().SetId(this);
                     leave.Insert(0f, peel);
+                }
+
+                if (clear.IsInPlace)
+                {
+                    continue;
                 }
 
                 var bump = PeelBump(block, clear.GateEdge);
@@ -486,6 +518,46 @@ namespace GateRush.Runtime
         {
             block.Body.localScale = new Vector3(scale, scale, 1f);
             block.Body.localPosition = block.FootprintCenter * (1f - scale);
+        }
+
+        /// <summary>
+        /// A block a joker destroyed breaks apart where it stands (Module 34),
+        /// as debris: it leaves the drawing for <c>Effects/Debris</c>, shards
+        /// in the colour it was drawn in — ice for a frozen block, so its
+        /// hidden colour stays hidden (M3) — fly out of its footprint, and it
+        /// fades over <see cref="RuntimeConfig.BreakFadeSeconds"/> where it is,
+        /// then is destroyed. It travels nowhere and no gate glows. Like a
+        /// pass through a gate, every tween carries <see cref="debrisId"/> and
+        /// the fade is counted as a pass, so a win's panel waits for it
+        /// (<see cref="EndPresentation"/>) while input does not.
+        /// </summary>
+        private void BreakApart(DrawnBlock block, ClearedBlock clear)
+        {
+            var root = block.Root;
+
+            block.LiftTween?.Kill();
+            block.LiftTween = null;
+            drawnBlocks.Remove(clear.BlockIndex);
+            root.SetParent(debris, true);
+
+            // A block's face is drawn in one colour (DrawBlocks): its fill, or
+            // ice while frozen.
+            ShatterBlock(clear.BlockIndex, leftState.Origins[clear.BlockIndex], BurstKind.Break, block.FaceQuarters[0].color);
+
+            var fade = new Fade(root);
+            passesInFlight++;
+            DOVirtual.Float(1f, 0f, config.BreakFadeSeconds, fade.Apply)
+                .SetEase(config.BreakFadeEase)
+                .SetId(debrisId)
+                .OnComplete(() =>
+                {
+                    if (root != null)
+                    {
+                        Destroy(root.gameObject);
+                    }
+
+                    OnPassEnded();
+                });
         }
 
         /// <summary>
@@ -1185,15 +1257,25 @@ namespace GateRush.Runtime
         /// <summary>Ice shards fly out from the centre of a block that thawed, over its unfrozen face.</summary>
         private void ShatterBlockIce(int blockIndex, BoardState state)
         {
+            ShatterBlock(blockIndex, state.Origins[blockIndex], BurstKind.Thaw, config.IceColor);
+        }
+
+        /// <summary>
+        /// Shards in <paramref name="color"/> fly out from the centre of block
+        /// <paramref name="blockIndex"/>'s footprint at <paramref name="origin"/>,
+        /// seeded from <paramref name="kind"/>, the block and the move. The one
+        /// burst over a block for a thaw and for a joker's clear in place.
+        /// </summary>
+        private void ShatterBlock(int blockIndex, Coord origin, BurstKind kind, Color color)
+        {
             var cells = ctx.SpecAt(blockIndex).Cells;
-            var origin = state.Origins[blockIndex];
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
             var centre = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f);
             var pieces = BurstLayout.Pieces(
                 CellAreas(cells), null, centre,
-                BurstLayout.Seed(BurstKind.Thaw, blockIndex, presentedMoveNumber), shardBurst);
+                BurstLayout.Seed(kind, blockIndex, presentedMoveNumber), shardBurst);
 
-            PlayShards(pieces, cellsInBlock => GridToLocal(new Vector2(origin.X, origin.Y) + cellsInBlock));
+            PlayShards(pieces, cellsInBlock => GridToLocal(new Vector2(origin.X, origin.Y) + cellsInBlock), color);
         }
 
         /// <summary>Ice shards burst from the ice of a gate that opened, over the coloured gate now drawn.</summary>
@@ -1212,13 +1294,13 @@ namespace GateRush.Runtime
                 areas, null, span.center,
                 BurstLayout.Seed(BurstKind.GateOpening, gateIndex, presentedMoveNumber), shardBurst);
 
-            PlayShards(pieces, GridToLocal);
+            PlayShards(pieces, GridToLocal, config.IceColor);
         }
 
-        private void PlayShards(IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal)
+        private void PlayShards(IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal, Color color)
         {
             PlayBurst(
-                pieces, toLocal, layout.CellSize, config.ShardSprite, config.IceColor,
+                pieces, toLocal, layout.CellSize, config.ShardSprite, color,
                 config.ShardSeconds, config.ShardEase, config.ShardEndScale, config.ShardFallCells);
         }
 

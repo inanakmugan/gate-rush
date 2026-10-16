@@ -53,6 +53,33 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void BottomBandAnchors_FullSafeArea_IsTheBottomBandAcrossTheScreen()
+        {
+            var band = ScreenBands.BottomBandAnchors(FullScreen, Width, Height, BottomBand);
+
+            AssertRect(Rect.MinMaxRect(0f, 0f, 1f, BottomBand), band);
+        }
+
+        [Test]
+        public void BottomBandAnchors_HomeIndicator_StartsAtTheSafeBottom()
+        {
+            var band = ScreenBands.BottomBandAnchors(Notched, Width, Height, BottomBand);
+
+            AssertRect(Rect.MinMaxRect(0f, 0.05f, 1f, 0.05f + BottomBand), band);
+        }
+
+        [Test]
+        public void BottomBandAnchors_SideInsets_SpansTheSafeWidth()
+        {
+            var safe = new Rect(50f, 0f, Width - 100f, Height);
+
+            var band = ScreenBands.BottomBandAnchors(safe, Width, Height, BottomBand);
+
+            Assert.AreEqual(0.05f, band.xMin, Tolerance);
+            Assert.AreEqual(0.95f, band.xMax, Tolerance);
+        }
+
+        [Test]
         public void SafeAnchors_SafeAreaPastTheScreen_IsClampedToIt()
         {
             var safe = new Rect(-10f, -10f, Width + 20f, Height + 20f);
