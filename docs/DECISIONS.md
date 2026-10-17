@@ -2079,9 +2079,10 @@ every tab.
 ## D69 — The interface uses CC0 art and an open font, never the reference game's art
 
 **Decision.** The screens take the reference game's layout and nothing of
-its art. Buttons, panels, toggles and icons come from Kenney's UI Pack,
-and avatars from Kenney's Animal Pack Redux, both CC0. Text uses Fredoka,
-under the SIL Open Font License. The packs and the font live under
+its art. Buttons, panels and toggles come from Kenney's UI Pack, icons
+from Kenney's Game Icons and Board Game Icons, and avatars from Kenney's
+Animal Pack Redux, all CC0. Text uses Fredoka, under the SIL Open Font
+License. The packs and the font live under
 `Assets/ThirdParty/`, and README credits them. Colours, sizes and the font
 are one theme the screens share.
 
@@ -2093,6 +2094,8 @@ were checked.
 
 **Consequences.**
 - Art can be replaced later on the prefabs without code changes.
+- Only the sprites the screens use are imported, at the packs' larger
+  size, so they stay sharp on phones.
 - Fredoka is imported as a TextMeshPro font asset that covers Turkish
   characters, so player names can use them.
 

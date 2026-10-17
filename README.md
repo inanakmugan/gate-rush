@@ -136,6 +136,15 @@ Unity → Window → General → Test Runner → Edit Mode → Run All
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
+## Credits
+
+- Interface art: [Kenney](https://kenney.nl) — UI Pack, Game Icons, Board
+  Game Icons and Animal Pack Redux, all CC0.
+- Font: [Fredoka](https://fonts.google.com/specimen/Fredoka), SIL Open Font
+  License 1.1.
+
+The licences are kept beside the files under `Assets/ThirdParty/`.
+
 ## Note on the web build
 
 Progress (completed levels, gold, lives and the campaign) is stored in
