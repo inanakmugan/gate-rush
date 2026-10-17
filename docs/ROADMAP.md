@@ -298,7 +298,7 @@ Each spec is written when the module before it is merged.
 
 | # | Module | Spec | Status |
 |---|---|---|---|
-| 6.1 | UI foundation: the assembly, tabs and overlay stack, theme, shared prefabs, Home (D68, D69) | — | Planned |
+| 6.1 | UI foundation: the assembly, tabs and overlay stack, theme, shared prefabs, Home (D68, D69) | `Modules/35-ui-foundation.md` | Planned |
 | 6.2 | Store, and routing to it when the gold is short (D62) | — | Planned |
 | 6.3 | Win Streak: Home's progress bar and the ladder screen (D61) | — | Planned |
 | 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | — | Planned |
