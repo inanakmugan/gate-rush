@@ -2031,3 +2031,121 @@ third step in a fast game. A tap elsewhere cancelling the selection: a
 near miss on a small block would throw the choice away.
 
 ---
+
+## D68 — Phase 6 builds the screens as uGUI prefabs in a UI assembly
+
+**Decision.** Phase 6 replaces the prototype front end (D50, D64) with
+real screens, built as uGUI prefabs laid out in the Editor and driven by
+code in a new `GateRush.UI` assembly. The game stays in one scene. Home
+and two more tabs sit at the bottom, Store, Home and Leaderboard, and
+Profile, Settings and Win Streak open over them on a navigation stack. The
+layout follows the reference game; its art does not (D69). The interface
+stays in English. Six modules, each spec written when the one before it is
+merged:
+
+- 6.1 the UI foundation: the assembly, the tabs and the overlay stack, the
+  theme, the shared button and top bar prefabs, and Home in place of the
+  prototype title page;
+- 6.2 the Store, and routing to it when the gold is short;
+- 6.3 the Win Streak: Home's progress bar and the ladder screen;
+- 6.4 Profile and Settings (D71);
+- 6.5 the Leaderboard (D70);
+- 6.6 the level's own interface (HUD, joker bar, result panel,
+  confirmation, no-lives page) in the new theme, as prefabs.
+
+**Why.** Screens built from code were right for a prototype, but every
+layout tweak went through code and nothing could be seen in the Inspector.
+Prefabs are how mobile studios build interfaces, and they let the owner
+lay out a screen directly. Screens hold no rules: they ask `Meta`, which
+is tested (ARCHITECTURE, UI).
+
+**Consequences.**
+- `GateRush.UI` references `Runtime`, `Meta` and `Platform`; nothing
+  references it but the scene. The prototype menu in `Runtime/UI` is
+  removed when Home replaces it.
+- The store sells only what D62 sells, for gold. No real-money purchases,
+  live events, notifications (Phase 7), music, social sign-in or account
+  deletion.
+- English text lives on the prefabs and in configuration; localization
+  would be a later module.
+
+**Rejected.** Keeping screens built from code: the owner could not lay
+them out. UI Toolkit: less common in the studios this portfolio targets,
+and the game already runs on uGUI. One scene per screen: a scene load for
+every tab.
+
+---
+
+## D69 — The interface uses CC0 art and an open font, never the reference game's art
+
+**Decision.** The screens take the reference game's layout and nothing of
+its art. Buttons, panels, toggles and icons come from Kenney's UI Pack,
+and avatars from Kenney's Animal Pack Redux, both CC0. Text uses Fredoka,
+under the SIL Open Font License. The packs and the font live under
+`Assets/ThirdParty/`, and README credits them. Colours, sizes and the font
+are one theme the screens share.
+
+**Why.** Copying a published game's characters or icons would be a
+copyright problem and would read as a clone in a portfolio. The owner has
+no art of his own; these packs are free for any use, consistent in style
+and close enough to the genre's look. A credits section shows the licences
+were checked.
+
+**Consequences.**
+- Art can be replaced later on the prefabs without code changes.
+- Fredoka is imported as a TextMeshPro font asset that covers Turkish
+  characters, so player names can use them.
+
+**Rejected.** The reference game's assets: not ours. Drawing art now: not
+the point of this phase. Plain rectangles: a portfolio screen should look
+finished.
+
+---
+
+## D70 — The leaderboard sits behind a service; the first one is local and honest
+
+**Decision.** The Leaderboard screen reads its rows from an
+`ILeaderboardService` in `Platform`. The first implementation is local: it
+returns only the player's own entry, ranked on lifetime gold (D22), with
+the name and avatar of D71. The screen says that the online leaderboard is
+not connected. There are no weekly, world or country tabs.
+
+**Why.** There is no server, and a table of invented players would not be
+honest in a portfolio. The interface shows the screen working and where a
+backend plugs in, as `ISaveStore` and `IHaptics` already do.
+
+**Consequences.**
+- A real backend is a new implementation of the service, not a change to
+  the screen.
+- Tests can give the screen any rows through a test implementation.
+
+**Rejected.** Invented players: dishonest. A real backend now (Firebase,
+PlayFab): a large detour, and awkward in a web build. A "Coming soon" tab:
+shows nothing of the architecture.
+
+---
+
+## D71 — The player has a name, an avatar and a haptics setting, saved in format 4
+
+**Decision.** The save gains the player's name, the chosen avatar and
+whether haptics are on, and its format becomes version 4. A new player,
+and an older save, get the name "Player", the first avatar and haptics on,
+from the rules (D60). A name is trimmed and 1 to 16 characters long.
+Profile shows and edits the name and avatar; Settings has a Haptics toggle
+beside Sound.
+
+**Why.** The leaderboard needs a name and a face, and Profile is where a
+player sets them. Haptics could only be switched off with the sound;
+players expect a toggle of its own.
+
+**Consequences.**
+- `TryFromDto` carries a version 3 save forward with the defaults (D56,
+  D60).
+- Profile's statistics come from what the save already holds: levels
+  completed, the campaign level, the best streak and lifetime gold. A
+  first-try win count is not tracked.
+
+**Rejected.** A name only on the leaderboard: Profile is the natural
+place. Free-form avatars (photos): needs storage and moderation.
+
+---

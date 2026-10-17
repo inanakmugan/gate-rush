@@ -292,6 +292,19 @@ insufficient-funds prompt routing to the store, quit-confirmation prompt.
 
 Meta is already tested by this point, so this phase is presentation only.
 
+Screens are uGUI prefabs in a `GateRush.UI` assembly, laid out after the
+reference game with CC0 art and an open font (D68, D69). Six modules (D68).
+Each spec is written when the module before it is merged.
+
+| # | Module | Spec | Status |
+|---|---|---|---|
+| 6.1 | UI foundation: the assembly, tabs and overlay stack, theme, shared prefabs, Home (D68, D69) | — | Planned |
+| 6.2 | Store, and routing to it when the gold is short (D62) | — | Planned |
+| 6.3 | Win Streak: Home's progress bar and the ladder screen (D61) | — | Planned |
+| 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | — | Planned |
+| 6.5 | Leaderboard behind `ILeaderboardService`, local first (D70) | — | Planned |
+| 6.6 | The level's interface in the new theme, as prefabs | — | Planned |
+
 ---
 
 ## Phase 7 — Polish
