@@ -1,16 +1,20 @@
 using System;
 using GateRush.Meta;
+using GateRush.Platform;
 using GateRush.Runtime;
 using NUnit.Framework;
 
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Module 35's <see cref="FrontEndState.Of"/>, the one place the
-    /// front end's numbers are read: the gold, the lives and the cap from the
-    /// save at the time given, with no wait when full; the campaign level's
-    /// 1-based number, null past the last level and with no usable order;
-    /// whether the refill is possible; and the level list with its marks.
+    /// Covers Modules 35 and 36's <see cref="FrontEndState.Of"/>, the one
+    /// place the front end's numbers are read: the gold, the lives and the cap
+    /// from the save at the time given, with no wait when full; the campaign
+    /// level's 1-based number, null past the last level and with no usable
+    /// order; whether the lives are full, whatever the balance; the level list
+    /// with its marks; the jokers' counts and prices; and the gold offers,
+    /// only packs both sides know, in the rules' order with the service's
+    /// price text.
     /// </summary>
     /// <remarks>
     /// The rules are <see cref="MetaRulesFixture"/>'s, unlike a fresh config,
@@ -21,6 +25,11 @@ namespace GateRush.Tests
     {
         private const int Gold = 640;
         private const int SomeLives = 2;
+        private const int ClockCount = 4;
+        private const int RocketCount = 7;
+        private const int BroomCount = 9;
+        private const string SmallPrice = "$0.10";
+        private const string LargePrice = "$0.90";
 
         private static readonly DateTime Noon = new DateTime(2026, 10, 15, 12, 0, 0, DateTimeKind.Utc);
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
@@ -47,7 +56,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.AreEqual(Gold, state.Gold);
             Assert.AreEqual(SomeLives, state.Lives);
@@ -60,7 +69,7 @@ namespace GateRush.Tests
             var meta = Meta(Gold, 1);
             var twoIntervalsLater = Noon + rules.LifeRegenInterval + rules.LifeRegenInterval + OneSecond;
 
-            var state = FrontEndState.Of(meta, rules, twoIntervalsLater, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, twoIntervalsLater, Catalog(), true, Products());
 
             Assert.AreEqual(3, state.Lives);
         }
@@ -70,7 +79,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, rules.LifeCap);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.IsNull(state.UntilNextLife);
         }
@@ -80,7 +89,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon + FiveMinutes, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon + FiveMinutes, Catalog(), true, Products());
 
             Assert.AreEqual(rules.LifeRegenInterval - FiveMinutes, state.UntilNextLife);
         }
@@ -91,7 +100,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives, position);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.AreEqual(position + 1, state.CampaignLevelNumber);
         }
@@ -101,7 +110,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives, NamesInOrder.Length);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.IsNull(state.CampaignLevelNumber);
         }
@@ -111,7 +120,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, null, true);
+            var state = FrontEndState.Of(meta, rules, Noon, null, true, Products());
 
             Assert.IsNull(state.CampaignLevelNumber);
             Assert.IsNotNull(state.Levels);
@@ -123,40 +132,86 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, new LevelCatalog(Array.Empty<(string, int)>()), true);
+            var state = FrontEndState.Of(meta, rules, Noon, new LevelCatalog(Array.Empty<(string, int)>()), true, Products());
 
             Assert.IsNull(state.CampaignLevelNumber);
             Assert.AreEqual(0, state.Levels.Count);
         }
 
         [Test]
-        public void Of_FullLives_CannotRefill()
+        public void Of_FullLives_AreFull()
         {
             var meta = Meta(rules.LivesRefillPrice + Gold, rules.LifeCap);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
-            Assert.IsFalse(state.CanRefill);
+            Assert.IsTrue(state.IsLivesFull);
         }
 
         [Test]
-        public void Of_BalanceBelowThePrice_CannotRefill()
+        public void Of_LivesBelowTheCapWithNoGold_AreNotFull()
         {
-            var meta = Meta(rules.LivesRefillPrice - 1, SomeLives);
+            var meta = Meta(0, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
-            Assert.IsFalse(state.CanRefill);
+            Assert.IsFalse(state.IsLivesFull, "the refill is pressable whatever the balance");
         }
 
         [Test]
-        public void Of_LivesBelowTheCapAndBalanceExactlyThePrice_CanRefill()
+        public void Of_JokerCounts_ComeFromTheInventory([Values] JokerKind kind)
         {
-            var meta = Meta(rules.LivesRefillPrice, SomeLives);
+            var meta = Meta(Gold, SomeLives, jokers: new JokerInventory(ClockCount, RocketCount, BroomCount));
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
-            Assert.IsTrue(state.CanRefill);
+            Assert.AreEqual(meta.Save.Jokers.CountOf(kind), state.JokerCount(kind));
+        }
+
+        [Test]
+        public void Of_JokerPrices_ComeFromTheRules([Values] JokerKind kind)
+        {
+            var meta = Meta(Gold, SomeLives);
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(rules.JokerPrice(kind), state.JokerPrice(kind));
+        }
+
+        [Test]
+        public void Of_GoldOffers_OnlyPacksTheServiceSells()
+        {
+            var meta = Meta(Gold, SomeLives);
+            var onlyLarge = new[] { new StoreProduct(MetaRulesFixture.LargePackId, LargePrice), new StoreProduct("unknown", SmallPrice) };
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, onlyLarge);
+
+            Assert.AreEqual(1, state.GoldOffers.Count);
+            Assert.AreEqual(MetaRulesFixture.LargePackId, state.GoldOffers[0].ProductId);
+        }
+
+        [Test]
+        public void Of_GoldOffers_InTheRulesOrderWithTheServicePriceText()
+        {
+            var meta = Meta(Gold, SomeLives);
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(rules.GoldPacks.Count, state.GoldOffers.Count);
+            Assert.AreEqual(MetaRulesFixture.SmallPackId, state.GoldOffers[0].ProductId);
+            Assert.AreEqual(MetaRulesFixture.SmallPackGold, state.GoldOffers[0].Gold);
+            Assert.AreEqual(SmallPrice, state.GoldOffers[0].PriceText);
+            Assert.AreEqual(MetaRulesFixture.LargePackId, state.GoldOffers[1].ProductId);
+            Assert.AreEqual(MetaRulesFixture.LargePackGold, state.GoldOffers[1].Gold);
+            Assert.AreEqual(LargePrice, state.GoldOffers[1].PriceText);
+        }
+
+        [Test]
+        public void Of_NullProducts_Throws()
+        {
+            var meta = Meta(Gold, SomeLives);
+
+            Assert.Throws<ArgumentNullException>(() => FrontEndState.Of(meta, rules, Noon, Catalog(), true, null));
         }
 
         [Test]
@@ -164,7 +219,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.AreEqual(rules.LivesRefillPrice, state.RefillPrice);
         }
@@ -173,9 +228,9 @@ namespace GateRush.Tests
         public void Of_Levels_ListTheOrderWithNumbersAndCompletedMarks()
         {
             var catalog = Catalog();
-            var meta = Meta(Gold, SomeLives, 0, IdsInOrder[1], IdsInOrder[3]);
+            var meta = Meta(Gold, SomeLives, 0, null, IdsInOrder[1], IdsInOrder[3]);
 
-            var state = FrontEndState.Of(meta, rules, Noon, catalog, true);
+            var state = FrontEndState.Of(meta, rules, Noon, catalog, true, Products());
 
             Assert.AreEqual(NamesInOrder.Length, state.Levels.Count, "every catalog level is listed");
             for (var i = 0; i < NamesInOrder.Length; i++)
@@ -193,7 +248,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), isSoundOn);
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), isSoundOn, Products());
 
             Assert.AreEqual(isSoundOn, state.IsSoundOn);
         }
@@ -201,7 +256,7 @@ namespace GateRush.Tests
         [Test]
         public void Of_NullMeta_Throws()
         {
-            Assert.Throws<ArgumentNullException>(() => FrontEndState.Of(null, rules, Noon, Catalog(), true));
+            Assert.Throws<ArgumentNullException>(() => FrontEndState.Of(null, rules, Noon, Catalog(), true, Products()));
         }
 
         [Test]
@@ -209,24 +264,36 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives);
 
-            Assert.Throws<ArgumentNullException>(() => FrontEndState.Of(meta, null, Noon, Catalog(), true));
+            Assert.Throws<ArgumentNullException>(() => FrontEndState.Of(meta, null, Noon, Catalog(), true, Products()));
         }
 
         private static LevelCatalog Catalog() => new LevelCatalog(Levels);
 
         /// <summary>
+        /// The purchase service's products: the fixture's two packs, listed
+        /// in the opposite order to the rules', so an offer list in the
+        /// service's order fails.
+        /// </summary>
+        private static StoreProduct[] Products() => new[]
+        {
+            new StoreProduct(MetaRulesFixture.LargePackId, LargePrice),
+            new StoreProduct(MetaRulesFixture.SmallPackId, SmallPrice),
+        };
+
+        /// <summary>
         /// A meta game over a save with <paramref name="gold"/>,
         /// <paramref name="lives"/> waiting since noon, the campaign at
-        /// <paramref name="position"/> and <paramref name="completedIds"/> won.
+        /// <paramref name="position"/>, <paramref name="jokers"/> (none by
+        /// default) and <paramref name="completedIds"/> won.
         /// </summary>
-        private MetaGame Meta(int gold, int lives, int position = 0, params int[] completedIds)
+        private MetaGame Meta(int gold, int lives, int position = 0, JokerInventory jokers = null, params int[] completedIds)
         {
             var save = new SaveData(
                 CompletedLevels.Of(completedIds),
                 new SoundSetting(),
                 new Wallet(gold, 0),
                 new Lives(rules, lives, Noon),
-                new JokerInventory(0, 0, 0),
+                jokers ?? new JokerInventory(0, 0, 0),
                 new WinStreak(0, 0),
                 new CampaignProgress(position));
             return new MetaGame(save, rules, new ManualClock(Noon));

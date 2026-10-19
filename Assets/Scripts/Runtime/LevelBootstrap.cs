@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using GateRush.Core;
 using GateRush.Meta;
+using GateRush.Platform;
 using GateRush.Serialization;
 using UnityEngine;
 
@@ -38,7 +39,7 @@ namespace GateRush.Runtime
     /// This is the only caller of <see cref="MetaGame"/>: a campaign win is
     /// reported where it is decided, a campaign loss when the countdown runs
     /// out or the player confirms leaving or restarting a level being
-    /// played, and a refill from the Lives overlay; every call that changed
+    /// played, and the Store's purchases and the refill; every call that changed
     /// the save is followed by one <see cref="SaveOrWarn"/>, a loss's even
     /// when no life was left to lose. Leaving or restarting a campaign level
     /// being played asks first (<see cref="ConfirmPrompt"/>), with the
@@ -110,6 +111,17 @@ namespace GateRush.Runtime
     /// nothing and keeps the selection. Menu, Restart, the confirmation, the
     /// end of the level and a new level clear it. The free-play allowance is
     /// full again on every load and restart.</para>
+    /// <para><b>Store (Module 36, D62, D72).</b> Gold packs are bought through
+    /// an <see cref="IPurchaseService"/>, the
+    /// <see cref="SimulatedPurchaseService"/> over
+    /// <see cref="SimulatedStoreConfig"/>, whose confirmations are passed to
+    /// the front end's test purchase sheet; a pack that succeeds is reported
+    /// (<see cref="MetaGame.ReportGoldPurchase"/>) and saved. Jokers and the
+    /// refill are bought for gold here too; a purchase refused for want of
+    /// gold opens the Not Enough Gold prompt with the shortfall worked out
+    /// here. Every purchase leaves the player where they were. A pack id
+    /// known to the rules or to the service but not both is logged as an
+    /// error at start, and the Store shows only the packs both know.</para>
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
@@ -124,8 +136,11 @@ namespace GateRush.Runtime
 
         [SerializeField] private RuntimeConfig config;
 
-        [Tooltip("The life cap, the minutes a life takes to come back, a new player's gold and jokers, the store's prices (the jokers and the lives refill the Lives overlay sells) and the win streak's reward table: Assets/Config/MetaConfig.asset. The save cannot be read without them, so left empty, or with a problem, it logs an error and nothing is drawn.")]
+        [Tooltip("The life cap, the minutes a life takes to come back, a new player's gold and jokers, the store's prices (the jokers and the lives refill), the win streak's reward table and the gold each gold pack gives: Assets/Config/MetaConfig.asset. The save cannot be read without them, so left empty, or with a problem, it logs an error and nothing is drawn.")]
         [SerializeField] private MetaConfig metaConfig;
+
+        [Tooltip("What the simulated store sells: each gold pack's product id and the price its test sheet shows, charging nothing (Module 36): Assets/Config/SimulatedStoreConfig.asset. Left empty, or with a problem, it logs an error and nothing is drawn.")]
+        [SerializeField] private SimulatedStoreConfig simulatedStore;
 
         [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
         [SerializeField] private Camera boardCamera;
@@ -183,6 +198,11 @@ namespace GateRush.Runtime
         private MetaRules metaRules;
         private SystemTimeProvider clock;
         private MetaGame metaGame;
+
+        // Sells the gold packs (D72); made in Awake with the save. Its
+        // products and the rules' packs, matched once: what the Store offers.
+        private IPurchaseService purchases;
+        private IReadOnlyList<GoldOffer> goldOffers;
 
         // How the level being played was started (D58); kept by a restart.
         private PlayMode mode;
@@ -290,6 +310,7 @@ namespace GateRush.Runtime
             LoadSave();
             clock = new SystemTimeProvider();
             metaGame = new MetaGame(save, metaRules, clock);
+            CreatePurchases();
             freePlayJokers = new FreePlayJokers(metaConfig.FreePlayJokersPerLevel);
             InitializeSound();
             ApplySoundSetting();
@@ -621,7 +642,7 @@ namespace GateRush.Runtime
         /// its state is built (<see cref="FrontEndState.Of"/>).
         /// </summary>
         private FrontEndState FrontEndStateAt(DateTime nowUtc) =>
-            FrontEndState.Of(metaGame, metaRules, nowUtc, catalog, save.Sound.IsOn);
+            FrontEndState.Of(metaGame, metaRules, nowUtc, catalog, save.Sound.IsOn, purchases.Products);
 
         /// <summary>
         /// Opens the front end on Home over the background, with its state read
@@ -751,7 +772,7 @@ namespace GateRush.Runtime
         /// Leaves any level being played, opens Home when it was not already
         /// open, and opens the Lives overlay over the current tab: the time to
         /// the next life, and the refill, priced from the rules and pressable
-        /// only when the balance covers it (D62, <see cref="FrontEndState.CanRefill"/>).
+        /// whenever the lives are not full (D62, <see cref="FrontEndState.IsLivesFull"/>).
         /// It stays open as lives come back; the player closes it.
         /// </summary>
         private void ShowLivesOverlay()
@@ -765,9 +786,11 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The Lives overlay's refill button (D62): refills the lives and
-        /// saves, then opens Home with no overlay, ready to play. Lives that
-        /// came back meanwhile and are full cost nothing and open Home too.
+        /// The refill button, on the Store or the Lives overlay (D62): refills
+        /// the lives and saves, and the front end shows them full where it is
+        /// — the Lives overlay stays open, the Store stays. Lives that came
+        /// back meanwhile and are full cost nothing and show the same. Too
+        /// little gold opens the Not Enough Gold prompt.
         /// </summary>
         private void OnRefillRequested()
         {
@@ -775,18 +798,148 @@ namespace GateRush.Runtime
             {
                 case PurchaseResult.Bought:
                     SaveOrWarn("The lives were refilled, but saving that failed; the refill is remembered until the game is closed.");
-                    ShowHome();
                     break;
                 case PurchaseResult.AlreadyFull:
-                    ShowHome();
                     break;
                 case PurchaseResult.NotEnoughGold:
-                    // The button is not pressable then, so this is a bug.
-                    Debug.LogError("The refill button was pressed with too little gold for the refill; nothing changes.", this);
+                    ShowShortfall(metaRules.LivesRefillPrice);
                     break;
             }
 
             ForgetShownMeta();
+            RefreshMeta();
+        }
+
+        /// <summary>
+        /// A joker's buy button on the Store (D62): one bought and saved, and
+        /// its card's count goes up where the player is; too little gold opens
+        /// the Not Enough Gold prompt.
+        /// </summary>
+        private void OnJokerPurchaseRequested(JokerKind kind)
+        {
+            switch (metaGame.TryBuyJoker(kind))
+            {
+                case PurchaseResult.Bought:
+                    SaveOrWarn($"A {kind} was bought, but saving that failed; it is remembered until the game is closed.");
+                    ForgetShownMeta();
+                    RefreshMeta();
+                    break;
+                case PurchaseResult.NotEnoughGold:
+                    ShowShortfall(metaRules.JokerPrice(kind));
+                    break;
+                case PurchaseResult.AlreadyFull:
+                    Debug.LogError($"Buying a {kind} answered AlreadyFull, which only a refill can; nothing changes.", this);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Opens the Not Enough Gold prompt for a purchase of
+        /// <paramref name="price"/> that was refused for want of gold.
+        /// </summary>
+        private void ShowShortfall(int price)
+        {
+            // Called only after a NotEnoughGold, which Wallet.TrySpend gives
+            // exactly when the price is above the balance: always positive.
+            frontEndView.ShowNotEnoughGold(price - metaGame.Save.Wallet.Balance);
+        }
+
+        /// <summary>
+        /// Makes the purchase service over the Simulated Store Config, whose
+        /// confirmations go to the front end's test sheet, and matches its
+        /// products with the rules' gold packs once. Every id known to one
+        /// side only is logged as an error; the game goes on, and the Store
+        /// shows the packs both know.
+        /// </summary>
+        private void CreatePurchases()
+        {
+            purchases = new SimulatedPurchaseService(simulatedStore.Products(), ConfirmOnTestSheet);
+            goldOffers = GoldOffers.Match(metaRules.GoldPacks, purchases.Products);
+            foreach (var problem in GoldOffers.Mismatches(metaRules.GoldPacks, purchases.Products))
+            {
+                Debug.LogError(problem, simulatedStore);
+            }
+        }
+
+        /// <summary>
+        /// The simulated service's confirmation: the front end's test purchase
+        /// sheet for <paramref name="product"/>'s offer. Answers no when the
+        /// front end is closed, which no press can reach.
+        /// </summary>
+        private void ConfirmOnTestSheet(StoreProduct product, Action<bool> answer)
+        {
+            if (!frontEndView.IsOpen || !TryGetOffer(product.Id, out var offer))
+            {
+                answer(false);
+                return;
+            }
+
+            frontEndView.ConfirmTestPurchase(offer, answer);
+        }
+
+        /// <summary>
+        /// A gold pack's price button (D72): buys it through the purchase
+        /// service. A press while a purchase waits for its outcome is ignored.
+        /// </summary>
+        private void OnGoldPackRequested(string productId)
+        {
+            if (purchases.IsBusy)
+            {
+                return;
+            }
+
+            // Only offered packs are bought, so ReportGoldPurchase never meets
+            // an id the rules do not know.
+            if (!TryGetOffer(productId, out _))
+            {
+                Debug.LogError($"The Store asked for the gold pack '{productId}', which is not on offer; nothing changes.", this);
+                return;
+            }
+
+            purchases.Purchase(productId, outcome => OnGoldPurchaseDone(productId, outcome));
+        }
+
+        /// <summary>
+        /// A gold pack's outcome: Succeeded adds its gold and saves, and the
+        /// player stays where they are; Cancelled changes nothing; Failed
+        /// opens the message saying that nothing was charged.
+        /// </summary>
+        private void OnGoldPurchaseDone(string productId, PurchaseOutcome outcome)
+        {
+            switch (outcome)
+            {
+                case PurchaseOutcome.Succeeded:
+                    // Paid for, so credited even if the front end has closed.
+                    var gold = metaGame.ReportGoldPurchase(productId);
+                    SaveOrWarn($"{gold} gold was bought, but saving it failed; it is kept until the game is closed.");
+                    ForgetShownMeta();
+                    RefreshMeta();
+                    break;
+                case PurchaseOutcome.Cancelled:
+                    break;
+                case PurchaseOutcome.Failed:
+                    if (frontEndView.IsOpen)
+                    {
+                        frontEndView.ShowPurchaseFailed();
+                    }
+
+                    break;
+            }
+        }
+
+        private bool TryGetOffer(string productId, out GoldOffer offer)
+        {
+            for (var i = 0; i < goldOffers.Count; i++)
+            {
+                if (string.Equals(goldOffers[i].ProductId, productId, StringComparison.Ordinal))
+                {
+                    offer = goldOffers[i];
+                    return true;
+                }
+            }
+
+            offer = default;
+            return false;
         }
 
         /// <summary>A level's button in the level grid: that level as free play, whatever is completed (D58).</summary>
@@ -819,6 +972,8 @@ namespace GateRush.Runtime
             frontEndView.LevelRequested += OnLevelRequested;
             frontEndView.SoundToggleRequested += OnSoundToggleRequested;
             frontEndView.RefillRequested += OnRefillRequested;
+            frontEndView.GoldPackRequested += OnGoldPackRequested;
+            frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
             confirmPrompt.Confirmed += OnConfirmed;
             confirmPrompt.Cancelled += OnConfirmCancelled;
             boardView.LeaveStarted += OnLeaveStarted;
@@ -857,6 +1012,8 @@ namespace GateRush.Runtime
             frontEndView.LevelRequested -= OnLevelRequested;
             frontEndView.SoundToggleRequested -= OnSoundToggleRequested;
             frontEndView.RefillRequested -= OnRefillRequested;
+            frontEndView.GoldPackRequested -= OnGoldPackRequested;
+            frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
             confirmPrompt.Confirmed -= OnConfirmed;
             confirmPrompt.Cancelled -= OnConfirmCancelled;
             boardView.LeaveStarted -= OnLeaveStarted;
@@ -1943,6 +2100,20 @@ namespace GateRush.Runtime
                 foreach (var problem in metaConfig.Problems())
                 {
                     Debug.LogError($"{problem} Nothing is drawn.", metaConfig);
+                    isAssigned = false;
+                }
+            }
+
+            if (simulatedStore == null)
+            {
+                Debug.LogError("LevelBootstrap: Simulated Store is not assigned; nothing is drawn.", this);
+                isAssigned = false;
+            }
+            else
+            {
+                foreach (var problem in simulatedStore.Problems())
+                {
+                    Debug.LogError($"{problem} Nothing is drawn.", simulatedStore);
                     isAssigned = false;
                 }
             }
