@@ -12,7 +12,8 @@ namespace GateRush.Tests
     /// problem; each text or format that is empty, each format with a
     /// placeholder beyond the numbers it is given, and each fully transparent
     /// colour is reported by its field's name; and each colour role reads its
-    /// own field.
+    /// own field. Module 36's Store texts are checked the same way, and a
+    /// ribbon with an empty or repeated id or an empty text is reported.
     /// </summary>
     public class UiConfigTests
     {
@@ -47,6 +48,19 @@ namespace GateRush.Tests
         [TestCase("waitFormat", "Wait Format")]
         [TestCase("refillFormat", "Refill Format")]
         [TestCase("levelNumberFormat", "Level Number Format")]
+        [TestCase("goldAmountFormat", "Gold Amount Format")]
+        [TestCase("goldPriceFormat", "Gold Price Format")]
+        [TestCase("jokerCountFormat", "Joker Count Format")]
+        [TestCase("shortfallFormat", "Shortfall Format")]
+        [TestCase("goldHeader", "Gold Header")]
+        [TestCase("jokersHeader", "Jokers Header")]
+        [TestCase("livesHeader", "Lives Header")]
+        [TestCase("testStoreNote", "Test Store Note")]
+        [TestCase("testPurchaseTitle", "Test Purchase Title")]
+        [TestCase("testPurchaseOfferFormat", "Test Purchase Offer Format")]
+        [TestCase("testPurchaseNote", "Test Purchase Note")]
+        [TestCase("purchaseFailedTitle", "Purchase Failed Title")]
+        [TestCase("purchaseFailedText", "Purchase Failed Text")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -64,6 +78,11 @@ namespace GateRush.Tests
         [TestCase("waitFormat", "Wait Format", "{0}:{2:00}")]
         [TestCase("refillFormat", "Refill Format", "Refill ({1})")]
         [TestCase("levelNumberFormat", "Level Number Format", "{1}")]
+        [TestCase("goldAmountFormat", "Gold Amount Format", "{1:N0}")]
+        [TestCase("goldPriceFormat", "Gold Price Format", "{1}")]
+        [TestCase("jokerCountFormat", "Joker Count Format", "You have {1}")]
+        [TestCase("shortfallFormat", "Shortfall Format", "You need {1} more gold.")]
+        [TestCase("testPurchaseOfferFormat", "Test Purchase Offer Format", "{0} gold for {2}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -109,6 +128,47 @@ namespace GateRush.Tests
         public void ColorOf_UndeclaredRole_Throws()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => config.ColorOf((UiColorRole)(-1)));
+        }
+
+        [TestCase(" ", "Popular", "b", "Best", "Ribbons element 0: Product Id is empty", TestName = "Problems_RibbonWithEmptyId_IsReported")]
+        [TestCase("a", "Popular", "a", "Best", "Ribbons element 1: Product Id 'a' is used", TestName = "Problems_RibbonsWithRepeatedId_AreReported")]
+        [TestCase("a", "", "b", "Best", "Ribbons element 0: Text is empty", TestName = "Problems_RibbonWithEmptyText_IsReported")]
+        public void Problems_RibbonWithAProblem_IsReported(
+            string firstId, string firstText, string secondId, string secondText, string expected)
+        {
+            SetRibbons((firstId, firstText), (secondId, secondText));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(expected), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void RibbonFor_KnownAndUnknownId_IsItsTextOrNull()
+        {
+            SetRibbons(("pack_a", "Hot"), ("pack_b", "Cheap"));
+
+            var known = config.RibbonFor("pack_b");
+            var unknown = config.RibbonFor("pack_c");
+
+            Assert.AreEqual("Cheap", known);
+            Assert.IsNull(unknown);
+        }
+
+        private void SetRibbons(params (string id, string text)[] ribbons)
+        {
+            var serialized = new SerializedObject(config);
+            var entries = serialized.FindProperty("ribbons");
+            Assert.IsNotNull(entries, "UiConfig has no serialized field 'ribbons'.");
+            entries.arraySize = ribbons.Length;
+            for (var i = 0; i < ribbons.Length; i++)
+            {
+                var entry = entries.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("productId").stringValue = ribbons[i].id;
+                entry.FindPropertyRelative("text").stringValue = ribbons[i].text;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private void SetString(string field, string value)

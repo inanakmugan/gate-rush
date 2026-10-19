@@ -10,7 +10,9 @@ namespace GateRush.Tests
     /// at most once; Back closes the top overlay, then returns from Store or
     /// Leaderboard to Home, and on Home does nothing; and
     /// <see cref="UiNavigation.Changed"/> is raised once per change and never
-    /// when nothing changed.
+    /// when nothing changed. Module 36's Not Enough Gold, Message and Test
+    /// Purchase overlays stack and close with Back like the others, and Get
+    /// Gold — selecting the Store — closes every overlay.
     /// </summary>
     public class UiNavigationTests
     {
@@ -173,6 +175,54 @@ namespace GateRush.Tests
             navigation.Reset();
 
             Assert.AreEqual(0, changes);
+        }
+
+        [TestCase(UiOverlay.NotEnoughGold)]
+        [TestCase(UiOverlay.Message)]
+        [TestCase(UiOverlay.TestPurchase)]
+        public void Open_StoreOverlayOverLives_StacksOnTop(UiOverlay overlay)
+        {
+            navigation.Open(UiOverlay.Lives);
+            changes = 0;
+
+            navigation.Open(overlay);
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.Lives, overlay }, navigation.Overlays);
+            Assert.AreEqual(1, changes);
+        }
+
+        [Test]
+        public void Back_NotEnoughGoldMessageAndTestPurchaseStacked_ClosesThemTopFirst()
+        {
+            navigation.SelectTab(UiTab.Store);
+            navigation.Open(UiOverlay.NotEnoughGold);
+            navigation.Open(UiOverlay.Message);
+            navigation.Open(UiOverlay.TestPurchase);
+
+            navigation.Back();
+            var afterFirst = new[] { navigation.Overlays[0], navigation.Overlays[1] };
+            navigation.Back();
+            var afterSecond = new[] { navigation.Overlays[0] };
+            navigation.Back();
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.NotEnoughGold, UiOverlay.Message }, afterFirst);
+            CollectionAssert.AreEqual(new[] { UiOverlay.NotEnoughGold }, afterSecond);
+            Assert.AreEqual(0, navigation.Overlays.Count);
+            Assert.AreEqual(UiTab.Store, navigation.Tab);
+        }
+
+        [Test]
+        public void SelectTab_GetGoldFromNotEnoughGoldOverLives_StoreWithNoOverlayInOneChange()
+        {
+            navigation.Open(UiOverlay.Lives);
+            navigation.Open(UiOverlay.NotEnoughGold);
+            changes = 0;
+
+            navigation.SelectTab(UiTab.Store);
+
+            Assert.AreEqual(UiTab.Store, navigation.Tab);
+            Assert.AreEqual(0, navigation.Overlays.Count);
+            Assert.AreEqual(1, changes);
         }
 
         [Test]

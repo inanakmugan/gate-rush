@@ -6,10 +6,11 @@ using UnityEngine;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Every tunable number of the meta game (Modules 30, 31 and 33): the life
-    /// cap, how long a life takes to come back, a new player's gold and
+    /// Every tunable number of the meta game (Modules 30, 31, 33 and 36): the
+    /// life cap, how long a life takes to come back, a new player's gold and
     /// jokers, the store's prices, the win streak's reward table, the seconds
-    /// a Clock adds and free play's jokers per level. Nothing in
+    /// a Clock adds, free play's jokers per level and the gold of each gold
+    /// pack. Nothing in
     /// <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
     /// hands them over as <see cref="MetaRules"/>, all but free play's
     /// allowance, which <c>Meta</c> knows nothing of (D66) and
@@ -72,6 +73,15 @@ namespace GateRush.Runtime
         [Tooltip("Jokers of each kind a level played in free play starts with, apart from the campaign's inventory. Not saved; full again on Restart and on every new level. At least 0.")]
         [SerializeField] private int freePlayJokersPerLevel = 3;
 
+        [Header("Gold packs")]
+        [Tooltip("The gold packs sold for real money (D72), in the Store's order: the product id the purchase service sells each under, and the gold it adds to the balance — never to the lifetime gold. Ids not empty and unique, Gold at least 1. Prices belong to the purchase service (the Simulated Store Config). May be empty.")]
+        [SerializeField] private GoldPackEntry[] goldPacks =
+        {
+            new GoldPackEntry("gold_small", 500),
+            new GoldPackEntry("gold_medium", 1500),
+            new GoldPackEntry("gold_large", 4000),
+        };
+
         /// <summary>
         /// How many of each joker a level played in free play starts with
         /// (D66). Never negative when <see cref="Problems"/> is empty. Not part
@@ -118,6 +128,11 @@ namespace GateRush.Runtime
 
             AddIfNegative(problems, freePlayJokersPerLevel, "Free Play Jokers Per Level");
 
+            foreach (var problem in GoldPack.ProblemsOf(GoldPacks()))
+            {
+                problems.Add($"{name}: Gold Packs {problem}");
+            }
+
             return problems;
         }
 
@@ -135,7 +150,8 @@ namespace GateRush.Runtime
                 livesRefillPrice,
                 new JokerAmounts(startingClocks, startingRockets, startingBrooms),
                 StreakRewards(),
-                clockBonusSeconds);
+                clockBonusSeconds,
+                GoldPacks());
 
         private StreakReward[] StreakRewards()
         {
@@ -147,6 +163,18 @@ namespace GateRush.Runtime
             }
 
             return rewards;
+        }
+
+        private GoldPack[] GoldPacks()
+        {
+            var entries = goldPacks ?? Array.Empty<GoldPackEntry>();
+            var packs = new GoldPack[entries.Length];
+            for (var i = 0; i < entries.Length; i++)
+            {
+                packs[i] = entries[i].ToPack();
+            }
+
+            return packs;
         }
 
         private void AddIfNegative(List<string> problems, int value, string field)
@@ -173,6 +201,22 @@ namespace GateRush.Runtime
             }
 
             public StreakReward ToReward() => new StreakReward(wins, joker, count);
+        }
+
+        /// <summary>One gold pack, as the Inspector edits it.</summary>
+        [Serializable]
+        private sealed class GoldPackEntry
+        {
+            [SerializeField] private string productId;
+            [SerializeField] private int gold;
+
+            public GoldPackEntry(string productId, int gold)
+            {
+                this.productId = productId;
+                this.gold = gold;
+            }
+
+            public GoldPack ToPack() => new GoldPack(productId, gold);
         }
     }
 }

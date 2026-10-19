@@ -9,7 +9,8 @@ namespace GateRush.Meta
     /// reports campaign wins and losses here, buys here, and spends jokers
     /// here. One object keeps the rules of D57 (a loss costs one life,
     /// starting costs none), D58 (only the campaign counts), D61 (the streak
-    /// and its rewards), D62 (the store) and D65 (spending a joker) together.
+    /// and its rewards), D62 (the store), D65 (spending a joker) and D72 (gold
+    /// bought for real money) together.
     /// </summary>
     /// <remarks>
     /// <para><b>It never saves.</b> It changes the <see cref="SaveData"/> it
@@ -124,6 +125,35 @@ namespace GateRush.Meta
 
             Save.Jokers.Add(kind, JokersPerPurchase);
             return PurchaseResult.Bought;
+        }
+
+        /// <summary>
+        /// Reports a gold pack the purchase service sold (D72): adds the gold
+        /// of the pack in the rules with <paramref name="productId"/> to the
+        /// balance only, never to the lifetime gold (D22), and returns it.
+        /// The streak, the lives, the jokers and the campaign never change.
+        /// Always changes the save; the caller saves.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="productId"/> is null.</exception>
+        /// <exception cref="ArgumentException">No gold pack has <paramref name="productId"/>; nothing changes.</exception>
+        public int ReportGoldPurchase(string productId)
+        {
+            if (productId == null)
+            {
+                throw new ArgumentNullException(nameof(productId));
+            }
+
+            var packs = rules.GoldPacks;
+            for (var i = 0; i < packs.Count; i++)
+            {
+                if (string.Equals(packs[i].ProductId, productId, StringComparison.Ordinal))
+                {
+                    Save.Wallet.AddPurchased(packs[i].Gold);
+                    return packs[i].Gold;
+                }
+            }
+
+            throw new ArgumentException($"No gold pack has the product id '{productId}'.", nameof(productId));
         }
 
         /// <summary>

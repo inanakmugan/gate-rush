@@ -56,6 +56,28 @@ namespace GateRush.Tests
             new StreakReward(8, JokerKind.Broom, 1),
         };
 
+        /// <summary>The first gold pack's product id in the test rules.</summary>
+        public const string SmallPackId = "test_small";
+
+        /// <summary>The second gold pack's product id in the test rules.</summary>
+        public const string LargePackId = "test_large";
+
+        /// <summary>The first gold pack's gold in the test rules.</summary>
+        public const int SmallPackGold = 120;
+
+        /// <summary>The second gold pack's gold in the test rules.</summary>
+        public const int LargePackGold = 950;
+
+        /// <summary>
+        /// The gold packs of the test rules: <see cref="SmallPackId"/> and
+        /// <see cref="LargePackId"/>, in that order. A new array on each call.
+        /// </summary>
+        public static GoldPack[] GoldPacks() => new[]
+        {
+            new GoldPack(SmallPackId, SmallPackGold),
+            new GoldPack(LargePackId, LargePackGold),
+        };
+
         /// <summary>Rules with the test defaults, except the values given.</summary>
         public static MetaRules Build(
             int lifeCap = LifeCap,
@@ -65,7 +87,8 @@ namespace GateRush.Tests
             int livesRefillPrice = LivesRefillPrice,
             JokerAmounts? startingJokers = null,
             IReadOnlyList<StreakReward> streakRewards = null,
-            int clockBonusSeconds = ClockBonusSeconds) =>
+            int clockBonusSeconds = ClockBonusSeconds,
+            IReadOnlyList<GoldPack> goldPacks = null) =>
             new MetaRules(
                 lifeCap,
                 lifeRegenInterval ?? TimeSpan.FromMinutes(LifeRegenMinutes),
@@ -74,6 +97,7 @@ namespace GateRush.Tests
                 livesRefillPrice,
                 startingJokers ?? new JokerAmounts(StartingClocks, StartingRockets, StartingBrooms),
                 streakRewards ?? StreakRewards(),
-                clockBonusSeconds);
+                clockBonusSeconds,
+                goldPacks ?? GoldPacks());
     }
 }

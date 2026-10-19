@@ -1,4 +1,5 @@
 using System;
+using GateRush.Meta;
 
 namespace GateRush.Runtime
 {
@@ -26,10 +27,18 @@ namespace GateRush.Runtime
         event Action SoundToggleRequested;
 
         /// <summary>
-        /// Raised when the player presses the refill button, which is only
-        /// pressable while <see cref="FrontEndState.CanRefill"/> (D62).
+        /// Raised when the player presses a refill button, on the Store or the
+        /// Lives overlay, which is pressable whenever the lives are not full
+        /// (<see cref="FrontEndState.IsLivesFull"/>), whatever the balance
+        /// (D62, Module 36).
         /// </summary>
         event Action RefillRequested;
+
+        /// <summary>Raised when the player presses a gold pack's price button, with its product id (D72).</summary>
+        event Action<string> GoldPackRequested;
+
+        /// <summary>Raised when the player presses a joker's buy button on the Store, with its kind (D62).</summary>
+        event Action<JokerKind> JokerPurchaseRequested;
 
         /// <summary>
         /// Raised when the player presses any button of the front end, or Back
@@ -66,7 +75,30 @@ namespace GateRush.Runtime
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowNotice(string text);
 
-        /// <summary>Hides the front end.</summary>
+        /// <summary>
+        /// Opens the Not Enough Gold prompt over whatever is showing, with
+        /// <paramref name="shortfall"/>, the gold missing, as the bootstrap
+        /// worked it out. Its Get Gold button selects the Store.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowNotEnoughGold(int shortfall);
+
+        /// <summary>Opens the message prompt saying that a purchase failed and nothing was charged.</summary>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowPurchaseFailed();
+
+        /// <summary>
+        /// Opens the test purchase sheet for <paramref name="offer"/> over
+        /// everything, saying that the store is simulated and no money is
+        /// charged, and calls <paramref name="answer"/> exactly once: true for
+        /// Buy; false for Cancel, Back, the close button, or the front end
+        /// being hidden first.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="answer"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">The front end is not open, or a sheet is already waiting for its answer.</exception>
+        void ConfirmTestPurchase(GoldOffer offer, Action<bool> answer);
+
+        /// <summary>Hides the front end. An open test purchase sheet is answered no.</summary>
         void Hide();
     }
 }

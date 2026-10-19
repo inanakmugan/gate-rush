@@ -1,21 +1,28 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Meta;
+using GateRush.Platform;
 
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Everything the front end shows (Module 35): plain numbers read once
-    /// from the save and the rules by <see cref="Of"/>, so the screens hold
-    /// no rule and every number on them comes from here.
+    /// Everything the front end shows (Modules 35 and 36): plain numbers read
+    /// once from the save, the rules and the purchase service's products by
+    /// <see cref="Of"/>, so the screens hold no rule and every number on them
+    /// comes from here.
     /// </summary>
     /// <remarks>
-    /// Whether the refill is affordable is decided here, not on a screen
-    /// (ARCHITECTURE, UI). The wait to the next life is exact to the tick;
-    /// rounding it for display is the screen's.
+    /// Which gold packs are offered is decided here (<see cref="Runtime.GoldOffers"/>),
+    /// not on a screen (ARCHITECTURE, UI). Whether a purchase is affordable is
+    /// not shown: every purchase can be pressed, and a refusal opens the Not
+    /// Enough Gold prompt (D72). The wait to the next life is exact to the
+    /// tick; rounding it for display is the screen's.
     /// </remarks>
     public readonly struct FrontEndState
     {
+        private readonly JokerAmounts jokerCounts;
+        private readonly JokerAmounts jokerPrices;
+
         private FrontEndState(
             int gold,
             int lives,
@@ -23,9 +30,12 @@ namespace GateRush.Runtime
             TimeSpan? untilNextLife,
             int? campaignLevelNumber,
             int refillPrice,
-            bool canRefill,
+            bool isLivesFull,
             bool isSoundOn,
-            IReadOnlyList<LevelEntry> levels)
+            IReadOnlyList<LevelEntry> levels,
+            JokerAmounts jokerCounts,
+            JokerAmounts jokerPrices,
+            IReadOnlyList<GoldOffer> goldOffers)
         {
             Gold = gold;
             Lives = lives;
@@ -33,9 +43,12 @@ namespace GateRush.Runtime
             UntilNextLife = untilNextLife;
             CampaignLevelNumber = campaignLevelNumber;
             RefillPrice = refillPrice;
-            CanRefill = canRefill;
+            IsLivesFull = isLivesFull;
             IsSoundOn = isSoundOn;
             Levels = levels;
+            this.jokerCounts = jokerCounts;
+            this.jokerPrices = jokerPrices;
+            GoldOffers = goldOffers;
         }
 
         /// <summary>The gold balance.</summary>
@@ -59,8 +72,11 @@ namespace GateRush.Runtime
         /// <summary>What refilling the lives costs (D62).</summary>
         public int RefillPrice { get; }
 
-        /// <summary>True when the lives are not full and the balance covers <see cref="RefillPrice"/>.</summary>
-        public bool CanRefill { get; }
+        /// <summary>
+        /// True when the lives are at the cap: the refill cannot be pressed
+        /// then. Below the cap it can, whatever the balance (Module 36).
+        /// </summary>
+        public bool IsLivesFull { get; }
 
         /// <summary>Whether sound and vibration are on.</summary>
         public bool IsSoundOn { get; }
@@ -73,17 +89,35 @@ namespace GateRush.Runtime
         public IReadOnlyList<LevelEntry> Levels { get; }
 
         /// <summary>
-        /// The front end's state at <paramref name="nowUtc"/>: the gold and
-        /// the lives of <paramref name="meta"/>'s save, the cap and the refill
-        /// price of <paramref name="rules"/> — the rules the save was loaded
-        /// with — the campaign level's number and the level list from
-        /// <paramref name="catalog"/>, which may be null when the level order
-        /// is unusable, and <paramref name="isSoundOn"/>. Reading the lives
-        /// settles them, which needs no save (<see cref="MetaGame"/>).
+        /// The gold packs the Store shows (D72): only those the rules and the
+        /// purchase service both know, in the rules' order, with the service's
+        /// price text. Never null for a state built by <see cref="Of"/>.
         /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="meta"/> or <paramref name="rules"/> is null.</exception>
+        public IReadOnlyList<GoldOffer> GoldOffers { get; }
+
+        /// <summary>How many of <paramref name="kind"/> the campaign's inventory holds.</summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public int JokerCount(JokerKind kind) => jokerCounts.Of(kind);
+
+        /// <summary>What one <paramref name="kind"/> costs in the store (D62).</summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public int JokerPrice(JokerKind kind) => jokerPrices.Of(kind);
+
+        /// <summary>
+        /// The front end's state at <paramref name="nowUtc"/>: the gold, the
+        /// lives and the jokers of <paramref name="meta"/>'s save; the cap, the
+        /// prices and the gold packs of <paramref name="rules"/> — the rules the
+        /// save was loaded with; the campaign level's number and the level
+        /// list from <paramref name="catalog"/>, which may be null when the
+        /// level order is unusable; <paramref name="isSoundOn"/>; and the gold
+        /// offers, priced from <paramref name="products"/>, the purchase
+        /// service's. Reading the lives settles them, which needs no save
+        /// (<see cref="MetaGame"/>).
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="meta"/>, <paramref name="rules"/> or <paramref name="products"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="nowUtc"/> is not of <see cref="DateTimeKind.Utc"/>.</exception>
-        public static FrontEndState Of(MetaGame meta, MetaRules rules, DateTime nowUtc, LevelCatalog catalog, bool isSoundOn)
+        public static FrontEndState Of(
+            MetaGame meta, MetaRules rules, DateTime nowUtc, LevelCatalog catalog, bool isSoundOn, IReadOnlyList<StoreProduct> products)
         {
             if (meta == null)
             {
@@ -95,27 +129,34 @@ namespace GateRush.Runtime
                 throw new ArgumentNullException(nameof(rules));
             }
 
+            if (products == null)
+            {
+                throw new ArgumentNullException(nameof(products));
+            }
+
             var save = meta.Save;
             var lives = save.Lives.CountAt(nowUtc);
             var isFull = save.Lives.IsFullAt(nowUtc);
-            var gold = save.Wallet.Balance;
-            var price = rules.LivesRefillPrice;
 
             // The position is an index into the level order; the player counts from 1.
             int? campaignNumber = CampaignLevels.TryGetLevel(catalog, meta.CampaignPosition, out _)
                 ? meta.CampaignPosition + 1
                 : (int?)null;
 
+            var jokers = save.Jokers;
             return new FrontEndState(
-                gold,
+                save.Wallet.Balance,
                 lives,
                 rules.LifeCap,
                 save.Lives.UntilNextLifeAt(nowUtc),
                 campaignNumber,
-                price,
-                !isFull && gold >= price,
+                rules.LivesRefillPrice,
+                isFull,
                 isSoundOn,
-                LevelsOf(catalog, save.Completed));
+                LevelsOf(catalog, save.Completed),
+                new JokerAmounts(jokers.CountOf(JokerKind.Clock), jokers.CountOf(JokerKind.Rocket), jokers.CountOf(JokerKind.Broom)),
+                new JokerAmounts(rules.JokerPrice(JokerKind.Clock), rules.JokerPrice(JokerKind.Rocket), rules.JokerPrice(JokerKind.Broom)),
+                Runtime.GoldOffers.Match(rules.GoldPacks, products));
         }
 
         /// <summary>

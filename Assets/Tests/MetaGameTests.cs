@@ -15,7 +15,9 @@ namespace GateRush.Tests
     /// balance covers and never touches the lifetime gold; and Module 33's
     /// <see cref="MetaGame.TryUseJoker"/> takes a held joker, else buys and
     /// uses one without adding it to the inventory, else changes nothing,
-    /// never touching the streak, the position or the lives (D65).
+    /// never touching the streak, the position or the lives (D65). Module
+    /// 36's <see cref="MetaGame.ReportGoldPurchase"/> adds a pack's gold to
+    /// the balance only and touches nothing else; an unknown id throws.
     /// </summary>
     public class MetaGameTests
     {
@@ -356,6 +358,57 @@ namespace GateRush.Tests
             Assert.AreEqual(balance, save.Wallet.Balance);
             Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
             Assert.AreEqual(1, save.Lives.CountAt(clock.UtcNow));
+        }
+
+        [Test]
+        public void ReportGoldPurchase_KnownId_AddsPackGoldToBalanceOnlyAndReturnsIt()
+        {
+            var save = Save(new Wallet(Reward, Reward), Lives.Full(rules), new WinStreak(0, 0), new CampaignProgress(0));
+            var game = Game(save);
+
+            var added = game.ReportGoldPurchase(MetaRulesFixture.LargePackId);
+
+            Assert.AreEqual(MetaRulesFixture.LargePackGold, added);
+            Assert.AreEqual(Reward + MetaRulesFixture.LargePackGold, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned, "bought gold never enters the lifetime gold (D22)");
+        }
+
+        [Test]
+        public void ReportGoldPurchase_UnknownId_ThrowsAndChangesNothing()
+        {
+            var save = Save(new Wallet(Reward, Reward), Lives.Full(rules), new WinStreak(0, 0), new CampaignProgress(0));
+            var game = Game(save);
+
+            Assert.Throws<ArgumentException>(() => game.ReportGoldPurchase("not_a_pack"));
+
+            Assert.AreEqual(Reward, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
+        }
+
+        [Test]
+        public void ReportGoldPurchase_NullId_Throws()
+        {
+            var game = Game(SaveData.CreateDefault(rules));
+
+            Assert.Throws<ArgumentNullException>(() => game.ReportGoldPurchase(null));
+        }
+
+        [Test]
+        public void ReportGoldPurchase_KnownId_LeavesStreakLivesJokersAndPosition()
+        {
+            var jokers = Holding(JokerKind.Broom, HeldOfTheUsedKind);
+            var save = Save(new Wallet(Reward, Reward), new Lives(rules, LivesHeld, clock.UtcNow),
+                new WinStreak(StreakCurrent, StreakBest), new CampaignProgress(Position), jokers);
+            var before = Snapshot(save.Jokers);
+            var game = Game(save);
+
+            game.ReportGoldPurchase(MetaRulesFixture.SmallPackId);
+
+            Assert.AreEqual(StreakCurrent, save.Streak.Current);
+            Assert.AreEqual(StreakBest, save.Streak.Best);
+            Assert.AreEqual(Position, game.CampaignPosition);
+            Assert.AreEqual(LivesHeld, save.Lives.CountAt(clock.UtcNow));
+            AssertSameJokers(before, save.Jokers);
         }
 
         [Test]

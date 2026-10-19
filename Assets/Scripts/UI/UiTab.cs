@@ -3,7 +3,7 @@ namespace GateRush.UI
     /// <summary>The front end's tabs, left to right along the tab bar (Module 35, D68).</summary>
     public enum UiTab
     {
-        /// <summary>The store; its goods arrive with Module 6.2.</summary>
+        /// <summary>The store: gold packs, jokers and the lives refill (Module 36).</summary>
         Store,
 
         /// <summary>Home: the top bar's numbers, the streak area and Play. Selected at start.</summary>

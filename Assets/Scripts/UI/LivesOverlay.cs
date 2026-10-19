@@ -10,8 +10,9 @@ namespace GateRush.UI
     /// <summary>
     /// The Lives overlay (Module 35, D62): the lives as "3/5", "Full" or the
     /// time to the next life, and the refill button with its price, pressable
-    /// only when <see cref="FrontEndState.CanRefill"/>. It stays open as lives
-    /// come back; the player closes it.
+    /// whenever the lives are not full (<see cref="FrontEndState.IsLivesFull"/>),
+    /// whatever the balance: too little gold opens the Not Enough Gold prompt
+    /// (Module 36). It stays open as lives come back; the player closes it.
     /// </summary>
     /// <remarks>
     /// A button that cannot be pressed shows the grey sprite through its
@@ -37,7 +38,7 @@ namespace GateRush.UI
         /// <summary>Raised when the close button is pressed.</summary>
         public event Action CloseRequested;
 
-        /// <summary>Raised when the refill button is pressed; it is pressable only while the refill is possible.</summary>
+        /// <summary>Raised when the refill button is pressed; it is pressable whenever the lives are not full.</summary>
         public event Action RefillRequested;
 
         /// <summary>Shows the lives and the refill of <paramref name="state"/>.</summary>
@@ -46,8 +47,9 @@ namespace GateRush.UI
             livesLabel.text = HomeTexts.LivesFraction(state.Lives, state.LifeCap, config);
             statusLabel.text = HomeTexts.LivesStatus(state.UntilNextLife, config);
             refillLabel.text = HomeTexts.Refill(state.RefillPrice, config);
-            refillButton.interactable = state.CanRefill;
-            refillLabel.color = state.CanRefill ? config.ButtonLabelColor : config.DisabledButtonLabelColor;
+            var canPress = !state.IsLivesFull;
+            refillButton.interactable = canPress;
+            refillLabel.color = canPress ? config.ButtonLabelColor : config.DisabledButtonLabelColor;
         }
 
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>

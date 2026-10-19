@@ -7,13 +7,14 @@ namespace GateRush.Meta
     /// The numbers the meta game runs on (Modules 30, 31 and 33): how many
     /// lives a player can hold and how long one takes to come back (D59), the
     /// gold and jokers a new player starts with (D59, D61), the store's prices
-    /// (D62), the win streak's reward table (D61) and the seconds a Clock adds
-    /// (D65). Built by <c>Runtime</c> from
+    /// (D62), the win streak's reward table (D61), the seconds a Clock adds
+    /// (D65) and the gold packs sold for real money (Module 36, D72). Built by
+    /// <c>Runtime</c> from
     /// its configuration asset; this assembly holds no default of its own, so
     /// every default — a new player's, and that of a section an older save
     /// lacks (D60) — comes from one instance of this class.
     /// </summary>
-    /// <remarks>Immutable: the reward table is copied on construction.</remarks>
+    /// <remarks>Immutable: the reward table and the gold packs are copied on construction.</remarks>
     public sealed class MetaRules
     {
         private readonly JokerAmounts jokerPrices;
@@ -26,9 +27,10 @@ namespace GateRush.Meta
         /// <paramref name="livesRefillPrice"/> or a starting count is negative,
         /// or <paramref name="clockBonusSeconds"/> is below 1.
         /// </exception>
-        /// <exception cref="ArgumentNullException"><paramref name="streakRewards"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="streakRewards"/> or <paramref name="goldPacks"/> is null.</exception>
         /// <exception cref="ArgumentException">
-        /// <paramref name="streakRewards"/> has a problem <see cref="StreakReward.ProblemsOf"/> reports.
+        /// <paramref name="streakRewards"/> has a problem <see cref="StreakReward.ProblemsOf"/> reports, or
+        /// <paramref name="goldPacks"/> one <see cref="GoldPack.ProblemsOf"/> reports.
         /// </exception>
         public MetaRules(
             int lifeCap,
@@ -38,7 +40,8 @@ namespace GateRush.Meta
             int livesRefillPrice,
             JokerAmounts startingJokers,
             IReadOnlyList<StreakReward> streakRewards,
-            int clockBonusSeconds)
+            int clockBonusSeconds,
+            IReadOnlyList<GoldPack> goldPacks)
         {
             if (lifeCap < 1)
             {
@@ -93,6 +96,23 @@ namespace GateRush.Meta
                     nameof(clockBonusSeconds), clockBonusSeconds, "The Clock's bonus seconds must be positive.");
             }
 
+            if (goldPacks == null)
+            {
+                throw new ArgumentNullException(nameof(goldPacks));
+            }
+
+            var packProblems = GoldPack.ProblemsOf(goldPacks);
+            if (packProblems.Count > 0)
+            {
+                throw new ArgumentException($"The gold packs are invalid: {packProblems[0]}", nameof(goldPacks));
+            }
+
+            var packs = new GoldPack[goldPacks.Count];
+            for (var i = 0; i < packs.Length; i++)
+            {
+                packs[i] = goldPacks[i];
+            }
+
             var rewards = new StreakReward[streakRewards.Count];
             for (var i = 0; i < rewards.Length; i++)
             {
@@ -107,6 +127,7 @@ namespace GateRush.Meta
             this.startingJokers = startingJokers;
             StreakRewards = Array.AsReadOnly(rewards);
             ClockBonusSeconds = clockBonusSeconds;
+            GoldPacks = Array.AsReadOnly(packs);
         }
 
         /// <summary>The most lives a player holds; lives never come back above it. At least 1.</summary>
@@ -133,6 +154,14 @@ namespace GateRush.Meta
         /// Clock whose use was checked always adds time.
         /// </summary>
         public int ClockBonusSeconds { get; }
+
+        /// <summary>
+        /// The gold packs sold for real money (D72), in the store's order:
+        /// each product id not blank and unique, each pack's gold at least 1.
+        /// May be empty: the store sells no gold. A pack's price is the
+        /// purchase service's, not a rule.
+        /// </summary>
+        public IReadOnlyList<GoldPack> GoldPacks { get; }
 
         /// <summary>What one <paramref name="kind"/> costs in the store (D62). Never negative.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>

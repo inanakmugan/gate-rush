@@ -1,6 +1,6 @@
 namespace GateRush.UI
 {
-    /// <summary>The pages that open over a tab, newest on top (Module 35).</summary>
+    /// <summary>The pages that open over a tab, newest on top (Modules 35 and 36).</summary>
     public enum UiOverlay
     {
         /// <summary>The sound toggle and the Levels button.</summary>
@@ -10,6 +10,15 @@ namespace GateRush.UI
         Levels,
 
         /// <summary>The lives, the time to the next and the refill (D62).</summary>
-        Lives
+        Lives,
+
+        /// <summary>The shortfall of a purchase refused for want of gold, and Get Gold (D72).</summary>
+        NotEnoughGold,
+
+        /// <summary>A title, a line and an OK button: a purchase that failed.</summary>
+        Message,
+
+        /// <summary>The simulated store's confirmation of a gold pack, Buy or Cancel (D72).</summary>
+        TestPurchase
     }
 }
