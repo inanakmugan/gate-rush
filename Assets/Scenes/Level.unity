@@ -749,6 +749,7 @@ MonoBehaviour:
   level: {fileID: 4900000, guid: 2688dad6665041a47b0559f6587f984e, type: 3}
   config: {fileID: 11400000, guid: 9cd3ac5d10531b440817f895710981e1, type: 2}
   metaConfig: {fileID: 11400000, guid: d566c0aa31d589449b78ab3ab9ed0025, type: 2}
+  simulatedStore: {fileID: 11400000, guid: c68c6f8265107614f94cb4bb2162aca9, type: 2}
   boardCamera: {fileID: 519420031}
   boardView: {fileID: 1462388029}
   backgroundView: {fileID: 1379113321}

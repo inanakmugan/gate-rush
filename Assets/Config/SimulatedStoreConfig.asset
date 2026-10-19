@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f77e73985fe30364dbd407562492e3f6, type: 3}
+  m_Name: SimulatedStoreConfig
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.SimulatedStoreConfig
+  products:
+  - productId: gold_small
+    priceText: $0.99
+  - productId: gold_medium
+    priceText: $2.49
+  - productId: gold_large
+    priceText: $4.99
