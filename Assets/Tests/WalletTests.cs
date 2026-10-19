@@ -9,7 +9,8 @@ namespace GateRush.Tests
     /// the starting gold and no lifetime gold (D22); earning raises both,
     /// spending lowers only the balance and never below zero; zero changes
     /// nothing, a negative amount throws, and sums stop at
-    /// <see cref="int.MaxValue"/>.
+    /// <see cref="int.MaxValue"/>. Module 36's bought gold raises the balance
+    /// only (D22, D72).
     /// </summary>
     public class WalletTests
     {
@@ -113,6 +114,39 @@ namespace GateRush.Tests
 
             Assert.AreEqual(int.MaxValue, wallet.Balance);
             Assert.AreEqual(int.MaxValue, wallet.LifetimeEarned);
+        }
+
+        [Test]
+        public void AddPurchased_Amount_RaisesBalanceAndLeavesLifetime()
+        {
+            var wallet = new Wallet(Balance, LifetimeEarned);
+
+            wallet.AddPurchased(Amount);
+
+            Assert.AreEqual(Balance + Amount, wallet.Balance);
+            Assert.AreEqual(LifetimeEarned, wallet.LifetimeEarned);
+        }
+
+        [Test]
+        public void AddPurchased_NegativeAmount_ThrowsAndChangesNothing()
+        {
+            var wallet = new Wallet(Balance, LifetimeEarned);
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => wallet.AddPurchased(-1));
+
+            Assert.AreEqual(Balance, wallet.Balance);
+            Assert.AreEqual(LifetimeEarned, wallet.LifetimeEarned);
+        }
+
+        [Test]
+        public void AddPurchased_PastIntMax_StopsAtIntMax()
+        {
+            var wallet = new Wallet(int.MaxValue - 1, LifetimeEarned);
+
+            wallet.AddPurchased(Amount);
+
+            Assert.AreEqual(int.MaxValue, wallet.Balance);
+            Assert.AreEqual(LifetimeEarned, wallet.LifetimeEarned);
         }
 
         [Test]

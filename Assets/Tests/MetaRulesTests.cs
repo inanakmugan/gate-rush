@@ -11,7 +11,9 @@ namespace GateRush.Tests
     /// starting jokers each throw; a reward table out of order, with a
     /// repeated or non-positive Wins, or a count below 1 throws; Module 33's
     /// Clock seconds that are not positive throw; an empty table is allowed;
-    /// and valid values are carried as given, the table as a copy.
+    /// and valid values are carried as given, the table as a copy. Module
+    /// 36's gold packs: a null list, a blank or repeated id, or gold below 1
+    /// throws; an empty list is allowed; the packs are carried as a copy.
     /// </summary>
     public class MetaRulesTests
     {
@@ -34,6 +36,21 @@ namespace GateRush.Tests
                 .SetName("Constructor_RewardTableWithNegativeWins_Throws");
             yield return new TestCaseData((object)new[] { new StreakReward(4, JokerKind.Clock, 0) })
                 .SetName("Constructor_RewardTableWithCountZero_Throws");
+        }
+
+        /// <summary>Gold pack lists each with one problem, named by the problem.</summary>
+        public static IEnumerable<TestCaseData> PacksWithAProblem()
+        {
+            yield return new TestCaseData((object)new[] { new GoldPack(string.Empty, 10) })
+                .SetName("Constructor_GoldPackWithEmptyId_Throws");
+            yield return new TestCaseData((object)new[] { new GoldPack("  ", 10) })
+                .SetName("Constructor_GoldPackWithBlankId_Throws");
+            yield return new TestCaseData((object)new[] { new GoldPack("a", 10), new GoldPack("a", 20) })
+                .SetName("Constructor_GoldPacksWithRepeatedId_Throws");
+            yield return new TestCaseData((object)new[] { new GoldPack("a", 0) })
+                .SetName("Constructor_GoldPackWithZeroGold_Throws");
+            yield return new TestCaseData((object)new[] { new GoldPack("a", -5) })
+                .SetName("Constructor_GoldPackWithNegativeGold_Throws");
         }
 
         [TestCase(0)]
@@ -84,7 +101,42 @@ namespace GateRush.Tests
         public void Constructor_NullRewards_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null, ClockSeconds));
+                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null, ClockSeconds,
+                MetaRulesFixture.GoldPacks()));
+        }
+
+        [Test]
+        public void Constructor_NullGoldPacks_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => new MetaRules(
+                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7),
+                MetaRulesFixture.StreakRewards(), ClockSeconds, null));
+        }
+
+        [TestCaseSource(nameof(PacksWithAProblem))]
+        public void Constructor_GoldPacksWithAProblem_Throws(GoldPack[] packs)
+        {
+            Assert.Throws<ArgumentException>(() => MetaRulesFixture.Build(goldPacks: packs));
+        }
+
+        [Test]
+        public void Constructor_EmptyGoldPacks_IsAllowed()
+        {
+            var rules = MetaRulesFixture.Build(goldPacks: Array.Empty<GoldPack>());
+
+            CollectionAssert.IsEmpty(rules.GoldPacks);
+        }
+
+        [Test]
+        public void GoldPacks_SourceChangedAfterConstruction_IsUnchanged()
+        {
+            var packs = MetaRulesFixture.GoldPacks();
+            var rules = MetaRulesFixture.Build(goldPacks: packs);
+            var first = packs[0];
+
+            packs[0] = new GoldPack("changed", 1);
+
+            Assert.AreEqual(first, rules.GoldPacks[0]);
         }
 
         [TestCase(0)]
@@ -106,9 +158,10 @@ namespace GateRush.Tests
         public void Constructor_ValidValues_CarriesThem()
         {
             var table = new[] { new StreakReward(2, JokerKind.Broom, 4), new StreakReward(9, JokerKind.Clock, 1) };
+            var packs = new[] { new GoldPack("first", 18), new GoldPack("second", 19) };
 
             var rules = new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds);
+                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds, packs);
 
             Assert.AreEqual(Cap, rules.LifeCap);
             Assert.AreEqual(Interval, rules.LifeRegenInterval);
@@ -122,6 +175,7 @@ namespace GateRush.Tests
             Assert.AreEqual(17, rules.StartingJokers(JokerKind.Broom));
             CollectionAssert.AreEqual(table, rules.StreakRewards);
             Assert.AreEqual(ClockSeconds, rules.ClockBonusSeconds);
+            CollectionAssert.AreEqual(packs, rules.GoldPacks);
         }
 
         [Test]

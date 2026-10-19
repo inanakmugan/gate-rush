@@ -66,6 +66,19 @@ namespace GateRush.Meta
         }
 
         /// <summary>
+        /// Adds bought gold (Module 36, D72) to the balance only, stopping at
+        /// <see cref="int.MaxValue"/>. The lifetime gold counts gold earned by
+        /// playing, which the leaderboard ranks on (D22, D70), so bought gold
+        /// never enters it: a rank cannot be bought.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="amount"/> is negative.</exception>
+        public void AddPurchased(int amount)
+        {
+            ThrowIfNegative(amount);
+            Balance = AddCapped(Balance, amount);
+        }
+
+        /// <summary>
         /// Takes <paramref name="amount"/> from the balance when it holds that
         /// much. False, with nothing changed, when it does not. The lifetime
         /// gold is never touched.

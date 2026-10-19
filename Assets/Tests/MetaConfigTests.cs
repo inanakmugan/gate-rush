@@ -16,7 +16,9 @@ namespace GateRush.Tests
     /// naming the field; so are Module 33's Clock seconds that are not
     /// positive and a negative free-play allowance, where 0 is accepted; an
     /// empty table is accepted; <see cref="MetaConfig.ToRules"/> carries the
-    /// values over; and the free-play allowance is read back as set.
+    /// values over; and the free-play allowance is read back as set. Module
+    /// 36's gold packs with an empty or repeated id, or gold below 1, are
+    /// reported, and are carried over to the rules.
     /// </summary>
     public class MetaConfigTests
     {
@@ -27,6 +29,8 @@ namespace GateRush.Tests
         private const string ClockBonusSecondsField = "clockBonusSeconds";
         private const string FreePlayJokersPerLevelField = "freePlayJokersPerLevel";
         private const string StreakRewardsLabel = "Streak Rewards";
+        private const string GoldPacksField = "goldPacks";
+        private const string GoldPacksLabel = "Gold Packs";
 
         private MetaConfig config;
 
@@ -208,6 +212,55 @@ namespace GateRush.Tests
             Assert.AreEqual(33, rules.StartingJokers(JokerKind.Broom));
             CollectionAssert.AreEqual(table, rules.StreakRewards);
             Assert.AreEqual(41, rules.ClockBonusSeconds);
+        }
+
+        [TestCase("", 10, TestName = "Problems_GoldPackWithEmptyId_IsReported")]
+        [TestCase("pack", 0, TestName = "Problems_GoldPackWithZeroGold_IsReported")]
+        [TestCase("pack", -1, TestName = "Problems_GoldPackWithNegativeGold_IsReported")]
+        public void Problems_GoldPackWithAProblem_IsReported(string productId, int gold)
+        {
+            SetGoldPacks(new GoldPack(productId, gold));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(GoldPacksLabel), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_GoldPacksWithRepeatedId_IsReported()
+        {
+            SetGoldPacks(new GoldPack("pack", 10), new GoldPack("pack", 20));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(GoldPacksLabel), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void ToRules_SetGoldPacks_CarriesThemOver()
+        {
+            var packs = new[] { new GoldPack("first", 70), new GoldPack("second", 80) };
+            SetGoldPacks(packs);
+
+            var rules = config.ToRules();
+
+            CollectionAssert.AreEqual(packs, rules.GoldPacks);
+        }
+
+        private void SetGoldPacks(params GoldPack[] packs)
+        {
+            var serialized = new SerializedObject(config);
+            var entries = serialized.FindProperty(GoldPacksField);
+            Assert.IsNotNull(entries, $"MetaConfig has no serialized field '{GoldPacksField}'.");
+            entries.arraySize = packs.Length;
+            for (var i = 0; i < packs.Length; i++)
+            {
+                var entry = entries.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("productId").stringValue = packs[i].ProductId;
+                entry.FindPropertyRelative("gold").intValue = packs[i].Gold;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
         private void SetInt(string field, int value)
