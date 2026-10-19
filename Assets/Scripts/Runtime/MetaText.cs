@@ -4,9 +4,9 @@ using System.Globalization;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// The meta game's texts on the prototype front end (Module 32, D64):
-    /// formatting only, every text from <see cref="RuntimeConfig"/>'s format
-    /// strings. The numbers are the caller's, read from <c>MetaGame</c> and
+    /// The meta game's texts on the HUD and the result panel (Module 32,
+    /// D64): formatting only, every text from <see cref="RuntimeConfig"/>'s
+    /// format strings. The front end's texts are <c>HomeTexts</c>' (Module 35). The numbers are the caller's, read from <c>MetaGame</c> and
     /// <c>MetaRules</c>; nothing here decides a rule.
     /// </summary>
     /// <remarks>
@@ -53,22 +53,6 @@ namespace GateRush.Runtime
         {
             Require(texts);
             return string.Format(CultureInfo.InvariantCulture, texts.GoldEarnedFormat, gold);
-        }
-
-        /// <summary>The time to the next life, for the no-lives page.</summary>
-        /// <exception cref="ArgumentNullException"><paramref name="texts"/> is null.</exception>
-        public static string NextLife(TimeSpan untilNext, RuntimeConfig texts)
-        {
-            Require(texts);
-            return string.Format(CultureInfo.InvariantCulture, texts.NextLifeFormat, Wait(untilNext));
-        }
-
-        /// <summary>The refill button's label, with <paramref name="price"/> from the rules.</summary>
-        /// <exception cref="ArgumentNullException"><paramref name="texts"/> is null.</exception>
-        public static string Refill(int price, RuntimeConfig texts)
-        {
-            Require(texts);
-            return string.Format(CultureInfo.InvariantCulture, texts.RefillFormat, price);
         }
 
         /// <summary>

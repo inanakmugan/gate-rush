@@ -297,12 +297,9 @@ namespace GateRush.Tests
         {
             var problems = config.Problems();
 
-            // Every message about the menu, the HUD's menu button and the
-            // result panel's new line names one of these.
+            // Every message about the menu buttons, the HUD's menu button and
+            // the result panel names one of these.
             Assert.That(problems, Has.None.Contains("Menu "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Level Select "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Level Tile "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Level Tick "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("Result "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
         }
@@ -314,13 +311,6 @@ namespace GateRush.Tests
             Assert.AreEqual("Thanks for playing!", config.AllDoneMessage);
         }
 
-        [TestCase("gameTitle", "Game Title")]
-        [TestCase("playLabel", "Play Label")]
-        [TestCase("levelsLabel", "Levels Label")]
-        [TestCase("soundOnLabel", "Sound On Label")]
-        [TestCase("soundOffLabel", "Sound Off Label")]
-        [TestCase("levelSelectTitle", "Level Select Title")]
-        [TestCase("backLabel", "Back Label")]
         [TestCase("menuLabel", "Menu Label")]
         [TestCase("allDoneMessage", "All Done Message")]
         public void Problems_EmptyNewText_IsReportedByName(string field, string shownName)
@@ -332,17 +322,8 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
         }
 
-        [TestCase("menuTitleHeightUnits", "Menu Title Height Units")]
-        [TestCase("menuTitleWidthUnits", "Menu Title Width Units")]
-        [TestCase("menuTitleFontSize", "Menu Title Font Size")]
-        [TestCase("levelSelectTitleFontSize", "Level Select Title Font Size")]
         [TestCase("menuButtonCornerUnits", "Menu Button Corner Units")]
         [TestCase("menuButtonFontSize", "Menu Button Font Size")]
-        [TestCase("levelTileSizeUnits", "Level Tile Size Units")]
-        [TestCase("levelTileCornerUnits", "Level Tile Corner Units")]
-        [TestCase("levelTileFontSize", "Level Tile Font Size")]
-        [TestCase("levelTickSizeUnits", "Level Tick Size Units")]
-        [TestCase("levelTickThicknessUnits", "Level Tick Thickness Units")]
         [TestCase("resultMessageHeightUnits", "Result Message Height Units")]
         [TestCase("resultMessageFontSize", "Result Message Font Size")]
         public void Problems_NonPositiveNewSize_IsReportedByName(string field, string shownName)
@@ -365,18 +346,6 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_NoLevelSelectColumns_IsReportedByName()
-        {
-            var serialized = new SerializedObject(config);
-            serialized.FindProperty("levelSelectColumns").intValue = 0;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Level Select Columns must be at least 1"), string.Join(" | ", problems));
         }
 
         [Test]
@@ -495,8 +464,6 @@ namespace GateRush.Tests
             Assert.That(problems, Has.None.Contains("Meta "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("Format"), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("Confirm "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Menu Notice "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Menu Wide "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
         }
 
@@ -508,17 +475,12 @@ namespace GateRush.Tests
             Assert.AreEqual("You will lose a life.", config.LoseLifeMessage);
             Assert.AreEqual("Lose a life", config.LoseLifeLabel);
             Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
-            Assert.AreEqual("No lives left", config.NoLivesTitle);
             Assert.AreEqual("Free Play", config.FreePlayLabel);
             Assert.AreEqual("All levels played. Play any level from Settings.", config.CampaignDoneNotice);
-            Assert.AreEqual("Settings", config.SettingsLabel);
         }
 
-        [TestCase("settingsLabel", "Settings Label")]
-        [TestCase("settingsTitle", "Settings Title")]
         [TestCase("freePlayLabel", "Free Play Label")]
         [TestCase("campaignDoneNotice", "Campaign Done Notice")]
-        [TestCase("noLivesTitle", "No Lives Title")]
         [TestCase("leaveLevelTitle", "Leave Level Title")]
         [TestCase("restartLevelTitle", "Restart Level Title")]
         [TestCase("loseLifeMessage", "Lose Life Message")]
@@ -528,8 +490,6 @@ namespace GateRush.Tests
         [TestCase("livesFullFormat", "Lives Full Format")]
         [TestCase("livesWaitingFormat", "Lives Waiting Format")]
         [TestCase("goldEarnedFormat", "Gold Earned Format")]
-        [TestCase("nextLifeFormat", "Next Life Format")]
-        [TestCase("refillFormat", "Refill Format")]
         public void Problems_EmptyMetaText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -564,8 +524,6 @@ namespace GateRush.Tests
         [TestCase("livesFullFormat", "Lives Full Format", "{0}/{2}")]
         [TestCase("livesWaitingFormat", "Lives Waiting Format", "{0}/{1} {3}")]
         [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
-        [TestCase("nextLifeFormat", "Next Life Format", "{1}")]
-        [TestCase("refillFormat", "Refill Format", "({1})")]
         [TestCase("goldFormat", "Gold Format", "Gold {0")]
         public void Problems_UnusableMetaFormat_IsReportedByName(string field, string shownName, string format)
         {
@@ -586,10 +544,6 @@ namespace GateRush.Tests
             Assert.That(problems, Has.None.Contains("Lives Waiting Format"), string.Join(" | ", problems));
         }
 
-        [TestCase("menuMetaHeightUnits", "Menu Meta Height Units")]
-        [TestCase("menuMetaFontSize", "Menu Meta Font Size")]
-        [TestCase("menuNoticeHeightUnits", "Menu Notice Height Units")]
-        [TestCase("menuNoticeFontSize", "Menu Notice Font Size")]
         [TestCase("hudMetaHeightUnits", "Hud Meta Height Units")]
         [TestCase("hudMetaFontSize", "Hud Meta Font Size")]
         public void Problems_NonPositiveMetaSize_IsReportedByName(string field, string shownName)
@@ -601,7 +555,6 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
         }
 
-        [TestCase("menuWideButtonSizeUnits", "Menu Wide Button Size Units")]
         [TestCase("confirmPanelSizeUnits", "Confirm Panel Size Units")]
         public void Problems_NonPositiveMetaVectorSize_IsReportedByName(string field, string shownName)
         {
