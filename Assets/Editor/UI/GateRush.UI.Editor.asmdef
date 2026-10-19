@@ -1,0 +1,21 @@
+{
+    "name": "GateRush.UI.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GateRush.UI",
+        "GateRush.Runtime",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

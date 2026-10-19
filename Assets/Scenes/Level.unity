@@ -134,7 +134,6 @@ GameObject:
   - component: {fileID: 483171906}
   - component: {fileID: 483171907}
   - component: {fileID: 483171908}
-  - component: {fileID: 483171909}
   - component: {fileID: 483171910}
   - component: {fileID: 483171911}
   m_Layer: 5
@@ -218,7 +217,8 @@ RectTransform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0, y: 0, z: 0}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 888999348}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -262,18 +262,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e6b3d1b4e8b33ce42959f7d83149ad85, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.IntroductionCard
---- !u!114 &483171909
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 483171901}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d70eea984fa882a4492030db2dffbdbb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.MenuScreen
 --- !u!114 &483171910
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -435,6 +423,119 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1001 &888999347
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 483171905}
+    m_Modifications:
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_Pivot.x
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_Pivot.y
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchorMin.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8321163113107196609, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+      propertyPath: m_Name
+      value: Front End
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+--- !u!224 &888999348 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 4372607163616459405, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+  m_PrefabInstance: {fileID: 888999347}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &888999349 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9177642069864973694, guid: 766ecfe575c4a39438d71bd26521f09a, type: 3}
+  m_PrefabInstance: {fileID: 888999347}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9a1ee060fa7f88046a075fe252437930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.FrontEnd
 --- !u!1 &1275668815
 GameObject:
   m_ObjectHideFlags: 0
@@ -655,7 +756,7 @@ MonoBehaviour:
   hudView: {fileID: 483171907}
   introductionCard: {fileID: 483171908}
   resultPanel: {fileID: 483171906}
-  menuScreen: {fileID: 483171909}
+  frontEnd: {fileID: 888999349}
   confirmPrompt: {fileID: 483171910}
   jokerBar: {fileID: 483171911}
   soundPlayer: {fileID: 2009815755}
