@@ -1862,7 +1862,8 @@ portfolio build.
 - The refill price is the same whatever the number of lives missing.
 
 **Rejected.** A refill priced per missing life: harder to read on a button
-for little gain. Real-money products: not in a portfolio build.
+for little gain. Real-money products: not in a portfolio build (reversed by
+D72: gold packs are sold through a simulated purchase service).
 
 ---
 
@@ -2065,7 +2066,8 @@ is tested (ARCHITECTURE, UI).
   removed when Home replaces it.
 - The store sells only what D62 sells, for gold. No real-money purchases,
   live events, notifications (Phase 7), music, social sign-in or account
-  deletion.
+  deletion. (D72 adds gold packs for real money through a simulated
+  purchase service.)
 - English text lives on the prefabs and in configuration; localization
   would be a later module.
 
@@ -2151,5 +2153,49 @@ players expect a toggle of its own.
 
 **Rejected.** A name only on the leaderboard: Profile is the natural
 place. Free-form avatars (photos): needs storage and moderation.
+
+---
+
+## D72 — Gold is sold for real money through a purchase service; the first one is simulated
+
+**Decision.** The Store sells gold packs for real money as well as the
+jokers and the refill of D62. Purchases go through an `IPurchaseService`
+in `Platform`. The first implementation, `SimulatedPurchaseService`,
+charges nothing: every purchase opens a test sheet that names the pack
+and its price, says that the store is simulated and no money is charged,
+and asks Buy or Cancel. The Store page says the same in a line that is
+never hidden. A pack's gold is a rule in `Meta`; its price text belongs to
+the service. Bought gold goes into the balance and never into the lifetime
+gold. When a gold purchase is refused for want of gold, a Not Enough Gold
+prompt gives the shortfall and a Get Gold button to the Store's packs.
+Three packs: 500 gold for $0.99, 1,500 for $2.49 and 4,000 for $4.99;
+they are configuration.
+
+**Why.** A store that sells only for gold cannot help a player who is out
+of gold, so there is nothing to route to. The money loop, gold running
+short, an offer, a purchase, is the core of a free-to-play puzzle game and
+what the studios this portfolio targets build every day; it has to be
+shown working. A service interface keeps a real store a new
+implementation, as `ISaveStore` does and `ILeaderboardService` will
+(D70), and
+the simulated one keeps the build honest: nobody can mistake it for a
+real charge.
+
+**Consequences.**
+- D62's rejection of real-money products and D68's "no real-money
+  purchases" are reversed for gold packs only. Jokers and the refill are
+  still bought with gold.
+- The leaderboard ranks on lifetime gold (D22, D70), so buying gold
+  cannot raise a player's rank.
+- No save change: gold already lives in the save, and a simulated store
+  has no receipts to keep.
+- The in-level purchase of a joker when the gold is short (D65) is routed
+  in 6.6, with the level's own interface.
+
+**Rejected.** A Store that sells only for gold with a dead "Not enough
+gold" message: shows nothing of the loop. A free gold gift in place of
+packs: a new rule that still would not show a purchase. A sheet that
+imitates Google Play or the App Store: it would look like a real charge.
+Counting bought gold in lifetime gold: the ranking could be bought.
 
 ---
