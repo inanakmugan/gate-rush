@@ -2096,8 +2096,9 @@ were checked.
 - Art can be replaced later on the prefabs without code changes.
 - Only the sprites the screens use are imported, at the packs' larger
   size, so they stay sharp on phones.
-- Fredoka is imported as a TextMeshPro font asset that covers Turkish
-  characters, so player names can use them.
+- Fredoka is imported as a TextMeshPro font asset. It lacks six Turkish
+  letters, among them Ğ, İ and Ş; the interface is English, and a
+  fallback font comes with Module 6.4, before player names can use them.
 
 **Rejected.** The reference game's assets: not ours. Drawing art now: not
 the point of this phase. Plain rectangles: a portfolio screen should look

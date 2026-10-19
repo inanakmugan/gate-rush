@@ -21,7 +21,9 @@ gold, lives that come back on a real-time clock, a win streak that pays
 jokers, the store's rules and a campaign, shown in plain text, with every
 level open in free play from Settings. The jokers are playable (Phase 5):
 a bar under the board, the Clock on a press, the Rocket and the Broom on a
-tap of a block. Sound effects and haptics came forward from Phase 7. The
+tap of a block. The interface is under way (Phase 6): the menu is a
+front end of tabs, overlays and a top bar, built from uGUI prefabs. Sound
+effects and haptics came forward from Phase 7. The
 itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -104,7 +106,7 @@ Meta            economy, lives         no engine references
 Platform        service interfaces     no engine references
 Serialization   JSON DTOs
 Runtime         MonoBehaviours, DOTween, input
-UI              screens and navigation (Phase 6; the menu lives in Runtime)
+UI              screens and navigation, uGUI prefabs (Phase 6)
 ```
 
 Full write-up: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -132,7 +134,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,021 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,073 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 

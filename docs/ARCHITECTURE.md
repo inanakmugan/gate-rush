@@ -121,10 +121,23 @@ animation, pointer input, the level countdown, and the visibility overlay
 Home, Store, Leaderboard, Profile, Settings, Win Streak. Screens hold no rules.
 A screen never computes whether the player can afford something; it asks `Meta`.
 
-Not created yet: it arrives with Phase 6. Until then the only screens, the
-prototype menu (Modules 23 and 32, D50, D64), the confirmation prompt
-(Module 32) and the joker bar (Module 34), live in `Runtime/UI` inside the
-`Runtime` assembly.
+`GateRush.UI` (Module 35, D68) references `Runtime`, `Meta` and `Platform`,
+and nothing references it. `Runtime` reaches it only through `IFrontEnd`:
+`LevelBootstrap` holds the front end as a MonoBehaviour field and casts it.
+`FrontEnd` shows the `FrontEndState` it is given and raises an event for
+every request; the bootstrap decides what follows. `UiNavigation`, plain
+C#, keeps the selected tab and the overlay stack. Texts, formats and
+colours set from code live in `UiConfig`.
+
+The screens are uGUI prefabs under `Assets/Prefabs/UI`. The shared parts
+are laid out by hand; the pages, the overlays and the front end that
+holds them are written by an Editor builder in `GateRush.UI.Editor`
+(*Gate Rush → Build UI Prefabs*), which nests the hand-made prefabs and
+never writes them.
+
+The level's own interface, the HUD, the result panel, the confirmation
+prompt (Module 32) and the joker bar (Module 34), is still built from code
+in `Runtime`; it moves to prefabs in 6.6.
 
 ---
 

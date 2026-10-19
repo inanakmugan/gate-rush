@@ -164,8 +164,9 @@ screens hold no rules, and that every number a screen shows comes from
   icon for close, grey for a button that cannot be pressed. Panels use
   `button_square_flat`. Icons come from `Kenney/GameIcons` and
   `Kenney/BoardGameIcons`, tinted from `UiConfig`.
-- Text is TextMeshPro with a Fredoka Bold font asset; it must cover
-  Turkish letters, so player names of 6.4 can use them.
+- Text is TextMeshPro with a Fredoka Bold font asset. Fredoka lacks six
+  Turkish letters (see Resolved); 6.4 adds a fallback font before player
+  names can use them.
 - The background is a flat colour from `UiConfig`, the reference game's
   purple.
 - Every colour set from code is a `UiConfig` field; colours that never
@@ -235,3 +236,44 @@ screens hold no rules, and that every number a screen shows comes from
   shows the notice.
 - Back closes overlays one at a time; leaving a level returns to Home.
 - The layout holds on a tall phone and in the web build's window.
+
+---
+
+## Resolved during implementation
+
+- **Parts.** `FrontEnd` finds the parts of the prefabs only through
+  serialized fields on small views: `TopBar`, `TabBar` and its
+  `TabButton`s, `HomeScreen`, `LevelButton` and the three overlays.
+  `FrontEnd.MissingSetup()` names any part left unassigned, and needs a
+  Canvas above the front end.
+- **Open and closed.** `Show` and `Hide` switch the front end's own
+  GameObject, so nothing in it runs while it is closed; the prefab is
+  saved inactive. The overlays share one parent and stack by sibling
+  order. Back is the Escape key, Android's back button under the Input
+  System.
+- **The level grid.** Its buttons are created from the Level Button
+  prefab the first time the grid is shown, and again only when the count
+  changes; every later show updates the numbers and marks in place.
+- **Tints.** `UiTint` colours are applied when the front end opens, and by
+  the grid for the buttons it creates. In prefab mode tinted graphics show
+  white.
+- **Prefabs built from code.** The owner laid out the four buttons, Level
+  Button, Top Bar, Tab Bar and Home Page by hand. Store Page, Leaderboard
+  Page, the Settings, Levels and Lives overlays and Front End are written
+  by *Gate Rush → Build UI Prefabs*, in the Editor-only
+  `GateRush.UI.Editor` assembly under `Assets/Editor/UI`. It nests the
+  hand-made prefabs as linked instances and never writes them, checks
+  every input before the first save, and assembles in a preview scene, so
+  the open scene is never touched. A rebuild keeps each prefab's GUID but
+  not the file IDs inside it, so `LevelBootstrap`'s reference to the front
+  end is checked again after one.
+- **Safe area.** Pages, Top Bar and Tab Bar sit under `Safe`; `Overlays`
+  is a direct child of the front end's root, so the scrims cover the
+  safe-area insets too.
+- **Font.** Fredoka's import reports six missing Turkish letters, among
+  them Ğ, İ and Ş. The interface is English, so this module needs none of
+  them; 6.4 adds a fallback font.
+- **Sprites.** The Kenney sprites are imported as Single with Full Rect
+  meshes. `audioOn` and `audioOff` came sliced and were set to Single for
+  the builder, which refuses a sprite that imports as more than one.
+- **Tests.** 52 new, 8 of them for the builder; 2,073 in all.
