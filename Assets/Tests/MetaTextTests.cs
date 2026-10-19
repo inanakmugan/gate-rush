@@ -123,26 +123,6 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void NextLife_Wait_UsesTheConfigFormat()
-        {
-            SetString("nextLifeFormat", "back at {0}");
-
-            var text = MetaText.NextLife(new TimeSpan(0, 12, 34), config);
-
-            Assert.AreEqual("back at 12:34", text);
-        }
-
-        [Test]
-        public void Refill_Price_UsesTheConfigFormatAndThePriceGiven()
-        {
-            SetString("refillFormat", "fill for {0}");
-
-            var text = MetaText.Refill(123, config);
-
-            Assert.AreEqual("fill for 123", text);
-        }
-
-        [Test]
         public void Lives_NoConfig_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => MetaText.Lives(1, 5, null, null));

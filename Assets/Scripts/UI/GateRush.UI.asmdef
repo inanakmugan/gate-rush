@@ -1,0 +1,21 @@
+{
+    "name": "GateRush.UI",
+    "rootNamespace": "",
+    "references": [
+        "GateRush.Runtime",
+        "GateRush.Meta",
+        "GateRush.Platform",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -21,8 +21,9 @@ namespace GateRush.Runtime
     /// active; it builds one <c>Jokers</c> child under its own transform, last
     /// among the canvas's children when <see cref="Initialize"/> runs. The
     /// bootstrap initialises it right after the HUD, so the introduction
-    /// card, the result panel, the menu and the confirmation, built later,
-    /// all draw over it.</para>
+    /// card, the result panel and the confirmation, built later,
+    /// all draw over it. The front end (Module 35), a scene object under the
+    /// canvas, ends up beneath it, and the bar is hidden while it shows.</para>
     /// <para><b>Placement.</b> The <c>Jokers</c> rect is anchored to the band
     /// the camera keeps free below the board, starting at the safe area's
     /// bottom (<see cref="ScreenBands.BottomBandAnchors"/>), and re-anchored

@@ -8,7 +8,7 @@ using UnityEngine;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Opens the game on the menu and builds the level the menu picks from its
+    /// Opens the game on the front end and builds the level it picks from its
     /// JSON <see cref="TextAsset"/>: the <see cref="LevelSession"/> and its
     /// <see cref="LevelRun"/> with the countdown, the plain helpers they need,
     /// and the views that draw them. Runs the countdown, feeds the HUD, shows
@@ -17,10 +17,14 @@ namespace GateRush.Runtime
     /// reload, so nothing here is static.
     /// </summary>
     /// <remarks>
-    /// <para><b>Menu (Module 23, D50).</b> A plain Play and the player build
-    /// open on <see cref="MenuScreen"/>'s title page with no level loaded: no
-    /// board, no countdown, the HUD hidden and the input controller unbound.
-    /// Menu, from the HUD or the result panel, abandons the level
+    /// <para><b>Front end (Module 35, D68).</b> A plain Play and the player
+    /// build open on the front end's Home (<see cref="IFrontEnd"/>) with no
+    /// level loaded: no board, no countdown, the HUD hidden and the input
+    /// controller unbound. The front end is a <c>GateRush.UI</c> component
+    /// held as a <see cref="MonoBehaviour"/>, so this assembly never
+    /// references the screens; it shows the <see cref="FrontEndState"/> built
+    /// here and raises events, and every decision stays here. Menu, from the
+    /// HUD or the result panel, abandons the level and opens Home
     /// (<see cref="GoToMenu"/>). A level that is won is recorded in
     /// <see cref="CompletedLevels"/>, and the whole save is saved through
     /// <see cref="SaveRepository"/> at once.</para>
@@ -29,21 +33,21 @@ namespace GateRush.Runtime
     /// run; Restart keeps it. Play and Next after a campaign win start the
     /// campaign level, the one at <see cref="MetaGame.CampaignPosition"/>
     /// (<see cref="CampaignLevels.TryGetLevel"/>), and only with a life left;
-    /// with none, the menu's no-lives page opens. The level select, Next
+    /// with none, the front end's Lives overlay opens. The level grid, Next
     /// after a free-play win and every development tool start free play.
     /// This is the only caller of <see cref="MetaGame"/>: a campaign win is
     /// reported where it is decided, a campaign loss when the countdown runs
     /// out or the player confirms leaving or restarting a level being
-    /// played, and a refill from the no-lives page; every call that changed
+    /// played, and a refill from the Lives overlay; every call that changed
     /// the save is followed by one <see cref="SaveOrWarn"/>, a loss's even
     /// when no life was left to lose. Leaving or restarting a campaign level
     /// being played asks first (<see cref="ConfirmPrompt"/>), with the
     /// countdown stopped and the board and the HUD's buttons held. A
     /// campaign win's panel has no Restart: a won campaign level is never
-    /// replayed. The meta lines are rebuilt only when the lives, the second
-    /// to the next life or the gold they show have changed. With no usable
-    /// level order the select is hidden and Play starts <see cref="level"/>
-    /// as free play.</para>
+    /// replayed. The HUD's meta line and the front end are refreshed only
+    /// when the lives, the second to the next life or the gold have changed.
+    /// With no usable level order the level grid is empty and Play starts
+    /// <see cref="level"/> as free play.</para>
     /// <para>A level or config that cannot be used logs the reason and draws
     /// nothing. A level whose time budget is not positive logs an error and
     /// plays without a countdown, so an unfinished level stays testable.</para>
@@ -62,7 +66,7 @@ namespace GateRush.Runtime
     /// level order, or any level while that order is unusable, shows none
     /// either.</para>
     /// <para><b>Development tools (Module 21).</b> In the editor, a level the
-    /// editor tools asked for (<see cref="DevLevelOverride"/>) skips the menu
+    /// editor tools asked for (<see cref="DevLevelOverride"/>) skips Home
     /// and is played at once, for one Play session. In the editor and in development builds, Page Down and Page Up
     /// (<c>DevKeys</c>) go to the next and previous level through the same
     /// load as Next. A release build has neither. Both play free play: no
@@ -73,7 +77,7 @@ namespace GateRush.Runtime
     /// here play the cues — a move's from <see cref="MoveCues"/> as each
     /// stage of its presentation starts, the timer's from
     /// <see cref="TimerTicks"/>. Voices are stopped on a restart, a level
-    /// change and the way to the menu. The menu's sound button flips
+    /// change and the way to the front end. The front end's sound toggle flips
     /// <see cref="SoundSetting"/>, and the whole save is saved at once. With no Sound Player or Sound Config assigned, one error is
     /// logged and the game runs silently; the config's problems — a fresh
     /// one has no clips — are logged once, at start, and never stop the
@@ -115,12 +119,12 @@ namespace GateRush.Runtime
         /// </summary>
         public const string LevelsResourcePath = "Levels";
 
-        [Tooltip("The level Play starts, as free play, only when the level order is unusable (two files in Assets/Resources/Levels sharing a level id, or none); otherwise Play starts the campaign level and this is not read. The Level Editor's Play button and Gate Rush > Play Level… skip the menu and start on their level for one Play session. In the editor and in development builds, Page Down goes to the next level and Page Up to the previous one, in level order, at any moment a level is played; at the last or first level the key only logs a line. A release build has neither. Every one of these development tools plays free play: no life needed or lost, no gold.")]
+        [Tooltip("The level Play starts, as free play, only when the level order is unusable (two files in Assets/Resources/Levels sharing a level id, or none); otherwise Play starts the campaign level and this is not read. The Level Editor's Play button and Gate Rush > Play Level… skip Home and start on their level for one Play session. In the editor and in development builds, Page Down goes to the next level and Page Up to the previous one, in level order, at any moment a level is played; at the last or first level the key only logs a line. A release build has neither. Every one of these development tools plays free play: no life needed or lost, no gold.")]
         [SerializeField] private TextAsset level;
 
         [SerializeField] private RuntimeConfig config;
 
-        [Tooltip("The life cap, the minutes a life takes to come back, a new player's gold and jokers, the store's prices (the jokers and the lives refill the no-lives page sells) and the win streak's reward table: Assets/Config/MetaConfig.asset. The save cannot be read without them, so left empty, or with a problem, it logs an error and nothing is drawn.")]
+        [Tooltip("The life cap, the minutes a life takes to come back, a new player's gold and jokers, the store's prices (the jokers and the lives refill the Lives overlay sells) and the win streak's reward table: Assets/Config/MetaConfig.asset. The save cannot be read without them, so left empty, or with a problem, it logs an error and nothing is drawn.")]
         [SerializeField] private MetaConfig metaConfig;
 
         [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
@@ -141,13 +145,13 @@ namespace GateRush.Runtime
         [Tooltip("The result panel on the canvas.")]
         [SerializeField] private ResultPanel resultPanel;
 
-        [Tooltip("The menu on the canvas: the title screen, Settings, the level select and the no-lives page, shown while no level is loaded.")]
-        [SerializeField] private MenuScreen menuScreen;
+        [Tooltip("The front end (Module 35): drag the FrontEnd component of the Front End instance under the canvas — the component's header, not the GameObject. Home, its tabs and overlays, shown while no level is loaded. It must implement IFrontEnd and report no missing part; otherwise an error is logged and nothing is drawn.")]
+        [SerializeField] private MonoBehaviour frontEnd;
 
         [Tooltip("The confirmation on the canvas before Menu or Restart costs a life while a campaign level is played (Module 32). Drawn over everything else on the canvas.")]
         [SerializeField] private ConfirmPrompt confirmPrompt;
 
-        [Tooltip("The joker bar on the canvas: the Clock, Rocket and Broom buttons in the bottom band, shown with the HUD (Module 34). Drawn under the introduction card, the result panel, the menu and the confirmation.")]
+        [Tooltip("The joker bar on the canvas: the Clock, Rocket and Broom buttons in the bottom band, shown with the HUD (Module 34). Drawn under the introduction card, the result panel and the confirmation; hidden while the front end shows.")]
         [SerializeField] private JokerBar jokerBar;
 
         [Tooltip("Plays the sound cues and vibration pulses (Module 25). Left empty, the game runs silently and logs one error.")]
@@ -166,6 +170,10 @@ namespace GateRush.Runtime
 
         private bool isUsable;
         private LevelCatalog catalog;
+
+        // The front end as the interface it must implement; set by
+        // HasEverythingAssigned, and only read once that has passed.
+        private IFrontEnd frontEndView;
 
         // Where the save is kept, the save itself, the rules it was loaded
         // with, the clock and the meta game over them. All are made in Awake
@@ -200,7 +208,7 @@ namespace GateRush.Runtime
         // game silent (no Sound Player or no Sound Config assigned).
         private bool hasSound;
 
-        // Null while the menu shows: no level is loaded.
+        // Null while the front end shows: no level is loaded.
         private LevelRun run;
 
         // The session whose time bonuses the HUD shows; null while not
@@ -241,7 +249,7 @@ namespace GateRush.Runtime
         {
             // Taken before anything can return: taking clears the override, so
             // even a scene that draws nothing leaves the next plain Play a
-            // plain Play, opening on the menu.
+            // plain Play, opening on Home.
             var hasOverride = DevLevelOverride.TryTake(out var overrideName);
 
             if (!HasEverythingAssigned())
@@ -261,13 +269,15 @@ namespace GateRush.Runtime
 
             // Each puts what it builds last among the canvas's children, so
             // this order — after the HUD, which puts itself first — leaves the
-            // card over the HUD, the result panel over the card, and the menu
-            // over all of them; the menu never shows together with the others.
-            // The confirmation comes last and draws over everything; nothing
-            // it covers can be open together with it.
+            // card over the HUD, and the result panel over the card. The front
+            // end, a prefab instance under the canvas, stays where the scene
+            // put it: after the HUD and before everything built here, so the
+            // card, the panel and the confirmation draw over it, and nothing
+            // under it is open together with it. The confirmation comes last
+            // and draws over everything; nothing it covers can be open
+            // together with it.
             introductionCard.Initialize(config);
             resultPanel.Initialize(config);
-            menuScreen.Initialize(config);
             confirmPrompt.Initialize(config);
 
             boardCamera.orthographic = true;
@@ -286,14 +296,14 @@ namespace GateRush.Runtime
 
             if (!TryGetOverrideLevel(hasOverride, overrideName, out var overrideLevel) || !Load(overrideLevel, PlayMode.FreePlay))
             {
-                ShowMenu();
+                ShowHome();
             }
         }
 
         /// <summary>
         /// The level the editor tools asked this Play session to start on
         /// (<see cref="DevLevelOverride"/>, Module 21), when it is a level file
-        /// that loads: it is played at once, skipping the menu. False for a
+        /// that loads: it is played at once, skipping Home. False for a
         /// plain Play; an override naming no such file is reported and
         /// ignored, which also leaves a plain Play. Outside the editor there
         /// is never an override.
@@ -310,7 +320,7 @@ namespace GateRush.Runtime
                 }
 
                 Debug.LogWarning(
-                    $"{warning} It must be a level in Resources/{LevelsResourcePath}; the title screen opens instead.",
+                    $"{warning} It must be a level in Resources/{LevelsResourcePath}; Home opens instead.",
                     this);
             }
 #endif
@@ -368,29 +378,32 @@ namespace GateRush.Runtime
             hasSound = true;
         }
 
-        /// <summary>Makes the sound player and the menu's sound button follow the save's sound setting.</summary>
+        /// <summary>
+        /// Makes the sound player follow the save's sound setting. The front
+        /// end's toggle reads it from <see cref="FrontEndState.IsSoundOn"/>.
+        /// </summary>
         private void ApplySoundSetting()
         {
             if (hasSound)
             {
                 soundPlayer.IsOn = save.Sound.IsOn;
             }
-
-            menuScreen.ShowSound(save.Sound.IsOn);
         }
 
         /// <summary>
-        /// The menu's sound button: turns sound and vibration off or on
-        /// together and saves the choice at once. Turning off stops what is
-        /// playing; turning on affects the next cue. A save that fails is
-        /// logged and the game goes on; the choice then lasts for this
-        /// session.
+        /// The front end's sound toggle: turns sound and vibration off or on
+        /// together, saves the choice at once and shows it on the toggle.
+        /// Turning off stops what is playing; turning on affects the next cue.
+        /// A save that fails is logged and the game goes on; the choice then
+        /// lasts for this session.
         /// </summary>
         private void OnSoundToggleRequested()
         {
             save.Sound.IsOn = !save.Sound.IsOn;
             ApplySoundSetting();
             SaveOrWarn("The sound setting was changed, but saving it failed; it is remembered until the game is closed.");
+            ForgetShownMeta();
+            RefreshMeta();
         }
 
         /// <summary>
@@ -547,14 +560,15 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Rebuilds the meta lines when what they show has changed: on the
-        /// menu, the title page's gold and lives and, on the no-lives page,
-        /// the time to the next life — that page gives way to the title page
-        /// as soon as a life is back; during a campaign level, the HUD's lives
-        /// and gold; during free play, the HUD's Free Play and gold, which no
-        /// passing second changes. Reads the clock once, and allocates
-        /// nothing when nothing changed, so it runs every frame. Reading the
-        /// lives settles them, which needs no save (<see cref="MetaGame"/>).
+        /// Shows the meta game again when what is shown has changed: with no
+        /// level loaded, the front end's whole state, which a passing second
+        /// changes only while a life is coming back — an open Lives overlay
+        /// stays open as lives come back; during a campaign level, the HUD's
+        /// lives and gold; during free play, the HUD's Free Play and gold,
+        /// which no passing second changes. Reads the clock once, and
+        /// allocates nothing when nothing changed, so it runs every frame.
+        /// Reading the lives settles them, which needs no save
+        /// (<see cref="MetaGame"/>).
         /// </summary>
         private void RefreshMeta()
         {
@@ -575,6 +589,16 @@ namespace GateRush.Runtime
             shownWaitSeconds = waitSeconds;
             shownGold = gold;
 
+            if (run == null)
+            {
+                if (frontEndView.IsOpen)
+                {
+                    frontEndView.Refresh(FrontEndStateAt(nowUtc));
+                }
+
+                return;
+            }
+
             var goldText = MetaText.Gold(gold, config);
             if (isFreePlay)
             {
@@ -583,46 +607,33 @@ namespace GateRush.Runtime
             }
 
             var livesText = MetaText.Lives(count, metaRules.LifeCap, untilNext, config);
-            if (run != null)
-            {
-                hudView.ShowMeta(MetaText.Joined(livesText, goldText, config));
-                return;
-            }
-
-            menuScreen.ShowMeta(MetaText.Joined(goldText, livesText, config));
-            if (menuScreen.IsOpen && menuScreen.Page == MenuPage.NoLives)
-            {
-                if (count > 0)
-                {
-                    menuScreen.ShowTitlePage();
-                }
-                else if (untilNext.HasValue)
-                {
-                    menuScreen.ShowNextLife(MetaText.NextLife(untilNext.Value, config));
-                }
-            }
+            hudView.ShowMeta(MetaText.Joined(livesText, goldText, config));
         }
 
-        /// <summary>Makes the next <see cref="RefreshMeta"/> rebuild every meta line, for a new page or level.</summary>
+        /// <summary>Makes the next <see cref="RefreshMeta"/> show everything again, for a new screen, level or setting.</summary>
         private void ForgetShownMeta()
         {
             hasShownMeta = false;
         }
 
         /// <summary>
-        /// Opens the menu's title page over the background, with the meta
-        /// line read afresh and the level select listing every level of the
-        /// level order and its completed mark. With no usable level order the
-        /// select is empty, which hides the Levels button.
+        /// What the front end shows at <paramref name="nowUtc"/>: the one place
+        /// its state is built (<see cref="FrontEndState.Of"/>).
         /// </summary>
-        private void ShowMenu()
+        private FrontEndState FrontEndStateAt(DateTime nowUtc) =>
+            FrontEndState.Of(metaGame, metaRules, nowUtc, catalog, save.Sound.IsOn);
+
+        /// <summary>
+        /// Opens the front end on Home over the background, with its state read
+        /// afresh: the gold, the lives, the campaign level and the level grid
+        /// with every level of the level order and its completed mark. With no
+        /// usable level order the grid is empty.
+        /// </summary>
+        private void ShowHome()
         {
             hudView.Hide();
             jokerBar.Hide();
-            var entries = catalog != null
-                ? MenuLevels.Entries(catalog, save.Completed)
-                : Array.Empty<MenuLevelEntry>();
-            menuScreen.ShowTitle(entries, string.Empty);
+            frontEndView.Show(FrontEndStateAt(clock.UtcNow));
             ForgetShownMeta();
             RefreshMeta();
 
@@ -632,15 +643,16 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Abandons the level being played and opens the menu (Module 23).
-        /// Reports nothing: the callers that cost a life have reported it.
-        /// Does nothing while the menu already shows.
+        /// Abandons the level being played and opens Home (Module 35): what
+        /// Menu on the HUD and on the result panel does. Reports nothing: the
+        /// callers that cost a life have reported it. Does nothing while no
+        /// level is loaded.
         /// </summary>
         private void GoToMenu()
         {
             if (LeaveLevel())
             {
-                ShowMenu();
+                ShowHome();
             }
         }
 
@@ -680,7 +692,7 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Play on the title page: the campaign level (D58). With no usable
+        /// Play on Home: the campaign level (D58). With no usable
         /// level order — or no level in it — the scene's <see cref="level"/>
         /// as free play, logged once.
         /// </summary>
@@ -707,26 +719,26 @@ namespace GateRush.Runtime
         /// Starts the campaign level, the one at
         /// <see cref="MetaGame.CampaignPosition"/> in the level order — from
         /// Play, or from Next after a campaign win. Past the last level the
-        /// campaign is over: the title page says so and nothing starts, lives
-        /// or none. With no life left the no-lives page opens instead
+        /// campaign is over: Home's notice says so and nothing starts, lives
+        /// or none. With no life left the Lives overlay opens instead
         /// (D57). Starting spends nothing.
         /// </summary>
         private void StartCampaignLevel()
         {
             if (!CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out var campaignName))
             {
-                if (!menuScreen.IsOpen)
+                if (!frontEndView.IsOpen)
                 {
                     GoToMenu();
                 }
 
-                menuScreen.ShowNotice(config.CampaignDoneNotice);
+                frontEndView.ShowNotice(config.CampaignDoneNotice);
                 return;
             }
 
             if (!metaGame.CanStartCampaignLevel())
             {
-                ShowNoLivesPage();
+                ShowLivesOverlay();
                 return;
             }
 
@@ -736,31 +748,26 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Leaves any level being played and opens the menu's no-lives page:
-        /// the time to the next life, and the refill, priced from the rules
-        /// and pressable only when the balance covers it (D62).
+        /// Leaves any level being played, opens Home when it was not already
+        /// open, and opens the Lives overlay over the current tab: the time to
+        /// the next life, and the refill, priced from the rules and pressable
+        /// only when the balance covers it (D62, <see cref="FrontEndState.CanRefill"/>).
+        /// It stays open as lives come back; the player closes it.
         /// </summary>
-        private void ShowNoLivesPage()
+        private void ShowLivesOverlay()
         {
-            LeaveLevel();
-            ShowMenu();
+            if (LeaveLevel() || !frontEndView.IsOpen)
+            {
+                ShowHome();
+            }
 
-            var price = metaRules.LivesRefillPrice;
-            var untilNext = metaGame.Save.Lives.UntilNextLifeAt(clock.UtcNow);
-
-            // With no life left the lives are never full, so the wait is never
-            // null here; a zero wait reads 00:00 and the next refresh moves on.
-            menuScreen.ShowNoLives(
-                MetaText.NextLife(untilNext ?? TimeSpan.Zero, config),
-                MetaText.Refill(price, config),
-                metaGame.Save.Wallet.Balance >= price);
-            ForgetShownMeta();
+            frontEndView.ShowLives();
         }
 
         /// <summary>
-        /// The no-lives page's refill button (D62): refills the lives and
-        /// saves, then opens the title page. Lives that came back meanwhile
-        /// and are full cost nothing and open the title page too.
+        /// The Lives overlay's refill button (D62): refills the lives and
+        /// saves, then opens Home with no overlay, ready to play. Lives that
+        /// came back meanwhile and are full cost nothing and open Home too.
         /// </summary>
         private void OnRefillRequested()
         {
@@ -768,10 +775,10 @@ namespace GateRush.Runtime
             {
                 case PurchaseResult.Bought:
                     SaveOrWarn("The lives were refilled, but saving that failed; the refill is remembered until the game is closed.");
-                    menuScreen.ShowTitlePage();
+                    ShowHome();
                     break;
                 case PurchaseResult.AlreadyFull:
-                    menuScreen.ShowTitlePage();
+                    ShowHome();
                     break;
                 case PurchaseResult.NotEnoughGold:
                     // The button is not pressable then, so this is a bug.
@@ -782,7 +789,7 @@ namespace GateRush.Runtime
             ForgetShownMeta();
         }
 
-        /// <summary>A level's button on the level select: that level as free play, whatever is completed (D58).</summary>
+        /// <summary>A level's button in the level grid: that level as free play, whatever is completed (D58).</summary>
         private void OnLevelRequested(string requestedName)
         {
             if (levelAssets.TryGetValue(requestedName, out var asset))
@@ -791,7 +798,7 @@ namespace GateRush.Runtime
                 return;
             }
 
-            Debug.LogError($"The level select asked for '{requestedName}', which is not a level that loaded; nothing changes.", this);
+            Debug.LogError($"The level grid asked for '{requestedName}', which is not a level that loaded; nothing changes.", this);
         }
 
         private void OnEnable()
@@ -808,10 +815,10 @@ namespace GateRush.Runtime
             resultPanel.RestartRequested += OnRestartRequested;
             resultPanel.NextRequested += Next;
             resultPanel.MenuRequested += GoToMenu;
-            menuScreen.PlayRequested += OnPlayRequested;
-            menuScreen.LevelRequested += OnLevelRequested;
-            menuScreen.SoundToggleRequested += OnSoundToggleRequested;
-            menuScreen.RefillRequested += OnRefillRequested;
+            frontEndView.PlayRequested += OnPlayRequested;
+            frontEndView.LevelRequested += OnLevelRequested;
+            frontEndView.SoundToggleRequested += OnSoundToggleRequested;
+            frontEndView.RefillRequested += OnRefillRequested;
             confirmPrompt.Confirmed += OnConfirmed;
             confirmPrompt.Cancelled += OnConfirmCancelled;
             boardView.LeaveStarted += OnLeaveStarted;
@@ -821,7 +828,7 @@ namespace GateRush.Runtime
             hudView.ButtonPressed += OnButtonPressed;
             introductionCard.ButtonPressed += OnButtonPressed;
             resultPanel.ButtonPressed += OnButtonPressed;
-            menuScreen.ButtonPressed += OnButtonPressed;
+            frontEndView.ButtonPressed += OnButtonPressed;
             confirmPrompt.ButtonPressed += OnButtonPressed;
             inputController.BoardTapped += OnBoardTapped;
             jokerBar.JokerPressed += OnJokerPressed;
@@ -846,10 +853,10 @@ namespace GateRush.Runtime
             resultPanel.RestartRequested -= OnRestartRequested;
             resultPanel.NextRequested -= Next;
             resultPanel.MenuRequested -= GoToMenu;
-            menuScreen.PlayRequested -= OnPlayRequested;
-            menuScreen.LevelRequested -= OnLevelRequested;
-            menuScreen.SoundToggleRequested -= OnSoundToggleRequested;
-            menuScreen.RefillRequested -= OnRefillRequested;
+            frontEndView.PlayRequested -= OnPlayRequested;
+            frontEndView.LevelRequested -= OnLevelRequested;
+            frontEndView.SoundToggleRequested -= OnSoundToggleRequested;
+            frontEndView.RefillRequested -= OnRefillRequested;
             confirmPrompt.Confirmed -= OnConfirmed;
             confirmPrompt.Cancelled -= OnConfirmCancelled;
             boardView.LeaveStarted -= OnLeaveStarted;
@@ -859,7 +866,7 @@ namespace GateRush.Runtime
             hudView.ButtonPressed -= OnButtonPressed;
             introductionCard.ButtonPressed -= OnButtonPressed;
             resultPanel.ButtonPressed -= OnButtonPressed;
-            menuScreen.ButtonPressed -= OnButtonPressed;
+            frontEndView.ButtonPressed -= OnButtonPressed;
             confirmPrompt.ButtonPressed -= OnButtonPressed;
             inputController.BoardTapped -= OnBoardTapped;
             jokerBar.JokerPressed -= OnJokerPressed;
@@ -874,7 +881,7 @@ namespace GateRush.Runtime
         {
             if (run == null)
             {
-                // The menu: no level, so nothing ticks; only the background
+                // The front end: no level, so nothing ticks; only the background
                 // follows the screen.
                 if (isUsable)
                 {
@@ -921,11 +928,11 @@ namespace GateRush.Runtime
         /// Replaces whatever is being played with <paramref name="asset"/>,
         /// started afresh and played as <paramref name="playMode"/>. Its
         /// countdown starts at once, or — when the level introduces mechanics
-        /// — when the last introduction card closes. The menu, if it was
+        /// — when the last introduction card closes. The front end, if it was
         /// showing, closes and the HUD shows. A level being left reports
         /// nothing, an open confirmation included: only the development tools
         /// replace a level being played. A level that fails to load logs the
-        /// reason, changes nothing — a menu that was showing stays — and
+        /// reason, changes nothing — a front end that was showing stays — and
         /// answers false.
         /// </summary>
         private bool Load(TextAsset asset, PlayMode playMode)
@@ -936,7 +943,7 @@ namespace GateRush.Runtime
                 return false;
             }
 
-            menuScreen.Hide();
+            frontEndView.Hide();
             confirmPrompt.Hide();
             hudView.Show();
             jokerBar.Show();
@@ -1060,7 +1067,7 @@ namespace GateRush.Runtime
         /// free play restarts at once. After the level has ended it never
         /// asks: a campaign win cannot be restarted at all — its panel has no
         /// Restart and <b>R</b> does nothing — and a campaign loss restarts
-        /// only with a life left, opening the no-lives page otherwise. Held
+        /// only with a life left, opening the Lives overlay otherwise. Held
         /// while a card or the confirmation is open.
         /// </summary>
         private void OnRestartRequested()
@@ -1085,7 +1092,7 @@ namespace GateRush.Runtime
 
                 if (!metaGame.CanStartCampaignLevel())
                 {
-                    ShowNoLivesPage();
+                    ShowLivesOverlay();
                     return;
                 }
             }
@@ -1142,7 +1149,7 @@ namespace GateRush.Runtime
         /// <summary>
         /// "Lose a life": reports the loss and saves, then leaves or restarts.
         /// A restart needs a life, so with none left after the loss the
-        /// no-lives page opens instead.
+        /// Lives overlay opens instead.
         /// </summary>
         private void OnConfirmed()
         {
@@ -1163,7 +1170,7 @@ namespace GateRush.Runtime
             }
             else
             {
-                ShowNoLivesPage();
+                ShowLivesOverlay();
             }
         }
 
@@ -1686,7 +1693,7 @@ namespace GateRush.Runtime
         {
             // GoToMenu clears the board, which drops this callback; the null
             // check only keeps a report that slipped through from opening a
-            // panel over the menu.
+            // panel over the front end.
             if (run == null || run.Outcome != LevelOutcome.Won)
             {
                 return;
@@ -1898,7 +1905,7 @@ namespace GateRush.Runtime
             if (roster.Catalog == null)
             {
                 Debug.LogError(
-                    $"{roster.CatalogError} The level order is unusable, so the level select and Next are hidden and no introduction card shows; Play starts the scene's level.",
+                    $"{roster.CatalogError} The level order is unusable, so the level grid is empty, Next is hidden and no introduction card shows; Play starts the scene's level.",
                     this);
                 return;
             }
@@ -1947,27 +1954,39 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || hudView == null || introductionCard == null || resultPanel == null || menuScreen == null
+                || hudView == null || introductionCard == null || resultPanel == null || frontEnd == null
                 || confirmPrompt == null || jokerBar == null)
             {
                 Debug.LogError(
                     "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card, " +
-                    "Result Panel, Menu Screen, Confirm Prompt and Joker Bar must all be assigned; nothing is drawn.",
+                    "Result Panel, Front End, Confirm Prompt and Joker Bar must all be assigned; nothing is drawn.",
                     this);
                 return false;
+            }
+
+            frontEndView = frontEnd as IFrontEnd;
+            if (frontEndView == null)
+            {
+                Debug.LogError(
+                    $"LevelBootstrap: Front End holds a {frontEnd.GetType().Name}, which does not implement IFrontEnd; " +
+                    "drag the FrontEnd component of the Front End instance there. Nothing is drawn.",
+                    frontEnd);
+                isAssigned = false;
+            }
+            else
+            {
+                var setupProblem = frontEndView.MissingSetup();
+                if (setupProblem != null)
+                {
+                    Debug.LogError($"{setupProblem} Nothing is drawn.", frontEnd);
+                    isAssigned = false;
+                }
             }
 
             var barProblem = jokerBar.MissingCanvas();
             if (barProblem.Length > 0)
             {
                 Debug.LogError($"{barProblem} Nothing is drawn.", jokerBar);
-                isAssigned = false;
-            }
-
-            var menuProblem = menuScreen.MissingCanvas();
-            if (menuProblem.Length > 0)
-            {
-                Debug.LogError($"{menuProblem} Nothing is drawn.", menuScreen);
                 isAssigned = false;
             }
 
@@ -2005,7 +2024,7 @@ namespace GateRush.Runtime
         /// <summary>What a confirmed prompt does once the life is lost.</summary>
         private enum ConfirmedAction
         {
-            /// <summary>Leave the level for the menu.</summary>
+            /// <summary>Leave the level for Home.</summary>
             Leave,
 
             /// <summary>Restart the level, when a life is left for it.</summary>

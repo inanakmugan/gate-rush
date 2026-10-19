@@ -11,7 +11,9 @@
         "DOTween.Modules",
         "GateRush.Solver",
         "GateRush.Editor",
-        "GateRush.Runtime"
+        "GateRush.Runtime",
+        "GateRush.UI",
+        "GateRush.UI.Editor"
     ],
     "includePlatforms": [
         "Editor"

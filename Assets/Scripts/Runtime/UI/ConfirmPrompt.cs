@@ -20,7 +20,7 @@ namespace GateRush.Runtime
     /// active; it builds one <c>Confirm</c> child under its own transform,
     /// last among the canvas's children when <see cref="Initialize"/> runs,
     /// and shows and hides that child. The bootstrap initialises it last, so
-    /// it draws over the HUD; the card, the result panel and the menu are
+    /// it draws over the HUD; the card, the result panel and the front end are
     /// never open together with it.</para>
     /// <para>The backdrop covers the whole screen, the HUD included, and is a
     /// raycast target: while the prompt shows, a press anywhere but its
