@@ -104,10 +104,13 @@ implementations supplied at startup:
 | `ISaveStore` | Persist and load a string blob | In-memory dictionary |
 | `ITimeProvider` | Current UTC time; the frame delta stays in `Runtime` | Manually advanced clock |
 | `IHaptics` | Vibration feedback | No-op |
+| `IPurchaseService` | Buy a store product for real money (D72) | `SimulatedPurchaseService`, confirm delegate |
 
-`ISaveStore` (Module 23), `IHaptics` (Module 25) and `ITimeProvider`
-(Module 30) exist so far; their implementations, `PlayerPrefsSaveStore`,
-`WebHaptics` and `SystemTimeProvider`, live in `Runtime`. `ILevelSource`
+`ISaveStore` (Module 23), `IHaptics` (Module 25), `ITimeProvider`
+(Module 30) and `IPurchaseService` (Module 36) exist so far; their
+implementations, `PlayerPrefsSaveStore`, `WebHaptics`,
+`SystemTimeProvider` and `SimulatedPurchaseService`, live in `Runtime`.
+The simulated store charges nothing and says so on every purchase. `ILevelSource`
 arrives when something needs it.
 
 ### Runtime — presentation

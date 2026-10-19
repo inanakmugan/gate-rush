@@ -22,7 +22,9 @@ jokers, the store's rules and a campaign, shown in plain text, with every
 level open in free play from Settings. The jokers are playable (Phase 5):
 a bar under the board, the Clock on a press, the Rocket and the Broom on a
 tap of a block. The interface is under way (Phase 6): the menu is a
-front end of tabs, overlays and a top bar, built from uGUI prefabs. Sound
+front end of tabs, overlays and a top bar, built from uGUI prefabs, and
+a Store that sells gold packs through a simulated purchase service that
+charges nothing. Sound
 effects and haptics came forward from Phase 7. The
 itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -134,7 +136,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,073 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,170 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 

@@ -268,3 +268,46 @@ A real store would replace the sheet with its own, through a new
 - The leaderboard's lifetime gold does not grow from a gold purchase
   (checked in the save until 6.5 shows it).
 - The layout holds on a tall phone and in the web build's window.
+
+---
+
+## Resolved during implementation
+
+- **Mismatched packs.** A product id known to the rules or the purchase
+  service but not both is logged as an error when the bootstrap starts,
+  not reported by `MissingSetup`; the game goes on and the Store shows the
+  packs both sides know (`GoldOffers`).
+- **The simulated products** live in a `SimulatedStoreConfig` asset in
+  `Runtime`, assigned on `LevelBootstrap`; a real store replaces the asset
+  with the class. The ribbons are `UiConfig` fields by product id.
+- **The confirm path.** The bootstrap hands the simulated service a
+  delegate that opens the test sheet through `IFrontEnd`, so `Runtime`
+  still never references the UI. The service's answer is one-shot and
+  clears `IsBusy` before `done` runs. On the front end, Buy answers yes;
+  Cancel, the close button, Back and `Hide` all answer no through one
+  path. A purchase started while one waits throws; the bootstrap checks
+  `IsBusy` first, so a press is ignored.
+- **Paid gold** is credited even when the front end closed meanwhile.
+- **Refill.** Bought or already full, the front end refreshes in place:
+  the Lives overlay stays open and shows the lives full, the Store stays.
+  The Lives overlay's button keeps its price label when full and is
+  greyed out; only the Store's reads "Full".
+- **Overlays.** The Message overlay has no close button; OK and Back
+  close it.
+- **Cards.** The joker and refill cards are fixed on the Store page, one
+  `StoreItemCard` type for all four; the gold pack cards are created per
+  offer and rebuilt only when the number of offers changes. Card names
+  and button labels are fixed English text on the prefabs.
+- **Icons.** The joker bar draws text only, so the Store uses CC0 Board
+  Game Icons: `hourglass` for the Clock, and `exploding` and
+  `arrow_horizontal` as stand-ins for the Rocket and the Broom until 6.6.
+  They have a fixed prefab colour, not a `UiTint`, since white icons do
+  not show on the light cards.
+- **The builder** writes ten prefabs, refuses to build when `UiConfig` has
+  problems, gives every tinted graphic its `UiConfig` colour at build time
+  (recorded as overrides on nested hand-made prefabs, whose own files stay
+  white), and sets one scroll sensitivity on every `ScrollRect`: Unity's
+  default of 1 made the mouse wheel crawl at the 1080x1920 reference.
+- **Not checked by hand:** that a gold pack leaves the lifetime gold
+  unchanged; `WalletTests` and `MetaGameTests` cover it.
+- **Tests.** 97 new; 2,170 in all.

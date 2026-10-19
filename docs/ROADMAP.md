@@ -288,7 +288,10 @@ merged.
 
 *Status: in progress.* 6.1 is done: a uGUI front end in `GateRush.UI`
 with three tabs, an overlay stack, the top bar and Home, built from
-prefabs laid out by hand and by an Editor builder (Module 35).
+prefabs laid out by hand and by an Editor builder (Module 35). 6.2 is
+done: the Store sells gold packs through a simulated purchase service, and
+jokers and the refill for gold, with a Not Enough Gold prompt that routes
+to the packs (Module 36, D72).
 
 Home, bottom tabs (Store / Home / Leaderboard), overlay screens (Profile,
 Settings, Win Streak) with a navigation stack, life and gold displays,
@@ -303,7 +306,7 @@ Each spec is written when the module before it is merged.
 | # | Module | Spec | Status |
 |---|---|---|---|
 | 6.1 | UI foundation: the assembly, tabs and overlay stack, theme, shared prefabs, Home (D68, D69) | `Modules/35-ui-foundation.md` | Done |
-| 6.2 | Store: gold packs through a simulated purchase service, jokers and the refill for gold, and Not Enough Gold routing to it (D62, D72) | `Modules/36-store.md` | Planned |
+| 6.2 | Store: gold packs through a simulated purchase service, jokers and the refill for gold, and Not Enough Gold routing to it (D62, D72) | `Modules/36-store.md` | Done |
 | 6.3 | Win Streak: Home's progress bar and the ladder screen (D61) | — | Planned |
 | 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | — | Planned |
 | 6.5 | Leaderboard behind `ILeaderboardService`, local first (D70) | — | Planned |
