@@ -319,7 +319,7 @@ Each spec is written when the module before it is merged.
 | 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | `Modules/38-profile-settings.md` | Done |
 | 6.5 | Leaderboard behind `ILeaderboardService`, the player ranked among labelled demo players (D70, D73) | `Modules/39-leaderboard.md` | Done |
 | 6.6 | The level's HUD and joker bar as prefabs, and gold bought inside a level (D74) | `Modules/40-level-hud.md` | Done |
-| 6.7 | The result panel, the leave and restart confirmation with the streak, and the introduction card in the new theme (D74) | — | Planned |
+| 6.7 | The result panel, the leave and restart confirmation with the streak, and the introduction card in the new theme (D74) | `Modules/41-level-panels.md` | Planned |
 
 ---
 
