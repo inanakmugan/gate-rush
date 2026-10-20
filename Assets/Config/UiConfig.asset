@@ -21,10 +21,48 @@ MonoBehaviour:
   waitFormat: '{0}:{1:00}'
   refillFormat: Refill ({0})
   levelNumberFormat: '{0}'
+  goldAmountFormat: '{0:N0}'
+  goldPriceFormat: '{0}'
+  jokerCountFormat: You have {0}
+  shortfallFormat: You need {0} more gold.
+  goldHeader: Gold
+  jokersHeader: Jokers
+  livesHeader: Lives
+  testStoreNote: 'Test store: purchases are simulated and no money is charged.'
+  testPurchaseTitle: Test Purchase
+  testPurchaseOfferFormat: '{0:N0} gold for {1}'
+  testPurchaseNote: This is a simulated store. No money is charged.
+  purchaseFailedTitle: Purchase failed
+  purchaseFailedText: Nothing was charged. Please try again.
+  ribbons:
+  - productId: gold_medium
+    text: Popular
+  - productId: gold_large
+    text: Best Value
+  streakCountFormat: '{0}'
+  firstRewardFormat: 'Win {0} in a row: {1}'
+  moreWinsFormat: '{0} more wins: {1}'
+  oneMoreWinFormat: '1 more win: {0}'
+  allRewardsCollectedLabel: Every reward collected
+  currentStreakFormat: 'Streak : {0}'
+  bestStreakFormat: 'Best : {0}'
+  ladderWinsFormat: '{0} wins'
+  ladderRewardFormat: '{0} x{1}'
+  markerCountFormat: x{0}
+  collectedLabel: Collected
+  nextLabel: Next
+  streakRuleText: Win campaign levels in a row. A lost level resets the streak. Free
+    play does not count.
+  rewardHeadlineFormat: '{0} wins in a row!'
+  prizeFormat: +{0} {1}
+  clockName: Clock
+  rocketName: Rocket
+  broomName: Broom
   backgroundColor: {r: 0.36, g: 0.2, b: 0.62, a: 1}
   iconColor: {r: 1, g: 1, b: 1, a: 1}
   idleTabIconColor: {r: 1, g: 1, b: 1, a: 0.55}
   coinColor: {r: 1, g: 0.8, b: 0.2, a: 1}
   heartColor: {r: 0.95, g: 0.27, b: 0.36, a: 1}
+  streakColor: {r: 1, g: 0.55, b: 0.12, a: 1}
   buttonLabelColor: {r: 1, g: 1, b: 1, a: 1}
   disabledButtonLabelColor: {r: 0.43, g: 0.44, b: 0.56, a: 1}
