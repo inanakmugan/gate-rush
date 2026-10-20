@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Meta;
+using GateRush.Platform;
 
 namespace GateRush.Runtime
 {
@@ -54,6 +55,15 @@ namespace GateRush.Runtime
 
         /// <summary>Raised when the player presses a joker's buy button on the Store, with its kind (D62).</summary>
         event Action<JokerKind> JokerPurchaseRequested;
+
+        /// <summary>
+        /// Raised when the Leaderboard tab is selected, and when its Retry
+        /// button is pressed (Module 39): the page shows Loading until
+        /// <see cref="ShowLeaderboard"/> brings a result. The bootstrap fetches
+        /// a fresh result each time, so a changed name or avatar shows on the
+        /// next selection.
+        /// </summary>
+        event Action LeaderboardRequested;
 
         /// <summary>
         /// Raised when the player presses any button of the front end, or Back
@@ -132,6 +142,17 @@ namespace GateRush.Runtime
         /// </summary>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowNameRefused();
+
+        /// <summary>
+        /// Shows <paramref name="result"/> on the Leaderboard page (Module 39):
+        /// the rows with the player's marked and scrolled into view and, while
+        /// the result is simulated, the line saying so; or, for a failed
+        /// fetch, the failure line and Retry. Ignored while another tab is
+        /// selected: the next selection asks again.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="result"/> is null.</exception>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowLeaderboard(LeaderboardResult result);
 
         /// <summary>Hides the front end. An open test purchase sheet is answered no.</summary>
         void Hide();
