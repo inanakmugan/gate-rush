@@ -162,3 +162,30 @@ keeps stopping the level through the one pause of Module 40, is not.
 - A level with a new mechanic shows the introduction card in the new
   theme with its drawing, and closes as before.
 - The layout holds on a tall phone and in the web build's window.
+
+---
+
+## Resolved during implementation
+
+- **The title.** The win title is always "Level Complete": a free play
+  win of the last level no longer shows "All Levels Played", and the
+  closing message shows only after the last campaign level. `ResultTitle`
+  is removed.
+- **Where the panels sit.** The result and the confirmation share Level
+  UI's overlays parent but sit beside `LevelOverlayStack`, not in it; the
+  shared-parent check covers all six. `IsPaused` is `IsConfirmOpen ||
+  IsOverlayOpen`. Escape closes the top in-level overlay, else counts as
+  Keep playing on the confirmation, else does nothing.
+- **Sizes.** Next and both Restart buttons are 320 by 140 and the button
+  row spans the panel, so three buttons and Menu fit in 900 units. Lose a
+  life is a Button Primary turned red on its instance only.
+- **The introduction card** keeps its flow, drawings, sparkles and tweens.
+  It takes `introFont`, a 9-sliced `introPanelSprite`, `introPanelPaddingUnits`
+  and a sprite close button with its cross from `RuntimeConfig`. The four
+  fields it shared with the old result panel are renamed to `intro*` with
+  `FormerlySerializedAs`, so their values carried over; its title outline
+  and per-label material are gone; the close cross defaults to 66 units.
+- **Removed.** `ResultPanel`, `ConfirmPrompt`, `ResultTitle`, the
+  `RuntimeConfig` fields only they read, `MetaText.GoldEarned`, the empty
+  `Runtime/UI` folder and 24 tests.
+- **Tests.** 51 new; 2,544 in all.

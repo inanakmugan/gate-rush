@@ -139,11 +139,13 @@ holds them are written by an Editor builder in `GateRush.UI.Editor`
 (*Gate Rush → Build UI Prefabs*), which nests the hand-made prefabs and
 never writes them.
 
-The level's HUD and joker bar are prefabs too, reached through
-`ILevelUi` the same way (Module 40): `LevelBootstrap` builds a
-`LevelUiState` and the level UI shows it. The result panel, the
-confirmation prompt (Module 32) and the introduction card are still built
-from code in `Runtime`; they move to the new theme in 6.7.
+The level's interface is prefabs too, reached through `ILevelUi` the same
+way: the HUD and the joker bar (Module 40), and the result panel and the
+leave and restart confirmation (Module 41). `LevelBootstrap` builds a
+`LevelUiState` or a `LevelResult` and the level UI shows it. Only the
+introduction card is still built from code in `Runtime`, since it draws
+the mechanics with the game's own art (D46); it takes the theme's panel,
+font and close button from `RuntimeConfig`.
 
 ---
 
