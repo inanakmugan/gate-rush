@@ -38,7 +38,11 @@ namespace GateRush.Tests
     /// the HUD's texts and colours come from the UI Config, Menu and Restart
     /// are Button Rounds with the home and return icons, and the bar's icons
     /// are the Joker Icons'; the hand-made prefabs, Home Page and Top Bar
-    /// among them, stay unwritten.
+    /// among them, stay unwritten. Module 41's Result and Confirm overlays are
+    /// fully wired, nested in Level UI's Overlays and saved closed; their
+    /// buttons are the theme's prefabs, Lose a life a red Button Primary and
+    /// Menu a Button Round with the home icon, neither has a close button,
+    /// and their texts come from the UI Config.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -74,18 +78,25 @@ namespace GateRush.Tests
         private const string HomeSpritePath = "Assets/ThirdParty/Kenney/GameIcons/home.png";
         private const string ReturnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/return.png";
 
+        private const string ResultOverlayName = "Result Overlay";
+        private const string ConfirmOverlayName = "Confirm Overlay";
+        private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
+        private const string RedButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_flat.png";
+
         private static string[] OutputNames => new[]
         {
             GoldPackCardName, "Store Page", LeaderboardRowName, "Leaderboard Page", "Settings Overlay", "Levels Overlay", "Lives Overlay",
             "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", StreakMarkerName, StreakBarName,
             StreakLadderRowName, "Win Streak Overlay", StreakPrizeName, "Streak Reward Overlay", AvatarButtonName,
-            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName
+            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName,
+            ResultOverlayName, ConfirmOverlayName
         };
 
         private static (Type type, string prefabName)[] LevelOverlays => new[]
         {
             (typeof(NotEnoughGoldOverlay), "Not Enough Gold Overlay"), (typeof(GoldPacksOverlay), GoldPacksOverlayName),
-            (typeof(TestPurchaseOverlay), "Test Purchase Overlay"), (typeof(MessageOverlay), "Message Overlay")
+            (typeof(TestPurchaseOverlay), "Test Purchase Overlay"), (typeof(MessageOverlay), "Message Overlay"),
+            (typeof(ResultOverlay), ResultOverlayName), (typeof(ConfirmOverlay), ConfirmOverlayName)
         };
 
         private static string[] HandMadeNames => new[]
@@ -123,7 +134,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_IntoFolder_WritesExactlyTheTwentyThreePrefabs()
+        public void Build_IntoFolder_WritesExactlyTheTwentyFivePrefabs()
         {
             var names = AssetDatabase.FindAssets("t:Prefab", new[] { folder })
                 .Select(guid => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(guid)))
@@ -133,7 +144,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ExistingOutputs_AfterBuild_NamesAllTwentyThree()
+        public void ExistingOutputs_AfterBuild_NamesAllTwentyFive()
         {
             var existing = UiPrefabBuilder.ExistingOutputs(folder);
 
@@ -411,13 +422,15 @@ namespace GateRush.Tests
             }
         }
 
-        [TestCase(typeof(LevelUi), 7)]
+        [TestCase(typeof(LevelUi), 9)]
         [TestCase(typeof(LevelHud), 11)]
         [TestCase(typeof(JokerBarView), 3)]
         [TestCase(typeof(GoldPacksOverlay), 5)]
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(MessageOverlay), 3)]
+        [TestCase(typeof(ResultOverlay), 13)]
+        [TestCase(typeof(ConfirmOverlay), 8)]
         public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(LevelUiName).GetComponentInChildren(viewType, true);
@@ -529,6 +542,94 @@ namespace GateRush.Tests
 
             Assert.IsTrue(root.GetComponentInChildren<LevelHud>(true).gameObject.activeSelf, "the HUD shows with the level");
             Assert.IsTrue(root.GetComponentInChildren<JokerBarView>(true).gameObject.activeSelf, "the bar shows with the level");
+        }
+
+        [Test]
+        public void Build_ResultOverlay_ButtonsAreTheThemesPrefabsAndMenuHasTheHomeIcon()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var next = Reference<Button>(serialized, "nextButton");
+                var winRestart = Reference<Button>(serialized, "winRestartButton");
+                var lossRestart = Reference<Button>(serialized, "lossRestartButton");
+                var menu = Reference<Button>(serialized, "menuButton");
+
+                Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(next), "Next is green");
+                Assert.AreEqual(HandMadePath("Button Secondary"), SourcePath(winRestart), "Restart after a free-play win is blue");
+                Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(lossRestart), "Restart after a loss is green");
+                Assert.AreEqual(HandMadePath("Button Round"), SourcePath(menu), "Menu is round");
+                Assert.AreEqual(HomeSpritePath, AssetDatabase.GetAssetPath(menu.transform.Find("Icon").GetComponent<Image>().sprite));
+            }
+        }
+
+        [Test]
+        public void Build_ConfirmOverlay_LoseALifeIsARedButtonPrimaryAndKeepPlayingStaysGreen()
+        {
+            var overlay = LoadBuilt(ConfirmOverlayName).GetComponent<ConfirmOverlay>();
+            Assert.IsNotNull(overlay, nameof(ConfirmOverlay));
+            var primary = AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePath("Button Primary")).GetComponent<Button>();
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var lose = Reference<Button>(serialized, "loseLifeButton");
+                var keep = Reference<Button>(serialized, "keepPlayingButton");
+
+                Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(lose));
+                Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(keep));
+                Assert.AreEqual(RedButtonSpritePath, AssetDatabase.GetAssetPath(lose.image.sprite), "Lose a life's face is red");
+                Assert.AreEqual(RedButtonPressedSpritePath, AssetDatabase.GetAssetPath(lose.spriteState.pressedSprite), "and so is its pressed look");
+                Assert.AreEqual(primary.image.sprite, keep.image.sprite, "Keep playing keeps Button Primary's green");
+            }
+        }
+
+        [Test]
+        public void Build_LevelPanels_TextsComeFromTheConfig()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var result = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            var confirm = LoadBuilt(ConfirmOverlayName).GetComponent<ConfirmOverlay>();
+            Assert.IsNotNull(result, nameof(ResultOverlay));
+            Assert.IsNotNull(confirm, nameof(ConfirmOverlay));
+
+            using (var serialized = new SerializedObject(result))
+            {
+                Assert.AreEqual(config.LevelCompleteTitle, Label(serialized, "titleLabel").text);
+                Assert.AreEqual(config.ClosingMessage, Label(serialized, "messageLabel").text);
+                Assert.AreEqual(config.NextButtonLabel, Label(serialized, "nextLabel").text);
+                Assert.AreEqual(config.RestartButtonLabel, Label(serialized, "winRestartLabel").text);
+                Assert.AreEqual(config.RestartButtonLabel, Label(serialized, "lossRestartLabel").text);
+            }
+
+            using (var serialized = new SerializedObject(confirm))
+            {
+                Assert.AreEqual(config.LeaveLevelTitle, Label(serialized, "titleLabel").text);
+                Assert.AreEqual(config.LoseLifeLabel, Label(serialized, "loseLifeLabel").text);
+                Assert.AreEqual(config.KeepPlayingLabel, Label(serialized, "keepPlayingLabel").text);
+            }
+        }
+
+        [Test]
+        public void Build_LevelPanels_HaveNoCloseButton()
+        {
+            var buttons = LoadBuilt(ResultOverlayName).GetComponentsInChildren<Button>(true)
+                .Concat(LoadBuilt(ConfirmOverlayName).GetComponentsInChildren<Button>(true))
+                .ToList();
+
+            var closes = buttons.Where(button => SourcePath(button) == HandMadePath("Button Close")).Select(button => button.name).ToList();
+
+            Assert.That(buttons.Count, Is.EqualTo(6), "Next, two Restarts and Menu; Lose a life and Keep playing");
+            CollectionAssert.IsEmpty(closes, "the buttons are the way out");
+        }
+
+        private static T Reference<T>(SerializedObject serialized, string field) where T : Object
+        {
+            var value = (T)serialized.FindProperty(field).objectReferenceValue;
+            Assert.IsNotNull(value, field);
+            return value;
         }
 
         private static Sprite IconOf(SerializedObject bar, string field)

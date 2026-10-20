@@ -22,8 +22,9 @@ namespace GateRush.UI.Editor
     /// Streak Reward Overlay, and Module 38's Avatar Button and Profile
     /// Overlay, with the Settings overlay now holding the Haptics row, and
     /// Module 39's Leaderboard Row, with the Leaderboard Page now holding the
-    /// leaderboard, and Module 40's Gold Packs Overlay, Level HUD, Joker Bar
-    /// and Level UI — from code, with every serialized field wired.
+    /// leaderboard, Module 40's Gold Packs Overlay, Level HUD, Joker Bar and
+    /// Level UI, and Module 41's Result Overlay and Confirm Overlay, nested in
+    /// Level UI — from code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -92,6 +93,11 @@ namespace GateRush.UI.Editor
         private const string HomeSpritePath = "Assets/ThirdParty/Kenney/GameIcons/home.png";
         private const string ReturnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/return.png";
         private const string HourglassSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/hourglass.png";
+
+        // Module 41: the confirmation's red button, 9-sliced as Button
+        // Primary's green face is. Its pressed look is the red flat sprite the
+        // ribbon uses (RibbonSpritePath).
+        private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -134,6 +140,8 @@ namespace GateRush.UI.Editor
         private const string LevelHudName = "Level HUD";
         private const string JokerBarName = "Joker Bar";
         private const string LevelUiName = "Level UI";
+        private const string ResultOverlayName = "Result Overlay";
+        private const string ConfirmOverlayName = "Confirm Overlay";
 
         // Child objects.
         private const string TitleName = "Title";
@@ -231,6 +239,14 @@ namespace GateRush.UI.Editor
         private const string BadgeName = "Badge";
         private const string BadgeLabelName = "Label";
         private const string PacksName = "Packs";
+        private const string GoldRowName = "Gold";
+        private const string MessageName = "Message";
+        private const string ButtonsName = "Buttons";
+        private const string NextName = "Next";
+        private const string WinRestartName = "Win Restart";
+        private const string LossRestartName = "Loss Restart";
+        private const string LoseLifeName = "Lose a life";
+        private const string KeepPlayingName = "Keep playing";
 
         // Texts. Labels the game overwrites from the state only show in the
         // Editor; those it sets from the UI Config are written from it.
@@ -291,6 +307,11 @@ namespace GateRush.UI.Editor
         private const float TimerPlaceholderSeconds = 75f;
         private const int TimeBonusPlaceholder = 20;
         private const int LivesCountPlaceholder = 5;
+
+        // Module 41's placeholders: a campaign win's gold, as in the spec, and
+        // a streak at risk, so the confirmation shows its longer line.
+        private const int GoldEarnedPlaceholder = 50;
+        private const int StreakAtRiskPlaceholder = 4;
 
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
@@ -649,6 +670,35 @@ namespace GateRush.UI.Editor
         private const float BadgeCoinSize = 44f;
         private const float BadgeFontSize = 44f;
 
+        // Module 41: the result panel. Under the title, the gold row (coin and
+        // amount, centred) and the closing message; at the foot, one centred
+        // row of Next, the two Restarts (one shows at a time) and Menu, which
+        // keeps Button Round's own size. The widest row, Next, Restart and
+        // Menu, is 320 + 320 + 110 + 2 x 30 = 810 units.
+        private const float ResultPanelWidth = 900f;
+        private const float ResultPanelHeight = 680f;
+        private const float GoldRowPosY = -170f;
+        private const float GoldRowHeight = 120f;
+        private const float GoldRowSpacing = 16f;
+        private const float GoldCoinSize = 96f;
+        private const float GoldFontSize = 72f;
+        private const float ClosingMessagePosY = -310f;
+        private const float ClosingMessageHeight = 90f;
+        private const float ClosingMessageFontSize = 52f;
+        private const float ResultButtonWidth = 320f;
+        private const float ResultButtonHeight = 140f;
+        private const float ResultButtonGap = 30f;
+
+        // Module 41: the confirmation. The line under the title; Keep playing
+        // at the foot and Lose a life above it, both at Button Primary's own
+        // size, as wide as "Keep playing" needs.
+        private const float ConfirmPanelWidth = 860f;
+        private const float ConfirmPanelHeight = 820f;
+        private const float ConfirmLinePosY = -170f;
+        private const float ConfirmLineHeight = 200f;
+        private const float ConfirmLineFontSize = 52f;
+        private const float ConfirmButtonGap = 30f;
+
         // The bar heights the layout was planned with. The build uses the
         // heights on the prefabs and only warns when they differ.
         private const float ExpectedTopBarHeight = 160f;
@@ -783,6 +833,22 @@ namespace GateRush.UI.Editor
         private const string BroomField = "broom";
         private const string HudField = "hud";
         private const string JokerBarField = "jokerBar";
+        private const string GroupField = "group";
+        private const string PanelField = "panel";
+        private const string GoldRowField = "goldRow";
+        private const string MessageLabelField = "messageLabel";
+        private const string NextButtonField = "nextButton";
+        private const string NextLabelField = "nextLabel";
+        private const string WinRestartButtonField = "winRestartButton";
+        private const string WinRestartLabelField = "winRestartLabel";
+        private const string LossRestartButtonField = "lossRestartButton";
+        private const string LossRestartLabelField = "lossRestartLabel";
+        private const string LoseLifeButtonField = "loseLifeButton";
+        private const string LoseLifeLabelField = "loseLifeLabel";
+        private const string KeepPlayingButtonField = "keepPlayingButton";
+        private const string KeepPlayingLabelField = "keepPlayingLabel";
+        private const string ResultOverlayField = "resultOverlay";
+        private const string ConfirmOverlayField = "confirmOverlay";
 
         // The overwrite prompt.
         private const string DialogTitle = "Build UI Prefabs";
@@ -836,7 +902,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Builds the twenty-three prefabs into <paramref name="outputFolder"/>,
+        /// Builds the twenty-five prefabs into <paramref name="outputFolder"/>,
         /// overwriting any already there without asking. The hand-made
         /// prefabs are read from <see cref="HandMadeFolder"/>.
         /// </summary>
@@ -878,7 +944,9 @@ namespace GateRush.UI.Editor
                 var goldPacks = Save(BuildGoldPacksOverlay(scene, sources, goldPackCard), sources, outputFolder);
                 var levelHud = Save(BuildLevelHud(scene, sources), sources, outputFolder);
                 var jokerBar = Save(BuildJokerBar(scene, sources), sources, outputFolder);
-                var levelOverlays = new LevelOverlayAssets(notEnoughGold, goldPacks, testPurchase, message);
+                var result = Save(BuildResultOverlay(scene, sources), sources, outputFolder);
+                var confirm = Save(BuildConfirmOverlay(scene, sources), sources, outputFolder);
+                var levelOverlays = new LevelOverlayAssets(notEnoughGold, goldPacks, testPurchase, message, result, confirm);
                 Save(BuildLevelUi(scene, sources, levelHud, jokerBar, levelOverlays), sources, outputFolder);
             }
             finally
@@ -892,7 +960,8 @@ namespace GateRush.UI.Editor
             GoldPackCardName, StorePageName, LeaderboardRowName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
             NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
             StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, AvatarButtonName,
-            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName
+            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName,
+            ResultOverlayName, ConfirmOverlayName
         };
 
         private static string PrefabPath(string folder, string name) => $"{folder}/{name}{PrefabExtension}";
@@ -2081,17 +2150,190 @@ namespace GateRush.UI.Editor
             UiBuilder.Place(button, new Vector2(AnchorLow, AnchorHigh), new Vector2(left, -HudTopInset), button.sizeDelta);
             Record(button);
             Record(button.gameObject);
+            SetRoundIcon(button, icon);
+            return button;
+        }
 
+        /// <summary>
+        /// Gives a Button Round instance's own icon <paramref name="icon"/>, as
+        /// an override of that instance only, so Button Round's file stays
+        /// unwritten.
+        /// </summary>
+        private static void SetRoundIcon(RectTransform button, Sprite icon)
+        {
             var ownIcon = button.Find(ButtonRoundIconName);
             var image = ownIcon == null ? null : ownIcon.GetComponent<Image>();
             if (image == null)
             {
-                throw new InvalidOperationException($"{ButtonRoundName} has no child '{ButtonRoundIconName}' with an Image for the {name} icon.");
+                throw new InvalidOperationException($"{ButtonRoundName} has no child '{ButtonRoundIconName}' with an Image for the {button.name} icon.");
             }
 
             image.sprite = icon;
             Record(image);
+        }
+
+        /// <summary>
+        /// The result panel over a level (Module 41): the frame with no close
+        /// button — the buttons are the way out — and the title, the gold row
+        /// with the coin, the closing message, and the row of Next (Button
+        /// Primary), Restart after a free-play win (Button Secondary), Restart
+        /// after a loss (Button Primary, saved hidden) and Menu (Button Round
+        /// with the home icon). Written as a campaign win with gold and the
+        /// closing message, the texts from the UI Config; the overlay sets
+        /// them all again when it opens. A CanvasGroup on the root carries the
+        /// pop's fade.
+        /// </summary>
+        private static GameObject BuildResultOverlay(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(
+                scene, sources, ResultOverlayName, config.LevelCompleteTitle, ResultPanelWidth, ResultPanelHeight, false);
+            var group = frame.Root.AddComponent<CanvasGroup>();
+
+            // Centred on the panel whatever the amount's width: the fitter
+            // sizes the row to the coin and the amount.
+            var gold = UiBuilder.CreateRect(GoldRowName, frame.Panel);
+            UiBuilder.Place(gold, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, GoldRowPosY), new Vector2(0f, GoldRowHeight));
+            var goldLayout = gold.gameObject.AddComponent<HorizontalLayoutGroup>();
+            goldLayout.spacing = GoldRowSpacing;
+            goldLayout.childAlignment = TextAnchor.MiddleCenter;
+            goldLayout.childControlWidth = true;
+            goldLayout.childControlHeight = true;
+            goldLayout.childForceExpandWidth = false;
+            goldLayout.childForceExpandHeight = false;
+            var goldFitter = gold.gameObject.AddComponent<ContentSizeFitter>();
+            goldFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            goldFitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+            var coin = UiBuilder.CreateRect(CoinName, gold);
+            var coinElement = coin.gameObject.AddComponent<LayoutElement>();
+            coinElement.preferredWidth = GoldCoinSize;
+            coinElement.preferredHeight = GoldCoinSize;
+            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
+            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+
+            var amount = UiBuilder.CreateRect(AmountName, gold);
+            var goldLabel = AddText(amount, sources, LevelPanelTexts.GoldEarned(GoldEarnedPlaceholder, config), GoldFontSize, OverlayTextColorHex);
+
+            var messageRect = UiBuilder.CreateRect(MessageName, frame.Panel);
+            TopStretch(messageRect, OverlayTextInset, ClosingMessagePosY, ClosingMessageHeight);
+            var messageLabel = AddWrappingText(messageRect, sources, config.ClosingMessage, ClosingMessageFontSize, OverlayTextColorHex);
+
+            // The row centres the buttons that show: hidden ones take no room.
+            var row = UiBuilder.CreateRect(ButtonsName, frame.Panel);
+            BottomStretch(row, 0f, PanelButtonPosY, ResultButtonHeight);
+            var rowLayout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            rowLayout.spacing = ResultButtonGap;
+            rowLayout.childAlignment = TextAnchor.MiddleCenter;
+            rowLayout.childControlWidth = false;
+            rowLayout.childControlHeight = false;
+            rowLayout.childForceExpandWidth = false;
+            rowLayout.childForceExpandHeight = false;
+
+            var next = AddResultButton(row, sources.ButtonPrimary, NextName);
+            var nextLabel = SetNestedLabel(next, config.NextButtonLabel);
+            var winRestart = AddResultButton(row, sources.ButtonSecondary, WinRestartName);
+            var winRestartLabel = SetNestedLabel(winRestart, config.RestartButtonLabel);
+            var lossRestart = AddResultButton(row, sources.ButtonPrimary, LossRestartName);
+            var lossRestartLabel = SetNestedLabel(lossRestart, config.RestartButtonLabel);
+            lossRestart.gameObject.SetActive(false);
+            Record(lossRestart.gameObject);
+
+            var menu = Nest(sources.ButtonRound, row);
+            menu.name = MenuName;
+            Record(menu.gameObject);
+            SetRoundIcon(menu, sources.Home);
+
+            var overlay = frame.Root.AddComponent<ResultOverlay>();
+            SetReferences(
+                overlay,
+                (GroupField, group),
+                (PanelField, frame.Panel),
+                (TitleLabelField, frame.Title),
+                (GoldRowField, gold.gameObject),
+                (GoldLabelField, goldLabel),
+                (MessageLabelField, messageLabel),
+                (NextButtonField, Single<Button>(next.gameObject, ButtonPrimaryName)),
+                (NextLabelField, nextLabel),
+                (WinRestartButtonField, Single<Button>(winRestart.gameObject, ButtonSecondaryName)),
+                (WinRestartLabelField, winRestartLabel),
+                (LossRestartButtonField, Single<Button>(lossRestart.gameObject, ButtonPrimaryName)),
+                (LossRestartLabelField, lossRestartLabel),
+                (MenuButtonField, Single<Button>(menu.gameObject, ButtonRoundName)));
+            return frame.Root;
+        }
+
+        /// <summary>One of the result panel's rectangular buttons: a <paramref name="prefab"/> instance named <paramref name="name"/> at the result button's size.</summary>
+        private static RectTransform AddResultButton(RectTransform row, GameObject prefab, string name)
+        {
+            var button = Nest(prefab, row);
+            button.name = name;
+            button.sizeDelta = new Vector2(ResultButtonWidth, ResultButtonHeight);
+            Record(button);
+            Record(button.gameObject);
             return button;
+        }
+
+        /// <summary>
+        /// The confirmation before a lost life (Module 41): the frame with no
+        /// close button, the title, the line, Keep playing at the foot (Button
+        /// Primary, green) and Lose a life above it — a Button Primary whose
+        /// face and pressed look are red on this instance only. Written as
+        /// Leave level with a streak at risk, the texts from the UI Config; the
+        /// overlay sets them all again when it opens. A CanvasGroup on the
+        /// root carries the pop's fade.
+        /// </summary>
+        private static GameObject BuildConfirmOverlay(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(
+                scene, sources, ConfirmOverlayName, config.LeaveLevelTitle, ConfirmPanelWidth, ConfirmPanelHeight, false);
+            var group = frame.Root.AddComponent<CanvasGroup>();
+
+            var lineRect = UiBuilder.CreateRect(LineName, frame.Panel);
+            TopStretch(lineRect, OverlayTextInset, ConfirmLinePosY, ConfirmLineHeight);
+            var line = AddWrappingText(
+                lineRect, sources, LevelPanelTexts.ConfirmLine(StreakAtRiskPlaceholder, config), ConfirmLineFontSize, OverlayTextColorHex);
+
+            var keep = Nest(sources.ButtonPrimary, frame.Panel);
+            keep.name = KeepPlayingName;
+            Record(keep.gameObject);
+            PlaceAtPanelBottom(keep);
+            var keepLabel = SetNestedLabel(keep, config.KeepPlayingLabel);
+
+            var lose = Nest(sources.ButtonPrimary, frame.Panel);
+            lose.name = LoseLifeName;
+            UiBuilder.Place(
+                lose, new Vector2(AnchorMid, AnchorLow), new Vector2(0f, PanelButtonPosY + keep.sizeDelta.y + ConfirmButtonGap), lose.sizeDelta);
+            Record(lose);
+            Record(lose.gameObject);
+            var loseLabel = SetNestedLabel(lose, config.LoseLifeLabel);
+            var loseButton = Single<Button>(lose.gameObject, ButtonPrimaryName);
+            var loseFace = loseButton.image;
+            if (loseFace == null)
+            {
+                throw new InvalidOperationException($"{ButtonPrimaryName}'s Button has no Image as its target graphic for the red face.");
+            }
+
+            loseFace.sprite = sources.RedButton;
+            Record(loseFace);
+            var sprites = loseButton.spriteState;
+            sprites.pressedSprite = sources.RedButtonPressed;
+            loseButton.spriteState = sprites;
+            Record(loseButton);
+
+            var overlay = frame.Root.AddComponent<ConfirmOverlay>();
+            SetReferences(
+                overlay,
+                (GroupField, group),
+                (PanelField, frame.Panel),
+                (TitleLabelField, frame.Title),
+                (LineLabelField, line),
+                (LoseLifeButtonField, loseButton),
+                (LoseLifeLabelField, loseLabel),
+                (KeepPlayingButtonField, Single<Button>(keep.gameObject, ButtonPrimaryName)),
+                (KeepPlayingLabelField, keepLabel));
+            return frame.Root;
         }
 
         /// <summary>
@@ -2192,11 +2434,12 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// The level's interface (Module 40), set as <see cref="LevelUi.Show"/>
-        /// leaves it: the Level HUD along the top and the Joker Bar along the
-        /// bottom — <see cref="LevelUi.PlaceBands"/> anchors both to their
-        /// bands at runtime — and every overlay hidden under Overlays, a
-        /// direct child of the root so the scrims cover everything. Its root
+        /// The level's interface (Modules 40 and 41), set as
+        /// <see cref="LevelUi.Show"/> leaves it: the Level HUD along the top and
+        /// the Joker Bar along the bottom — <see cref="LevelUi.PlaceBands"/>
+        /// anchors both to their bands at runtime — and every overlay, the
+        /// result panel and the confirmation among them, hidden under
+        /// Overlays, a direct child of the root so the scrims cover everything. Its root
         /// is saved inactive, so only <see cref="LevelUi.Show"/> opens it.
         /// </summary>
         private static GameObject BuildLevelUi(
@@ -2214,6 +2457,11 @@ namespace GateRush.UI.Editor
 
             var overlays = UiBuilder.CreateRect(OverlaysName, root.transform);
             UiBuilder.Stretch(overlays);
+
+            // The level's panels first: the stack's overlays are moved last
+            // when they open (Module 41).
+            var result = NestStretched(overlayAssets.Result, overlays, false);
+            var confirm = NestStretched(overlayAssets.Confirm, overlays, false);
             var notEnoughGold = NestStretched(overlayAssets.NotEnoughGold, overlays, false);
             var goldPacks = NestStretched(overlayAssets.GoldPacks, overlays, false);
             var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
@@ -2228,7 +2476,9 @@ namespace GateRush.UI.Editor
                 (NotEnoughGoldField, Single<NotEnoughGoldOverlay>(notEnoughGold.gameObject, NotEnoughGoldOverlayName)),
                 (GoldPacksField, Single<GoldPacksOverlay>(goldPacks.gameObject, GoldPacksOverlayName)),
                 (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
-                (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)));
+                (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)),
+                (ResultOverlayField, Single<ResultOverlay>(result.gameObject, ResultOverlayName)),
+                (ConfirmOverlayField, Single<ConfirmOverlay>(confirm.gameObject, ConfirmOverlayName)));
 
             root.SetActive(false);
             return root;
@@ -2875,21 +3125,27 @@ namespace GateRush.UI.Editor
             public GameObject Profile { get; }
         }
 
-        /// <summary>The saved overlay prefabs Level UI nests, in stacking order.</summary>
+        /// <summary>The saved overlay prefabs Level UI nests: the stack's, in stacking order, and the level's two panels.</summary>
         private readonly struct LevelOverlayAssets
         {
-            public LevelOverlayAssets(GameObject notEnoughGold, GameObject goldPacks, GameObject testPurchase, GameObject message)
+            public LevelOverlayAssets(
+                GameObject notEnoughGold, GameObject goldPacks, GameObject testPurchase, GameObject message, GameObject result,
+                GameObject confirm)
             {
                 NotEnoughGold = notEnoughGold;
                 GoldPacks = goldPacks;
                 TestPurchase = testPurchase;
                 Message = message;
+                Result = result;
+                Confirm = confirm;
             }
 
             public GameObject NotEnoughGold { get; }
             public GameObject GoldPacks { get; }
             public GameObject TestPurchase { get; }
             public GameObject Message { get; }
+            public GameObject Result { get; }
+            public GameObject Confirm { get; }
         }
 
         /// <summary>Every asset the build reads, loaded and checked before anything is written.</summary>
@@ -2914,6 +3170,13 @@ namespace GateRush.UI.Editor
             public Sprite Home { get; private set; }
             public Sprite Return { get; private set; }
             public Sprite Hourglass { get; private set; }
+
+            /// <summary>The red face of the confirmation's Lose a life, 9-sliced.</summary>
+            public Sprite RedButton { get; private set; }
+
+            /// <summary>Lose a life's pressed look: the red flat sprite, the ribbon's.</summary>
+            public Sprite RedButtonPressed { get; private set; }
+
             public JokerIcons JokerIcons { get; private set; }
             public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
@@ -2975,6 +3238,8 @@ namespace GateRush.UI.Editor
                     Home = LoadSprite(HomeSpritePath),
                     Return = LoadSprite(ReturnSpritePath),
                     Hourglass = LoadSprite(HourglassSpritePath),
+                    RedButton = LoadSlicedSprite(RedButtonSpritePath),
+                    RedButtonPressed = LoadSlicedSprite(RibbonSpritePath),
                     JokerIcons = LoadJokerIcons(),
                     AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),
