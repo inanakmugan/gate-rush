@@ -16,7 +16,8 @@ namespace GateRush.Tests
     /// own field. Module 36's Store texts are checked the same way, and a
     /// ribbon with an empty or repeated id or an empty text is reported.
     /// Module 37's win streak texts and Streak colour are checked the same
-    /// way, and each joker kind reads its own name.
+    /// way, and each joker kind reads its own name. Module 38's Profile and
+    /// Haptics texts are checked the same way.
     /// </summary>
     public class UiConfigTests
     {
@@ -82,6 +83,15 @@ namespace GateRush.Tests
         [TestCase("clockName", "Clock Name")]
         [TestCase("rocketName", "Rocket Name")]
         [TestCase("broomName", "Broom Name")]
+        [TestCase("profileTitle", "Profile Title")]
+        [TestCase("nameEditHint", "Name Edit Hint")]
+        [TestCase("nameRefusedText", "Name Refused Text")]
+        [TestCase("levelsCompletedLabel", "Levels Completed Label")]
+        [TestCase("campaignLevelLabel", "Campaign Level Label")]
+        [TestCase("bestStreakLabel", "Best Streak Label")]
+        [TestCase("lifetimeGoldLabel", "Lifetime Gold Label")]
+        [TestCase("statisticFormat", "Statistic Format")]
+        [TestCase("hapticsLabel", "Haptics Label")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -115,6 +125,7 @@ namespace GateRush.Tests
         [TestCase("markerCountFormat", "Marker Count Format", "x{1}")]
         [TestCase("rewardHeadlineFormat", "Reward Headline Format", "{1} wins in a row!")]
         [TestCase("prizeFormat", "Prize Format", "+{0} {2}")]
+        [TestCase("statisticFormat", "Statistic Format", "{1:N0}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);

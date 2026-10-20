@@ -1,9 +1,9 @@
 namespace GateRush.UI
 {
-    /// <summary>The pages that open over a tab, newest on top (Modules 35, 36 and 37).</summary>
+    /// <summary>The pages that open over a tab, newest on top (Modules 35 to 38).</summary>
     public enum UiOverlay
     {
-        /// <summary>The sound toggle and the Levels button.</summary>
+        /// <summary>The sound and haptics toggles and the Levels button.</summary>
         Settings,
 
         /// <summary>The level grid: free play (D58).</summary>
@@ -25,6 +25,9 @@ namespace GateRush.UI
         WinStreak,
 
         /// <summary>The streak rewards campaign wins gave since the last announcement, and Collect.</summary>
-        StreakReward
+        StreakReward,
+
+        /// <summary>The player's name and avatar, the avatar grid and four statistics (D71).</summary>
+        Profile
     }
 }

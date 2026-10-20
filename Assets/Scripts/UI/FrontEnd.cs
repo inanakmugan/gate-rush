@@ -8,10 +8,10 @@ using UnityEngine.InputSystem;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The front end (Modules 35, 36 and 37, D68): three tabs — Store, Home and
+    /// The front end (Modules 35 to 38, D68): three tabs — Store, Home and
     /// Leaderboard — under a top bar and over a tab bar, and a stack of
     /// overlays — Settings, Levels, Lives, Not Enough Gold, Message, Test
-    /// Purchase, Win Streak and Streak Reward — over them. Implements <see cref="IFrontEnd"/>, the one way
+    /// Purchase, Win Streak, Streak Reward and Profile — over them. Implements <see cref="IFrontEnd"/>, the one way
     /// the bootstrap shows and hears it.
     /// </summary>
     /// <remarks>
@@ -73,12 +73,16 @@ namespace GateRush.UI
         [SerializeField] private TestPurchaseOverlay testPurchase;
         [SerializeField] private WinStreakOverlay winStreak;
         [SerializeField] private StreakRewardOverlay streakReward;
+        [SerializeField] private ProfileOverlay profile;
 
         [Tooltip("The streak bar: a nested instance under the Home Page instance's Streak Area, placed by the UI builder.")]
         [SerializeField] private StreakBar streakBar;
 
         [Tooltip("Assets/Config/JokerIcons.asset: the joker icons the streak's screens draw.")]
         [SerializeField] private JokerIcons jokerIcons;
+
+        [Tooltip("Assets/Config/AvatarCatalog.asset: the avatars the top bar and Profile draw, the same asset the bootstrap holds.")]
+        [SerializeField] private AvatarCatalog avatarCatalog;
 
         private readonly UiNavigation navigation = new UiNavigation();
 
@@ -97,6 +101,15 @@ namespace GateRush.UI
 
         /// <inheritdoc />
         public event Action SoundToggleRequested;
+
+        /// <inheritdoc />
+        public event Action HapticsToggleRequested;
+
+        /// <inheritdoc />
+        public event Action<string> NameChangeRequested;
+
+        /// <inheritdoc />
+        public event Action<string> AvatarChangeRequested;
 
         /// <inheritdoc />
         public event Action RefillRequested;
@@ -131,8 +144,10 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, testPurchase, nameof(FrontEnd), nameof(testPurchase));
             UiParts.AddIfMissing(missing, winStreak, nameof(FrontEnd), nameof(winStreak));
             UiParts.AddIfMissing(missing, streakReward, nameof(FrontEnd), nameof(streakReward));
+            UiParts.AddIfMissing(missing, profile, nameof(FrontEnd), nameof(profile));
             UiParts.AddIfMissing(missing, streakBar, nameof(FrontEnd), nameof(streakBar));
             UiParts.AddIfMissing(missing, jokerIcons, nameof(FrontEnd), nameof(jokerIcons));
+            UiParts.AddIfMissing(missing, avatarCatalog, nameof(FrontEnd), nameof(avatarCatalog));
 
             if (store != null)
             {
@@ -194,6 +209,11 @@ namespace GateRush.UI
                 streakReward.AddMissing(missing);
             }
 
+            if (profile != null)
+            {
+                profile.AddMissing(missing);
+            }
+
             if (streakBar != null)
             {
                 streakBar.AddMissing(missing);
@@ -213,7 +233,7 @@ namespace GateRush.UI
 
             if (!OverlaysShareOneParent())
             {
-                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message, Test Purchase, Win Streak and Streak Reward overlays must share one parent, which stacks them");
+                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message, Test Purchase, Win Streak, Streak Reward and Profile overlays must share one parent, which stacks them");
             }
 
             if (config != null)
@@ -224,6 +244,11 @@ namespace GateRush.UI
             if (jokerIcons != null)
             {
                 missing.AddRange(jokerIcons.Problems());
+            }
+
+            if (avatarCatalog != null)
+            {
+                missing.AddRange(avatarCatalog.Problems());
             }
 
             return missing.Count == 0
@@ -246,10 +271,11 @@ namespace GateRush.UI
         /// <inheritdoc />
         public void Refresh(FrontEndState state)
         {
-            topBar.Show(state, config);
+            topBar.Show(state, config, avatarCatalog);
             home.Show(state, config);
             store.Show(state, config);
-            settings.Show(state);
+            settings.Show(state, config);
+            profile.Show(state, config, avatarCatalog);
             levels.Show(state.Levels ?? Array.Empty<LevelEntry>(), config);
             lives.Show(state, config);
             streakBar.Show(state, config, jokerIcons);
@@ -326,6 +352,13 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void ShowNameRefused()
+        {
+            RequireOpen(nameof(ShowNameRefused));
+            profile.ShowNameRefused(config);
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
             gameObject.SetActive(false);
@@ -369,7 +402,7 @@ namespace GateRush.UI
 
         private bool OverlaysShareOneParent()
         {
-            var overlays = new Component[] { settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward };
+            var overlays = new Component[] { settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile };
             Transform parent = null;
             for (var i = 0; i < overlays.Length; i++)
             {
@@ -413,6 +446,7 @@ namespace GateRush.UI
             testPurchase.gameObject.SetActive(Contains(open, UiOverlay.TestPurchase));
             winStreak.gameObject.SetActive(Contains(open, UiOverlay.WinStreak));
             streakReward.gameObject.SetActive(Contains(open, UiOverlay.StreakReward));
+            profile.gameObject.SetActive(Contains(open, UiOverlay.Profile));
             for (var i = 0; i < open.Count; i++)
             {
                 OverlayObject(open[i]).transform.SetAsLastSibling();
@@ -452,6 +486,8 @@ namespace GateRush.UI
                     return winStreak;
                 case UiOverlay.StreakReward:
                     return streakReward;
+                case UiOverlay.Profile:
+                    return profile;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(overlay), overlay, "Not a front end overlay.");
             }
@@ -467,7 +503,7 @@ namespace GateRush.UI
             if (isSubscribed || store == null || home == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
                 || notEnoughGold == null || message == null || testPurchase == null
-                || winStreak == null || streakReward == null || streakBar == null)
+                || winStreak == null || streakReward == null || profile == null || streakBar == null)
             {
                 return;
             }
@@ -480,9 +516,11 @@ namespace GateRush.UI
             topBar.StoreRequested += OnStoreRequested;
             topBar.LivesRequested += OnLivesRequested;
             topBar.SettingsRequested += OnSettingsRequested;
+            topBar.ProfileRequested += OnProfileRequested;
             tabBar.TabSelected += OnTabSelected;
             settings.CloseRequested += OnSettingsCloseRequested;
             settings.SoundToggleRequested += OnSoundToggleRequested;
+            settings.HapticsToggleRequested += OnHapticsToggleRequested;
             settings.LevelsRequested += OnLevelsRequested;
             levels.CloseRequested += OnLevelsCloseRequested;
             levels.LevelRequested += OnLevelRequested;
@@ -496,6 +534,9 @@ namespace GateRush.UI
             streakBar.Pressed += OnStreakBarPressed;
             winStreak.CloseRequested += OnWinStreakCloseRequested;
             streakReward.CollectRequested += OnStreakRewardCollectRequested;
+            profile.CloseRequested += OnProfileCloseRequested;
+            profile.NameChangeRequested += OnNameChangeRequested;
+            profile.AvatarChangeRequested += OnAvatarChangeRequested;
             isSubscribed = true;
         }
 
@@ -516,9 +557,11 @@ namespace GateRush.UI
             topBar.StoreRequested -= OnStoreRequested;
             topBar.LivesRequested -= OnLivesRequested;
             topBar.SettingsRequested -= OnSettingsRequested;
+            topBar.ProfileRequested -= OnProfileRequested;
             tabBar.TabSelected -= OnTabSelected;
             settings.CloseRequested -= OnSettingsCloseRequested;
             settings.SoundToggleRequested -= OnSoundToggleRequested;
+            settings.HapticsToggleRequested -= OnHapticsToggleRequested;
             settings.LevelsRequested -= OnLevelsRequested;
             levels.CloseRequested -= OnLevelsCloseRequested;
             levels.LevelRequested -= OnLevelRequested;
@@ -532,6 +575,9 @@ namespace GateRush.UI
             streakBar.Pressed -= OnStreakBarPressed;
             winStreak.CloseRequested -= OnWinStreakCloseRequested;
             streakReward.CollectRequested -= OnStreakRewardCollectRequested;
+            profile.CloseRequested -= OnProfileCloseRequested;
+            profile.NameChangeRequested -= OnNameChangeRequested;
+            profile.AvatarChangeRequested -= OnAvatarChangeRequested;
             isSubscribed = false;
         }
 
@@ -680,6 +726,34 @@ namespace GateRush.UI
         private void OnWinStreakCloseRequested() => OnCloseClicked(UiOverlay.WinStreak);
 
         private void OnStreakRewardCollectRequested() => OnCloseClicked(UiOverlay.StreakReward);
+
+        /// <summary>The top bar's avatar: opens Profile with its refusal line cleared.</summary>
+        private void OnProfileRequested()
+        {
+            profile.ClearRefusal();
+            navigation.Open(UiOverlay.Profile);
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnProfileCloseRequested() => OnCloseClicked(UiOverlay.Profile);
+
+        private void OnHapticsToggleRequested()
+        {
+            HapticsToggleRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        /// <summary>A finished name edit is no button press, so it sounds nothing.</summary>
+        private void OnNameChangeRequested(string raw)
+        {
+            NameChangeRequested?.Invoke(raw);
+        }
+
+        private void OnAvatarChangeRequested(string avatarId)
+        {
+            AvatarChangeRequested?.Invoke(avatarId);
+            ButtonPressed?.Invoke();
+        }
 
         /// <summary>
         /// Buy: the answer is taken before the sheet closes, so closing it

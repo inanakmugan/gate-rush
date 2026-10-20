@@ -13,7 +13,8 @@ namespace GateRush.Tests
     /// when nothing changed. Module 36's Not Enough Gold, Message and Test
     /// Purchase overlays stack and close with Back like the others, and Get
     /// Gold — selecting the Store — closes every overlay. Module 37's Win
-    /// Streak and Streak Reward overlays stack and close with Back too.
+    /// Streak and Streak Reward overlays stack and close with Back too, and
+    /// Module 38's Profile opens over any tab and closes with Back.
     /// </summary>
     public class UiNavigationTests
     {
@@ -255,6 +256,23 @@ namespace GateRush.Tests
             CollectionAssert.AreEqual(new[] { UiOverlay.WinStreak, UiOverlay.StreakReward }, stacked);
             CollectionAssert.AreEqual(new[] { UiOverlay.WinStreak }, afterFirst);
             Assert.AreEqual(0, navigation.Overlays.Count);
+        }
+
+        [Test]
+        public void Back_ProfileOverATab_ClosesItAndKeepsTheTab([Values] UiTab tab)
+        {
+            navigation.SelectTab(tab);
+            navigation.Open(UiOverlay.Profile);
+            var opened = new[] { navigation.Overlays[0] };
+            changes = 0;
+
+            var isBack = navigation.Back();
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.Profile }, opened);
+            Assert.IsTrue(isBack);
+            Assert.AreEqual(0, navigation.Overlays.Count);
+            Assert.AreEqual(tab, navigation.Tab, "the top bar is on every tab, and Back closes only Profile");
+            Assert.AreEqual(1, changes);
         }
 
         [Test]
