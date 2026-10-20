@@ -19,7 +19,10 @@ namespace GateRush.Tests
     /// way, and each joker kind reads its own name. Module 38's Profile and
     /// Haptics texts are checked the same way. Module 39's Leaderboard texts
     /// and colours are checked the same way, and the first three ranks read
-    /// their own medal colour while every other rank has none.
+    /// their own medal colour while every other rank has none. Module 40's
+    /// level HUD texts, formats and colours are checked the same way, an
+    /// unusable timing is reported, the defaults read as specified, and the
+    /// selected joker's ring reads its own colour.
     /// </summary>
     public class UiConfigTests
     {
@@ -100,6 +103,13 @@ namespace GateRush.Tests
         [TestCase("leaderboardRetryLabel", "Leaderboard Retry Label")]
         [TestCase("leaderboardScoreFormat", "Leaderboard Score Format")]
         [TestCase("leaderboardRankFormat", "Leaderboard Rank Format")]
+        [TestCase("freePlayLabel", "Free Play Label")]
+        [TestCase("levelLabelFormat", "Level Label Format")]
+        [TestCase("timerFormat", "Timer Format")]
+        [TestCase("timeBonusFormat", "Time Bonus Format")]
+        [TestCase("jokerCountBadgeFormat", "Joker Count Badge Format")]
+        [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format")]
+        [TestCase("goldPacksTitle", "Gold Packs Title")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -136,6 +146,11 @@ namespace GateRush.Tests
         [TestCase("statisticFormat", "Statistic Format", "{1:N0}")]
         [TestCase("leaderboardScoreFormat", "Leaderboard Score Format", "{1:N0}")]
         [TestCase("leaderboardRankFormat", "Leaderboard Rank Format", "{1}")]
+        [TestCase("levelLabelFormat", "Level Label Format", "Level {1}")]
+        [TestCase("timerFormat", "Timer Format", "{0}:{2:00}")]
+        [TestCase("timeBonusFormat", "Time Bonus Format", "+{1}")]
+        [TestCase("jokerCountBadgeFormat", "Joker Count Badge Format", "{1}")]
+        [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format", "{1}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -158,6 +173,12 @@ namespace GateRush.Tests
         [TestCase("bronzeMedalColor", "Bronze Medal Color")]
         [TestCase("leaderboardHighlightColor", "Leaderboard Highlight Color")]
         [TestCase("leaderboardRowColor", "Leaderboard Row Color")]
+        [TestCase("jokerSelectedColor", "Joker Selected Color")]
+        [TestCase("timerColor", "Timer Color")]
+        [TestCase("timerWarningColor", "Timer Warning Color")]
+        [TestCase("timeBonusColor", "Time Bonus Color")]
+        [TestCase("jokerBadgeTextColor", "Joker Badge Text Color")]
+        [TestCase("shortPriceColor", "Short Price Color")]
         public void Problems_TransparentColor_IsReportedByName(string field, string shownName)
         {
             SetColor(field, new Color(1f, 1f, 1f, 0f));
@@ -173,6 +194,7 @@ namespace GateRush.Tests
         [TestCase(UiColorRole.Coin, "coinColor")]
         [TestCase(UiColorRole.Heart, "heartColor")]
         [TestCase(UiColorRole.Streak, "streakColor")]
+        [TestCase(UiColorRole.JokerSelected, "jokerSelectedColor")]
         public void ColorOf_Role_IsItsOwnField(UiColorRole role, string field)
         {
             // A colour no default has, so a role reading another field fails.
@@ -182,6 +204,43 @@ namespace GateRush.Tests
             var color = config.ColorOf(role);
 
             Assert.AreEqual(marker, color);
+        }
+
+        [Test]
+        public void Defaults_LevelHudTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("Free Play", config.FreePlayLabel);
+            Assert.AreEqual("Level {0}", config.LevelLabelFormat);
+            Assert.AreEqual("{0}:{1:00}", config.TimerFormat, "the timer reads m:ss");
+            Assert.AreEqual("+{0}", config.TimeBonusFormat, "the Clock's bonus reads +20");
+            Assert.AreEqual("Get Gold", config.GoldPacksTitle);
+        }
+
+        [TestCase("timeBonusSeconds", 0f, "Time Bonus Seconds must be positive")]
+        [TestCase("timerPulseSeconds", 0f, "Timer Pulse Seconds must be positive")]
+        [TestCase("timeBonusRiseUnits", -1f, "Time Bonus Rise Units must be at least 0")]
+        [TestCase("timerPulseScale", 0.9f, "Timer Pulse Scale must be at least 1")]
+        public void Problems_UnusableLevelTiming_IsReportedByName(string field, float value, string expected)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(expected), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NegativeTimerWarningSeconds_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("timerWarningSeconds").intValue = -1;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Timer Warning Seconds may not be negative"), string.Join(" | ", problems));
         }
 
         [Test]

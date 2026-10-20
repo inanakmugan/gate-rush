@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using GateRush.Core;
-using GateRush.Meta;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -96,13 +95,6 @@ namespace GateRush.Runtime
         /// </summary>
         private const int DeepestLayerCountChecked = 99;
 
-        /// <summary>
-        /// How many bars the HUD's menu button draws: the three of the usual
-        /// menu icon. Not a tunable; it is the icon's shape. Public so
-        /// <see cref="HudView"/> draws the count <see cref="Problems"/> sized.
-        /// </summary>
-        public const int MenuIconBarCount = 3;
-
         private const int DefaultLiftedBlockOrder = 26;
         private const int DefaultEffectOrder = 27;
         private const int DefaultPullGlowOrder = DefaultBlockLipOrder - 1;
@@ -146,7 +138,6 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite shutterSlatsSprite;
         [SerializeField] private Sprite doorPanelSprite;
         [SerializeField] private Sprite clockSprite;
-        [SerializeField] private Sprite restartSprite;
         [SerializeField] private Sprite cubeSprite;
         [SerializeField] private Sprite shardSprite;
         [SerializeField] private Sprite gateGlowSprite;
@@ -507,80 +498,6 @@ namespace GateRush.Runtime
         [Tooltip("Seconds the preview takes to fade out fully when the block is released.")]
         [SerializeField] private float generatorPreviewFadeOutSeconds = 0.12f;
 
-        [Header("HUD (canvas units of a 1080 × 1920 portrait screen)")]
-        [Tooltip("Space between the safe area's left and right edges and the restart button and level pill, and the least space kept between them and the timer.")]
-        [SerializeField] private float hudSidePaddingUnits = 40f;
-
-        [Tooltip("Side of the square restart button. It is tinted the frame's colour.")]
-        [SerializeField] private float hudRestartSizeUnits = 120f;
-
-        [Tooltip("Corner radius of the restart button.")]
-        [SerializeField] private float hudRestartCornerUnits = 30f;
-
-        [Tooltip("Size of the restart icon on the button. At most the button's size.")]
-        [SerializeField] private float hudRestartIconSizeUnits = 72f;
-
-        [Tooltip("Height of the timer and level pills; their corners are half of it.")]
-        [SerializeField] private float hudPillHeightUnits = 96f;
-
-        [SerializeField] private float timerPillWidthUnits = 280f;
-        [SerializeField] private float levelPillWidthUnits = 260f;
-
-        [Tooltip("Size of the clock icon in the timer pill. At most the pill's height.")]
-        [SerializeField] private float hudClockIconSizeUnits = 60f;
-
-        [Tooltip("Space between the clock icon and the digits.")]
-        [SerializeField] private float hudIconGapUnits = 12f;
-
-        [Tooltip("Font size of the timer's digits and the level pill's text.")]
-        [SerializeField] private float hudFontSize = 56f;
-
-        [Tooltip("The timer's digits turn Timer Warning Color once the displayed second is at most this. 0 turns them red only at 00:00.")]
-        [SerializeField] private int timerWarningSeconds = 10;
-
-        [SerializeField] private Color hudPillColor = new Color(0.08f, 0.08f, 0.16f, 0.9f);
-        [SerializeField] private Color hudTextColor = Color.white;
-
-        [Tooltip("Tint of the clock and restart icons.")]
-        [SerializeField] private Color hudIconColor = Color.white;
-
-        [SerializeField] private Color timerWarningColor = new Color(1f, 0.32f, 0.32f);
-
-        [Tooltip("Text of the level pill; {0} is the level's 1-based position in level id order.")]
-        [SerializeField] private string levelLabelFormat = "Level {0}";
-
-        [Tooltip("Text shown next to the timer when a move earns a time bonus (M10); {0} is the seconds earned.")]
-        [SerializeField] private string timeBonusFormat = "+{0} s";
-
-        [SerializeField] private Color timeBonusColor = new Color(0.45f, 1f, 0.45f);
-        [SerializeField] private float timeBonusFontSize = 56f;
-
-        [Tooltip("Space between the timer pill's right end and the time bonus text.")]
-        [SerializeField] private float timeBonusGapUnits = 16f;
-
-        [Tooltip("How far the time bonus text rises while it fades.")]
-        [SerializeField] private float timeBonusRiseUnits = 60f;
-
-        [Tooltip("Seconds the time bonus text takes to rise and fade. Runs on unscaled time.")]
-        [SerializeField] private float timeBonusSeconds = 0.9f;
-
-        [SerializeField] private Ease timeBonusEase = Ease.OutQuad;
-
-        [Tooltip("The scale the timer pill pulses to when a bonus is earned: at least 1.")]
-        [SerializeField] private float timerPulseScale = 1.15f;
-
-        [Tooltip("Seconds the timer pill's pulse takes, up and back.")]
-        [SerializeField] private float timerPulseSeconds = 0.25f;
-
-        [Tooltip("Space between the restart button and the menu button beside it.")]
-        [SerializeField] private float hudButtonGapUnits = 20f;
-
-        [Tooltip("Width and thickness of each of the three bars drawn on the HUD's menu button. The button itself has the restart button's size, corner and tint.")]
-        [SerializeField] private Vector2 hudMenuBarSizeUnits = new Vector2(60f, 10f);
-
-        [Tooltip("Space between the menu button's bars. The three bars and their gaps must fit in the button.")]
-        [SerializeField] private float hudMenuBarGapUnits = 12f;
-
         [Header("Result panel (canvas units; the panel is tinted the frame's colour)")]
         [SerializeField] private string winTitle = "Level Complete";
 
@@ -635,7 +552,7 @@ namespace GateRush.Runtime
         [Tooltip("The panel's scale when the pop starts; it ends at 1.")]
         [SerializeField] private float resultPopStartScale = 0.8f;
 
-        [Header("Menu buttons (canvas units; the confirmation's two buttons, and the joker bar's corner and text colour)")]
+        [Header("Menu buttons (canvas units; the confirmation's two buttons)")]
         [Tooltip("Size of the confirmation's two buttons.")]
         [SerializeField] private Vector2 menuButtonSizeUnits = new Vector2(520f, 150f);
 
@@ -646,21 +563,6 @@ namespace GateRush.Runtime
         [SerializeField] private float menuButtonGapUnits = 40f;
 
         [Header("Meta game (Module 32; the label font holds ASCII only, so no '·' in these texts)")]
-        [Tooltip("Put between the parts of the HUD's meta line: the lives (or Free Play Label) and the gold.")]
-        [SerializeField] private string metaSeparator = " | ";
-
-        [Tooltip("The gold balance; {0} is the balance.")]
-        [SerializeField] private string goldFormat = "Gold {0}";
-
-        [Tooltip("The lives while they are full; {0} is the count and {1} the cap.")]
-        [SerializeField] private string livesFullFormat = "Lives {0}/{1}";
-
-        [Tooltip("The lives while one is coming back; {0} is the count, {1} the cap and {2} the time to the next life as mm:ss.")]
-        [SerializeField] private string livesWaitingFormat = "Lives {0}/{1} | next {2}";
-
-        [Tooltip("Shown on the HUD where the lives would be, during free play.")]
-        [SerializeField] private string freePlayLabel = "Free Play";
-
         [Tooltip("The line under a campaign win's title; {0} is the gold the level paid.")]
         [SerializeField] private string goldEarnedFormat = "+{0} gold";
 
@@ -682,43 +584,8 @@ namespace GateRush.Runtime
         [Tooltip("Label of the confirmation's button that closes it and resumes the countdown. Tinted Next Button Color.")]
         [SerializeField] private string keepPlayingLabel = "Keep playing";
 
-        [Tooltip("Height of the HUD's meta line, under the row of buttons and pills, right-aligned to the level pill.")]
-        [SerializeField] private float hudMetaHeightUnits = 60f;
-
-        [SerializeField] private float hudMetaFontSize = 40f;
-
-        [Tooltip("Space between the HUD's row and its meta line.")]
-        [SerializeField] private float hudMetaGapUnits = 12f;
-
         [Tooltip("Size of the confirmation's panel. It holds the title, the line under it and two menu buttons stacked, inside Result Padding Units, and uses the result panel's fonts and backdrop.")]
         [SerializeField] private Vector2 confirmPanelSizeUnits = new Vector2(860f, 900f);
-
-        [Header("Joker bar (Module 34; canvas units, in the bottom band; face, corner, text colour and font are the menu buttons')")]
-        [Tooltip("The Clock's name on its button.")]
-        [SerializeField] private string clockLabel = "Clock";
-
-        [Tooltip("The Rocket's name on its button.")]
-        [SerializeField] private string rocketLabel = "Rocket";
-
-        [Tooltip("The Broom's name on its button.")]
-        [SerializeField] private string broomLabel = "Broom";
-
-        [Tooltip("A joker's button while some are held, or left in free play; {0} is the joker's name and {1} the count.")]
-        [SerializeField] private string jokerCountFormat = "{0} {1}";
-
-        [Tooltip("A joker's button in the campaign while none is held; {0} is the joker's name and {1} its price from the Meta Config.")]
-        [SerializeField] private string jokerPriceFormat = "{0} {1} gold";
-
-        [Tooltip("Size of each joker button. The row of three is scaled down when the band is too small for it.")]
-        [SerializeField] private Vector2 jokerButtonSizeUnits = new Vector2(300f, 130f);
-
-        [Tooltip("Space between two joker buttons.")]
-        [SerializeField] private float jokerButtonGapUnits = 30f;
-
-        [SerializeField] private float jokerButtonFontSize = 44f;
-
-        [Tooltip("Face of the selected Rocket or Broom button, in place of the frame's colour.")]
-        [SerializeField] private Color jokerSelectedColor = new Color(1f, 0.76f, 0.2f, 1f);
 
         [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
         [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
@@ -1037,11 +904,8 @@ namespace GateRush.Runtime
         /// <summary>One cell of lift door, tiled over an elevator's region.</summary>
         public Sprite DoorPanelSprite => doorPanelSprite;
 
-        /// <summary>The HUD's white clock icon, tinted <see cref="HudIconColor"/>.</summary>
+        /// <summary>The white clock icon of a time-bonus block's mark, tinted <see cref="TimeBonusMarkIconColor"/>.</summary>
         public Sprite ClockSprite => clockSprite;
-
-        /// <summary>The HUD's white restart arrow, tinted <see cref="HudIconColor"/>.</summary>
-        public Sprite RestartSprite => restartSprite;
 
         /// <summary>One cube of a destroyed block's burst, tinted the block's colour.</summary>
         public Sprite CubeSprite => cubeSprite;
@@ -1362,19 +1226,10 @@ namespace GateRush.Runtime
         /// <summary>Tint of the result panel's Menu button.</summary>
         public Color MenuButtonColor => menuButtonColor;
 
-        /// <summary>Space between the HUD's restart and menu buttons, in canvas units.</summary>
-        public float HudButtonGapUnits => hudButtonGapUnits;
-
-        /// <summary>Width and thickness of each bar on the HUD's menu button, in canvas units.</summary>
-        public Vector2 HudMenuBarSizeUnits => hudMenuBarSizeUnits;
-
-        /// <summary>Space between the bars on the HUD's menu button, in canvas units.</summary>
-        public float HudMenuBarGapUnits => hudMenuBarGapUnits;
-
         /// <summary>Size of the confirmation's buttons, in canvas units.</summary>
         public Vector2 MenuButtonSizeUnits => menuButtonSizeUnits;
 
-        /// <summary>Corner radius of the confirmation's buttons and the joker bar's, in canvas units.</summary>
+        /// <summary>Corner radius of the confirmation's buttons, in canvas units.</summary>
         public float MenuButtonCornerUnits => menuButtonCornerUnits;
 
         /// <summary>Font size of the confirmation's button labels.</summary>
@@ -1382,21 +1237,6 @@ namespace GateRush.Runtime
 
         /// <summary>Space between the confirmation's buttons, in canvas units.</summary>
         public float MenuButtonGapUnits => menuButtonGapUnits;
-
-        /// <summary>Put between the parts of a meta line (<see cref="MetaText.Joined"/>).</summary>
-        public string MetaSeparator => metaSeparator;
-
-        /// <summary>The gold balance; {0} is the balance.</summary>
-        public string GoldFormat => goldFormat;
-
-        /// <summary>The lives while full; {0} is the count, {1} the cap.</summary>
-        public string LivesFullFormat => livesFullFormat;
-
-        /// <summary>The lives while one is coming back; {0} the count, {1} the cap, {2} the wait as mm:ss.</summary>
-        public string LivesWaitingFormat => livesWaitingFormat;
-
-        /// <summary>Shown on the HUD where the lives would be, during free play.</summary>
-        public string FreePlayLabel => freePlayLabel;
 
         /// <summary>The line under a campaign win's title; {0} is the gold paid.</summary>
         public string GoldEarnedFormat => goldEarnedFormat;
@@ -1419,127 +1259,8 @@ namespace GateRush.Runtime
         /// <summary>Label of the confirmation's button that resumes the level.</summary>
         public string KeepPlayingLabel => keepPlayingLabel;
 
-        /// <summary>Height of the HUD's meta line, in canvas units.</summary>
-        public float HudMetaHeightUnits => hudMetaHeightUnits;
-
-        /// <summary>Font size of the HUD's meta line.</summary>
-        public float HudMetaFontSize => hudMetaFontSize;
-
-        /// <summary>Space between the HUD's row and its meta line, in canvas units.</summary>
-        public float HudMetaGapUnits => hudMetaGapUnits;
-
         /// <summary>Size of the confirmation's panel, in canvas units.</summary>
         public Vector2 ConfirmPanelSizeUnits => confirmPanelSizeUnits;
-
-        /// <summary>A joker button's text while some are held or left; {0} is the name, {1} the count.</summary>
-        public string JokerCountFormat => jokerCountFormat;
-
-        /// <summary>A campaign joker button's text while none is held; {0} is the name, {1} the price.</summary>
-        public string JokerPriceFormat => jokerPriceFormat;
-
-        /// <summary>Size of each joker button, in canvas units.</summary>
-        public Vector2 JokerButtonSizeUnits => jokerButtonSizeUnits;
-
-        /// <summary>Space between two joker buttons, in canvas units.</summary>
-        public float JokerButtonGapUnits => jokerButtonGapUnits;
-
-        /// <summary>Font size of the joker buttons' text.</summary>
-        public float JokerButtonFontSize => jokerButtonFontSize;
-
-        /// <summary>Face of the selected Rocket or Broom button.</summary>
-        public Color JokerSelectedColor => jokerSelectedColor;
-
-        /// <summary>The name a joker's button shows.</summary>
-        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
-        public string JokerName(JokerKind kind)
-        {
-            switch (kind)
-            {
-                case JokerKind.Clock:
-                    return clockLabel;
-                case JokerKind.Rocket:
-                    return rocketLabel;
-                case JokerKind.Broom:
-                    return broomLabel;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(kind), kind, $"{(int)kind} is not a joker kind.");
-            }
-        }
-
-        /// <summary>Space from the safe area's sides to the HUD's outer elements, and the least space beside the timer, in canvas units.</summary>
-        public float HudSidePaddingUnits => hudSidePaddingUnits;
-
-        /// <summary>Side of the square restart button, in canvas units.</summary>
-        public float HudRestartSizeUnits => hudRestartSizeUnits;
-
-        /// <summary>Corner radius of the restart button, in canvas units.</summary>
-        public float HudRestartCornerUnits => hudRestartCornerUnits;
-
-        /// <summary>Size of the restart icon, in canvas units.</summary>
-        public float HudRestartIconSizeUnits => hudRestartIconSizeUnits;
-
-        /// <summary>Height of the timer and level pills, in canvas units.</summary>
-        public float HudPillHeightUnits => hudPillHeightUnits;
-
-        /// <summary>Width of the timer pill, in canvas units.</summary>
-        public float TimerPillWidthUnits => timerPillWidthUnits;
-
-        /// <summary>Width of the level pill, in canvas units.</summary>
-        public float LevelPillWidthUnits => levelPillWidthUnits;
-
-        /// <summary>Size of the clock icon, in canvas units.</summary>
-        public float HudClockIconSizeUnits => hudClockIconSizeUnits;
-
-        /// <summary>Space between the clock icon and the digits, in canvas units.</summary>
-        public float HudIconGapUnits => hudIconGapUnits;
-
-        /// <summary>Font size of the HUD's text.</summary>
-        public float HudFontSize => hudFontSize;
-
-        /// <summary>The displayed second at or below which the timer turns <see cref="TimerWarningColor"/> (<see cref="TimeFormat.IsWarning"/>).</summary>
-        public int TimerWarningSeconds => timerWarningSeconds;
-
-        /// <summary>Tint of the timer and level pills.</summary>
-        public Color HudPillColor => hudPillColor;
-
-        /// <summary>Colour of the HUD's text.</summary>
-        public Color HudTextColor => hudTextColor;
-
-        /// <summary>Tint of the HUD's icons.</summary>
-        public Color HudIconColor => hudIconColor;
-
-        /// <summary>Colour of the timer's digits near the end.</summary>
-        public Color TimerWarningColor => timerWarningColor;
-
-        /// <summary>Composite format of the level pill; <c>{0}</c> is the level number.</summary>
-        public string LevelLabelFormat => levelLabelFormat;
-
-        /// <summary>Composite format of the time bonus text; <c>{0}</c> is the seconds earned.</summary>
-        public string TimeBonusFormat => timeBonusFormat;
-
-        /// <summary>Colour of the time bonus text.</summary>
-        public Color TimeBonusColor => timeBonusColor;
-
-        /// <summary>Font size of the time bonus text.</summary>
-        public float TimeBonusFontSize => timeBonusFontSize;
-
-        /// <summary>Space between the timer pill and the time bonus text, in canvas units.</summary>
-        public float TimeBonusGapUnits => timeBonusGapUnits;
-
-        /// <summary>How far the time bonus text rises, in canvas units.</summary>
-        public float TimeBonusRiseUnits => timeBonusRiseUnits;
-
-        /// <summary>Seconds the time bonus text takes to rise and fade.</summary>
-        public float TimeBonusSeconds => timeBonusSeconds;
-
-        /// <summary>Easing of the time bonus text.</summary>
-        public Ease TimeBonusEase => timeBonusEase;
-
-        /// <summary>The scale the timer pill pulses to on a bonus.</summary>
-        public float TimerPulseScale => timerPulseScale;
-
-        /// <summary>Seconds the timer pill's pulse takes, up and back.</summary>
-        public float TimerPulseSeconds => timerPulseSeconds;
 
         /// <summary>Colour of the full-screen backdrop behind the result panel.</summary>
         public Color ResultBackdropColor => resultBackdropColor;
@@ -2064,7 +1785,6 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, shutterSlatsSprite, "Shutter Slats Sprite");
             AddIfUnassigned(problems, doorPanelSprite, "Door Panel Sprite");
             AddIfUnassigned(problems, clockSprite, "Clock Sprite");
-            AddIfUnassigned(problems, restartSprite, "Restart Sprite");
             AddIfUnassigned(problems, cubeSprite, "Cube Sprite");
             AddIfUnassigned(problems, shardSprite, "Shard Sprite");
             AddIfUnassigned(problems, gateGlowSprite, "Gate Glow Sprite");
@@ -2182,11 +1902,10 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Block Palette needs {colourCount} entries, one per BlockColor.");
             }
 
-            AddHudProblems(problems);
             AddResultPanelProblems(problems);
             AddMenuButtonProblems(problems);
             AddMetaProblems(problems);
-            AddJokerBarProblems(problems);
+            AddJokerBreakProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
             return problems;
@@ -2553,72 +2272,6 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>The constraints on the HUD's values, each message naming its field.</summary>
-        private void AddHudProblems(List<string> problems)
-        {
-            if (!(hudRestartSizeUnits > 0f && hudRestartCornerUnits > 0f && hudRestartIconSizeUnits > 0f
-                  && hudRestartIconSizeUnits <= hudRestartSizeUnits))
-            {
-                problems.Add($"{name}: Hud Restart Size Units, Hud Restart Corner Units and Hud Restart Icon Size Units must be positive, and the icon at most the button's size.");
-            }
-
-            if (!(hudPillHeightUnits > 0f && timerPillWidthUnits > 0f && levelPillWidthUnits > 0f))
-            {
-                problems.Add($"{name}: Hud Pill Height Units, Timer Pill Width Units and Level Pill Width Units must be positive.");
-            }
-
-            if (!(hudClockIconSizeUnits > 0f && hudClockIconSizeUnits <= hudPillHeightUnits && hudIconGapUnits >= 0f
-                  && hudClockIconSizeUnits + hudIconGapUnits + (hudPillHeightUnits - hudClockIconSizeUnits) < timerPillWidthUnits))
-            {
-                problems.Add($"{name}: Hud Clock Icon Size Units must be positive and at most Hud Pill Height Units, Hud Icon Gap Units at least 0, and together they must leave room for the digits in Timer Pill Width Units.");
-            }
-
-            if (!(hudSidePaddingUnits >= 0f && hudFontSize > 0f))
-            {
-                problems.Add($"{name}: Hud Side Padding Units must be at least 0 and Hud Font Size positive.");
-            }
-
-            if (timerWarningSeconds < 0)
-            {
-                problems.Add($"{name}: Timer Warning Seconds may not be negative.");
-            }
-
-            if (!IsUsableFormat(levelLabelFormat))
-            {
-                problems.Add($"{name}: Level Label Format must be a format with at most one placeholder, {{0}}, for the level number.");
-            }
-
-            if (!IsUsableFormat(timeBonusFormat))
-            {
-                problems.Add($"{name}: Time Bonus Format must be a format with at most one placeholder, {{0}}, for the seconds earned.");
-            }
-
-            if (!(timeBonusFontSize > 0f && timeBonusGapUnits >= 0f && timeBonusRiseUnits >= 0f))
-            {
-                problems.Add($"{name}: Time Bonus Font Size must be positive, and Time Bonus Gap Units and Time Bonus Rise Units at least 0.");
-            }
-
-            if (!(timerPulseScale >= 1f) || float.IsInfinity(timerPulseScale))
-            {
-                problems.Add($"{name}: Timer Pulse Scale must be at least 1 and finite.");
-            }
-
-            AddIfNotPositive(problems, timeBonusSeconds, "Time Bonus Seconds");
-            AddIfNotPositive(problems, timerPulseSeconds, "Timer Pulse Seconds");
-
-            if (!(hudButtonGapUnits >= 0f))
-            {
-                problems.Add($"{name}: Hud Button Gap Units may not be negative.");
-            }
-
-            AddIfNotPositive(problems, hudMenuBarSizeUnits, "Hud Menu Bar Size Units");
-            if (!(hudMenuBarGapUnits >= 0f && hudMenuBarSizeUnits.x <= hudRestartSizeUnits
-                  && MenuIconBarCount * hudMenuBarSizeUnits.y + (MenuIconBarCount - 1) * hudMenuBarGapUnits <= hudRestartSizeUnits))
-            {
-                problems.Add($"{name}: Hud Menu Bar Gap Units must be at least 0, and the menu button's {MenuIconBarCount} bars of Hud Menu Bar Size Units with their gaps must fit in Hud Restart Size Units.");
-            }
-        }
-
         /// <summary>The constraints on the result panel's values, each message naming its field.</summary>
         private void AddResultPanelProblems(List<string> problems)
         {
@@ -2654,7 +2307,7 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The constraints on the menu buttons' values, which the confirmation
-        /// and the joker bar use, each message naming its field: every size is
+        /// uses, each message naming its field: every size is
         /// positive and the gap is not negative.
         /// </summary>
         private void AddMenuButtonProblems(List<string> problems)
@@ -2677,33 +2330,15 @@ namespace GateRush.Runtime
         /// </summary>
         private void AddMetaProblems(List<string> problems)
         {
-            AddIfBlank(problems, freePlayLabel, "Free Play Label");
             AddIfBlank(problems, campaignDoneNotice, "Campaign Done Notice");
             AddIfBlank(problems, leaveLevelTitle, "Leave Level Title");
             AddIfBlank(problems, restartLevelTitle, "Restart Level Title");
             AddIfBlank(problems, loseLifeMessage, "Lose Life Message");
             AddIfBlank(problems, loseLifeLabel, "Lose Life Label");
             AddIfBlank(problems, keepPlayingLabel, "Keep Playing Label");
-
-            // Spaces alone are a usable separator; only no text at all is not.
-            if (string.IsNullOrEmpty(metaSeparator))
-            {
-                problems.Add($"{name}: Meta Separator is empty.");
-            }
-
-            AddIfUnusableFormat(problems, goldFormat, 1, "Gold Format", "{0} for the balance");
-            AddIfUnusableFormat(problems, livesFullFormat, 2, "Lives Full Format", "{0} for the count and {1} for the cap");
-            AddIfUnusableFormat(problems, livesWaitingFormat, 3, "Lives Waiting Format", "{0} for the count, {1} for the cap and {2} for the wait");
             AddIfUnusableFormat(problems, goldEarnedFormat, 1, "Gold Earned Format", "{0} for the gold paid");
 
-            AddIfNotPositive(problems, hudMetaHeightUnits, "Hud Meta Height Units");
-            AddIfNotPositive(problems, hudMetaFontSize, "Hud Meta Font Size");
             AddIfNotPositive(problems, confirmPanelSizeUnits, "Confirm Panel Size Units");
-
-            if (!(hudMetaGapUnits >= 0f) || float.IsInfinity(hudMetaGapUnits))
-            {
-                problems.Add($"{name}: Hud Meta Gap Units must be at least 0 and finite.");
-            }
 
             // From the panel's foot: Keep playing, the gap, Lose a life, the
             // padding, the line, the title; padding at the foot and the top.
@@ -2716,32 +2351,12 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The constraints on the joker bar's values and the joker break
-        /// (Module 34), each message naming its field: every name is there to
-        /// read, both formats take a name and a number, every size and time
-        /// is positive, the gap is not negative, and the highlight can be
-        /// seen.
+        /// The constraint on the joker break (Module 34): a destroyed frozen
+        /// block's fade takes a positive time.
         /// </summary>
-        private void AddJokerBarProblems(List<string> problems)
+        private void AddJokerBreakProblems(List<string> problems)
         {
-            AddIfBlank(problems, clockLabel, "Clock Label");
-            AddIfBlank(problems, rocketLabel, "Rocket Label");
-            AddIfBlank(problems, broomLabel, "Broom Label");
-            AddIfUnusableFormat(problems, jokerCountFormat, 2, "Joker Count Format", "{0} for the name and {1} for the count");
-            AddIfUnusableFormat(problems, jokerPriceFormat, 2, "Joker Price Format", "{0} for the name and {1} for the price");
-            AddIfNotPositive(problems, jokerButtonSizeUnits, "Joker Button Size Units");
-            AddIfNotPositive(problems, jokerButtonFontSize, "Joker Button Font Size");
             AddIfNotPositive(problems, breakFadeSeconds, "Break Fade Seconds");
-
-            if (!(jokerButtonGapUnits >= 0f) || float.IsInfinity(jokerButtonGapUnits))
-            {
-                problems.Add($"{name}: Joker Button Gap Units must be at least 0 and finite.");
-            }
-
-            if (!(jokerSelectedColor.a > 0f))
-            {
-                problems.Add($"{name}: Joker Selected Color must not be fully transparent.");
-            }
         }
 
         private void AddIfUnusableFormat(List<string> problems, string format, int argumentCount, string field, string placeholders)

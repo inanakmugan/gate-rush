@@ -23,6 +23,9 @@ namespace GateRush.UI
         Heart,
 
         /// <summary>The win streak's fire, the bar's fill and the next reward's highlight (<see cref="UiConfig.StreakColor"/>).</summary>
-        Streak
+        Streak,
+
+        /// <summary>The ring around the selected joker's button in a level (<see cref="UiConfig.JokerSelectedColor"/>).</summary>
+        JokerSelected
     }
 }

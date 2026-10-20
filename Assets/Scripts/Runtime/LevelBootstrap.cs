@@ -20,8 +20,8 @@ namespace GateRush.Runtime
     /// <remarks>
     /// <para><b>Front end (Module 35, D68).</b> A plain Play and the player
     /// build open on the front end's Home (<see cref="IFrontEnd"/>) with no
-    /// level loaded: no board, no countdown, the HUD hidden and the input
-    /// controller unbound. The front end is a <c>GateRush.UI</c> component
+    /// level loaded: no board, no countdown, the level's interface hidden and
+    /// the input controller unbound. The front end is a <c>GateRush.UI</c> component
     /// held as a <see cref="MonoBehaviour"/>, so this assembly never
     /// references the screens; it shows the <see cref="FrontEndState"/> built
     /// here and raises events, and every decision stays here. Menu, from the
@@ -45,8 +45,8 @@ namespace GateRush.Runtime
     /// being played asks first (<see cref="ConfirmPrompt"/>), with the
     /// countdown stopped and the board and the HUD's buttons held. A
     /// campaign win's panel has no Restart: a won campaign level is never
-    /// replayed. The HUD's meta line and the front end are refreshed only
-    /// when the lives, the second to the next life or the gold have changed.
+    /// replayed. The level's interface and the front end are refreshed only
+    /// when what they show has changed.
     /// With no usable level order the level grid is empty and Play starts
     /// <see cref="level"/> as free play.</para>
     /// <para>A level or config that cannot be used logs the reason and draws
@@ -57,7 +57,7 @@ namespace GateRush.Runtime
     /// to load is logged and left out; two files sharing a level id are
     /// logged and hide Next altogether. Neither stops the current level from
     /// playing. The HUD's level number comes from the same catalog; a level
-    /// without one plays with the level pill hidden.</para>
+    /// without one plays with no number shown.</para>
     /// <para><b>Introductions (Module 19).</b> The same pass over the level
     /// files records which mechanics each level contains
     /// (<see cref="LevelMechanics.Of"/>), in the catalog's order. A level that
@@ -101,11 +101,24 @@ namespace GateRush.Runtime
     /// <para><b>Camera fit.</b> The camera keeps free the HUD bands measured
     /// from the safe area's edges: each band plus the unsafe strip on its side
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
-    /// screen's size or safe area changes.</para>
-    /// <para><b>Jokers (Module 34, D65, D66, D67).</b> The joker bar shows
-    /// with the HUD. The Clock's button uses it at once; the Rocket's and the
-    /// Broom's select it (<see cref="JokerSelection"/>), and the next valid
-    /// tap on a block uses it. Every use runs in one order: check, spend
+    /// screen's size or safe area changes, and the level's interface is given
+    /// the same bands (<see cref="ILevelUi.PlaceBands"/>) at the same time.</para>
+    /// <para><b>The level's interface (Module 40, D74).</b> The HUD, the joker
+    /// bar and the in-level overlays are a <c>GateRush.UI</c> component held
+    /// as a <see cref="MonoBehaviour"/> (<see cref="ILevelUi"/>), shown the
+    /// <see cref="LevelUiState"/> built here. One query,
+    /// <see cref="LevelUiStateAt"/>, draws the joker buttons and decides
+    /// what a press does. The level stops — the drag cancelled, the
+    /// countdown stopped, the board and the HUD's buttons held — while the
+    /// confirmation or any in-level overlay is open (<see cref="IsPaused"/>),
+    /// and goes on when the last of them closes (<see cref="ResumeIfFree"/>).</para>
+    /// <para><b>Jokers (Module 34, D65, D66, D67, D74).</b> The joker bar
+    /// shows with the HUD. The Clock's button uses it at once; the Rocket's
+    /// and the Broom's select it (<see cref="JokerSelection"/>), and the next
+    /// valid tap on a block uses it. In the campaign, a joker with none held
+    /// and a price above the balance opens Not Enough Gold over the level
+    /// instead, whatever its kind; Get Gold leads to the gold packs there,
+    /// and nothing is bought or used for the player on return. Every use runs in one order: check, spend
     /// (<see cref="MetaGame.TryUseJoker"/> in the campaign, the level's
     /// <see cref="FreePlayJokers"/> in free play), apply, save in the
     /// campaign, then present — a joker through the same
@@ -117,7 +130,8 @@ namespace GateRush.Runtime
     /// an <see cref="IPurchaseService"/>, the
     /// <see cref="SimulatedPurchaseService"/> over
     /// <see cref="SimulatedStoreConfig"/>, whose confirmations are passed to
-    /// the front end's test purchase sheet; a pack that succeeds is reported
+    /// the test purchase sheet of the front end or the level's interface,
+    /// whichever is open; a pack that succeeds is reported
     /// (<see cref="MetaGame.ReportGoldPurchase"/>) and saved. Jokers and the
     /// refill are bought for gold here too; a purchase refused for want of
     /// gold opens the Not Enough Gold prompt with the shortfall worked out
@@ -175,9 +189,6 @@ namespace GateRush.Runtime
         [SerializeField] private BackgroundView backgroundView;
         [SerializeField] private InputController inputController;
 
-        [Tooltip("The HUD on the canvas: restart button, timer and level number in the top band.")]
-        [SerializeField] private HudView hudView;
-
         [Tooltip("The introduction card on the canvas: shown over the HUD and under the result panel when a level introduces a mechanic.")]
         [SerializeField] private IntroductionCard introductionCard;
 
@@ -190,8 +201,8 @@ namespace GateRush.Runtime
         [Tooltip("The confirmation on the canvas before Menu or Restart costs a life while a campaign level is played (Module 32). Drawn over everything else on the canvas.")]
         [SerializeField] private ConfirmPrompt confirmPrompt;
 
-        [Tooltip("The joker bar on the canvas: the Clock, Rocket and Broom buttons in the bottom band, shown with the HUD (Module 34). Drawn under the introduction card, the result panel and the confirmation; hidden while the front end shows.")]
-        [SerializeField] private JokerBar jokerBar;
+        [Tooltip("The level's interface (Module 40): drag the LevelUi component of the Level UI instance under the canvas — the component's header, not the GameObject. The HUD, the joker bar and the in-level overlays, shown while a level is loaded. It must implement ILevelUi and report no missing part; otherwise an error is logged and nothing is drawn.")]
+        [SerializeField] private MonoBehaviour levelUi;
 
         [Tooltip("Plays the sound cues and vibration pulses (Module 25). Left empty, the game runs silently and logs one error.")]
         [SerializeField] private SoundPlayer soundPlayer;
@@ -213,6 +224,10 @@ namespace GateRush.Runtime
         // The front end as the interface it must implement; set by
         // HasEverythingAssigned, and only read once that has passed.
         private IFrontEnd frontEndView;
+
+        // The level's interface as the interface it must implement; set by
+        // HasEverythingAssigned, and only read once that has passed.
+        private ILevelUi levelUiView;
 
         // Where the save is kept, the save itself, the rules it was loaded
         // with, the clock and the meta game over them. All are made in Awake
@@ -275,15 +290,14 @@ namespace GateRush.Runtime
         // The Rocket or Broom selected and not yet used (D67); never saved.
         private readonly JokerSelection jokerSelection = new JokerSelection();
 
-        // The joker bar's buttons, left to right, and what each last showed,
-        // so the bar is rebuilt only when it changes (RefreshJokerBar).
-        private readonly JokerKind[] barKinds = { JokerKind.Clock, JokerKind.Rocket, JokerKind.Broom };
-        private int[] shownJokerCounts;
-        private bool hasShownJokers;
-        private PlayMode shownJokerMode;
-        private bool shownJokersUsable;
-        private bool shownClockUsable;
-        private int shownJokerGold;
+        // What the level's interface last showed, so it is refreshed only when
+        // that changes (RefreshLevelUi).
+        private bool hasShownLevelUi;
+        private LevelUiState shownLevelUi;
+
+        // The level being played's number in the level order; null for a
+        // level outside it (ShowLevelNumber).
+        private int? levelNumber;
 
         // Free play's jokers for the level being played (D66), made in Awake
         // and refilled on every load and restart.
@@ -316,23 +330,14 @@ namespace GateRush.Runtime
 
             isUsable = true;
             backgroundView.Initialize(config);
-            hudView.Initialize(config);
-            hudView.HideTime();
-            hudView.HideLevel();
-
-            // Right after the HUD: everything initialised below goes over it.
-            jokerBar.Initialize(config);
-            shownJokerCounts = new int[barKinds.Length];
 
             // Each puts what it builds last among the canvas's children, so
-            // this order — after the HUD, which puts itself first — leaves the
-            // card over the HUD, and the result panel over the card. The front
-            // end, a prefab instance under the canvas, stays where the scene
-            // put it: after the HUD and before everything built here, so the
-            // card, the panel and the confirmation draw over it, and nothing
-            // under it is open together with it. The confirmation comes last
-            // and draws over everything; nothing it covers can be open
-            // together with it.
+            // this order leaves the result panel over the card. The front end
+            // and the level's interface, prefab instances under the canvas,
+            // stay where the scene put them, before everything built here, so
+            // the card, the panel and the confirmation draw over the HUD and
+            // the joker bar. The confirmation comes last and draws over
+            // everything; nothing it covers can be open together with it.
             introductionCard.Initialize(config);
             resultPanel.Initialize(config);
             confirmPrompt.Initialize(config);
@@ -799,24 +804,27 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Shows the meta game again when what is shown has changed: with no
+        /// Shows the meta game again when what is shown has changed: during a
+        /// level, the level's interface (<see cref="RefreshLevelUi"/>); with no
         /// level loaded, the front end's whole state, which a passing second
         /// changes only while a life is coming back — an open Lives overlay
-        /// stays open as lives come back; during a campaign level, the HUD's
-        /// lives and gold; during free play, the HUD's Free Play and gold,
-        /// which no passing second changes. Reads the clock once, and
-        /// allocates nothing when nothing changed, so it runs every frame.
-        /// Reading the lives settles them, which needs no save
-        /// (<see cref="MetaGame"/>).
+        /// stays open as lives come back. Reads the clock once, and allocates
+        /// nothing when nothing changed, so it runs every frame. Reading the
+        /// lives settles them, which needs no save (<see cref="MetaGame"/>).
         /// </summary>
         private void RefreshMeta()
         {
-            var meta = metaGame.Save;
             var nowUtc = clock.UtcNow;
+            if (run != null)
+            {
+                RefreshLevelUi(nowUtc);
+                return;
+            }
+
+            var meta = metaGame.Save;
             var gold = meta.Wallet.Balance;
-            var isFreePlay = run != null && mode == PlayMode.FreePlay;
-            var count = isFreePlay ? -1 : meta.Lives.CountAt(nowUtc);
-            var untilNext = isFreePlay ? null : meta.Lives.UntilNextLifeAt(nowUtc);
+            var count = meta.Lives.CountAt(nowUtc);
+            var untilNext = meta.Lives.UntilNextLifeAt(nowUtc);
             var waitSeconds = untilNext.HasValue ? MetaText.WholeSeconds(untilNext.Value) : -1;
             if (hasShownMeta && count == shownLives && waitSeconds == shownWaitSeconds && gold == shownGold)
             {
@@ -827,32 +835,49 @@ namespace GateRush.Runtime
             shownLives = count;
             shownWaitSeconds = waitSeconds;
             shownGold = gold;
-
-            if (run == null)
+            if (frontEndView.IsOpen)
             {
-                if (frontEndView.IsOpen)
-                {
-                    frontEndView.Refresh(FrontEndStateAt(nowUtc));
-                }
-
-                return;
+                frontEndView.Refresh(FrontEndStateAt(nowUtc));
             }
-
-            var goldText = MetaText.Gold(gold, config);
-            if (isFreePlay)
-            {
-                hudView.ShowMeta(MetaText.Joined(config.FreePlayLabel, goldText, config));
-                return;
-            }
-
-            var livesText = MetaText.Lives(count, metaRules.LifeCap, untilNext, config);
-            hudView.ShowMeta(MetaText.Joined(livesText, goldText, config));
         }
+
+        /// <summary>
+        /// Shows the level's interface again when its state at
+        /// <paramref name="nowUtc"/> differs from what it last showed: so every
+        /// use, purchase, selection, win, loss, restart, change of gold or
+        /// lives, and card, confirmation or overlay opening or closing shows at
+        /// once. Allocates nothing when nothing changed.
+        /// </summary>
+        private void RefreshLevelUi(DateTime nowUtc)
+        {
+            var state = LevelUiStateAt(nowUtc);
+            if (hasShownLevelUi && state.Equals(shownLevelUi))
+            {
+                return;
+            }
+
+            hasShownLevelUi = true;
+            shownLevelUi = state;
+            levelUiView.Refresh(state);
+        }
+
+        /// <summary>
+        /// What the level's interface shows at <paramref name="nowUtc"/>, for
+        /// the level being played: the one query that draws the joker buttons
+        /// and decides what a press on one does (<see cref="OnJokerPressed"/>).
+        /// A joker is usable while the level is being played and nothing holds
+        /// it; the Clock also needs a countdown.
+        /// </summary>
+        private LevelUiState LevelUiStateAt(DateTime nowUtc) =>
+            LevelUiState.Of(
+                mode, levelNumber, metaGame, metaRules, nowUtc, freePlayJokers, IsBeingPlayed() && !IsHeld(), run.Countdown != null,
+                jokerSelection.Selected, goldOffers);
 
         /// <summary>Makes the next <see cref="RefreshMeta"/> show everything again, for a new screen, level or setting.</summary>
         private void ForgetShownMeta()
         {
             hasShownMeta = false;
+            hasShownLevelUi = false;
         }
 
         /// <summary>
@@ -881,8 +906,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void OpenHome()
         {
-            hudView.Hide();
-            jokerBar.Hide();
+            levelUiView.Hide();
             frontEndView.Show(FrontEndStateAt(clock.UtcNow));
             ForgetShownMeta();
             RefreshMeta();
@@ -1079,7 +1103,7 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Makes the purchase service over the Simulated Store Config, whose
-        /// confirmations go to the front end's test sheet, and matches its
+        /// confirmations go to the open test sheet, and matches its
         /// products with the rules' gold packs once. Every id known to one
         /// side only is logged as an error; the game goes on, and the Store
         /// shows the packs both know.
@@ -1095,24 +1119,38 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The simulated service's confirmation: the front end's test purchase
-        /// sheet for <paramref name="product"/>'s offer. Answers no when the
-        /// front end is closed, which no press can reach.
+        /// The simulated service's confirmation: the test purchase sheet for
+        /// <paramref name="product"/>'s offer, on the front end when it is
+        /// open, otherwise on the level's interface when that is — the two are
+        /// never open together. Answers no when neither is open, which no
+        /// press can reach.
         /// </summary>
         private void ConfirmOnTestSheet(StoreProduct product, Action<bool> answer)
         {
-            if (!frontEndView.IsOpen || !TryGetOffer(product.Id, out var offer))
+            if (!TryGetOffer(product.Id, out var offer))
             {
                 answer(false);
                 return;
             }
 
-            frontEndView.ConfirmTestPurchase(offer, answer);
+            if (frontEndView.IsOpen)
+            {
+                frontEndView.ConfirmTestPurchase(offer, answer);
+            }
+            else if (levelUiView.IsOpen)
+            {
+                levelUiView.ConfirmTestPurchase(offer, answer);
+            }
+            else
+            {
+                answer(false);
+            }
         }
 
         /// <summary>
-        /// A gold pack's price button (D72): buys it through the purchase
-        /// service. A press while a purchase waits for its outcome is ignored.
+        /// A gold pack's price button (D72), on the Store or in the level's
+        /// gold packs: buys it through the purchase service. A press while a
+        /// purchase waits for its outcome is ignored.
         /// </summary>
         private void OnGoldPackRequested(string productId)
         {
@@ -1125,7 +1163,7 @@ namespace GateRush.Runtime
             // an id the rules do not know.
             if (!TryGetOffer(productId, out _))
             {
-                Debug.LogError($"The Store asked for the gold pack '{productId}', which is not on offer; nothing changes.", this);
+                Debug.LogError($"A gold pack button asked for '{productId}', which is not on offer; nothing changes.", this);
                 return;
             }
 
@@ -1134,8 +1172,11 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A gold pack's outcome: Succeeded adds its gold and saves, and the
-        /// player stays where they are; Cancelled changes nothing; Failed
-        /// opens the message saying that nothing was charged.
+        /// player stays where they are — in a level, the gold packs stay open
+        /// and the joker is pressed again by the player (D74); Cancelled
+        /// changes nothing; Failed opens the message saying that nothing was
+        /// charged, on whichever of the front end and the level's interface is
+        /// open.
         /// </summary>
         private void OnGoldPurchaseDone(string productId, PurchaseOutcome outcome)
         {
@@ -1154,6 +1195,10 @@ namespace GateRush.Runtime
                     if (frontEndView.IsOpen)
                     {
                         frontEndView.ShowPurchaseFailed();
+                    }
+                    else if (levelUiView.IsOpen)
+                    {
+                        levelUiView.ShowPurchaseFailed();
                     }
 
                     break;
@@ -1196,8 +1241,10 @@ namespace GateRush.Runtime
 
             inputController.MoveApplied += OnMoveApplied;
             inputController.RestartRequested += OnRestartRequested;
-            hudView.RestartRequested += OnRestartRequested;
-            hudView.MenuRequested += OnMenuRequested;
+            levelUiView.RestartRequested += OnRestartRequested;
+            levelUiView.MenuRequested += OnMenuRequested;
+            levelUiView.GoldPackRequested += OnGoldPackRequested;
+            levelUiView.OverlaysClosed += OnLevelOverlaysClosed;
             resultPanel.RestartRequested += OnRestartRequested;
             resultPanel.NextRequested += Next;
             resultPanel.MenuRequested += GoToMenu;
@@ -1217,14 +1264,13 @@ namespace GateRush.Runtime
             boardView.ArriveStarted += OnArriveStarted;
             inputController.DragStarted += OnDragStarted;
             inputController.DragDropped += OnDragDropped;
-            hudView.ButtonPressed += OnButtonPressed;
+            levelUiView.ButtonPressed += OnButtonPressed;
             introductionCard.ButtonPressed += OnButtonPressed;
             resultPanel.ButtonPressed += OnButtonPressed;
             frontEndView.ButtonPressed += OnButtonPressed;
             confirmPrompt.ButtonPressed += OnButtonPressed;
             inputController.BoardTapped += OnBoardTapped;
-            jokerBar.JokerPressed += OnJokerPressed;
-            jokerBar.ButtonPressed += OnButtonPressed;
+            levelUiView.JokerPressed += OnJokerPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested += OnDevLevelStep;
 #endif
@@ -1240,8 +1286,10 @@ namespace GateRush.Runtime
 
             inputController.MoveApplied -= OnMoveApplied;
             inputController.RestartRequested -= OnRestartRequested;
-            hudView.RestartRequested -= OnRestartRequested;
-            hudView.MenuRequested -= OnMenuRequested;
+            levelUiView.RestartRequested -= OnRestartRequested;
+            levelUiView.MenuRequested -= OnMenuRequested;
+            levelUiView.GoldPackRequested -= OnGoldPackRequested;
+            levelUiView.OverlaysClosed -= OnLevelOverlaysClosed;
             resultPanel.RestartRequested -= OnRestartRequested;
             resultPanel.NextRequested -= Next;
             resultPanel.MenuRequested -= GoToMenu;
@@ -1261,14 +1309,13 @@ namespace GateRush.Runtime
             boardView.ArriveStarted -= OnArriveStarted;
             inputController.DragStarted -= OnDragStarted;
             inputController.DragDropped -= OnDragDropped;
-            hudView.ButtonPressed -= OnButtonPressed;
+            levelUiView.ButtonPressed -= OnButtonPressed;
             introductionCard.ButtonPressed -= OnButtonPressed;
             resultPanel.ButtonPressed -= OnButtonPressed;
             frontEndView.ButtonPressed -= OnButtonPressed;
             confirmPrompt.ButtonPressed -= OnButtonPressed;
             inputController.BoardTapped -= OnBoardTapped;
-            jokerBar.JokerPressed -= OnJokerPressed;
-            jokerBar.ButtonPressed -= OnButtonPressed;
+            levelUiView.JokerPressed -= OnJokerPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
             inputController.DevLevelStepRequested -= OnDevLevelStep;
 #endif
@@ -1319,7 +1366,6 @@ namespace GateRush.Runtime
 
             ShowRemainingTime();
             RefreshMeta();
-            RefreshJokerBar();
         }
 
         /// <summary>
@@ -1327,8 +1373,9 @@ namespace GateRush.Runtime
         /// started afresh and played as <paramref name="playMode"/>. Its
         /// countdown starts at once, or — when the level introduces mechanics
         /// — when the last introduction card closes. The front end, if it was
-        /// showing, closes and the HUD shows. A level being left reports
-        /// nothing, an open confirmation included: only the development tools
+        /// showing, closes and the level's interface shows, with no overlay
+        /// open. A level being left reports nothing, an open confirmation or
+        /// in-level overlay included: only the development tools
         /// replace a level being played. A level that fails to load logs the
         /// reason, changes nothing — a front end that was showing stays — and
         /// answers false.
@@ -1343,8 +1390,6 @@ namespace GateRush.Runtime
 
             frontEndView.Hide();
             confirmPrompt.Hide();
-            hudView.Show();
-            jokerBar.Show();
             inputController.CancelDrag();
             ClearJokerSelection();
             freePlayJokers.Refill();
@@ -1373,7 +1418,6 @@ namespace GateRush.Runtime
             mode = playMode;
             campaignGoldEarned = null;
             moveNumber = 0;
-            hudView.CancelTimeBonus();
             if (isActiveAndEnabled)
             {
                 ListenForTimeBonus();
@@ -1396,6 +1440,14 @@ namespace GateRush.Runtime
                 IsHeld,
                 IsAiming);
 
+            // Shown afresh: no overlay, no time bonus, the new level's state.
+            ShowLevelNumber(asset.name);
+            ForgetShownMeta();
+            var state = LevelUiStateAt(clock.UtcNow);
+            levelUiView.Show(state);
+            hasShownLevelUi = true;
+            shownLevelUi = state;
+
             fittedScreenWidth = 0;
             fittedScreenHeight = 0;
             FitCameraToScreen();
@@ -1403,15 +1455,10 @@ namespace GateRush.Runtime
             resultPanel.Hide();
             if (countdown == null)
             {
-                hudView.HideTime();
+                levelUiView.HideTime();
             }
 
-            ShowLevelNumber(asset.name);
             ShowRemainingTime();
-            ForgetShownMeta();
-            RefreshMeta();
-            ForgetShownJokers();
-            RefreshJokerBar();
 
             // The run is not started while a card is open: an unstarted
             // countdown ignores every tick, so the timer stands at the whole
@@ -1443,15 +1490,54 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// True while an introduction card or the confirmation is open: the
-        /// one query that holds the pointer and <b>R</b>
-        /// (<see cref="InputController"/>) and the HUD's restart and menu
+        /// True while an introduction card is open or the level is paused
+        /// (<see cref="IsPaused"/>): the one query that holds the pointer and
+        /// <b>R</b> (<see cref="InputController"/>), the HUD's restart and menu
         /// buttons (<see cref="OnRestartRequested"/>,
-        /// <see cref="OnMenuRequested"/>). Neither opens during a drag: a card
-        /// opens as a level loads, which cancels any drag first, and
-        /// <see cref="AskToConfirm"/> cancels it before opening.
+        /// <see cref="OnMenuRequested"/>) and the jokers. None opens during a
+        /// drag: a card opens as a level loads, which cancels any drag first,
+        /// and <see cref="PauseLevel"/> cancels it before a pause.
         /// </summary>
-        private bool IsHeld() => introductionCard.IsOpen || confirmPrompt.IsOpen;
+        private bool IsHeld() => introductionCard.IsOpen || IsPaused();
+
+        /// <summary>
+        /// True while the confirmation or any in-level overlay is open (D64,
+        /// D74): the countdown stands still and the board takes no input. The
+        /// one test both kinds of pause share.
+        /// </summary>
+        private bool IsPaused() => confirmPrompt.IsOpen || levelUiView.IsOverlayOpen;
+
+        /// <summary>
+        /// Stops the level for a pause that is about to open: the drag is
+        /// cancelled, then the countdown stopped where it stands. The pause's
+        /// own view then holds the board through <see cref="IsHeld"/>.
+        /// </summary>
+        private void PauseLevel()
+        {
+            inputController.CancelDrag();
+            run.Countdown?.Stop();
+        }
+
+        /// <summary>
+        /// Resumes the countdown from the same remaining time once nothing
+        /// pauses the level any more — the confirmation answered "Keep
+        /// playing", or the last in-level overlay closed — and only while it is
+        /// being played. While something still pauses it, nothing changes.
+        /// </summary>
+        private void ResumeIfFree()
+        {
+            if (IsBeingPlayed() && !IsPaused())
+            {
+                run.Countdown?.Start();
+            }
+        }
+
+        /// <summary>The player closed the last in-level overlay: the level goes on (D74).</summary>
+        private void OnLevelOverlaysClosed()
+        {
+            ResumeIfFree();
+            RefreshMeta();
+        }
 
         /// <summary>
         /// True while the level is being played: loaded, neither won nor lost
@@ -1521,15 +1607,14 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Opens the confirmation that <paramref name="action"/> will cost a
-        /// life (D57, D64), with the drag cancelled first, then the countdown
-        /// stopped where it stands; the board and the HUD's buttons are held
-        /// while it is open (<see cref="IsHeld"/>).
+        /// life (D57, D64), with the selection cleared (D67) and the level
+        /// paused (<see cref="PauseLevel"/>); the board and the HUD's buttons
+        /// are held while it is open (<see cref="IsHeld"/>).
         /// </summary>
         private void AskToConfirm(ConfirmedAction action)
         {
-            inputController.CancelDrag();
             ClearJokerSelection();
-            run.Countdown?.Stop();
+            PauseLevel();
             pendingConfirm = action;
             confirmPrompt.Show(action == ConfirmedAction.Leave ? config.LeaveLevelTitle : config.RestartLevelTitle);
         }
@@ -1538,10 +1623,7 @@ namespace GateRush.Runtime
         private void OnConfirmCancelled()
         {
             confirmPrompt.Hide();
-            if (IsBeingPlayed())
-            {
-                run.Countdown?.Start();
-            }
+            ResumeIfFree();
         }
 
         /// <summary>
@@ -1606,12 +1688,12 @@ namespace GateRush.Runtime
             run.Restart();
             moveNumber = 0;
             freePlayJokers.Refill();
-            hudView.CancelTimeBonus();
+            levelUiView.CancelTimeBonus();
             boardView.Rebuild(run.Session.State);
             resultPanel.Hide();
             ShowRemainingTime();
-            ForgetShownJokers();
-            RefreshJokerBar();
+            ForgetShownMeta();
+            RefreshMeta();
         }
 
         /// <summary>
@@ -1740,28 +1822,42 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A press of a joker's button (Module 34). The Clock is used at once
-        /// (<see cref="UseClock"/>). The Rocket and the Broom are selected,
-        /// unselected or switched (<see cref="JokerSelection.Press"/>) and
-        /// nothing is spent (D67). The buttons are not pressable while the
-        /// level is not being played or is held; a press that comes then
-        /// anyway changes nothing.
+        /// A press of a joker's button (Modules 34 and 40). Read against the
+        /// same state that drew the button (<see cref="LevelUiStateAt"/>): in
+        /// the campaign, a joker with none held and a price above the balance
+        /// pauses the level and opens Not Enough Gold with the shortfall,
+        /// whatever its kind, selecting and using nothing and keeping any
+        /// selection (D74). Otherwise the Clock is used at once
+        /// (<see cref="UseClock"/>), and the Rocket and the Broom are selected,
+        /// unselected or switched (<see cref="JokerSelection.Press"/>) with
+        /// nothing spent (D67). The buttons are not pressable while the level
+        /// is not being played or is held; a press that comes then anyway
+        /// changes nothing.
         /// </summary>
         private void OnJokerPressed(JokerKind kind)
         {
+            if (!IsBeingPlayed() || IsHeld())
+            {
+                return;
+            }
+
+            var button = LevelUiStateAt(clock.UtcNow).Button(kind);
+            if (button.IsShortOfGold)
+            {
+                PauseLevel();
+                levelUiView.ShowNotEnoughGold(button.Shortfall);
+                RefreshMeta();
+                return;
+            }
+
             if (kind == JokerKind.Clock)
             {
                 UseClock();
                 return;
             }
 
-            if (!IsBeingPlayed() || IsHeld())
-            {
-                return;
-            }
-
             jokerSelection.Press(kind);
-            jokerBar.ShowSelected(jokerSelection.Selected);
+            RefreshMeta();
         }
 
         /// <summary>
@@ -1781,7 +1877,7 @@ namespace GateRush.Runtime
 
             if (!TrySpendJoker(JokerKind.Clock))
             {
-                RefreshJokerBar();
+                RefreshMeta();
                 return;
             }
 
@@ -1789,7 +1885,7 @@ namespace GateRush.Runtime
             run.Countdown.AddBonus(seconds);
             SaveJokerSpend(JokerKind.Clock);
             ShowTimeBonus(seconds);
-            RefreshJokerBar();
+            RefreshMeta();
         }
 
         /// <summary>
@@ -1848,7 +1944,7 @@ namespace GateRush.Runtime
             if (!TrySpendJoker(kind))
             {
                 ClearJokerSelection();
-                RefreshJokerBar();
+                RefreshMeta();
                 return;
             }
 
@@ -1867,7 +1963,7 @@ namespace GateRush.Runtime
                     this);
             }
 
-            RefreshJokerBar();
+            RefreshMeta();
         }
 
         /// <summary>
@@ -1939,11 +2035,14 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>Unselects any joker and shows no button highlighted.</summary>
+        /// <summary>
+        /// Unselects any joker. The bar shows it at the next
+        /// <see cref="RefreshMeta"/>, which compares the selection with what it
+        /// last showed.
+        /// </summary>
         private void ClearJokerSelection()
         {
             jokerSelection.Clear();
-            jokerBar.ShowSelected(null);
         }
 
         /// <summary>
@@ -1951,71 +2050,6 @@ namespace GateRush.Runtime
         /// turns a press on the board into a tap (<see cref="InputController"/>).
         /// </summary>
         private bool IsAiming() => jokerSelection.Selected.HasValue;
-
-        /// <summary>
-        /// Rebuilds the joker bar's buttons when what they show has changed:
-        /// the mode, whether the level can use a joker now — being played and
-        /// not held — and the Clock too — with a countdown —, the counts held
-        /// or left, and in the campaign the gold. So every use, purchase, win,
-        /// loss, restart, change of gold, and card or confirmation opening or
-        /// closing shows at once. Allocates nothing when nothing changed, so it
-        /// runs every frame a level is loaded.
-        /// </summary>
-        private void RefreshJokerBar()
-        {
-            if (run == null)
-            {
-                return;
-            }
-
-            var isUsable = IsBeingPlayed() && !IsHeld();
-            var isClockUsable = isUsable && run.Countdown != null;
-            var gold = metaGame.Save.Wallet.Balance;
-            var isCampaign = mode == PlayMode.Campaign;
-
-            var isChanged = !hasShownJokers || mode != shownJokerMode || isUsable != shownJokersUsable
-                            || isClockUsable != shownClockUsable || (isCampaign && gold != shownJokerGold);
-            for (var i = 0; i < barKinds.Length; i++)
-            {
-                var count = JokerCount(barKinds[i]);
-                if (count != shownJokerCounts[i])
-                {
-                    isChanged = true;
-                    shownJokerCounts[i] = count;
-                }
-            }
-
-            if (!isChanged)
-            {
-                return;
-            }
-
-            hasShownJokers = true;
-            shownJokerMode = mode;
-            shownJokersUsable = isUsable;
-            shownClockUsable = isClockUsable;
-            shownJokerGold = gold;
-
-            for (var i = 0; i < barKinds.Length; i++)
-            {
-                var kind = barKinds[i];
-                var isKindUsable = kind == JokerKind.Clock ? isClockUsable : isUsable;
-                var button = isCampaign
-                    ? JokerButtons.Campaign(kind, shownJokerCounts[i], metaRules.JokerPrice(kind), gold, isKindUsable, config)
-                    : JokerButtons.FreePlay(kind, shownJokerCounts[i], isKindUsable, config);
-                jokerBar.ShowButton(kind, button);
-            }
-        }
-
-        /// <summary>How many <paramref name="kind"/> the level being played can use: held in the campaign, left in free play.</summary>
-        private int JokerCount(JokerKind kind) =>
-            mode == PlayMode.Campaign ? metaGame.Save.Jokers.CountOf(kind) : freePlayJokers.CountOf(kind);
-
-        /// <summary>Makes the next <see cref="RefreshJokerBar"/> rebuild every button, for a new level or a restart.</summary>
-        private void ForgetShownJokers()
-        {
-            hasShownJokers = false;
-        }
 
         /// <summary>
         /// Every change but the clear, or none when even those cannot be worked
@@ -2078,7 +2112,7 @@ namespace GateRush.Runtime
         /// </summary>
         private void ShowTimeBonus(int seconds)
         {
-            hudView.ShowTimeBonus(seconds);
+            levelUiView.ShowTimeBonus(seconds);
             PlayCue(SoundCue.TimeBonus);
         }
 
@@ -2136,30 +2170,31 @@ namespace GateRush.Runtime
             var countdown = run.Countdown;
             if (countdown != null)
             {
-                hudView.ShowTime(countdown.RemainingSeconds);
+                levelUiView.ShowTime(countdown.RemainingSeconds);
             }
         }
 
         /// <summary>
-        /// Shows the level number of the file <paramref name="levelFile"/>, or
-        /// hides the level pill with a warning saying why it has none. A level
-        /// with no number has no place in the level order either, so the same
-        /// warning says that it shows no introduction cards.
+        /// Keeps the level number of the file <paramref name="levelFile"/> for
+        /// the level's interface, or none with a warning saying why it has
+        /// none. A level with no number has no place in the level order
+        /// either, so the same warning says that it shows no introduction
+        /// cards.
         /// </summary>
         private void ShowLevelNumber(string levelFile)
         {
             if (catalog != null && catalog.TryGetNumber(levelFile, out var number))
             {
-                hudView.ShowLevel(number);
+                levelNumber = number;
                 return;
             }
 
-            hudView.HideLevel();
+            levelNumber = null;
             var reason = catalog == null
                 ? "the level order is unusable"
                 : $"it is not one of the levels in Resources/{LevelsResourcePath}";
             Debug.LogWarning(
-                $"Level '{levelFile}' has no level number because {reason}; the HUD hides the level pill and the level shows no introduction cards.",
+                $"Level '{levelFile}' has no level number because {reason}; the HUD shows no number and the level shows no introduction cards.",
                 this);
         }
 
@@ -2191,6 +2226,11 @@ namespace GateRush.Runtime
                     "under the unsafe edges and the HUD. Reported once.",
                     this);
             }
+
+            // The bands the camera keeps free, measured by the same rule.
+            levelUiView.PlaceBands(
+                ScreenBands.HudBandAnchors(safeArea, fittedScreenWidth, fittedScreenHeight, config.TopBandScreenFraction),
+                ScreenBands.BottomBandAnchors(safeArea, fittedScreenWidth, fittedScreenHeight, config.BottomBandScreenFraction));
 
             var size = layout.FitOrthographicSize(
                 (float)fittedScreenWidth / fittedScreenHeight, config.SideMarginCells, top, bottom);
@@ -2394,12 +2434,12 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || hudView == null || introductionCard == null || resultPanel == null || frontEnd == null
-                || confirmPrompt == null || jokerBar == null)
+                || introductionCard == null || resultPanel == null || frontEnd == null
+                || confirmPrompt == null || levelUi == null)
             {
                 Debug.LogError(
-                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Hud View, Introduction Card, " +
-                    "Result Panel, Front End, Confirm Prompt and Joker Bar must all be assigned; nothing is drawn.",
+                    "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Introduction Card, " +
+                    "Result Panel, Front End, Confirm Prompt and Level Ui must all be assigned; nothing is drawn.",
                     this);
                 return false;
             }
@@ -2423,24 +2463,29 @@ namespace GateRush.Runtime
                 }
             }
 
-            var barProblem = jokerBar.MissingCanvas();
-            if (barProblem.Length > 0)
+            levelUiView = levelUi as ILevelUi;
+            if (levelUiView == null)
             {
-                Debug.LogError($"{barProblem} Nothing is drawn.", jokerBar);
+                Debug.LogError(
+                    $"LevelBootstrap: Level Ui holds a {levelUi.GetType().Name}, which does not implement ILevelUi; " +
+                    "drag the LevelUi component of the Level UI instance there. Nothing is drawn.",
+                    levelUi);
                 isAssigned = false;
+            }
+            else
+            {
+                var levelUiProblem = levelUiView.MissingSetup();
+                if (levelUiProblem != null)
+                {
+                    Debug.LogError($"{levelUiProblem} Nothing is drawn.", levelUi);
+                    isAssigned = false;
+                }
             }
 
             var cardProblem = introductionCard.MissingCanvas();
             if (cardProblem.Length > 0)
             {
                 Debug.LogError($"{cardProblem} Nothing is drawn.", introductionCard);
-                isAssigned = false;
-            }
-
-            var hudProblem = hudView.MissingCanvas();
-            if (hudProblem.Length > 0)
-            {
-                Debug.LogError($"{hudProblem} Nothing is drawn.", hudView);
                 isAssigned = false;
             }
 

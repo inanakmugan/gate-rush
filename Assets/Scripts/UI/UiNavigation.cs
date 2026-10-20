@@ -69,6 +69,31 @@ namespace GateRush.UI
         }
 
         /// <summary>
+        /// Closes the top overlay and opens <paramref name="overlay"/> in its
+        /// place, as one change: the stack is never seen empty in between.
+        /// With none open, opens it. Already on top, nothing changes; lower in
+        /// the stack, it is moved to the top in place of the top one.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="overlay"/> is not a declared overlay.</exception>
+        public void ReplaceTop(UiOverlay overlay)
+        {
+            RequireDeclared(overlay);
+            if (overlays.Count > 0 && overlays[overlays.Count - 1] == overlay)
+            {
+                return;
+            }
+
+            if (overlays.Count > 0)
+            {
+                overlays.RemoveAt(overlays.Count - 1);
+            }
+
+            overlays.Remove(overlay);
+            overlays.Add(overlay);
+            Changed?.Invoke();
+        }
+
+        /// <summary>
         /// Closes the top overlay; with none open, returns from Store or
         /// Leaderboard to Home. False, with nothing changed, on Home with no
         /// overlay.

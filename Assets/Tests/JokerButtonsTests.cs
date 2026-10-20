@@ -1,127 +1,115 @@
-using System;
-using GateRush.Meta;
 using GateRush.Runtime;
 using NUnit.Framework;
-using UnityEditor;
-using UnityEngine;
-using Object = UnityEngine.Object;
 
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Module 34's <see cref="JokerButtons"/>: what a joker button
-    /// reads and whether it can be pressed, in the campaign (D65) and in free
-    /// play (D66). The config's names and formats are set to texts no default
-    /// has, so every expected text is built from them: a text written into the
-    /// code instead of read from the config would fail.
+    /// Covers <see cref="JokerButtons"/> (Modules 34 and 40): what a joker
+    /// button's badge shows and whether it can be pressed, in the campaign
+    /// (D65) and in free play (D66). In the campaign with none held and a
+    /// price above the balance, the button can be pressed and carries the
+    /// shortfall, so a press opens Not Enough Gold (D74); with a price the
+    /// balance covers it behaves as before; free play is unchanged and never
+    /// short of gold.
     /// </summary>
     public class JokerButtonsTests
     {
-        private const string CountFormat = "<{0}|{1}>";
-        private const string PriceFormat = "[{0}:{1}]";
-        private const string RocketName = "Rkt";
         private const int Held = 2;
         private const int Price = 200;
         private const int AmpleGold = 1000;
 
-        private RuntimeConfig config;
-
-        [SetUp]
-        public void SetUp()
-        {
-            config = ScriptableObject.CreateInstance<RuntimeConfig>();
-            var serialized = new SerializedObject(config);
-            serialized.FindProperty("jokerCountFormat").stringValue = CountFormat;
-            serialized.FindProperty("jokerPriceFormat").stringValue = PriceFormat;
-            serialized.FindProperty("clockLabel").stringValue = "Clk";
-            serialized.FindProperty("rocketLabel").stringValue = RocketName;
-            serialized.FindProperty("broomLabel").stringValue = "Brm";
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-        }
-
-        [TearDown]
-        public void TearDown()
-        {
-            Object.DestroyImmediate(config);
-        }
-
         [Test]
-        public void Campaign_SomeHeld_ShowsTheNameAndTheCountAndIsPressable()
+        public void Campaign_SomeHeld_ShowsTheCountAndIsPressable()
         {
-            var button = JokerButtons.Campaign(JokerKind.Rocket, Held, Price, 0, true, config);
+            var button = JokerButtons.Campaign(Held, Price, 0, true);
 
-            Assert.AreEqual($"<{RocketName}|{Held}>", button.Label);
+            Assert.AreEqual(JokerBadge.Count, button.Badge);
+            Assert.AreEqual(Held, button.Amount);
             Assert.IsTrue(button.IsInteractable, "a held joker needs no gold");
+            Assert.IsFalse(button.IsShortOfGold);
         }
 
         [TestCase(Price)]
         [TestCase(Price + 1)]
         public void Campaign_NoneHeldAndTheBalanceCoversThePrice_ShowsThePriceAndIsPressable(int balance)
         {
-            var button = JokerButtons.Campaign(JokerKind.Rocket, 0, Price, balance, true, config);
+            var button = JokerButtons.Campaign(0, Price, balance, true);
 
-            Assert.AreEqual($"[{RocketName}:{Price}]", button.Label);
+            Assert.AreEqual(JokerBadge.Price, button.Badge);
+            Assert.AreEqual(Price, button.Amount);
             Assert.IsTrue(button.IsInteractable);
+            Assert.IsFalse(button.IsShortOfGold, "bought when it is used, as before (D65)");
+            Assert.AreEqual(0, button.Shortfall);
         }
 
-        [Test]
-        public void Campaign_NoneHeldAndTheBalanceShort_ShowsThePriceAndIsNotPressable()
-        {
-            var button = JokerButtons.Campaign(JokerKind.Rocket, 0, Price, Price - 1, true, config);
-
-            Assert.AreEqual($"[{RocketName}:{Price}]", button.Label);
-            Assert.IsFalse(button.IsInteractable);
-        }
-
-        [TestCase(Held)]
+        [TestCase(Price - 1)]
         [TestCase(0)]
-        public void Campaign_NotUsable_IsNotPressableWhateverIsHeld(int held)
+        public void Campaign_NoneHeldAndTheBalanceShort_IsPressableAndCarriesTheShortfall(int balance)
         {
-            var button = JokerButtons.Campaign(JokerKind.Rocket, held, Price, AmpleGold, false, config);
+            var button = JokerButtons.Campaign(0, Price, balance, true);
+
+            Assert.AreEqual(JokerBadge.Price, button.Badge);
+            Assert.AreEqual(Price, button.Amount);
+            Assert.IsTrue(button.IsInteractable, "a press opens Not Enough Gold (D74)");
+            Assert.IsTrue(button.IsShortOfGold);
+            Assert.AreEqual(Price - balance, button.Shortfall);
+        }
+
+        [TestCase(Held, AmpleGold)]
+        [TestCase(0, 0)]
+        public void Campaign_NotUsable_IsNotPressableWhateverIsHeld(int held, int balance)
+        {
+            var button = JokerButtons.Campaign(held, Price, balance, false);
 
             Assert.IsFalse(button.IsInteractable);
         }
 
         [Test]
-        public void FreePlay_SomeLeft_ShowsTheNameAndWhatIsLeftAndIsPressable()
+        public void FreePlay_SomeLeft_ShowsWhatIsLeftAndIsPressable()
         {
-            var button = JokerButtons.FreePlay(JokerKind.Rocket, Held, true, config);
+            var button = JokerButtons.FreePlay(Held, true);
 
-            Assert.AreEqual($"<{RocketName}|{Held}>", button.Label);
+            Assert.AreEqual(JokerBadge.Count, button.Badge);
+            Assert.AreEqual(Held, button.Amount);
             Assert.IsTrue(button.IsInteractable);
         }
 
         [Test]
-        public void FreePlay_NoneLeft_ShowsZeroAndIsNotPressable()
+        public void FreePlay_NoneLeft_ShowsZeroAndIsNotPressableNorShortOfGold()
         {
-            var button = JokerButtons.FreePlay(JokerKind.Rocket, 0, true, config);
+            var button = JokerButtons.FreePlay(0, true);
 
-            Assert.AreEqual($"<{RocketName}|0>", button.Label);
+            Assert.AreEqual(JokerBadge.Count, button.Badge);
+            Assert.AreEqual(0, button.Amount);
             Assert.IsFalse(button.IsInteractable, "free play is never topped up");
+            Assert.IsFalse(button.IsShortOfGold, "free play never reads the gold (D66)");
         }
 
         [Test]
         public void FreePlay_NotUsable_IsNotPressable()
         {
-            var button = JokerButtons.FreePlay(JokerKind.Rocket, Held, false, config);
+            var button = JokerButtons.FreePlay(Held, false);
 
             Assert.IsFalse(button.IsInteractable);
         }
 
         [Test]
-        public void Campaign_EachKind_ShowsItsOwnNameFromTheConfig([Values] JokerKind kind)
+        public void Equals_SameDecision_IsEqual()
         {
-            var button = JokerButtons.Campaign(kind, Held, Price, 0, true, config);
+            var first = JokerButtons.Campaign(0, Price, Price - 1, true);
+            var second = JokerButtons.Campaign(0, Price, Price - 1, true);
 
-            Assert.AreEqual($"<{config.JokerName(kind)}|{Held}>", button.Label);
-            Assert.That(new[] { "Clk", RocketName, "Brm" }, Has.Member(config.JokerName(kind)));
+            Assert.IsTrue(first == second);
+            Assert.AreEqual(first.GetHashCode(), second.GetHashCode());
         }
 
         [Test]
-        public void Campaign_UndefinedKind_Throws()
+        public void Equals_DifferentShortfall_IsNotEqual()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(
-                () => JokerButtons.Campaign((JokerKind)99, Held, Price, 0, true, config));
+            var first = JokerButtons.Campaign(0, Price, Price - 1, true);
+            var second = JokerButtons.Campaign(0, Price, Price - 2, true);
+
+            Assert.IsTrue(first != second);
         }
     }
 }

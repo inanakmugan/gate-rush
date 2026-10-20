@@ -22,7 +22,8 @@ namespace GateRush.UI.Editor
     /// Streak Reward Overlay, and Module 38's Avatar Button and Profile
     /// Overlay, with the Settings overlay now holding the Haptics row, and
     /// Module 39's Leaderboard Row, with the Leaderboard Page now holding the
-    /// leaderboard — from code, with every serialized field wired.
+    /// leaderboard, and Module 40's Gold Packs Overlay, Level HUD, Joker Bar
+    /// and Level UI — from code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -86,6 +87,11 @@ namespace GateRush.UI.Editor
         // The streak bar's track and fill: near-white, so a tint shows true.
         // Sliced, so it must have a border.
         private const string BarSpritePath = "Assets/ThirdParty/Kenney/UIPack/Extra/input_rectangle.png";
+
+        // Module 40: the HUD's Menu and Restart icons and the timer's hourglass.
+        private const string HomeSpritePath = "Assets/ThirdParty/Kenney/GameIcons/home.png";
+        private const string ReturnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/return.png";
+        private const string HourglassSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/hourglass.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -124,6 +130,10 @@ namespace GateRush.UI.Editor
         private const string AvatarButtonName = "Avatar Button";
         private const string ProfileOverlayName = "Profile Overlay";
         private const string FrontEndName = "Front End";
+        private const string GoldPacksOverlayName = "Gold Packs Overlay";
+        private const string LevelHudName = "Level HUD";
+        private const string JokerBarName = "Joker Bar";
+        private const string LevelUiName = "Level UI";
 
         // Child objects.
         private const string TitleName = "Title";
@@ -204,6 +214,23 @@ namespace GateRush.UI.Editor
         private const string ScoreName = "Score";
         private const string StatusName = "Status";
         private const string RetryName = "Retry";
+        private const string RowName = "Row";
+        private const string MenuName = "Menu";
+        private const string RestartName = "Restart";
+        private const string TimerName = "Timer";
+        private const string HourglassName = "Hourglass";
+        private const string DigitsName = "Digits";
+        private const string TimeBonusName = "Time Bonus";
+        private const string LevelLabelName = "Level";
+        private const string GoldPillName = "Gold Pill";
+        private const string GoldLabelName = "Gold";
+        private const string LivesPillName = "Lives Pill";
+        private const string LiftName = "Lift";
+        private const string RingName = "Ring";
+        private const string ButtonName = "Button";
+        private const string BadgeName = "Badge";
+        private const string BadgeLabelName = "Label";
+        private const string PacksName = "Packs";
 
         // Texts. Labels the game overwrites from the state only show in the
         // Editor; those it sets from the UI Config are written from it.
@@ -258,6 +285,13 @@ namespace GateRush.UI.Editor
         private const int RankPlaceholder = 1;
         private const int ScorePlaceholder = 1250;
 
+        // Module 40's placeholders: the level's HUD and joker bar as the
+        // Editor shows them.
+        private const int LevelNumberPlaceholder = 1;
+        private const float TimerPlaceholderSeconds = 75f;
+        private const int TimeBonusPlaceholder = 20;
+        private const int LivesCountPlaceholder = 5;
+
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
         private const string OverlayTextColorHex = "#3B2466";
@@ -282,6 +316,11 @@ namespace GateRush.UI.Editor
         // Under Profile's name field: the muted hint, and the refusal line.
         private const string NameHintColorHex = "#6E7090";
         private const string NameRefusalColorHex = "#D93A4A";
+
+        // The HUD's pills and the joker badges, the top bar's pill colour, and
+        // the HUD's white text.
+        private const string PillColorHex = "#2E1A52";
+        private const string HudTextColorHex = "#FFFFFF";
 
         // Anchor and pivot coordinates: a parent's low edge, middle and high edge.
         private const float AnchorLow = 0f;
@@ -541,6 +580,75 @@ namespace GateRush.UI.Editor
         private const float LeaderboardStatusFontSize = 52f;
         private const float LeaderboardRetryPosY = -180f;
 
+        // Module 40: the in-level gold packs. The column of Gold Pack Cards
+        // sits between the title and the test store line.
+        private const float GoldPacksPanelWidth = 860f;
+        private const float GoldPacksPanelHeight = 1100f;
+        private const float PacksInset = 40f;
+        private const float PacksTop = 160f;
+        private const float PacksBottom = 200f;
+        private const float GoldPacksNoteBottom = 40f;
+        private const float GoldPacksNoteHeight = 140f;
+        private const float GoldPacksNoteFontSize = 40f;
+
+        // Module 40: the Level HUD's row, laid out at the 1080x1920
+        // reference and scaled down by BandFit when the top band (0.14 of
+        // the screen's height, 269 units there) is smaller. Menu and Restart
+        // keep Button Round's own size; the timer pill is as tall.
+        private const float HudRowWidth = 1080f;
+        private const float HudRowHeight = 250f;
+        private const float HudSideInset = 40f;
+        private const float HudTopInset = 20f;
+        private const float HudButtonGap = 20f;
+        private const float TimerPillWidth = 300f;
+        private const float TimerPillHeight = 110f;
+        private const float HourglassSize = 70f;
+        private const float HourglassInset = 20f;
+        private const float TimerDigitsLeft = 100f;
+        private const float TimerDigitsRight = 20f;
+        private const float TimerFontSize = 64f;
+        private const float TimeBonusGap = 16f;
+        private const float TimeBonusWidth = 200f;
+        private const float TimeBonusFontSize = 64f;
+        private const float LevelLabelWidth = 300f;
+        private const float LevelLabelFontSize = 60f;
+        private const float HudRowGap = 16f;
+        private const float HudPillRowTop = HudTopInset + TimerPillHeight + HudRowGap;
+        private const float HudPillWidth = 300f;
+        private const float HudPillHeight = 80f;
+        private const float HudPillGap = 24f;
+        private const float PillIconInset = 12f;
+        private const float PillCoinSize = 60f;
+        private const float PillLabelLeft = 84f;
+        private const float PillFontSize = 48f;
+        private const float PillHeartInset = 10f;
+        private const float PillHeartSize = 70f;
+        private const float PillLivesCountFontSize = 40f;
+        private const float PillStatusLeft = 90f;
+        private const float PillStatusFontSize = 40f;
+
+        // Module 40: the Joker Bar's row, laid out at the reference and
+        // scaled down by BandFit when the bottom band (0.10 of the screen's
+        // height, 192 units there) is smaller. Each slot sits a little low,
+        // so the selected button has room to rise with its ring.
+        private const float JokerRowWidth = 1080f;
+        private const float JokerRowHeight = 190f;
+        private const float JokerSlotWidth = 280f;
+        private const float JokerSlotHeight = 150f;
+        private const float JokerSlotGap = 40f;
+        private const float JokerSlotDrop = 12f;
+        private const float JokerRaise = 20f;
+        private const float JokerRingOutset = 8f;
+        private const float JokerIconSize = 100f;
+        private const float JokerIconInset = 30f;
+        private const float BadgeWidth = 130f;
+        private const float BadgeHeight = 64f;
+        private const float BadgeInset = 20f;
+        private const int BadgePadding = 10;
+        private const float BadgeSpacing = 6f;
+        private const float BadgeCoinSize = 44f;
+        private const float BadgeFontSize = 44f;
+
         // The bar heights the layout was planned with. The build uses the
         // heights on the prefabs and only warns when they differ.
         private const float ExpectedTopBarHeight = 160f;
@@ -652,6 +760,29 @@ namespace GateRush.UI.Editor
         private const string ScoreLabelField = "scoreLabel";
         private const string RetryButtonField = "retryButton";
         private const string RetryLabelField = "retryLabel";
+        private const string PacksField = "packs";
+        private const string MenuButtonField = "menuButton";
+        private const string RestartButtonField = "restartButton";
+        private const string TimerField = "timer";
+        private const string TimerLabelField = "timerLabel";
+        private const string TimeBonusField = "timeBonus";
+        private const string TimeBonusLabelField = "timeBonusLabel";
+        private const string LevelLabelField = "levelLabel";
+        private const string GoldLabelField = "goldLabel";
+        private const string LivesPillField = "livesPill";
+        private const string LivesCountLabelField = "livesCountLabel";
+        private const string LivesStatusLabelField = "livesStatusLabel";
+        private const string DesignSizeField = "designSize";
+        private const string LiftField = "lift";
+        private const string RingField = "ring";
+        private const string CoinField = "coin";
+        private const string BadgeLabelField = "badgeLabel";
+        private const string SelectedRaiseField = "selectedRaise";
+        private const string ClockField = "clock";
+        private const string RocketField = "rocket";
+        private const string BroomField = "broom";
+        private const string HudField = "hud";
+        private const string JokerBarField = "jokerBar";
 
         // The overwrite prompt.
         private const string DialogTitle = "Build UI Prefabs";
@@ -705,7 +836,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Builds the nineteen prefabs into <paramref name="outputFolder"/>,
+        /// Builds the twenty-three prefabs into <paramref name="outputFolder"/>,
         /// overwriting any already there without asking. The hand-made
         /// prefabs are read from <see cref="HandMadeFolder"/>.
         /// </summary>
@@ -743,6 +874,12 @@ namespace GateRush.UI.Editor
                 var overlays = new OverlayAssets(
                     settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile);
                 Save(BuildFrontEnd(scene, sources, storePage, leaderboardPage, streakBar, overlays), sources, outputFolder);
+
+                var goldPacks = Save(BuildGoldPacksOverlay(scene, sources, goldPackCard), sources, outputFolder);
+                var levelHud = Save(BuildLevelHud(scene, sources), sources, outputFolder);
+                var jokerBar = Save(BuildJokerBar(scene, sources), sources, outputFolder);
+                var levelOverlays = new LevelOverlayAssets(notEnoughGold, goldPacks, testPurchase, message);
+                Save(BuildLevelUi(scene, sources, levelHud, jokerBar, levelOverlays), sources, outputFolder);
             }
             finally
             {
@@ -755,7 +892,7 @@ namespace GateRush.UI.Editor
             GoldPackCardName, StorePageName, LeaderboardRowName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
             NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
             StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, AvatarButtonName,
-            ProfileOverlayName, FrontEndName
+            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName
         };
 
         private static string PrefabPath(string folder, string name) => $"{folder}/{name}{PrefabExtension}";
@@ -1802,6 +1939,345 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
+        /// The gold packs over a level (Module 40): the overlay frame with its
+        /// close button, a column the Gold Pack Cards are created under at
+        /// runtime, one per offer, and the test store line at the bottom.
+        /// </summary>
+        private static GameObject BuildGoldPacksOverlay(Scene scene, Sources sources, GameObject goldPackCardAsset)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(
+                scene, sources, GoldPacksOverlayName, config.GoldPacksTitle, GoldPacksPanelWidth, GoldPacksPanelHeight, true);
+
+            var packs = UiBuilder.CreateRect(PacksName, frame.Panel);
+            UiBuilder.Stretch(packs);
+            packs.offsetMin = new Vector2(PacksInset, PacksBottom);
+            packs.offsetMax = new Vector2(-PacksInset, -PacksTop);
+            AddColumn(packs);
+
+            var note = UiBuilder.CreateRect(NoteName, frame.Panel);
+            BottomStretch(note, PacksInset, GoldPacksNoteBottom, GoldPacksNoteHeight);
+            var noteLabel = AddWrappingText(note, sources, config.TestStoreNote, GoldPacksNoteFontSize, OverlayTextColorHex);
+
+            var overlay = frame.Root.AddComponent<GoldPacksOverlay>();
+            SetReferences(
+                overlay,
+                (CloseButtonField, frame.Close),
+                (TitleLabelField, frame.Title),
+                (NoteLabelField, noteLabel),
+                (PacksField, packs),
+                (GoldPackCardPrefabField, Single<GoldPackCard>(goldPackCardAsset, GoldPackCardName)));
+            return frame.Root;
+        }
+
+        /// <summary>
+        /// The level's HUD (Module 40): a row, fitted to the top band, of Menu
+        /// and Restart at the left — Button Round instances whose own icon
+        /// shows home and return on the instance only — the timer pill with
+        /// the hourglass in the centre, the hidden time bonus beside it, the
+        /// level label at the right, and under them the gold and lives pills.
+        /// Texts the game sets are written with the config's values and
+        /// placeholders.
+        /// </summary>
+        private static GameObject BuildLevelHud(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var root = CreateRoot(LevelHudName, scene, sources.Layer);
+            var row = AddBandRow(root.transform, new Vector2(HudRowWidth, HudRowHeight));
+
+            var menu = AddHudButton(row, sources, MenuName, sources.Home, HudSideInset);
+            var restart = AddHudButton(row, sources, RestartName, sources.Return, HudSideInset + menu.sizeDelta.x + HudButtonGap);
+
+            var timer = UiBuilder.CreateRect(TimerName, row);
+            PlaceBelowTop(timer, AnchorMid, 0f, HudTopInset, new Vector2(TimerPillWidth, TimerPillHeight));
+            AddSliced(timer, sources.Panel, PillColorHex);
+            var hourglass = UiBuilder.CreateRect(HourglassName, timer);
+            UiBuilder.Place(
+                hourglass, new Vector2(AnchorLow, AnchorMid), new Vector2(HourglassInset, 0f), new Vector2(HourglassSize, HourglassSize));
+            var hourglassImage = UiBuilder.AddIcon(hourglass, sources.Hourglass, ParseColor(IconColorHex));
+            AddTint(hourglass.gameObject, hourglassImage, UiColorRole.Icon);
+            var digits = UiBuilder.CreateRect(DigitsName, timer);
+            HorizontalBand(digits, TimerDigitsLeft, TimerDigitsRight);
+            var timerLabel = AddText(digits, sources, LevelHudTexts.Timer(TimerPlaceholderSeconds, config), TimerFontSize, HudTextColorHex);
+            timerLabel.color = config.TimerColor;
+
+            // Its left end beside the timer's right end, centred on the timer.
+            var bonus = UiBuilder.CreateRect(TimeBonusName, row);
+            bonus.anchorMin = new Vector2(AnchorMid, AnchorHigh);
+            bonus.anchorMax = new Vector2(AnchorMid, AnchorHigh);
+            bonus.pivot = new Vector2(AnchorLow, AnchorMid);
+            bonus.anchoredPosition = new Vector2(TimerPillWidth / 2f + TimeBonusGap, -(HudTopInset + TimerPillHeight / 2f));
+            bonus.sizeDelta = new Vector2(TimeBonusWidth, TimerPillHeight);
+            var bonusLabel = AddText(bonus, sources, LevelHudTexts.TimeBonus(TimeBonusPlaceholder, config), TimeBonusFontSize, HudTextColorHex);
+            bonusLabel.color = config.TimeBonusColor;
+            bonusLabel.alignment = TextAlignmentOptions.MidlineLeft;
+            bonus.gameObject.SetActive(false);
+
+            var level = UiBuilder.CreateRect(LevelLabelName, row);
+            UiBuilder.Place(
+                level, new Vector2(AnchorHigh, AnchorHigh), new Vector2(-HudSideInset, -HudTopInset), new Vector2(LevelLabelWidth, TimerPillHeight));
+            var levelLabel = AddText(
+                level, sources, LevelHudTexts.LevelLabel(false, LevelNumberPlaceholder, config), LevelLabelFontSize, HudTextColorHex);
+            levelLabel.alignment = TextAlignmentOptions.MidlineRight;
+
+            var pillOffset = (HudPillWidth + HudPillGap) / 2f;
+            var pillSize = new Vector2(HudPillWidth, HudPillHeight);
+            var goldPill = UiBuilder.CreateRect(GoldPillName, row);
+            PlaceBelowTop(goldPill, AnchorMid, -pillOffset, HudPillRowTop, pillSize);
+            AddSliced(goldPill, sources.Panel, PillColorHex);
+            var coin = UiBuilder.CreateRect(CoinName, goldPill);
+            UiBuilder.Place(coin, new Vector2(AnchorLow, AnchorMid), new Vector2(PillIconInset, 0f), new Vector2(PillCoinSize, PillCoinSize));
+            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
+            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            var gold = UiBuilder.CreateRect(GoldLabelName, goldPill);
+            HorizontalBand(gold, PillLabelLeft, PillIconInset);
+            var goldLabel = AddText(gold, sources, HomeTexts.Gold(GoldPlaceholder, config), PillFontSize, HudTextColorHex);
+            goldLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            var livesPill = UiBuilder.CreateRect(LivesPillName, row);
+            PlaceBelowTop(livesPill, AnchorMid, pillOffset, HudPillRowTop, pillSize);
+            AddSliced(livesPill, sources.Panel, PillColorHex);
+            var heart = UiBuilder.CreateRect(HeartName, livesPill);
+            UiBuilder.Place(
+                heart, new Vector2(AnchorLow, AnchorMid), new Vector2(PillHeartInset, 0f), new Vector2(PillHeartSize, PillHeartSize));
+            var heartImage = UiBuilder.AddIcon(heart, sources.Heart, ParseColor(IconColorHex));
+            AddTint(heart.gameObject, heartImage, UiColorRole.Heart);
+            var count = UiBuilder.CreateRect(CountName, heart);
+            UiBuilder.Stretch(count);
+            var countLabel = AddText(
+                count, sources, HomeTexts.LivesCount(LivesCountPlaceholder, config), PillLivesCountFontSize, LivesLabelColorHex);
+            var status = UiBuilder.CreateRect(StatusName, livesPill);
+            HorizontalBand(status, PillStatusLeft, PillIconInset);
+            var statusLabel = AddText(status, sources, config.LivesFullLabel, PillStatusFontSize, HudTextColorHex);
+            statusLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            var hud = root.AddComponent<LevelHud>();
+            SetReferences(
+                hud,
+                (MenuButtonField, Single<Button>(menu.gameObject, ButtonRoundName)),
+                (RestartButtonField, Single<Button>(restart.gameObject, ButtonRoundName)),
+                (TimerField, timer),
+                (TimerLabelField, timerLabel),
+                (TimeBonusField, bonus),
+                (TimeBonusLabelField, bonusLabel),
+                (LevelLabelField, levelLabel),
+                (GoldLabelField, goldLabel),
+                (LivesPillField, livesPill.gameObject),
+                (LivesCountLabelField, countLabel),
+                (LivesStatusLabelField, statusLabel));
+            return root;
+        }
+
+        /// <summary>
+        /// A Button Round at the HUD row's top left, <paramref name="left"/>
+        /// in, named <paramref name="name"/>, its own icon showing
+        /// <paramref name="icon"/> — an override of this instance only, so
+        /// Button Round's file stays unwritten.
+        /// </summary>
+        private static RectTransform AddHudButton(RectTransform row, Sources sources, string name, Sprite icon, float left)
+        {
+            var button = Nest(sources.ButtonRound, row);
+            button.name = name;
+            UiBuilder.Place(button, new Vector2(AnchorLow, AnchorHigh), new Vector2(left, -HudTopInset), button.sizeDelta);
+            Record(button);
+            Record(button.gameObject);
+
+            var ownIcon = button.Find(ButtonRoundIconName);
+            var image = ownIcon == null ? null : ownIcon.GetComponent<Image>();
+            if (image == null)
+            {
+                throw new InvalidOperationException($"{ButtonRoundName} has no child '{ButtonRoundIconName}' with an Image for the {name} icon.");
+            }
+
+            image.sprite = icon;
+            Record(image);
+            return button;
+        }
+
+        /// <summary>
+        /// The level's joker bar (Module 40): a row, fitted to the bottom band,
+        /// of the Clock, the Rocket and the Broom, left to right.
+        /// </summary>
+        private static GameObject BuildJokerBar(Scene scene, Sources sources)
+        {
+            var root = CreateRoot(JokerBarName, scene, sources.Layer);
+            var row = AddBandRow(root.transform, new Vector2(JokerRowWidth, JokerRowHeight));
+
+            var pitch = JokerSlotWidth + JokerSlotGap;
+            var clock = BuildJokerSlot(row, sources, JokerKind.Clock, -pitch);
+            var rocket = BuildJokerSlot(row, sources, JokerKind.Rocket, 0f);
+            var broom = BuildJokerSlot(row, sources, JokerKind.Broom, pitch);
+
+            var bar = root.AddComponent<JokerBarView>();
+            SetReferences(bar, (ClockField, clock), (RocketField, rocket), (BroomField, broom));
+            return root;
+        }
+
+        /// <summary>
+        /// One joker's slot, <paramref name="x"/> from the row's centre and a
+        /// little low: the lift, raised while selected, holding the ring
+        /// (hidden) behind a Button Primary instance whose own label is
+        /// switched off on this instance; on the button, the joker's icon from
+        /// the Joker Icons asset and the badge with the coin (hidden) and the
+        /// count.
+        /// </summary>
+        private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
+        {
+            var config = sources.Config;
+            var slot = UiBuilder.CreateRect(kind.ToString(), row);
+            UiBuilder.PlaceCentered(slot, new Vector2(JokerSlotWidth, JokerSlotHeight));
+            slot.anchoredPosition = new Vector2(x, -JokerSlotDrop);
+
+            var lift = UiBuilder.CreateRect(LiftName, slot);
+            UiBuilder.Stretch(lift);
+
+            var ring = UiBuilder.CreateRect(RingName, lift);
+            UiBuilder.Stretch(ring);
+            ring.offsetMin = new Vector2(-JokerRingOutset, -JokerRingOutset);
+            ring.offsetMax = new Vector2(JokerRingOutset, JokerRingOutset);
+            var ringImage = AddSliced(ring, sources.Panel, PanelColorHex);
+            AddTint(ring.gameObject, ringImage, UiColorRole.JokerSelected);
+            ring.gameObject.SetActive(false);
+
+            var button = Nest(sources.ButtonPrimary, lift);
+            button.name = ButtonName;
+            UiBuilder.Stretch(button);
+            Record(button);
+            Record(button.gameObject);
+            var buttonComponent = Single<Button>(button.gameObject, ButtonPrimaryName);
+            var ownLabel = Single<TMP_Text>(button.gameObject, ButtonPrimaryName);
+            ownLabel.gameObject.SetActive(false);
+            Record(ownLabel.gameObject);
+
+            var icon = UiBuilder.CreateRect(IconName, button);
+            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(JokerIconInset, 0f), new Vector2(JokerIconSize, JokerIconSize));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(kind), config.IconColor);
+
+            var badge = UiBuilder.CreateRect(BadgeName, button);
+            UiBuilder.Place(badge, new Vector2(AnchorHigh, AnchorMid), new Vector2(-BadgeInset, 0f), new Vector2(BadgeWidth, BadgeHeight));
+            AddSliced(badge, sources.Panel, PillColorHex);
+            var layout = badge.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(BadgePadding, BadgePadding, 0, 0);
+            layout.spacing = BadgeSpacing;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            var coin = UiBuilder.CreateRect(CoinName, badge);
+            var coinElement = coin.gameObject.AddComponent<LayoutElement>();
+            coinElement.preferredWidth = BadgeCoinSize;
+            coinElement.preferredHeight = BadgeCoinSize;
+            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
+            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            coin.gameObject.SetActive(false);
+
+            var label = UiBuilder.CreateRect(BadgeLabelName, badge);
+            var placeholder = new JokerButton(JokerBadge.Count, CountPlaceholder, true, 0);
+            var badgeLabel = AddText(label, sources, LevelHudTexts.JokerBadge(placeholder, config), BadgeFontSize, HudTextColorHex);
+            badgeLabel.color = config.JokerBadgeTextColor;
+
+            var view = slot.gameObject.AddComponent<JokerBarButton>();
+            SetReferences(
+                view,
+                (ButtonField, buttonComponent),
+                (LiftField, lift),
+                (RingField, ring.gameObject),
+                (IconField, iconImage),
+                (CoinField, coin.gameObject),
+                (BadgeLabelField, badgeLabel));
+            SetFloat(view, SelectedRaiseField, JokerRaise);
+            return view;
+        }
+
+        /// <summary>
+        /// The level's interface (Module 40), set as <see cref="LevelUi.Show"/>
+        /// leaves it: the Level HUD along the top and the Joker Bar along the
+        /// bottom — <see cref="LevelUi.PlaceBands"/> anchors both to their
+        /// bands at runtime — and every overlay hidden under Overlays, a
+        /// direct child of the root so the scrims cover everything. Its root
+        /// is saved inactive, so only <see cref="LevelUi.Show"/> opens it.
+        /// </summary>
+        private static GameObject BuildLevelUi(
+            Scene scene, Sources sources, GameObject hudAsset, GameObject jokerBarAsset, LevelOverlayAssets overlayAssets)
+        {
+            var root = CreateRoot(LevelUiName, scene, sources.Layer);
+
+            var hud = Nest(hudAsset, root.transform);
+            TopStretch(hud, 0f, 0f, HudRowHeight);
+            Record(hud);
+
+            var bar = Nest(jokerBarAsset, root.transform);
+            BottomStretch(bar, 0f, 0f, JokerRowHeight);
+            Record(bar);
+
+            var overlays = UiBuilder.CreateRect(OverlaysName, root.transform);
+            UiBuilder.Stretch(overlays);
+            var notEnoughGold = NestStretched(overlayAssets.NotEnoughGold, overlays, false);
+            var goldPacks = NestStretched(overlayAssets.GoldPacks, overlays, false);
+            var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
+            var message = NestStretched(overlayAssets.Message, overlays, false);
+
+            var levelUi = root.AddComponent<LevelUi>();
+            SetReferences(
+                levelUi,
+                (ConfigField, sources.Config),
+                (HudField, Single<LevelHud>(hud.gameObject, LevelHudName)),
+                (JokerBarField, Single<JokerBarView>(bar.gameObject, JokerBarName)),
+                (NotEnoughGoldField, Single<NotEnoughGoldOverlay>(notEnoughGold.gameObject, NotEnoughGoldOverlayName)),
+                (GoldPacksField, Single<GoldPacksOverlay>(goldPacks.gameObject, GoldPacksOverlayName)),
+                (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
+                (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)));
+
+            root.SetActive(false);
+            return root;
+        }
+
+        /// <summary>
+        /// The row a band holds, centred at <paramref name="designSize"/>, with
+        /// a <see cref="BandFit"/> that scales it down to the band.
+        /// </summary>
+        private static RectTransform AddBandRow(Transform band, Vector2 designSize)
+        {
+            var row = UiBuilder.CreateRect(RowName, band);
+            UiBuilder.PlaceCentered(row, designSize);
+            var fit = row.gameObject.AddComponent<BandFit>();
+            using (var serialized = new SerializedObject(fit))
+            {
+                Property(serialized, DesignSizeField).vector2Value = designSize;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            return row;
+        }
+
+        /// <summary>
+        /// Gives <paramref name="rect"/> a fixed <paramref name="size"/>,
+        /// <paramref name="x"/> across from its parent's top edge at
+        /// <paramref name="anchorX"/>, its top <paramref name="top"/> below
+        /// that edge. Its pivot is its centre, so it scales about its middle.
+        /// </summary>
+        private static void PlaceBelowTop(RectTransform rect, float anchorX, float x, float top, Vector2 size)
+        {
+            rect.anchorMin = new Vector2(anchorX, AnchorHigh);
+            rect.anchorMax = new Vector2(anchorX, AnchorHigh);
+            rect.pivot = new Vector2(AnchorMid, AnchorMid);
+            rect.anchoredPosition = new Vector2(x, -(top + size.y / 2f));
+            rect.sizeDelta = size;
+        }
+
+        /// <summary>Assigns the serialized float <paramref name="field"/> by name; a missing field throws.</summary>
+        private static void SetFloat(Object component, string field, float value)
+        {
+            using (var serialized = new SerializedObject(component))
+            {
+                Property(serialized, field).floatValue = value;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>
         /// The root, scrim, panel and title every overlay shares, and the
         /// close button in the panel's corner when <paramref name="hasClose"/>.
         /// </summary>
@@ -2399,6 +2875,23 @@ namespace GateRush.UI.Editor
             public GameObject Profile { get; }
         }
 
+        /// <summary>The saved overlay prefabs Level UI nests, in stacking order.</summary>
+        private readonly struct LevelOverlayAssets
+        {
+            public LevelOverlayAssets(GameObject notEnoughGold, GameObject goldPacks, GameObject testPurchase, GameObject message)
+            {
+                NotEnoughGold = notEnoughGold;
+                GoldPacks = goldPacks;
+                TestPurchase = testPurchase;
+                Message = message;
+            }
+
+            public GameObject NotEnoughGold { get; }
+            public GameObject GoldPacks { get; }
+            public GameObject TestPurchase { get; }
+            public GameObject Message { get; }
+        }
+
         /// <summary>Every asset the build reads, loaded and checked before anything is written.</summary>
         private sealed class Sources
         {
@@ -2418,6 +2911,9 @@ namespace GateRush.UI.Editor
             public Sprite Phone { get; private set; }
             public Sprite Cross { get; private set; }
             public Sprite Medal { get; private set; }
+            public Sprite Home { get; private set; }
+            public Sprite Return { get; private set; }
+            public Sprite Hourglass { get; private set; }
             public JokerIcons JokerIcons { get; private set; }
             public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
@@ -2476,6 +2972,9 @@ namespace GateRush.UI.Editor
                     Phone = LoadSprite(PhoneSpritePath),
                     Cross = LoadSprite(CrossSpritePath),
                     Medal = LoadSprite(MedalSpritePath),
+                    Home = LoadSprite(HomeSpritePath),
+                    Return = LoadSprite(ReturnSpritePath),
+                    Hourglass = LoadSprite(HourglassSpritePath),
                     JokerIcons = LoadJokerIcons(),
                     AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),

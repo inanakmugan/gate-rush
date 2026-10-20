@@ -297,8 +297,8 @@ namespace GateRush.Tests
         {
             var problems = config.Problems();
 
-            // Every message about the menu buttons, the HUD's menu button and
-            // the result panel names one of these.
+            // Every message about the menu buttons and the result panel names
+            // one of these.
             Assert.That(problems, Has.None.Contains("Menu "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("Result "), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
@@ -336,7 +336,6 @@ namespace GateRush.Tests
         }
 
         [TestCase("menuButtonSizeUnits", "Menu Button Size Units")]
-        [TestCase("hudMenuBarSizeUnits", "Hud Menu Bar Size Units")]
         public void Problems_NonPositiveNewVectorSize_IsReportedByName(string field, string shownName)
         {
             var serialized = new SerializedObject(config);
@@ -475,20 +474,15 @@ namespace GateRush.Tests
             Assert.AreEqual("You will lose a life.", config.LoseLifeMessage);
             Assert.AreEqual("Lose a life", config.LoseLifeLabel);
             Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
-            Assert.AreEqual("Free Play", config.FreePlayLabel);
             Assert.AreEqual("All levels played. Play any level from Settings.", config.CampaignDoneNotice);
         }
 
-        [TestCase("freePlayLabel", "Free Play Label")]
         [TestCase("campaignDoneNotice", "Campaign Done Notice")]
         [TestCase("leaveLevelTitle", "Leave Level Title")]
         [TestCase("restartLevelTitle", "Restart Level Title")]
         [TestCase("loseLifeMessage", "Lose Life Message")]
         [TestCase("loseLifeLabel", "Lose Life Label")]
         [TestCase("keepPlayingLabel", "Keep Playing Label")]
-        [TestCase("goldFormat", "Gold Format")]
-        [TestCase("livesFullFormat", "Lives Full Format")]
-        [TestCase("livesWaitingFormat", "Lives Waiting Format")]
         [TestCase("goldEarnedFormat", "Gold Earned Format")]
         public void Problems_EmptyMetaText_IsReportedByName(string field, string shownName)
         {
@@ -499,32 +493,8 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
         }
 
-        [Test]
-        public void Problems_EmptyMetaSeparator_IsReportedByName()
-        {
-            SetString("metaSeparator", string.Empty);
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Meta Separator is empty"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_MetaSeparatorOfSpacesOnly_IsAllowed()
-        {
-            SetString("metaSeparator", "   ");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.None.Contains("Meta Separator"), string.Join(" | ", problems));
-        }
-
-        // Each format is given one placeholder more than it is formatted with.
-        [TestCase("goldFormat", "Gold Format", "{1}")]
-        [TestCase("livesFullFormat", "Lives Full Format", "{0}/{2}")]
-        [TestCase("livesWaitingFormat", "Lives Waiting Format", "{0}/{1} {3}")]
+        // The format is given one placeholder more than it is formatted with.
         [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
-        [TestCase("goldFormat", "Gold Format", "Gold {0")]
         public void Problems_UnusableMetaFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -532,27 +502,6 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains($"{shownName} must be a format"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_LivesWaitingFormatUsingEveryPlaceholder_IsAllowed()
-        {
-            SetString("livesWaitingFormat", "{2} {1} {0}");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.None.Contains("Lives Waiting Format"), string.Join(" | ", problems));
-        }
-
-        [TestCase("hudMetaHeightUnits", "Hud Meta Height Units")]
-        [TestCase("hudMetaFontSize", "Hud Meta Font Size")]
-        public void Problems_NonPositiveMetaSize_IsReportedByName(string field, string shownName)
-        {
-            SetFloat(field, 0f);
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
         }
 
         [TestCase("confirmPanelSizeUnits", "Confirm Panel Size Units")]
@@ -565,16 +514,6 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_NegativeHudMetaGap_IsReportedByName()
-        {
-            SetFloat("hudMetaGapUnits", -1f);
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Hud Meta Gap Units must be at least 0"), string.Join(" | ", problems));
         }
 
         [Test]
@@ -612,88 +551,25 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
         }
 
-        // ----- Module 34: the joker bar and the joker break ------------------
+        // ----- Module 34: the joker break ---------------------------------------
+        // The joker bar's values left with the bar in Module 40.
 
         [Test]
-        public void Problems_DefaultJokerBarValues_ReportNothingAboutThem()
+        public void Problems_DefaultJokerBreakValue_ReportsNothingAboutIt()
         {
             var problems = config.Problems();
 
-            // Every message about Module 34's values names one of these.
-            Assert.That(problems, Has.None.Contains("Joker "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Clock Label"), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Rocket Label"), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Broom Label"), string.Join(" | ", problems));
             Assert.That(problems, Has.None.Contains("Break Fade"), string.Join(" | ", problems));
         }
 
-        [TestCase("clockLabel", "Clock Label")]
-        [TestCase("rocketLabel", "Rocket Label")]
-        [TestCase("broomLabel", "Broom Label")]
-        public void Problems_EmptyJokerName_IsReportedByName(string field, string shownName)
-        {
-            SetString(field, "  ");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
-        }
-
-        // Each format is given one placeholder more than it is formatted with.
-        [TestCase("jokerCountFormat", "Joker Count Format")]
-        [TestCase("jokerPriceFormat", "Joker Price Format")]
-        public void Problems_UnusableJokerFormat_IsReportedByName(string field, string shownName)
-        {
-            SetString(field, "{0} {2}");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} must be a format"), string.Join(" | ", problems));
-        }
-
-        [TestCase("jokerButtonFontSize", "Joker Button Font Size")]
         [TestCase("breakFadeSeconds", "Break Fade Seconds")]
-        public void Problems_NonPositiveJokerSizeOrTime_IsReportedByName(string field, string shownName)
+        public void Problems_NonPositiveJokerBreakTime_IsReportedByName(string field, string shownName)
         {
             SetFloat(field, 0f);
 
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_NonPositiveJokerButtonSize_IsReportedByName()
-        {
-            var serialized = new SerializedObject(config);
-            serialized.FindProperty("jokerButtonSizeUnits").vector2Value = new Vector2(1f, 0f);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Joker Button Size Units must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_NegativeJokerButtonGap_IsReportedByName()
-        {
-            SetFloat("jokerButtonGapUnits", -1f);
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Joker Button Gap Units must be at least 0"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_TransparentJokerSelectedColor_IsReportedByName()
-        {
-            var serialized = new SerializedObject(config);
-            serialized.FindProperty("jokerSelectedColor").colorValue = new Color(1f, 1f, 1f, 0f);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Joker Selected Color must not be fully transparent"), string.Join(" | ", problems));
         }
 
         /// <summary>Sets the sorting order <paramref name="field"/> to the value <paramref name="sameAs"/> has.</summary>
