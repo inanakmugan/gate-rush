@@ -17,7 +17,9 @@ namespace GateRush.Tests
     /// ribbon with an empty or repeated id or an empty text is reported.
     /// Module 37's win streak texts and Streak colour are checked the same
     /// way, and each joker kind reads its own name. Module 38's Profile and
-    /// Haptics texts are checked the same way.
+    /// Haptics texts are checked the same way. Module 39's Leaderboard texts
+    /// and colours are checked the same way, and the first three ranks read
+    /// their own medal colour while every other rank has none.
     /// </summary>
     public class UiConfigTests
     {
@@ -92,6 +94,12 @@ namespace GateRush.Tests
         [TestCase("lifetimeGoldLabel", "Lifetime Gold Label")]
         [TestCase("statisticFormat", "Statistic Format")]
         [TestCase("hapticsLabel", "Haptics Label")]
+        [TestCase("leaderboardSimulatedNote", "Leaderboard Simulated Note")]
+        [TestCase("leaderboardLoadingText", "Leaderboard Loading Text")]
+        [TestCase("leaderboardFailedText", "Leaderboard Failed Text")]
+        [TestCase("leaderboardRetryLabel", "Leaderboard Retry Label")]
+        [TestCase("leaderboardScoreFormat", "Leaderboard Score Format")]
+        [TestCase("leaderboardRankFormat", "Leaderboard Rank Format")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -126,6 +134,8 @@ namespace GateRush.Tests
         [TestCase("rewardHeadlineFormat", "Reward Headline Format", "{1} wins in a row!")]
         [TestCase("prizeFormat", "Prize Format", "+{0} {2}")]
         [TestCase("statisticFormat", "Statistic Format", "{1:N0}")]
+        [TestCase("leaderboardScoreFormat", "Leaderboard Score Format", "{1:N0}")]
+        [TestCase("leaderboardRankFormat", "Leaderboard Rank Format", "{1}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -143,6 +153,11 @@ namespace GateRush.Tests
         [TestCase("streakColor", "Streak Color")]
         [TestCase("buttonLabelColor", "Button Label Color")]
         [TestCase("disabledButtonLabelColor", "Disabled Button Label Color")]
+        [TestCase("goldMedalColor", "Gold Medal Color")]
+        [TestCase("silverMedalColor", "Silver Medal Color")]
+        [TestCase("bronzeMedalColor", "Bronze Medal Color")]
+        [TestCase("leaderboardHighlightColor", "Leaderboard Highlight Color")]
+        [TestCase("leaderboardRowColor", "Leaderboard Row Color")]
         public void Problems_TransparentColor_IsReportedByName(string field, string shownName)
         {
             SetColor(field, new Color(1f, 1f, 1f, 0f));
@@ -185,6 +200,29 @@ namespace GateRush.Tests
             var name = config.JokerName(kind);
 
             Assert.AreEqual("Marker", name);
+        }
+
+        [TestCase(1, "goldMedalColor")]
+        [TestCase(2, "silverMedalColor")]
+        [TestCase(3, "bronzeMedalColor")]
+        public void TryGetMedalColor_FirstThreeRanks_IsTheirOwnField(int rank, string field)
+        {
+            var marker = new Color(0.12f, 0.34f, 0.56f, 0.78f);
+            SetColor(field, marker);
+
+            var hasMedal = config.TryGetMedalColor(rank, out var color);
+
+            Assert.IsTrue(hasMedal);
+            Assert.AreEqual(marker, color);
+        }
+
+        [TestCase(0)]
+        [TestCase(4)]
+        public void TryGetMedalColor_OtherRank_HasNoMedal(int rank)
+        {
+            var hasMedal = config.TryGetMedalColor(rank, out _);
+
+            Assert.IsFalse(hasMedal);
         }
 
         [Test]

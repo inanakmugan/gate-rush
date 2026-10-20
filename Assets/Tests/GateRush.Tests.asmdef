@@ -13,7 +13,9 @@
         "GateRush.Editor",
         "GateRush.Runtime",
         "GateRush.UI",
-        "GateRush.UI.Editor"
+        "GateRush.UI.Editor",
+        "Unity.TextMeshPro",
+        "UnityEngine.UI"
     ],
     "includePlatforms": [
         "Editor"

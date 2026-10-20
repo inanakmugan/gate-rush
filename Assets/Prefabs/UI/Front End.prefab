@@ -277,7 +277,7 @@ MonoBehaviour:
   config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}
   store: {fileID: 6689846363597275468}
   home: {fileID: 1659873394479071337}
-  leaderboardPage: {fileID: 5801340545805701355}
+  leaderboard: {fileID: 4193417939912717617}
   topBar: {fileID: 1369090833082928377}
   tabBar: {fileID: 3253521320147455054}
   settings: {fileID: 3023260926038005310}
@@ -1826,11 +1826,17 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 8146396431613092863, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
   m_PrefabInstance: {fileID: 8465307837254954128}
   m_PrefabAsset: {fileID: 0}
---- !u!1 &5801340545805701355 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 2736025684487486587, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
+--- !u!114 &4193417939912717617 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 5713048976670202273, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
   m_PrefabInstance: {fileID: 8465307837254954128}
   m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e0e772079610e3e4b80fc040a1f5471e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.LeaderboardScreen
 --- !u!1001 &8672848545771334946
 PrefabInstance:
   m_ObjectHideFlags: 0

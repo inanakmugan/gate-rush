@@ -16,7 +16,7 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers <see cref="UiPrefabBuilder"/> (Modules 35 to 38): the build
-    /// writes the eighteen prefabs and nothing else, the Front End it builds
+    /// writes the nineteen prefabs and nothing else, the Front End it builds
     /// reports no missing part, every overlay's, the Store's, its cards' and
     /// the Gold Pack Card's fields are wired, the hand-made parts stay linked
     /// to their prefabs and their files unwritten, every tinted graphic
@@ -26,7 +26,9 @@ namespace GateRush.Tests
     /// Area as an object added to it, Home Page's own file unwritten. Module
     /// 38's Avatar Button and Profile overlay are fully wired, the grid has
     /// five columns of the built Avatar Button, and Top Bar's file stays
-    /// unwritten with the other hand-made prefabs.
+    /// unwritten with the other hand-made prefabs. Module 39's Leaderboard
+    /// page and Leaderboard Row are fully wired, the page creating its rows
+    /// from the built row, with Home Page and Top Bar still unwritten.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -47,6 +49,8 @@ namespace GateRush.Tests
         private const string StreakAreaName = "Streak Area";
         private const string AvatarButtonName = "Avatar Button";
         private const string ProfileOverlayName = "Profile Overlay";
+        private const string LeaderboardRowName = "Leaderboard Row";
+        private const string LeaderboardPageName = "Leaderboard Page";
         private const int ProfileGridColumns = 5;
         private const string TintRoleField = "role";
         private const string TintTargetField = "target";
@@ -54,7 +58,7 @@ namespace GateRush.Tests
 
         private static string[] OutputNames => new[]
         {
-            GoldPackCardName, "Store Page", "Leaderboard Page", "Settings Overlay", "Levels Overlay", "Lives Overlay",
+            GoldPackCardName, "Store Page", LeaderboardRowName, "Leaderboard Page", "Settings Overlay", "Levels Overlay", "Lives Overlay",
             "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", StreakMarkerName, StreakBarName,
             StreakLadderRowName, "Win Streak Overlay", StreakPrizeName, "Streak Reward Overlay", AvatarButtonName,
             ProfileOverlayName, FrontEndName
@@ -95,7 +99,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_IntoFolder_WritesExactlyTheEighteenPrefabs()
+        public void Build_IntoFolder_WritesExactlyTheNineteenPrefabs()
         {
             var names = AssetDatabase.FindAssets("t:Prefab", new[] { folder })
                 .Select(guid => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(guid)))
@@ -105,7 +109,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ExistingOutputs_AfterBuild_NamesAllEighteen()
+        public void ExistingOutputs_AfterBuild_NamesAllNineteen()
         {
             var existing = UiPrefabBuilder.ExistingOutputs(folder);
 
@@ -155,6 +159,7 @@ namespace GateRush.Tests
         [TestCase(typeof(StreakRewardOverlay), 4)]
         [TestCase(typeof(StreakBar), 6)]
         [TestCase(typeof(ProfileOverlay), 16)]
+        [TestCase(typeof(LeaderboardScreen), 7)]
         [TestCase(typeof(FrontEnd), 18)]
         public void Build_View_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
@@ -203,6 +208,30 @@ namespace GateRush.Tests
             Assert.IsNotNull(cell, nameof(AvatarButton));
 
             AssertEveryReferenceAssigned(cell, 3);
+        }
+
+        [Test]
+        public void Build_LeaderboardRow_EveryReferenceIsAssigned()
+        {
+            var row = LoadBuilt(LeaderboardRowName).GetComponent<LeaderboardRow>();
+            Assert.IsNotNull(row, nameof(LeaderboardRow));
+
+            AssertEveryReferenceAssigned(row, 6);
+        }
+
+        [Test]
+        public void Build_LeaderboardPage_CreatesItsRowsFromTheBuiltLeaderboardRow()
+        {
+            var screen = LoadBuilt(LeaderboardPageName).GetComponent<LeaderboardScreen>();
+            Assert.IsNotNull(screen, nameof(LeaderboardScreen));
+
+            LeaderboardRow prefab;
+            using (var serialized = new SerializedObject(screen))
+            {
+                prefab = (LeaderboardRow)serialized.FindProperty("rowPrefab").objectReferenceValue;
+            }
+
+            Assert.AreEqual($"{folder}/{LeaderboardRowName}.prefab", AssetDatabase.GetAssetPath(prefab), "the built Leaderboard Row");
         }
 
         [Test]
@@ -264,6 +293,7 @@ namespace GateRush.Tests
             Assert.IsNotNull(config, UiConfigPath);
             var tints = LoadBuilt(FrontEndName).GetComponentsInChildren<UiTint>(true)
                 .Concat(LoadBuilt(GoldPackCardName).GetComponentsInChildren<UiTint>(true))
+                .Concat(LoadBuilt(LeaderboardRowName).GetComponentsInChildren<UiTint>(true))
                 .ToList();
             var wrong = new List<string>();
 
@@ -289,7 +319,8 @@ namespace GateRush.Tests
         {
             var scrollRects = LoadBuilt(FrontEndName).GetComponentsInChildren<ScrollRect>(true);
 
-            Assert.AreEqual(4, scrollRects.Length, "the Store page's, the Levels overlay's, the Win Streak overlay's and Profile's");
+            Assert.AreEqual(
+                5, scrollRects.Length, "the Store page's, the Leaderboard page's, the Levels overlay's, the Win Streak overlay's and Profile's");
             foreach (var scrollRect in scrollRects)
             {
                 Assert.AreEqual(ExpectedScrollSensitivity, scrollRect.scrollSensitivity, $"'{scrollRect.name}' scroll sensitivity");

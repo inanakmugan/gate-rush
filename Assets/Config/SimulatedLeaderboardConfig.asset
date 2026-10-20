@@ -1,0 +1,75 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8027d263f0dd22d40ab1b74f413953e0, type: 3}
+  m_Name: SimulatedLeaderboardConfig
+  m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.SimulatedLeaderboardConfig
+  players:
+  - name: GateKeeper
+    avatarId: rhino
+    score: 980
+  - name: "Y\u0131ld\u0131z Avc\u0131s\u0131"
+    avatarId: giraffe
+    score: 940
+  - name: PuzzleFox
+    avatarId: monkey
+    score: 890
+  - name: "Kay\u0131p Anahtar"
+    avatarId: elephant
+    score: 845
+  - name: BlockMason
+    avatarId: gorilla
+    score: 800
+  - name: Mavi Kedi
+    avatarId: penguin
+    score: 760
+  - name: SlideQueen
+    avatarId: parrot
+    score: 705
+  - name: "H\u0131zl\u0131 Kaplumba\u011Fa"
+    avatarId: sloth
+    score: 650
+  - name: NightOwl_7
+    avatarId: owl
+    score: 600
+  - name: "K\u0131rm\u0131z\u0131 Balon"
+    avatarId: pig
+    score: 555
+  - name: TileHopper
+    avatarId: rabbit
+    score: 500
+  - name: "Gece Ku\u015Fu"
+    avatarId: chick
+    score: 450
+  - name: Bamboo Muncher
+    avatarId: panda
+    score: 410
+  - name: "Kod Ustas\u0131"
+    avatarId: frog
+    score: 365
+  - name: CornerTurner
+    avatarId: hippo
+    score: 320
+  - name: Bulmaca Kurdu
+    avatarId: snake
+    score: 270
+  - name: QuietMoose
+    avatarId: moose
+    score: 215
+  - name: Tembel Fok
+    avatarId: walrus
+    score: 160
+  - name: PaddleDuck
+    avatarId: duck
+    score: 105
+  - name: "Yava\u015F Ad\u0131m"
+    avatarId: cow
+    score: 40

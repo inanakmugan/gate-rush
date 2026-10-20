@@ -130,6 +130,16 @@ namespace GateRush.Runtime
     /// accepted and changed, it is saved. A picked avatar is saved at once.
     /// The Meta Config's default avatar is checked against the
     /// <see cref="AvatarCatalog"/> at start and a mismatch logged.</para>
+    /// <para><b>Leaderboard (Module 39, D70, D73).</b> Rows come from an
+    /// <see cref="ILeaderboardService"/>, the
+    /// <see cref="SimulatedLeaderboardService"/> over
+    /// <see cref="SimulatedLeaderboardConfig"/>'s demo players; their avatar
+    /// ids are checked against the catalog at start and any it lacks logged.
+    /// Each request of the front end fetches with the player's name, avatar
+    /// and lifetime gold as they are then. A result that arrives after the
+    /// front end closed is dropped; one that arrives after a newer request
+    /// is dropped and fetched again, so the page never shows a table older
+    /// than its last request.</para>
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
@@ -152,6 +162,9 @@ namespace GateRush.Runtime
 
         [Tooltip("The avatars a player can choose (Module 38): Assets/Config/AvatarCatalog.asset, the one the Front End holds. Left empty, or with a problem, it logs an error and nothing is drawn; a Meta Config Default Avatar Id the catalog lacks is logged as an error and the game goes on, showing the catalog's first avatar.")]
         [SerializeField] private AvatarCatalog avatarCatalog;
+
+        [Tooltip("The demo players the simulated leaderboard ranks the player among, labelled as demo players on the Leaderboard tab (Module 39): Assets/Config/SimulatedLeaderboardConfig.asset. Left empty, or with a problem, it logs an error and nothing is drawn; an Avatar Id the Avatar Catalog lacks is logged as an error and the game goes on, showing the catalog's first avatar.")]
+        [SerializeField] private SimulatedLeaderboardConfig simulatedLeaderboard;
 
         [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
         [SerializeField] private Camera boardCamera;
@@ -214,6 +227,12 @@ namespace GateRush.Runtime
         // products and the rules' packs, matched once: what the Store offers.
         private IPurchaseService purchases;
         private IReadOnlyList<GoldOffer> goldOffers;
+
+        // Ranks the player for the Leaderboard tab (D73); made in Awake. True
+        // while a request came in during a fetch: that fetch's result is then
+        // dropped and fetched again.
+        private ILeaderboardService leaderboard;
+        private bool isLeaderboardAskedAgain;
 
         // How the level being played was started (D58); kept by a restart.
         private PlayMode mode;
@@ -330,6 +349,7 @@ namespace GateRush.Runtime
             metaGame = new MetaGame(save, metaRules, clock);
             CreatePurchases();
             CheckDefaultAvatar();
+            CreateLeaderboard();
             freePlayJokers = new FreePlayJokers(metaConfig.FreePlayJokersPerLevel);
             InitializeSound();
             ApplySoundSetting();
@@ -522,6 +542,70 @@ namespace GateRush.Runtime
                     $"a new player is shown '{avatarCatalog.ShownId(metaRules.DefaultAvatarId)}' instead.",
                     metaConfig);
             }
+        }
+
+        /// <summary>
+        /// Makes the leaderboard service over the Simulated Leaderboard
+        /// Config, whose problems <see cref="HasEverythingAssigned"/> has
+        /// already refused, and logs an error for each demo player's avatar id
+        /// the Avatar Catalog lacks, once at start. The game goes on: such a
+        /// row shows the catalog's first avatar.
+        /// </summary>
+        private void CreateLeaderboard()
+        {
+            leaderboard = new SimulatedLeaderboardService(simulatedLeaderboard.Players());
+            foreach (var problem in simulatedLeaderboard.MissingAvatars(avatarCatalog))
+            {
+                Debug.LogError(problem, simulatedLeaderboard);
+            }
+        }
+
+        /// <summary>
+        /// The Leaderboard tab was selected, or its Retry pressed: fetches a
+        /// fresh result. While a fetch is pending, the request is kept and
+        /// fetched once that one returns.
+        /// </summary>
+        private void OnLeaderboardRequested()
+        {
+            if (leaderboard.IsBusy)
+            {
+                isLeaderboardAskedAgain = true;
+                return;
+            }
+
+            FetchLeaderboard();
+        }
+
+        /// <summary>Fetches with the player's name, avatar and lifetime gold as the save holds them now (D22).</summary>
+        private void FetchLeaderboard()
+        {
+            var profile = save.Profile;
+            var player = new LeaderboardPlayer(profile.Name, profile.AvatarId, save.Wallet.LifetimeEarned);
+            leaderboard.Fetch(player, OnLeaderboardFetched);
+        }
+
+        /// <summary>
+        /// A fetch's answer: dropped when the front end has closed, since the
+        /// next opening asks again; dropped and fetched again when a request
+        /// came in while it was pending; otherwise shown. The service is no
+        /// longer busy when this runs (<see cref="ILeaderboardService.IsBusy"/>).
+        /// </summary>
+        private void OnLeaderboardFetched(LeaderboardResult result)
+        {
+            if (!frontEndView.IsOpen)
+            {
+                isLeaderboardAskedAgain = false;
+                return;
+            }
+
+            if (isLeaderboardAskedAgain)
+            {
+                isLeaderboardAskedAgain = false;
+                FetchLeaderboard();
+                return;
+            }
+
+            frontEndView.ShowLeaderboard(result);
         }
 
         /// <summary>
@@ -1126,6 +1210,7 @@ namespace GateRush.Runtime
             frontEndView.RefillRequested += OnRefillRequested;
             frontEndView.GoldPackRequested += OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
+            frontEndView.LeaderboardRequested += OnLeaderboardRequested;
             confirmPrompt.Confirmed += OnConfirmed;
             confirmPrompt.Cancelled += OnConfirmCancelled;
             boardView.LeaveStarted += OnLeaveStarted;
@@ -1169,6 +1254,7 @@ namespace GateRush.Runtime
             frontEndView.RefillRequested -= OnRefillRequested;
             frontEndView.GoldPackRequested -= OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
+            frontEndView.LeaderboardRequested -= OnLeaderboardRequested;
             confirmPrompt.Confirmed -= OnConfirmed;
             confirmPrompt.Cancelled -= OnConfirmCancelled;
             boardView.LeaveStarted -= OnLeaveStarted;
@@ -2269,6 +2355,20 @@ namespace GateRush.Runtime
                 foreach (var problem in simulatedStore.Problems())
                 {
                     Debug.LogError($"{problem} Nothing is drawn.", simulatedStore);
+                    isAssigned = false;
+                }
+            }
+
+            if (simulatedLeaderboard == null)
+            {
+                Debug.LogError("LevelBootstrap: Simulated Leaderboard is not assigned; nothing is drawn.", this);
+                isAssigned = false;
+            }
+            else
+            {
+                foreach (var problem in simulatedLeaderboard.Problems())
+                {
+                    Debug.LogError($"{problem} Nothing is drawn.", simulatedLeaderboard);
                     isAssigned = false;
                 }
             }

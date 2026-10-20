@@ -20,8 +20,9 @@ namespace GateRush.UI.Editor
     /// the Store Page now holding the Store, and Module 37's Streak Marker,
     /// Streak Bar, Streak Ladder Row, Win Streak Overlay, Streak Prize and
     /// Streak Reward Overlay, and Module 38's Avatar Button and Profile
-    /// Overlay, with the Settings overlay now holding the Haptics row — from
-    /// code, with every serialized field wired.
+    /// Overlay, with the Settings overlay now holding the Haptics row, and
+    /// Module 39's Leaderboard Row, with the Leaderboard Page now holding the
+    /// leaderboard — from code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -79,6 +80,9 @@ namespace GateRush.UI.Editor
         private const string PhoneSpritePath = "Assets/ThirdParty/Kenney/GameIcons/phone.png";
         private const string CrossSpritePath = "Assets/ThirdParty/Kenney/GameIcons/cross.png";
 
+        // The Leaderboard's rank mark: white, tinted gold, silver and bronze at runtime.
+        private const string MedalSpritePath = "Assets/ThirdParty/Kenney/GameIcons/medal1.png";
+
         // The streak bar's track and fill: near-white, so a tint shows true.
         // Sliced, so it must have a border.
         private const string BarSpritePath = "Assets/ThirdParty/Kenney/UIPack/Extra/input_rectangle.png";
@@ -103,6 +107,7 @@ namespace GateRush.UI.Editor
         // Built prefabs.
         private const string GoldPackCardName = "Gold Pack Card";
         private const string StorePageName = "Store Page";
+        private const string LeaderboardRowName = "Leaderboard Row";
         private const string LeaderboardPageName = "Leaderboard Page";
         private const string SettingsOverlayName = "Settings Overlay";
         private const string LevelsOverlayName = "Levels Overlay";
@@ -194,6 +199,11 @@ namespace GateRush.UI.Editor
         private const string LifetimeGoldName = "Lifetime Gold";
         private const string StatisticLabelName = "Label";
         private const string StatisticValueName = "Value";
+        private const string MedalName = "Medal";
+        private const string RankName = "Rank";
+        private const string ScoreName = "Score";
+        private const string StatusName = "Status";
+        private const string RetryName = "Retry";
 
         // Texts. Labels the game overwrites from the state only show in the
         // Editor; those it sets from the UI Config are written from it.
@@ -242,6 +252,11 @@ namespace GateRush.UI.Editor
         private const int LevelsCompletedPlaceholder = 12;
         private const int CampaignLevelPlaceholder = 13;
         private const int LifetimeGoldPlaceholder = 1250;
+
+        // The placeholder Leaderboard Row: the first rank, so its medal shows,
+        // with a score that shows a separator.
+        private const int RankPlaceholder = 1;
+        private const int ScorePlaceholder = 1250;
 
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
@@ -491,6 +506,41 @@ namespace GateRush.UI.Editor
         private const float HeadlineFontSize = 56f;
         private const float PrizesPosY = -410f;
 
+        // The Leaderboard Row: the medal, the rank, the avatar and the name
+        // from the left; the coin and the score from the right.
+        private const float LeaderboardRowPreviewWidth = 1000f;
+        private const float LeaderboardRowHeight = 140f;
+        private const float RowMedalLeft = 20f;
+        private const float RowMedalSize = 72f;
+        private const float RowRankLeft = 92f;
+        private const float RowRankWidth = 80f;
+        private const float RowRankFontSize = 52f;
+        private const float RowAvatarLeft = 180f;
+        private const float RowAvatarSize = 110f;
+        private const float RowNameLeft = 305f;
+        private const float RowNameRight = 264f;
+        private const float RowNameFontSize = 44f;
+        private const float RowCoinRight = 196f;
+        private const float RowCoinSize = 56f;
+        private const float RowScoreRight = 24f;
+        private const float RowScoreWidth = 160f;
+        private const float RowScoreFontSize = 48f;
+
+        // The Leaderboard page: the simulated line under the title, the list
+        // under it, and the status line and Retry in the middle.
+        private const float LeaderboardInset = 40f;
+        private const float LeaderboardNotePosY = PageTitlePosY - PageTitleHeight;
+        private const float LeaderboardNoteHeight = 100f;
+        private const float LeaderboardNoteFontSize = 40f;
+        private const float LeaderboardListGap = 20f;
+        private const float LeaderboardListTop = -LeaderboardNotePosY + LeaderboardNoteHeight + LeaderboardListGap;
+        private const float LeaderboardRowSpacing = 16f;
+        private const int LeaderboardListBottomPadding = 40;
+        private const float LeaderboardStatusWidth = 900f;
+        private const float LeaderboardStatusHeight = 200f;
+        private const float LeaderboardStatusFontSize = 52f;
+        private const float LeaderboardRetryPosY = -180f;
+
         // The bar heights the layout was planned with. The build uses the
         // heights on the prefabs and only warns when they differ.
         private const float ExpectedTopBarHeight = 160f;
@@ -513,7 +563,7 @@ namespace GateRush.UI.Editor
         private const string ConfigField = "config";
         private const string StoreField = "store";
         private const string HomeField = "home";
-        private const string LeaderboardPageField = "leaderboardPage";
+        private const string LeaderboardField = "leaderboard";
         private const string TopBarField = "topBar";
         private const string TabBarField = "tabBar";
         private const string SettingsField = "settings";
@@ -594,6 +644,14 @@ namespace GateRush.UI.Editor
         private const string LifetimeGoldValueField = "lifetimeGoldValue";
         private const string ProfileField = "profile";
         private const string AvatarCatalogField = "avatarCatalog";
+        private const string BackgroundField = "background";
+        private const string RankLabelField = "rankLabel";
+        private const string MedalField = "medal";
+        private const string AvatarField = "avatar";
+        private const string NameLabelField = "nameLabel";
+        private const string ScoreLabelField = "scoreLabel";
+        private const string RetryButtonField = "retryButton";
+        private const string RetryLabelField = "retryLabel";
 
         // The overwrite prompt.
         private const string DialogTitle = "Build UI Prefabs";
@@ -647,7 +705,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Builds the eighteen prefabs into <paramref name="outputFolder"/>,
+        /// Builds the nineteen prefabs into <paramref name="outputFolder"/>,
         /// overwriting any already there without asking. The hand-made
         /// prefabs are read from <see cref="HandMadeFolder"/>.
         /// </summary>
@@ -666,7 +724,8 @@ namespace GateRush.UI.Editor
             {
                 var goldPackCard = Save(BuildGoldPackCard(scene, sources), sources, outputFolder);
                 var storePage = Save(BuildStorePage(scene, sources, goldPackCard), sources, outputFolder);
-                var leaderboardPage = Save(BuildPage(scene, sources, LeaderboardPageName, LeaderboardTitle), sources, outputFolder);
+                var leaderboardRow = Save(BuildLeaderboardRow(scene, sources), sources, outputFolder);
+                var leaderboardPage = Save(BuildLeaderboardPage(scene, sources, leaderboardRow), sources, outputFolder);
                 var settings = Save(BuildSettingsOverlay(scene, sources), sources, outputFolder);
                 var levels = Save(BuildLevelsOverlay(scene, sources), sources, outputFolder);
                 var lives = Save(BuildLivesOverlay(scene, sources), sources, outputFolder);
@@ -693,7 +752,7 @@ namespace GateRush.UI.Editor
 
         private static string[] OutputNames() => new[]
         {
-            GoldPackCardName, StorePageName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
+            GoldPackCardName, StorePageName, LeaderboardRowName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
             NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
             StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, AvatarButtonName,
             ProfileOverlayName, FrontEndName
@@ -810,6 +869,121 @@ namespace GateRush.UI.Editor
                 (RocketCardField, rocket),
                 (BroomCardField, broom),
                 (LivesCardField, livesCard));
+            return root;
+        }
+
+        /// <summary>
+        /// One row of the Leaderboard, the prefab the page instantiates per
+        /// entry: the panel, the medal and the rank, the avatar, the name, and
+        /// the score beside the coin. Shown as the first rank in the row
+        /// colour; the screen sets every colour at runtime.
+        /// </summary>
+        private static GameObject BuildLeaderboardRow(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var root = CreateRoot(LeaderboardRowName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(LeaderboardRowPreviewWidth, LeaderboardRowHeight));
+            var background = AddSliced(rect, sources.Panel, PanelColorHex);
+            background.color = config.LeaderboardRowColor;
+            root.AddComponent<LayoutElement>().preferredHeight = LeaderboardRowHeight;
+
+            config.TryGetMedalColor(RankPlaceholder, out var medalColor);
+            var medal = UiBuilder.CreateRect(MedalName, rect);
+            UiBuilder.Place(medal, new Vector2(AnchorLow, AnchorMid), new Vector2(RowMedalLeft, 0f), new Vector2(RowMedalSize, RowMedalSize));
+            var medalImage = UiBuilder.AddIcon(medal, sources.Medal, medalColor);
+
+            var rank = UiBuilder.CreateRect(RankName, rect);
+            UiBuilder.SetAnchors(rank, new Vector2(AnchorLow, AnchorLow), new Vector2(AnchorLow, AnchorHigh));
+            rank.offsetMin = new Vector2(RowRankLeft, 0f);
+            rank.offsetMax = new Vector2(RowRankLeft + RowRankWidth, 0f);
+            var rankLabel = AddText(rank, sources, LeaderboardTexts.Rank(RankPlaceholder, config), RowRankFontSize, OverlayTextColorHex);
+
+            var avatar = UiBuilder.CreateRect(AvatarName, rect);
+            UiBuilder.Place(avatar, new Vector2(AnchorLow, AnchorMid), new Vector2(RowAvatarLeft, 0f), new Vector2(RowAvatarSize, RowAvatarSize));
+            var avatarImage = UiBuilder.AddIcon(avatar, sources.AvatarCatalog.SpriteAt(0), ParseColor(IconColorHex));
+
+            var nameLabel = AddBandText(rect, sources, CardNameLabelName, RowNameLeft, RowNameRight, NamePlaceholder, RowNameFontSize);
+            nameLabel.overflowMode = TextOverflowModes.Ellipsis;
+
+            var coin = UiBuilder.CreateRect(CoinName, rect);
+            UiBuilder.Place(coin, new Vector2(AnchorHigh, AnchorMid), new Vector2(-RowCoinRight, 0f), new Vector2(RowCoinSize, RowCoinSize));
+            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
+            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+
+            var score = UiBuilder.CreateRect(ScoreName, rect);
+            UiBuilder.SetAnchors(score, new Vector2(AnchorHigh, AnchorLow), new Vector2(AnchorHigh, AnchorHigh));
+            score.offsetMin = new Vector2(-(RowScoreRight + RowScoreWidth), 0f);
+            score.offsetMax = new Vector2(-RowScoreRight, 0f);
+            var scoreLabel = AddText(score, sources, LeaderboardTexts.Score(ScorePlaceholder, config), RowScoreFontSize, OverlayTextColorHex);
+            scoreLabel.alignment = TextAlignmentOptions.MidlineRight;
+
+            var row = root.AddComponent<LeaderboardRow>();
+            SetReferences(
+                row,
+                (BackgroundField, background),
+                (RankLabelField, rankLabel),
+                (MedalField, medalImage),
+                (AvatarField, avatarImage),
+                (NameLabelField, nameLabel),
+                (ScoreLabelField, scoreLabel));
+            return root;
+        }
+
+        /// <summary>
+        /// The Leaderboard tab's page: its title, the line saying the table is
+        /// simulated, the list in a vertical scroll whose rows are created at
+        /// runtime, and the status line and Retry, saved hidden, in the
+        /// middle.
+        /// </summary>
+        private static GameObject BuildLeaderboardPage(Scene scene, Sources sources, GameObject rowAsset)
+        {
+            var config = sources.Config;
+            var root = BuildPage(scene, sources, LeaderboardPageName, LeaderboardTitle);
+
+            var note = UiBuilder.CreateRect(NoteName, root.transform);
+            TopStretch(note, LeaderboardInset, LeaderboardNotePosY, LeaderboardNoteHeight);
+            var noteLabel = AddWrappingText(note, sources, config.LeaderboardSimulatedNote, LeaderboardNoteFontSize, PageTitleColorHex);
+
+            var scroll = UiBuilder.CreateRect(ScrollViewName, root.transform);
+            UiBuilder.Stretch(scroll);
+            scroll.offsetMin = new Vector2(LeaderboardInset, LeaderboardInset);
+            scroll.offsetMax = new Vector2(-LeaderboardInset, -LeaderboardListTop);
+            var viewport = AddViewport(scroll);
+            var content = UiBuilder.CreateRect(ContentName, viewport);
+            TopStretch(content, 0f, 0f, 0f);
+            var layout = AddColumn(content);
+            layout.spacing = LeaderboardRowSpacing;
+            layout.padding = new RectOffset(0, 0, 0, LeaderboardListBottomPadding);
+            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            var scrollRect = AddVerticalScroll(scroll, viewport, content);
+
+            var status = UiBuilder.CreateRect(StatusName, root.transform);
+            UiBuilder.PlaceCentered(status, new Vector2(LeaderboardStatusWidth, LeaderboardStatusHeight));
+            var statusLabel = AddWrappingText(status, sources, config.LeaderboardLoadingText, LeaderboardStatusFontSize, PageTitleColorHex);
+            status.gameObject.SetActive(false);
+
+            var retry = Nest(sources.ButtonPrimary, root.transform);
+            retry.name = RetryName;
+            UiBuilder.Place(retry, new Vector2(AnchorMid, AnchorMid), new Vector2(0f, LeaderboardRetryPosY), retry.sizeDelta);
+            Record(retry);
+            Record(retry.gameObject);
+            var retryLabel = SetNestedLabel(retry, config.LeaderboardRetryLabel);
+            retry.gameObject.SetActive(false);
+            Record(retry.gameObject);
+
+            var screen = root.AddComponent<LeaderboardScreen>();
+            SetReferences(
+                screen,
+                (ScrollRectField, scrollRect),
+                (NoteLabelField, noteLabel),
+                (StatusLabelField, statusLabel),
+                (RetryButtonField, Single<Button>(retry.gameObject, ButtonPrimaryName)),
+                (RetryLabelField, retryLabel),
+                (RowsField, content),
+                (RowPrefabField, Single<LeaderboardRow>(rowAsset, LeaderboardRowName)));
             return root;
         }
 
@@ -1607,7 +1781,7 @@ namespace GateRush.UI.Editor
                 (ConfigField, sources.Config),
                 (StoreField, Single<StoreScreen>(store.gameObject, StorePageName)),
                 (HomeField, Single<HomeScreen>(home.gameObject, HomePageName)),
-                (LeaderboardPageField, leaderboard.gameObject),
+                (LeaderboardField, Single<LeaderboardScreen>(leaderboard.gameObject, LeaderboardPageName)),
                 (TopBarField, Single<TopBar>(topBar.gameObject, TopBarName)),
                 (TabBarField, Single<TabBar>(tabBar.gameObject, TabBarName)),
                 (SettingsField, Single<SettingsOverlay>(settings.gameObject, SettingsOverlayName)),
@@ -2243,6 +2417,7 @@ namespace GateRush.UI.Editor
             public Sprite Bar { get; private set; }
             public Sprite Phone { get; private set; }
             public Sprite Cross { get; private set; }
+            public Sprite Medal { get; private set; }
             public JokerIcons JokerIcons { get; private set; }
             public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
@@ -2300,6 +2475,7 @@ namespace GateRush.UI.Editor
                     Bar = LoadSlicedSprite(BarSpritePath),
                     Phone = LoadSprite(PhoneSpritePath),
                     Cross = LoadSprite(CrossSpritePath),
+                    Medal = LoadSprite(MedalSpritePath),
                     JokerIcons = LoadJokerIcons(),
                     AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),

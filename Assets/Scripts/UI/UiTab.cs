@@ -9,7 +9,7 @@ namespace GateRush.UI
         /// <summary>Home: the top bar's numbers, the streak area and Play. Selected at start.</summary>
         Home,
 
-        /// <summary>The leaderboard; its content arrives with Module 6.5.</summary>
+        /// <summary>The leaderboard: the player ranked among labelled demo players (Module 39).</summary>
         Leaderboard
     }
 }
