@@ -17,7 +17,11 @@ namespace GateRush.Tests
     /// written — not JSON, empty, with a missing, non-positive or too new
     /// version, negative gold, lives, streaks, position or jokers, a best
     /// streak below the streak, ticks outside a date's range — is refused
-    /// with a problem and no data, never misread or corrected.
+    /// with a problem and no data, never misread or corrected. Module 38: a
+    /// version-4 save reads its name, avatar and haptics; versions 1 to 3 read
+    /// them as a new player has them, haptics on whatever the sound; and a
+    /// version-4 name the rule refuses or an empty avatar id reads as the
+    /// rules' default and is reported as a reset, not refused.
     /// </summary>
     public class JsonSaveCodecTests
     {
@@ -26,6 +30,7 @@ namespace GateRush.Tests
         private const int VersionOne = 1;
         private const int VersionTwo = 2;
         private const int VersionThree = 3;
+        private const int VersionFour = 4;
 
         private const int Gold = 640;
         private const int LifetimeGold = 140;
@@ -62,7 +67,7 @@ namespace GateRush.Tests
                 completed.MarkCompleted(id);
             }
 
-            var text = new JsonSaveCodec().Encode(NewPlayerSave(completed, new SoundSetting()));
+            var text = new JsonSaveCodec().Encode(SaveFixture.NewPlayerSave(completed, new SoundSetting()));
 
             var written = JsonUtility.FromJson<SaveDataDto>(text);
             CollectionAssert.AreEqual(new[] { 0, 3, 7, 12 }, written.completedLevelIds);
@@ -84,10 +89,10 @@ namespace GateRush.Tests
         public void TryDecode_OfEncode_GivesTheSameSave(bool hasCompletedLevels, bool isSoundOn)
         {
             var completed = hasCompletedLevels ? CompletedLevels.Of(new[] { 4, 1 }) : new CompletedLevels();
-            var save = NewPlayerSave(completed, new SoundSetting { IsOn = isSoundOn });
+            var save = SaveFixture.NewPlayerSave(completed, new SoundSetting { IsOn = isSoundOn });
             var codec = new JsonSaveCodec();
 
-            var isReadable = codec.TryDecode(codec.Encode(save), SaveFixture.Rules, out var read, out var problem);
+            var isReadable = codec.TryDecode(codec.Encode(save), SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             Assert.IsNull(problem);
@@ -100,9 +105,10 @@ namespace GateRush.Tests
             var save = SaveFixture.EveryField();
             var codec = new JsonSaveCodec();
 
-            var isReadable = codec.TryDecode(codec.Encode(save), SaveFixture.Rules, out var read, out var problem);
+            var isReadable = codec.TryDecode(codec.Encode(save), SaveFixture.Rules, out var read, out var problem, out var resets);
 
             Assert.IsTrue(isReadable, problem);
+            CollectionAssert.IsEmpty(resets, "a saved name and avatar are read as they are");
             SaveFixture.AssertSameSave(save, read);
         }
 
@@ -111,7 +117,7 @@ namespace GateRush.Tests
         {
             var text = $"{{\"formatVersion\":{VersionOne},\"completedLevelIds\":[3,1,3,1],\"soundOn\":true}}";
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             CollectionAssert.AreEqual(new[] { 1, 3 }, read.Completed.Ids);
@@ -127,7 +133,7 @@ namespace GateRush.Tests
         [TestCase("{\"formatVersion\":-1,\"completedLevelIds\":[1],\"soundOn\":true}")]
         public void TryDecode_UnreadableText_IsFalseWithAProblemAndNullData(string text)
         {
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -140,7 +146,7 @@ namespace GateRush.Tests
             var tooNew = JsonSaveCodec.CurrentFormatVersion + 1;
             var text = $"{{\"formatVersion\":{tooNew},\"completedLevelIds\":[1],\"soundOn\":true}}";
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -148,9 +154,91 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void CurrentFormatVersion_IsThree()
+        public void CurrentFormatVersion_IsFour()
         {
-            Assert.AreEqual(VersionThree, JsonSaveCodec.CurrentFormatVersion);
+            Assert.AreEqual(VersionFour, JsonSaveCodec.CurrentFormatVersion);
+        }
+
+        [Test]
+        public void TryDecode_VersionFourSave_ReadsNameAvatarAndHaptics()
+        {
+            var text = VersionFourText(SaveFixture.EveryFieldName, SaveFixture.EveryFieldAvatarId, false);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out var resets);
+
+            Assert.IsTrue(isReadable, problem);
+            CollectionAssert.IsEmpty(resets);
+            Assert.AreEqual(SaveFixture.EveryFieldName, read.Profile.Name);
+            Assert.AreEqual(SaveFixture.EveryFieldAvatarId, read.Profile.AvatarId);
+            Assert.IsFalse(read.Haptics.IsOn);
+            Assert.AreEqual(Streak, read.Streak.Current, "the earlier sections are still read");
+        }
+
+        [TestCase(VersionOne)]
+        [TestCase(VersionTwo)]
+        [TestCase(VersionThree)]
+        public void TryDecode_OlderVersionWithSoundOff_ReadsANewPlayersProfileAndHapticsOn(int version)
+        {
+            var text = OlderText(version);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out var resets);
+
+            Assert.IsTrue(isReadable, problem);
+            CollectionAssert.IsEmpty(resets, "a missing section is a default, not a reset");
+            Assert.IsFalse(read.Sound.IsOn, "the sound is kept");
+            Assert.IsTrue(read.Haptics.IsOn, "vibration no longer follows the sound");
+            Assert.AreEqual(MetaRulesFixture.DefaultPlayerName, read.Profile.Name, "the rules' default name");
+            Assert.AreEqual(MetaRulesFixture.DefaultAvatarId, read.Profile.AvatarId, "the rules' default avatar");
+            CollectionAssert.AreEqual(new[] { 1 }, read.Completed.Ids, "the completed levels are kept");
+        }
+
+        [Test]
+        public void TryDecode_VersionThreeSaveWithLaterFields_IgnoresThem()
+        {
+            var text = VersionThreeText(Streak, BestStreak, Position, Clocks, Rockets, Brooms).TrimEnd('}')
+                + ",\"playerName\":\"x!\",\"avatarId\":\"\",\"hapticsOn\":false}";
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out var resets);
+
+            Assert.IsTrue(isReadable, problem);
+            CollectionAssert.IsEmpty(resets);
+            SaveFixture.AssertSameSave(
+                new SaveData(
+                    read.Completed, read.Sound, read.Wallet, read.Lives, read.Jokers, read.Streak, read.Campaign,
+                    PlayerProfile.Starting(SaveFixture.Rules), new HapticsSetting()),
+                read);
+        }
+
+        [TestCase("\"\"")]
+        [TestCase("\"x!\"")]
+        [TestCase("\"abcdefghijklmnopq\"")]
+        [TestCase(null)]
+        public void TryDecode_VersionFourRefusedName_ReadsTheDefaultNameAndReportsIt(string nameJson)
+        {
+            var text = VersionFourText(nameJson, SaveFixture.EveryFieldAvatarId, false, isNameRaw: true);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out var resets);
+
+            Assert.IsTrue(isReadable, problem);
+            Assert.AreEqual(MetaRulesFixture.DefaultPlayerName, read.Profile.Name);
+            Assert.AreEqual(SaveFixture.EveryFieldAvatarId, read.Profile.AvatarId, "the avatar is still read");
+            Assert.IsFalse(read.Haptics.IsOn, "haptics are still read");
+            Assert.That(resets, Has.Exactly(1).Contains("playerName"), string.Join(" | ", resets));
+        }
+
+        [TestCase("")]
+        [TestCase("  ")]
+        [TestCase(null)]
+        public void TryDecode_VersionFourEmptyAvatarId_ReadsTheDefaultAvatarAndReportsIt(string avatarId)
+        {
+            var text = VersionFourText(SaveFixture.EveryFieldName, avatarId, true);
+
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out var resets);
+
+            Assert.IsTrue(isReadable, problem);
+            Assert.AreEqual(MetaRulesFixture.DefaultAvatarId, read.Profile.AvatarId);
+            Assert.AreEqual(SaveFixture.EveryFieldName, read.Profile.Name, "the name is still read");
+            Assert.That(resets, Has.Exactly(1).Contains("avatarId"), string.Join(" | ", resets));
         }
 
         [Test]
@@ -158,7 +246,7 @@ namespace GateRush.Tests
         {
             var text = $"{{\"formatVersion\":{VersionOne},\"completedLevelIds\":[0,1,3],\"soundOn\":false}}";
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             CollectionAssert.AreEqual(new[] { 0, 1, 3 }, read.Completed.Ids);
@@ -166,7 +254,7 @@ namespace GateRush.Tests
             Assert.AreEqual(SaveFixture.Rules.StartingGold, read.Wallet.Balance, "starting gold, from the rules");
             Assert.AreEqual(0, read.Wallet.LifetimeEarned, "the starting gold is not earned");
             Assert.AreEqual(SaveFixture.Rules.LifeCap, read.Lives.StoredCount, "full lives, from the rules");
-            SaveFixture.AssertSameSave(NewPlayerSave(read.Completed, read.Sound), read);
+            SaveFixture.AssertSameSave(SaveFixture.NewPlayerSave(read.Completed, read.Sound), read);
         }
 
         [Test]
@@ -174,7 +262,7 @@ namespace GateRush.Tests
         {
             var text = VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             Assert.AreEqual(Gold, read.Wallet.Balance);
@@ -191,7 +279,7 @@ namespace GateRush.Tests
             var text = VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks).TrimEnd('}')
                 + ",\"winStreak\":-1,\"bestWinStreak\":-1,\"campaignPosition\":-1,\"clocks\":-1,\"rockets\":-1,\"brooms\":-1}";
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             AssertNewPlayerStreakCampaignAndJokers(read);
@@ -202,7 +290,7 @@ namespace GateRush.Tests
         {
             var text = VersionThreeText(Streak, BestStreak, Position, Clocks, Rockets, Brooms);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             Assert.AreEqual(Gold, read.Wallet.Balance);
@@ -226,7 +314,7 @@ namespace GateRush.Tests
         {
             var text = VersionThreeText(winStreak, bestWinStreak, campaignPosition, clocks, rockets, brooms);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -238,7 +326,7 @@ namespace GateRush.Tests
         {
             var text = VersionThreeText(BestStreak, Streak, Position, Clocks, Rockets, Brooms);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -252,7 +340,7 @@ namespace GateRush.Tests
         {
             var text = VersionTwoText(gold, lifetimeGold, lives, SomeTicks);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -266,7 +354,7 @@ namespace GateRush.Tests
             var ticks = isAboveMax ? DateTime.MaxValue.Ticks + 1 : DateTime.MinValue.Ticks - 1;
             var text = VersionTwoText(Gold, LifetimeGold, SomeLives, ticks);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsFalse(isReadable);
             Assert.IsNull(read);
@@ -278,7 +366,7 @@ namespace GateRush.Tests
         {
             var text = VersionTwoText(Gold, LifetimeGold, SaveFixture.Rules.LifeCap + 1, SomeTicks);
 
-            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem);
+            var isReadable = new JsonSaveCodec().TryDecode(text, SaveFixture.Rules, out var read, out var problem, out _);
 
             Assert.IsTrue(isReadable, problem);
             Assert.AreEqual(SaveFixture.Rules.LifeCap, read.Lives.StoredCount);
@@ -289,19 +377,8 @@ namespace GateRush.Tests
         {
             var text = VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks);
 
-            Assert.Throws<ArgumentNullException>(() => new JsonSaveCodec().TryDecode(text, null, out _, out _));
+            Assert.Throws<ArgumentNullException>(() => new JsonSaveCodec().TryDecode(text, null, out _, out _, out _));
         }
-
-        /// <summary>A save holding <paramref name="completed"/> and <paramref name="sound"/>, and every other section a new player's by <see cref="SaveFixture.Rules"/>.</summary>
-        private static SaveData NewPlayerSave(CompletedLevels completed, SoundSetting sound) =>
-            new SaveData(
-                completed,
-                sound,
-                Wallet.Starting(SaveFixture.Rules),
-                Lives.Full(SaveFixture.Rules),
-                JokerInventory.Starting(SaveFixture.Rules),
-                WinStreak.Starting(),
-                CampaignProgress.Starting());
 
         /// <summary>Asserts the streak, campaign and jokers a new player gets by <see cref="SaveFixture.Rules"/>.</summary>
         private static void AssertNewPlayerStreakCampaignAndJokers(SaveData read)
@@ -327,5 +404,40 @@ namespace GateRush.Tests
                 "{{\"formatVersion\":{0},\"completedLevelIds\":[1],\"soundOn\":true,\"gold\":{1},\"lifetimeGold\":{2},\"lives\":{3},\"livesRegenStartUtcTicks\":{4}," +
                 "\"winStreak\":{5},\"bestWinStreak\":{6},\"campaignPosition\":{7},\"clocks\":{8},\"rockets\":{9},\"brooms\":{10}}}",
                 VersionThree, Gold, LifetimeGold, SomeLives, SomeTicks, winStreak, bestWinStreak, campaignPosition, clocks, rockets, brooms);
+
+        /// <summary>
+        /// A version-4 save with the version-3 fields of <see cref="VersionThreeText"/>
+        /// and the given profile. A null name or avatar id leaves its field
+        /// out; <paramref name="isNameRaw"/> writes the name as the JSON given,
+        /// quotes included, rather than quoting it.
+        /// </summary>
+        private static string VersionFourText(string name, string avatarId, bool isHapticsOn, bool isNameRaw = false)
+        {
+            var text = VersionThreeText(Streak, BestStreak, Position, Clocks, Rockets, Brooms)
+                .Replace($"\"formatVersion\":{VersionThree}", $"\"formatVersion\":{VersionFour}")
+                .TrimEnd('}');
+            if (name != null)
+            {
+                text += isNameRaw ? $",\"playerName\":{name}" : $",\"playerName\":\"{name}\"";
+            }
+
+            if (avatarId != null)
+            {
+                text += $",\"avatarId\":\"{avatarId}\"";
+            }
+
+            return text + (isHapticsOn ? ",\"hapticsOn\":true}" : ",\"hapticsOn\":false}");
+        }
+
+        /// <summary>A save of <paramref name="version"/>, 1 to 3, with level 1 completed and sound off.</summary>
+        private static string OlderText(int version)
+        {
+            var text = version == VersionOne
+                ? $"{{\"formatVersion\":{VersionOne},\"completedLevelIds\":[1],\"soundOn\":true}}"
+                : version == VersionTwo
+                    ? VersionTwoText(Gold, LifetimeGold, SomeLives, SomeTicks)
+                    : VersionThreeText(Streak, BestStreak, Position, Clocks, Rockets, Brooms);
+            return text.Replace("\"soundOn\":true", "\"soundOn\":false");
+        }
     }
 }
