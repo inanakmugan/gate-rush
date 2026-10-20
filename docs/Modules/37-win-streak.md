@@ -195,3 +195,37 @@ screen, is not.
 - Past 10 wins the bar stays full, the number keeps counting, and no
   reward is announced.
 - The layout holds on a tall phone and in the web build's window.
+
+---
+
+## Resolved during implementation
+
+- **Announcing rewards.** The player usually presses Next on the result
+  panel and goes straight to the next level, so dropping an unannounced
+  reward when a level loads would have hidden most of them. The bootstrap
+  keeps every reward a campaign win gave, across levels and restarts,
+  with the latest rewarded streak, and announces them all once when Home
+  is next shown; the list is emptied first, so nothing is announced
+  twice. Only closing the game loses the announcement, never the jokers.
+  In the campaign-done case the announcement follows the notice, which
+  closes every overlay.
+- **Merging.** The Streak Reward overlay merges the rewards by joker kind
+  in Clock, Rocket, Broom order (`StreakPrizes`), so two Clocks read "+2
+  Clock"; the headline uses the latest rewarded streak. The panel is
+  taller than planned so all three kinds fit above Collect.
+- **The bar.** `StreakProgress` gives the fill, the next reward, the wins
+  to it and every marker's state from one call, so the checks and the
+  fill always agree. Markers sit at their wins' share of the bar; a custom
+  table with two thresholds one win apart would overlap them. One win to
+  go has its own format ("1 more win: Rocket"). With an empty table the
+  line is empty.
+- **Joker icons** live in a `JokerIcons` asset in `Runtime`, read by the
+  Store and the streak screens, and later by 6.6's joker bar. The joker
+  names are `UiConfig` fields, so the Store's cards take them from there.
+- **The builder** writes sixteen prefabs and places the Streak Bar under
+  the Home Page instance's Streak Area in Front End as an added object;
+  Home Page's own file is never written. The scroll views share one
+  helper.
+- **UiConfig.asset** reads "Streak: {0}" and "Best: {0}"; the code's
+  defaults are without the colon.
+- **Tests.** 100 new; 2,270 in all.
