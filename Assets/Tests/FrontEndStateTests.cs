@@ -7,14 +7,15 @@ using NUnit.Framework;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers Modules 35 and 36's <see cref="FrontEndState.Of"/>, the one
+    /// Covers Modules 35, 36 and 37's <see cref="FrontEndState.Of"/>, the one
     /// place the front end's numbers are read: the gold, the lives and the cap
     /// from the save at the time given, with no wait when full; the campaign
     /// level's 1-based number, null past the last level and with no usable
     /// order; whether the lives are full, whatever the balance; the level list
     /// with its marks; the jokers' counts and prices; and the gold offers,
     /// only packs both sides know, in the rules' order with the service's
-    /// price text.
+    /// price text; the win streak and its best from the save, and the reward
+    /// table from the rules.
     /// </summary>
     /// <remarks>
     /// The rules are <see cref="MetaRulesFixture"/>'s, unlike a fresh config,
@@ -72,6 +73,27 @@ namespace GateRush.Tests
             var state = FrontEndState.Of(meta, rules, twoIntervalsLater, Catalog(), true, Products());
 
             Assert.AreEqual(3, state.Lives);
+        }
+
+        [Test]
+        public void Of_SaveStreak_StreakAndBestComeFromIt()
+        {
+            var meta = MetaWithStreak(new WinStreak(4, 9));
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(4, state.Streak);
+            Assert.AreEqual(9, state.BestStreak);
+        }
+
+        [Test]
+        public void Of_Rules_StreakRewardsAreTheRulesTableInOrder()
+        {
+            var meta = Meta(Gold, SomeLives);
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            CollectionAssert.AreEqual(rules.StreakRewards, state.StreakRewards);
         }
 
         [Test]
@@ -296,6 +318,20 @@ namespace GateRush.Tests
                 jokers ?? new JokerInventory(0, 0, 0),
                 new WinStreak(0, 0),
                 new CampaignProgress(position));
+            return new MetaGame(save, rules, new ManualClock(Noon));
+        }
+
+        /// <summary>A meta game over a save with <paramref name="streak"/> and otherwise what <see cref="Meta"/> gives by default.</summary>
+        private MetaGame MetaWithStreak(WinStreak streak)
+        {
+            var save = new SaveData(
+                CompletedLevels.Of(Array.Empty<int>()),
+                new SoundSetting(),
+                new Wallet(Gold, 0),
+                new Lives(rules, SomeLives, Noon),
+                new JokerInventory(0, 0, 0),
+                streak,
+                new CampaignProgress(0));
             return new MetaGame(save, rules, new ManualClock(Noon));
         }
     }

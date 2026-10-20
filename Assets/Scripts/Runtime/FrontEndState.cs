@@ -6,7 +6,7 @@ using GateRush.Platform;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Everything the front end shows (Modules 35 and 36): plain numbers read
+    /// Everything the front end shows (Modules 35, 36 and 37): plain numbers read
     /// once from the save, the rules and the purchase service's products by
     /// <see cref="Of"/>, so the screens hold no rule and every number on them
     /// comes from here.
@@ -35,7 +35,10 @@ namespace GateRush.Runtime
             IReadOnlyList<LevelEntry> levels,
             JokerAmounts jokerCounts,
             JokerAmounts jokerPrices,
-            IReadOnlyList<GoldOffer> goldOffers)
+            IReadOnlyList<GoldOffer> goldOffers,
+            int streak,
+            int bestStreak,
+            IReadOnlyList<StreakReward> streakRewards)
         {
             Gold = gold;
             Lives = lives;
@@ -49,6 +52,9 @@ namespace GateRush.Runtime
             this.jokerCounts = jokerCounts;
             this.jokerPrices = jokerPrices;
             GoldOffers = goldOffers;
+            Streak = streak;
+            BestStreak = bestStreak;
+            StreakRewards = streakRewards;
         }
 
         /// <summary>The gold balance.</summary>
@@ -95,6 +101,19 @@ namespace GateRush.Runtime
         /// </summary>
         public IReadOnlyList<GoldOffer> GoldOffers { get; }
 
+        /// <summary>The campaign wins in a row since the last campaign loss (D61).</summary>
+        public int Streak { get; }
+
+        /// <summary>The highest the streak has reached; never below <see cref="Streak"/>.</summary>
+        public int BestStreak { get; }
+
+        /// <summary>
+        /// The win streak's reward table (D61), the rules' own, in order of
+        /// ascending wins; may be empty. Never null for a state built by
+        /// <see cref="Of"/>.
+        /// </summary>
+        public IReadOnlyList<StreakReward> StreakRewards { get; }
+
         /// <summary>How many of <paramref name="kind"/> the campaign's inventory holds.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
         public int JokerCount(JokerKind kind) => jokerCounts.Of(kind);
@@ -105,8 +124,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The front end's state at <paramref name="nowUtc"/>: the gold, the
-        /// lives and the jokers of <paramref name="meta"/>'s save; the cap, the
-        /// prices and the gold packs of <paramref name="rules"/> — the rules the
+        /// lives, the jokers and the win streak of <paramref name="meta"/>'s
+        /// save; the cap, the prices, the gold packs and the streak's reward
+        /// table of <paramref name="rules"/> — the rules the
         /// save was loaded with; the campaign level's number and the level
         /// list from <paramref name="catalog"/>, which may be null when the
         /// level order is unusable; <paramref name="isSoundOn"/>; and the gold
@@ -156,7 +176,10 @@ namespace GateRush.Runtime
                 LevelsOf(catalog, save.Completed),
                 new JokerAmounts(jokers.CountOf(JokerKind.Clock), jokers.CountOf(JokerKind.Rocket), jokers.CountOf(JokerKind.Broom)),
                 new JokerAmounts(rules.JokerPrice(JokerKind.Clock), rules.JokerPrice(JokerKind.Rocket), rules.JokerPrice(JokerKind.Broom)),
-                Runtime.GoldOffers.Match(rules.GoldPacks, products));
+                Runtime.GoldOffers.Match(rules.GoldPacks, products),
+                save.Streak.Current,
+                save.Streak.Best,
+                rules.StreakRewards);
         }
 
         /// <summary>
