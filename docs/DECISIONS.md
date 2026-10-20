@@ -2126,9 +2126,10 @@ backend plugs in, as `ISaveStore` and `IHaptics` already do.
   the screen.
 - Tests can give the screen any rows through a test implementation.
 
-**Rejected.** Invented players: dishonest. A real backend now (Firebase,
-PlayFab): a large detour, and awkward in a web build. A "Coming soon" tab:
-shows nothing of the architecture.
+**Rejected.** Invented players: dishonest (reversed by D73: labelled demo
+players). A real backend now (Firebase, PlayFab): a large detour, and
+awkward in a web build. A "Coming soon" tab: shows nothing of the
+architecture.
 
 ---
 
@@ -2200,5 +2201,35 @@ gold" message: shows nothing of the loop. A free gold gift in place of
 packs: a new rule that still would not show a purchase. A sheet that
 imitates Google Play or the App Store: it would look like a real charge.
 Counting bought gold in lifetime gold: the ranking could be bought.
+
+---
+
+## D73 — The first leaderboard ranks the player among labelled demo players
+
+**Decision.** The first `ILeaderboardService` (D70) is simulated: twenty
+demo players from configuration, each an invented name, an avatar and a
+lifetime gold score, with the player ranked among them on their own
+lifetime gold (D22). The Leaderboard page says "Demo players. The online
+leaderboard is not connected." in a line that is never hidden while the
+table is simulated. The demo scores spread from 40 to 980, so the
+campaign's 750 gold climbs most of the table but not to the top.
+
+**Why.** A table with one row shows almost nothing of the screen: no
+ranking, no scrolling, no highlighted row among others. The Store already
+simulates a real-money purchase under a label (D72); the leaderboard
+follows the same rule, simulated and said to be, so no one mistakes it
+for real players.
+
+**Consequences.**
+- D70's rejection of invented players is reversed for labelled demo
+  players only; the service interface and a real backend as a new
+  implementation stand.
+- Demo names are invented handles, never a real person's or brand's
+  name, and pass the player name rule (Module 38).
+- Bought gold never raises the player's rank (D22, D72).
+
+**Rejected.** Only the player's own row (D70's first form): an empty
+screen in a portfolio. Unlabelled demo players: they would pass for real
+ones. Demo scores that move over time: more invention for little gain.
 
 ---
