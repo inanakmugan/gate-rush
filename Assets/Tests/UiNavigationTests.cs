@@ -12,7 +12,8 @@ namespace GateRush.Tests
     /// <see cref="UiNavigation.Changed"/> is raised once per change and never
     /// when nothing changed. Module 36's Not Enough Gold, Message and Test
     /// Purchase overlays stack and close with Back like the others, and Get
-    /// Gold — selecting the Store — closes every overlay.
+    /// Gold — selecting the Store — closes every overlay. Module 37's Win
+    /// Streak and Streak Reward overlays stack and close with Back too.
     /// </summary>
     public class UiNavigationTests
     {
@@ -223,6 +224,37 @@ namespace GateRush.Tests
             Assert.AreEqual(UiTab.Store, navigation.Tab);
             Assert.AreEqual(0, navigation.Overlays.Count);
             Assert.AreEqual(1, changes);
+        }
+
+        [TestCase(UiOverlay.WinStreak)]
+        [TestCase(UiOverlay.StreakReward)]
+        public void Back_StreakOverlayOnHome_ClosesItBackToHome(UiOverlay overlay)
+        {
+            navigation.Open(overlay);
+            changes = 0;
+
+            var isBack = navigation.Back();
+
+            Assert.IsTrue(isBack);
+            Assert.AreEqual(0, navigation.Overlays.Count);
+            Assert.AreEqual(UiTab.Home, navigation.Tab);
+            Assert.AreEqual(1, changes);
+        }
+
+        [Test]
+        public void Back_StreakRewardOverWinStreak_ClosesTheRewardFirst()
+        {
+            navigation.Open(UiOverlay.WinStreak);
+            navigation.Open(UiOverlay.StreakReward);
+            var stacked = new[] { navigation.Overlays[0], navigation.Overlays[1] };
+
+            navigation.Back();
+            var afterFirst = new[] { navigation.Overlays[0] };
+            navigation.Back();
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.WinStreak, UiOverlay.StreakReward }, stacked);
+            CollectionAssert.AreEqual(new[] { UiOverlay.WinStreak }, afterFirst);
+            Assert.AreEqual(0, navigation.Overlays.Count);
         }
 
         [Test]

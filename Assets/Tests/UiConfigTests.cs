@@ -1,4 +1,5 @@
 using System;
+using GateRush.Meta;
 using GateRush.UI;
 using NUnit.Framework;
 using UnityEditor;
@@ -14,6 +15,8 @@ namespace GateRush.Tests
     /// colour is reported by its field's name; and each colour role reads its
     /// own field. Module 36's Store texts are checked the same way, and a
     /// ribbon with an empty or repeated id or an empty text is reported.
+    /// Module 37's win streak texts and Streak colour are checked the same
+    /// way, and each joker kind reads its own name.
     /// </summary>
     public class UiConfigTests
     {
@@ -61,6 +64,24 @@ namespace GateRush.Tests
         [TestCase("testPurchaseNote", "Test Purchase Note")]
         [TestCase("purchaseFailedTitle", "Purchase Failed Title")]
         [TestCase("purchaseFailedText", "Purchase Failed Text")]
+        [TestCase("streakCountFormat", "Streak Count Format")]
+        [TestCase("firstRewardFormat", "First Reward Format")]
+        [TestCase("moreWinsFormat", "More Wins Format")]
+        [TestCase("oneMoreWinFormat", "One More Win Format")]
+        [TestCase("allRewardsCollectedLabel", "All Rewards Collected Label")]
+        [TestCase("currentStreakFormat", "Current Streak Format")]
+        [TestCase("bestStreakFormat", "Best Streak Format")]
+        [TestCase("ladderWinsFormat", "Ladder Wins Format")]
+        [TestCase("ladderRewardFormat", "Ladder Reward Format")]
+        [TestCase("markerCountFormat", "Marker Count Format")]
+        [TestCase("collectedLabel", "Collected Label")]
+        [TestCase("nextLabel", "Next Label")]
+        [TestCase("streakRuleText", "Streak Rule Text")]
+        [TestCase("rewardHeadlineFormat", "Reward Headline Format")]
+        [TestCase("prizeFormat", "Prize Format")]
+        [TestCase("clockName", "Clock Name")]
+        [TestCase("rocketName", "Rocket Name")]
+        [TestCase("broomName", "Broom Name")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -83,6 +104,17 @@ namespace GateRush.Tests
         [TestCase("jokerCountFormat", "Joker Count Format", "You have {1}")]
         [TestCase("shortfallFormat", "Shortfall Format", "You need {1} more gold.")]
         [TestCase("testPurchaseOfferFormat", "Test Purchase Offer Format", "{0} gold for {2}")]
+        [TestCase("streakCountFormat", "Streak Count Format", "{1}")]
+        [TestCase("firstRewardFormat", "First Reward Format", "Win {0} in a row: {2}")]
+        [TestCase("moreWinsFormat", "More Wins Format", "{0} more wins: {2}")]
+        [TestCase("oneMoreWinFormat", "One More Win Format", "1 more win: {1}")]
+        [TestCase("currentStreakFormat", "Current Streak Format", "Streak {1}")]
+        [TestCase("bestStreakFormat", "Best Streak Format", "Best {1}")]
+        [TestCase("ladderWinsFormat", "Ladder Wins Format", "{1} wins")]
+        [TestCase("ladderRewardFormat", "Ladder Reward Format", "{0} x{2}")]
+        [TestCase("markerCountFormat", "Marker Count Format", "x{1}")]
+        [TestCase("rewardHeadlineFormat", "Reward Headline Format", "{1} wins in a row!")]
+        [TestCase("prizeFormat", "Prize Format", "+{0} {2}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -97,6 +129,7 @@ namespace GateRush.Tests
         [TestCase("idleTabIconColor", "Idle Tab Icon Color")]
         [TestCase("coinColor", "Coin Color")]
         [TestCase("heartColor", "Heart Color")]
+        [TestCase("streakColor", "Streak Color")]
         [TestCase("buttonLabelColor", "Button Label Color")]
         [TestCase("disabledButtonLabelColor", "Disabled Button Label Color")]
         public void Problems_TransparentColor_IsReportedByName(string field, string shownName)
@@ -113,6 +146,7 @@ namespace GateRush.Tests
         [TestCase(UiColorRole.IdleTabIcon, "idleTabIconColor")]
         [TestCase(UiColorRole.Coin, "coinColor")]
         [TestCase(UiColorRole.Heart, "heartColor")]
+        [TestCase(UiColorRole.Streak, "streakColor")]
         public void ColorOf_Role_IsItsOwnField(UiColorRole role, string field)
         {
             // A colour no default has, so a role reading another field fails.
@@ -128,6 +162,24 @@ namespace GateRush.Tests
         public void ColorOf_UndeclaredRole_Throws()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => config.ColorOf((UiColorRole)(-1)));
+        }
+
+        [TestCase(JokerKind.Clock, "clockName")]
+        [TestCase(JokerKind.Rocket, "rocketName")]
+        [TestCase(JokerKind.Broom, "broomName")]
+        public void JokerName_Kind_IsItsOwnField(JokerKind kind, string field)
+        {
+            SetString(field, "Marker");
+
+            var name = config.JokerName(kind);
+
+            Assert.AreEqual("Marker", name);
+        }
+
+        [Test]
+        public void JokerName_UndeclaredKind_Throws()
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => config.JokerName((JokerKind)(-1)));
         }
 
         [TestCase(" ", "Popular", "b", "Best", "Ribbons element 0: Product Id is empty", TestName = "Problems_RibbonWithEmptyId_IsReported")]

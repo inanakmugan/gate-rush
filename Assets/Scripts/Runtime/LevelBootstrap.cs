@@ -214,6 +214,13 @@ namespace GateRush.Runtime
         // after a free-play win, or when the win could not be reported.
         private int? campaignGoldEarned;
 
+        // The streak rewards campaign wins gave that Home has not announced
+        // yet, oldest first, and the streak of the latest of those wins
+        // (Module 37). Kept across levels, since Next goes straight on to the
+        // next level, and emptied only when Home announces them; never saved.
+        private readonly List<StreakReward> unannouncedRewards = new List<StreakReward>();
+        private int latestRewardedStreak;
+
         private bool hasLoggedPlayFallback;
 
         // What the meta lines last showed, so they are rebuilt only when it
@@ -534,7 +541,8 @@ namespace GateRush.Runtime
         /// tab closed during the exit animation keeps it. Either way the level
         /// is marked completed when the level order holds it. A campaign win
         /// is also reported with the level's gold reward (D58, D63), and the
-        /// mark and the gold go in one save; a free-play win saves only when
+        /// mark and the gold go in one save; the streak rewards it gave are
+        /// kept for Home to announce (Module 37). A free-play win saves only when
         /// the mark is news. A save that fails is logged and the game goes on;
         /// the win then lasts for this session.
         /// </summary>
@@ -549,7 +557,9 @@ namespace GateRush.Runtime
             {
                 try
                 {
-                    campaignGoldEarned = metaGame.ReportCampaignWin(ctx.GoldReward).GoldEarned;
+                    var win = metaGame.ReportCampaignWin(ctx.GoldReward);
+                    campaignGoldEarned = win.GoldEarned;
+                    KeepUnannouncedRewards(win);
                 }
                 catch (ArgumentOutOfRangeException e)
                 {
@@ -567,6 +577,40 @@ namespace GateRush.Runtime
             {
                 SaveOrWarn($"Level '{levelName}' is completed, but saving that failed; it is remembered until the game is closed.");
             }
+        }
+
+        /// <summary>
+        /// Keeps the streak rewards <paramref name="win"/> gave, if any, for
+        /// Home to announce (Module 37), with its streak as the latest
+        /// rewarded one. The jokers are already in the inventory.
+        /// </summary>
+        private void KeepUnannouncedRewards(CampaignWin win)
+        {
+            if (win.RewardsGiven.Count == 0)
+            {
+                return;
+            }
+
+            unannouncedRewards.AddRange(win.RewardsGiven);
+            latestRewardedStreak = win.Streak;
+        }
+
+        /// <summary>
+        /// Opens the Streak Reward overlay with every reward kept since the
+        /// last announcement, once; does nothing when none is kept. The list
+        /// is emptied before the front end is called, so a call that throws
+        /// never announces them twice. The front end must be open.
+        /// </summary>
+        private void AnnounceStreakRewards()
+        {
+            if (unannouncedRewards.Count == 0)
+            {
+                return;
+            }
+
+            var rewards = unannouncedRewards.ToArray();
+            unannouncedRewards.Clear();
+            frontEndView.ShowStreakReward(latestRewardedStreak, rewards);
         }
 
         /// <summary>
@@ -645,12 +689,23 @@ namespace GateRush.Runtime
             FrontEndState.Of(metaGame, metaRules, nowUtc, catalog, save.Sound.IsOn, purchases.Products);
 
         /// <summary>
-        /// Opens the front end on Home over the background, with its state read
-        /// afresh: the gold, the lives, the campaign level and the level grid
-        /// with every level of the level order and its completed mark. With no
-        /// usable level order the grid is empty.
+        /// Opens Home (<see cref="OpenHome"/>) and announces the streak
+        /// rewards won since Home was last shown (Module 37).
         /// </summary>
         private void ShowHome()
+        {
+            OpenHome();
+            AnnounceStreakRewards();
+        }
+
+        /// <summary>
+        /// Opens the front end on Home over the background, with its state read
+        /// afresh: the gold, the lives, the campaign level, the win streak and
+        /// the level grid with every level of the level order and its
+        /// completed mark. With no usable level order the grid is empty.
+        /// Announces nothing; <see cref="ShowHome"/> does.
+        /// </summary>
+        private void OpenHome()
         {
             hudView.Hide();
             jokerBar.Hide();
@@ -748,12 +803,16 @@ namespace GateRush.Runtime
         {
             if (!CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out var campaignName))
             {
+                // The notice selects Home, which closes every overlay, so the
+                // streak rewards are announced after it.
                 if (!frontEndView.IsOpen)
                 {
-                    GoToMenu();
+                    LeaveLevel();
+                    OpenHome();
                 }
 
                 frontEndView.ShowNotice(config.CampaignDoneNotice);
+                AnnounceStreakRewards();
                 return;
             }
 

@@ -4,6 +4,7 @@
     "references": [
         "GateRush.UI",
         "GateRush.Runtime",
+        "GateRush.Meta",
         "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],

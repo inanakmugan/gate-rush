@@ -15,13 +15,15 @@ using Object = UnityEngine.Object;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Covers <see cref="UiPrefabBuilder"/> (Modules 35 and 36): the build
-    /// writes the ten prefabs and nothing else, the Front End it builds
+    /// Covers <see cref="UiPrefabBuilder"/> (Modules 35, 36 and 37): the build
+    /// writes the sixteen prefabs and nothing else, the Front End it builds
     /// reports no missing part, every overlay's, the Store's, its cards' and
     /// the Gold Pack Card's fields are wired, the hand-made parts stay linked
     /// to their prefabs and their files unwritten, every tinted graphic
     /// carries its UI Config colour, and the front end starts as
-    /// <see cref="FrontEnd.Show"/> leaves it.
+    /// <see cref="FrontEnd.Show"/> leaves it. The streak's parts are fully
+    /// wired, and the streak bar sits under the Home Page instance's Streak
+    /// Area as an object added to it, Home Page's own file unwritten.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -35,6 +37,11 @@ namespace GateRush.Tests
         private const string UiConfigPath = "Assets/Config/UiConfig.asset";
         private const string FrontEndName = "Front End";
         private const string GoldPackCardName = "Gold Pack Card";
+        private const string StreakMarkerName = "Streak Marker";
+        private const string StreakBarName = "Streak Bar";
+        private const string StreakLadderRowName = "Streak Ladder Row";
+        private const string StreakPrizeName = "Streak Prize";
+        private const string StreakAreaName = "Streak Area";
         private const string TintRoleField = "role";
         private const string TintTargetField = "target";
         private const float ExpectedScrollSensitivity = 20f;
@@ -42,7 +49,8 @@ namespace GateRush.Tests
         private static string[] OutputNames => new[]
         {
             GoldPackCardName, "Store Page", "Leaderboard Page", "Settings Overlay", "Levels Overlay", "Lives Overlay",
-            "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", FrontEndName
+            "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", StreakMarkerName, StreakBarName,
+            StreakLadderRowName, "Win Streak Overlay", StreakPrizeName, "Streak Reward Overlay", FrontEndName
         };
 
         private static string[] HandMadeNames => new[]
@@ -53,7 +61,8 @@ namespace GateRush.Tests
         private static Type[] OverlayTypes => new[]
         {
             typeof(SettingsOverlay), typeof(LevelsOverlay), typeof(LivesOverlay),
-            typeof(NotEnoughGoldOverlay), typeof(MessageOverlay), typeof(TestPurchaseOverlay)
+            typeof(NotEnoughGoldOverlay), typeof(MessageOverlay), typeof(TestPurchaseOverlay),
+            typeof(WinStreakOverlay), typeof(StreakRewardOverlay)
         };
 
         private string folder;
@@ -79,7 +88,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_IntoFolder_WritesExactlyTheTenPrefabs()
+        public void Build_IntoFolder_WritesExactlyTheSixteenPrefabs()
         {
             var names = AssetDatabase.FindAssets("t:Prefab", new[] { folder })
                 .Select(guid => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(guid)))
@@ -89,7 +98,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ExistingOutputs_AfterBuild_NamesAllTen()
+        public void ExistingOutputs_AfterBuild_NamesAllSixteen()
         {
             var existing = UiPrefabBuilder.ExistingOutputs(folder);
 
@@ -135,6 +144,10 @@ namespace GateRush.Tests
         [TestCase(typeof(MessageOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(StoreScreen), 11)]
+        [TestCase(typeof(WinStreakOverlay), 6)]
+        [TestCase(typeof(StreakRewardOverlay), 4)]
+        [TestCase(typeof(StreakBar), 6)]
+        [TestCase(typeof(FrontEnd), 16)]
         public void Build_View_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(FrontEndName).GetComponentInChildren(viewType, true);
@@ -162,6 +175,49 @@ namespace GateRush.Tests
             Assert.IsNotNull(card, nameof(GoldPackCard));
 
             AssertEveryReferenceAssigned(card, 5);
+        }
+
+        [TestCase(StreakMarkerName, typeof(StreakMarker), 4)]
+        [TestCase(StreakLadderRowName, typeof(StreakLadderRow), 4)]
+        [TestCase(StreakPrizeName, typeof(StreakPrize), 2)]
+        public void Build_StreakPartPrefab_EveryReferenceIsAssigned(string prefabName, Type viewType, int expectedFields)
+        {
+            var view = LoadBuilt(prefabName).GetComponent(viewType);
+            Assert.IsNotNull(view, viewType.Name);
+
+            AssertEveryReferenceAssigned(view, expectedFields);
+        }
+
+        [Test]
+        public void Build_StreakBar_IsAnObjectAddedToTheHomePageInstanceUnderItsStreakArea()
+        {
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{FrontEndName}.prefab");
+            try
+            {
+                var bar = contents.GetComponentInChildren<StreakBar>(true);
+                var home = contents.GetComponentInChildren<HomeScreen>(true);
+                Assert.IsNotNull(bar, nameof(StreakBar));
+                Assert.IsNotNull(home, nameof(HomeScreen));
+                var barRect = (RectTransform)bar.transform;
+
+                var added = PrefabUtility.GetAddedGameObjects(home.gameObject).Select(addition => addition.instanceGameObject);
+
+                Assert.AreEqual(StreakAreaName, barRect.parent.name);
+                Assert.AreEqual(home.transform, barRect.parent.parent, "the Streak Area is the Home Page instance's own");
+                CollectionAssert.Contains(added, bar.gameObject, "recorded as an object added to the Home Page instance");
+                Assert.AreEqual(
+                    $"{folder}/{StreakBarName}.prefab",
+                    AssetDatabase.GetAssetPath(PrefabUtility.GetCorrespondingObjectFromSource(bar.gameObject)),
+                    "a nested instance of the built Streak Bar");
+                Assert.AreEqual(Vector2.zero, barRect.anchorMin, "stretched to the Streak Area");
+                Assert.AreEqual(Vector2.one, barRect.anchorMax, "stretched to the Streak Area");
+                Assert.AreEqual(Vector2.zero, barRect.offsetMin, "stretched to the Streak Area");
+                Assert.AreEqual(Vector2.zero, barRect.offsetMax, "stretched to the Streak Area");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
         }
 
         [Test]
@@ -196,7 +252,7 @@ namespace GateRush.Tests
         {
             var scrollRects = LoadBuilt(FrontEndName).GetComponentsInChildren<ScrollRect>(true);
 
-            Assert.AreEqual(2, scrollRects.Length, "the Store page's and the Levels overlay's");
+            Assert.AreEqual(3, scrollRects.Length, "the Store page's, the Levels overlay's and the Win Streak overlay's");
             foreach (var scrollRect in scrollRects)
             {
                 Assert.AreEqual(ExpectedScrollSensitivity, scrollRect.scrollSensitivity, $"'{scrollRect.name}' scroll sensitivity");

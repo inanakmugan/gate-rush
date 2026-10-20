@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GateRush.Meta;
 using GateRush.Runtime;
 using TMPro;
 using UnityEditor;
@@ -14,10 +15,11 @@ namespace GateRush.UI.Editor
     /// <summary>
     /// <i>Gate Rush → Build UI Prefabs</i>: builds the prefabs the owner does
     /// not lay out by hand — Module 35's Store Page, Leaderboard Page,
-    /// Settings, Levels and Lives overlays and Front End, and Module 36's Gold
+    /// Settings, Levels and Lives overlays and Front End, Module 36's Gold
     /// Pack Card and Not Enough Gold, Message and Test Purchase overlays, with
-    /// the Store Page now holding the Store — from code, with every serialized
-    /// field wired.
+    /// the Store Page now holding the Store, and Module 37's Streak Marker,
+    /// Streak Bar, Streak Ladder Row, Win Streak Overlay, Streak Prize and
+    /// Streak Reward Overlay — from code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -39,6 +41,9 @@ namespace GateRush.UI.Editor
     /// <para>Texts the game sets from the UI Config are written with the
     /// config's values, for the same reason; texts it sets from the state
     /// are written with placeholders.</para>
+    /// <para><b>The streak bar sits inside Home Page without writing it.</b>
+    /// It is nested under the Home Page instance's Streak Area in Front End,
+    /// where it is recorded as an object added to that instance.</para>
     /// <para>Overwriting keeps each prefab's GUID, but the objects inside get
     /// new file IDs, so a scene reference into Front End is checked again
     /// after a rebuild.</para>
@@ -64,10 +69,13 @@ namespace GateRush.UI.Editor
         private const string CoinSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/token.png";
         private const string CoinStackSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/tokens_stack.png";
 
-        // The joker icons: stand-ins until 6.6.
-        private const string ClockSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/hourglass.png";
-        private const string RocketSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/exploding.png";
-        private const string BroomSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/arrow_horizontal.png";
+        private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
+        private const string FireSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/fire.png";
+        private const string CheckSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/icon_checkmark.png";
+
+        // The streak bar's track and fill: near-white, so a tint shows true.
+        // Sliced, so it must have a border.
+        private const string BarSpritePath = "Assets/ThirdParty/Kenney/UIPack/Extra/input_rectangle.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -83,6 +91,9 @@ namespace GateRush.UI.Editor
         // The child of Button Round that the sound looks replace.
         private const string ButtonRoundIconName = "Icon";
 
+        // The child of Home Page the streak bar is placed under.
+        private const string StreakAreaName = "Streak Area";
+
         // Built prefabs.
         private const string GoldPackCardName = "Gold Pack Card";
         private const string StorePageName = "Store Page";
@@ -93,6 +104,12 @@ namespace GateRush.UI.Editor
         private const string NotEnoughGoldOverlayName = "Not Enough Gold Overlay";
         private const string MessageOverlayName = "Message Overlay";
         private const string TestPurchaseOverlayName = "Test Purchase Overlay";
+        private const string StreakMarkerName = "Streak Marker";
+        private const string StreakBarName = "Streak Bar";
+        private const string StreakLadderRowName = "Streak Ladder Row";
+        private const string WinStreakOverlayName = "Win Streak Overlay";
+        private const string StreakPrizeName = "Streak Prize";
+        private const string StreakRewardOverlayName = "Streak Reward Overlay";
         private const string FrontEndName = "Front End";
 
         // Child objects.
@@ -134,6 +151,24 @@ namespace GateRush.UI.Editor
         private const string ShortfallName = "Shortfall";
         private const string OfferName = "Offer";
         private const string NoteName = "Note";
+        private const string HighlightName = "Highlight";
+        private const string DiscName = "Disc";
+        private const string CountName = "Count";
+        private const string CheckName = "Check";
+        private const string FireName = "Fire";
+        private const string TrackName = "Track";
+        private const string FillName = "Fill";
+        private const string MarkersName = "Markers";
+        private const string LineName = "Line";
+        private const string WinsName = "Wins";
+        private const string RewardName = "Reward";
+        private const string StateName = "State";
+        private const string StreakName = "Streak";
+        private const string BestName = "Best";
+        private const string RuleName = "Rule";
+        private const string HeadlineName = "Headline";
+        private const string PrizesName = "Prizes";
+        private const string PrizeLabelName = "Label";
 
         // Texts. Labels the game overwrites from the state only show in the
         // Editor; those it sets from the UI Config are written from it.
@@ -148,14 +183,14 @@ namespace GateRush.UI.Editor
         private const string RefillText = "Refill";
         private const string LivesPlaceholder = "5/5";
         private const string StatusPlaceholder = "Full";
-        private const string ClockText = "Clock";
-        private const string RocketText = "Rocket";
-        private const string BroomText = "Broom";
         private const string RefillLivesText = "Refill Lives";
         private const string GetGoldText = "Get Gold";
         private const string OkText = "OK";
         private const string BuyText = "Buy";
         private const string CancelText = "Cancel";
+        private const string WinStreakTitle = "Win Streak";
+        private const string StreakRewardTitle = "Streak Reward";
+        private const string CollectText = "Collect";
 
         // Placeholders for the Store's numbers, from the defaults of D72.
         private const int GoldPlaceholder = 1500;
@@ -166,6 +201,16 @@ namespace GateRush.UI.Editor
         private const string RibbonPlaceholder = "Popular";
         private const string ProductIdPlaceholder = "gold_medium";
 
+        // Placeholders for the win streak's numbers: the reward table of D61,
+        // a streak between its first two rewards, and a best above it.
+        private const int PlaceholderClockWins = 3;
+        private const int PlaceholderRocketWins = 5;
+        private const int PlaceholderBroomWins = 10;
+        private const int PlaceholderRewardCount = 1;
+        private const int PlaceholderMarkerCount = 2;
+        private const int StreakPlaceholder = 4;
+        private const int BestStreakPlaceholder = 7;
+
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
         private const string OverlayTextColorHex = "#3B2466";
@@ -175,6 +220,10 @@ namespace GateRush.UI.Editor
         private const string ScrimColorHex = "#000000";
         private const byte ScrimAlpha = 153;
         private const string ViewportColorHex = "#FFFFFF00";
+        private const string PanelColorHex = "#FFFFFF";
+
+        // The streak bar's track: a dark tint of the theme's purple.
+        private const string StreakTrackColorHex = "#2E1A52";
 
         // Anchor and pivot coordinates: a parent's low edge, middle and high edge.
         private const float AnchorLow = 0f;
@@ -283,6 +332,86 @@ namespace GateRush.UI.Editor
         private const float SheetButtonHeight = 140f;
         private const float SheetButtonOffsetX = 200f;
 
+        // Streak Marker, centred on the bar's track at its reward's place.
+        private const float MarkerSize = 84f;
+        private const float MarkerHighlightOutset = 8f;
+        private const float MarkerIconSize = 56f;
+        private const float MarkerCountWidth = 56f;
+        private const float MarkerCountHeight = 34f;
+        private const float MarkerCountFontSize = 30f;
+        private const float CheckWidth = 40f;
+        private const float CheckHeight = 36f;
+        private const float CheckOffset = 14f;
+
+        // Streak Bar. Front End stretches it to Home Page's Streak Area; this
+        // size is the area's at the reference resolution, for the Editor. The
+        // track's right inset leaves room for half of the last marker.
+        private const float StreakBarPreviewWidth = 1000f;
+        private const float StreakBarPreviewHeight = 200f;
+        private const float FireInset = 20f;
+        private const float FireSize = 110f;
+        private const float StreakCountLeft = 140f;
+        private const float StreakCountWidth = 80f;
+        private const float StreakCountFontSize = 64f;
+        private const float TrackLeft = 240f;
+        private const float TrackRight = 70f;
+        private const float TrackRaise = 30f;
+        private const float TrackHeight = 36f;
+        private const float LineLeft = 240f;
+        private const float LineRight = 20f;
+        private const float LineBottom = 10f;
+        private const float LineHeight = 56f;
+        private const float LineFontSize = 40f;
+
+        // Streak Ladder Row. Its width is the ladder's; this one is the
+        // prefab's own, for the Editor.
+        private const float LadderRowPreviewWidth = 780f;
+        private const float LadderRowHeight = 140f;
+        private const float LadderWinsLeft = 30f;
+        private const float LadderWinsWidth = 200f;
+        private const float LadderIconLeft = 240f;
+        private const float LadderIconSize = 90f;
+        private const float LadderRewardLeft = 350f;
+        private const float LadderRewardRight = 230f;
+        private const float LadderStateInset = 30f;
+        private const float LadderStateWidth = 200f;
+        private const float LadderFontSize = 48f;
+        private const float LadderStateFontSize = 44f;
+
+        // Win Streak overlay.
+        private const float WinStreakPanelWidth = 900f;
+        private const float WinStreakPanelHeight = 1300f;
+        private const float StreakLinePosY = -160f;
+        private const float StreakLineHeight = 80f;
+        private const float StreakLineFontSize = 56f;
+        private const float LadderTop = 270f;
+        private const float LadderBottom = 300f;
+        private const float LadderSpacing = 20f;
+        private const float RulePosY = 60f;
+        private const float RuleHeight = 220f;
+        private const float RuleFontSize = 40f;
+
+        // Streak Prize. Its width is the column's; this one is the prefab's
+        // own, for the Editor.
+        private const float PrizePreviewWidth = 700f;
+        private const float PrizeHeight = 110f;
+        private const float PrizeIconLeft = 120f;
+        private const float PrizeIconSize = 90f;
+        private const float PrizeLabelLeft = 230f;
+        private const float PrizeLabelRight = 40f;
+        private const float PrizeFontSize = 56f;
+
+        // Streak Reward overlay: tall enough for one line per joker kind
+        // between the headline and Collect.
+        private const float StreakRewardPanelWidth = 820f;
+        private const float StreakRewardPanelHeight = 1040f;
+        private const float RewardFireSize = 140f;
+        private const float RewardFirePosY = -140f;
+        private const float HeadlinePosY = -300f;
+        private const float HeadlineHeight = 90f;
+        private const float HeadlineFontSize = 56f;
+        private const float PrizesPosY = -410f;
+
         // The bar heights the layout was planned with. The build uses the
         // heights on the prefabs and only warns when they differ.
         private const float ExpectedTopBarHeight = 160f;
@@ -340,6 +469,32 @@ namespace GateRush.UI.Editor
         private const string OfferLabelField = "offerLabel";
         private const string NoteLabelField = "noteLabel";
         private const string CancelButtonField = "cancelButton";
+        private const string IconField = "icon";
+        private const string CountLabelField = "countLabel";
+        private const string CheckField = "check";
+        private const string HighlightField = "highlight";
+        private const string ButtonField = "button";
+        private const string StreakLabelField = "streakLabel";
+        private const string FillField = "fill";
+        private const string MarkersField = "markers";
+        private const string MarkerPrefabField = "markerPrefab";
+        private const string LineLabelField = "lineLabel";
+        private const string WinsLabelField = "winsLabel";
+        private const string RewardLabelField = "rewardLabel";
+        private const string StateLabelField = "stateLabel";
+        private const string BestLabelField = "bestLabel";
+        private const string RowsField = "rows";
+        private const string RowPrefabField = "rowPrefab";
+        private const string RuleLabelField = "ruleLabel";
+        private const string LabelField = "label";
+        private const string HeadlineLabelField = "headlineLabel";
+        private const string PrizesField = "prizes";
+        private const string PrizePrefabField = "prizePrefab";
+        private const string CollectButtonField = "collectButton";
+        private const string WinStreakField = "winStreak";
+        private const string StreakRewardField = "streakReward";
+        private const string StreakBarField = "streakBar";
+        private const string JokerIconsField = "jokerIcons";
 
         // The overwrite prompt.
         private const string DialogTitle = "Build UI Prefabs";
@@ -393,7 +548,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Builds the ten prefabs into <paramref name="outputFolder"/>,
+        /// Builds the sixteen prefabs into <paramref name="outputFolder"/>,
         /// overwriting any already there without asking. The hand-made
         /// prefabs are read from <see cref="HandMadeFolder"/>.
         /// </summary>
@@ -419,8 +574,14 @@ namespace GateRush.UI.Editor
                 var notEnoughGold = Save(BuildNotEnoughGoldOverlay(scene, sources), sources, outputFolder);
                 var message = Save(BuildMessageOverlay(scene, sources), sources, outputFolder);
                 var testPurchase = Save(BuildTestPurchaseOverlay(scene, sources), sources, outputFolder);
-                var overlays = new OverlayAssets(settings, levels, lives, notEnoughGold, message, testPurchase);
-                Save(BuildFrontEnd(scene, sources, storePage, leaderboardPage, overlays), sources, outputFolder);
+                var streakMarker = Save(BuildStreakMarker(scene, sources), sources, outputFolder);
+                var streakBar = Save(BuildStreakBar(scene, sources, streakMarker), sources, outputFolder);
+                var ladderRow = Save(BuildStreakLadderRow(scene, sources), sources, outputFolder);
+                var winStreak = Save(BuildWinStreakOverlay(scene, sources, ladderRow), sources, outputFolder);
+                var streakPrize = Save(BuildStreakPrize(scene, sources), sources, outputFolder);
+                var streakReward = Save(BuildStreakRewardOverlay(scene, sources, streakPrize), sources, outputFolder);
+                var overlays = new OverlayAssets(settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward);
+                Save(BuildFrontEnd(scene, sources, storePage, leaderboardPage, streakBar, overlays), sources, outputFolder);
             }
             finally
             {
@@ -431,7 +592,8 @@ namespace GateRush.UI.Editor
         private static string[] OutputNames() => new[]
         {
             GoldPackCardName, StorePageName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
-            NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, FrontEndName
+            NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
+            StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, FrontEndName
         };
 
         private static string PrefabPath(string folder, string name) => $"{folder}/{name}{PrefabExtension}";
@@ -501,14 +663,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(scroll);
             scroll.offsetMax = new Vector2(0f, PageTitlePosY - PageTitleHeight);
 
-            // RectMask2D clips; the clear image catches drags that start
-            // between cards, so the whole viewport scrolls.
-            var viewport = UiBuilder.CreateRect(ViewportName, scroll);
-            UiBuilder.Stretch(viewport);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            var viewportImage = viewport.gameObject.AddComponent<Image>();
-            viewportImage.color = ParseColor(ViewportColorHex);
-            viewportImage.raycastTarget = true;
+            var viewport = AddViewport(scroll);
 
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, StoreSideInset, 0f, 0f);
@@ -525,9 +680,9 @@ namespace GateRush.UI.Editor
             var jokersHeader = AddSectionLine(content, sources, JokersHeaderName, config.JokersHeader, SectionHeaderHeight, SectionHeaderFontSize, false);
             var jokerSub = StoreTexts.JokerCount(CountPlaceholder, config);
             var jokerPrice = StoreTexts.GoldPrice(PricePlaceholder, config);
-            var clock = BuildItemCard(content, sources, ClockCardName, sources.Clock, OverlayTextColorHex, null, ClockText, jokerSub, jokerPrice);
-            var rocket = BuildItemCard(content, sources, RocketCardName, sources.Rocket, OverlayTextColorHex, null, RocketText, jokerSub, jokerPrice);
-            var broom = BuildItemCard(content, sources, BroomCardName, sources.Broom, OverlayTextColorHex, null, BroomText, jokerSub, jokerPrice);
+            var clock = BuildJokerCard(content, sources, ClockCardName, JokerKind.Clock, jokerSub, jokerPrice);
+            var rocket = BuildJokerCard(content, sources, RocketCardName, JokerKind.Rocket, jokerSub, jokerPrice);
+            var broom = BuildJokerCard(content, sources, BroomCardName, JokerKind.Broom, jokerSub, jokerPrice);
 
             var livesHeader = AddSectionLine(content, sources, LivesHeaderName, config.LivesHeader, SectionHeaderHeight, SectionHeaderFontSize, false);
             var livesCard = BuildItemCard(
@@ -536,12 +691,7 @@ namespace GateRush.UI.Editor
 
             var note = AddSectionLine(content, sources, TestStoreNoteName, config.TestStoreNote, TestStoreNoteHeight, TestStoreNoteFontSize, true);
 
-            var scrollRect = scroll.gameObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.scrollSensitivity = ScrollSensitivity;
-            scrollRect.viewport = viewport;
-            scrollRect.content = content;
+            var scrollRect = AddVerticalScroll(scroll, viewport, content);
 
             var screen = root.AddComponent<StoreScreen>();
             SetReferences(
@@ -558,6 +708,15 @@ namespace GateRush.UI.Editor
                 (BroomCardField, broom),
                 (LivesCardField, livesCard));
             return root;
+        }
+
+        /// <summary>A joker's Store card, with the icon from the Joker Icons asset and the name from the UI Config.</summary>
+        private static StoreItemCard BuildJokerCard(
+            RectTransform parent, Sources sources, string name, JokerKind kind, string subText, string priceText)
+        {
+            return BuildItemCard(
+                parent, sources, name, sources.JokerIcons.IconOf(kind), OverlayTextColorHex, null,
+                sources.Config.JokerName(kind), subText, priceText);
         }
 
         /// <summary>
@@ -663,14 +822,7 @@ namespace GateRush.UI.Editor
             scroll.offsetMin = new Vector2(ScrollInset, ScrollInset);
             scroll.offsetMax = new Vector2(-ScrollInset, -ScrollTop);
 
-            // RectMask2D clips; the clear image only catches drags that start
-            // between buttons, so the whole viewport scrolls.
-            var viewport = UiBuilder.CreateRect(ViewportName, scroll);
-            UiBuilder.Stretch(viewport);
-            viewport.gameObject.AddComponent<RectMask2D>();
-            var viewportImage = viewport.gameObject.AddComponent<Image>();
-            viewportImage.color = ParseColor(ViewportColorHex);
-            viewportImage.raycastTarget = true;
+            var viewport = AddViewport(scroll);
 
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
@@ -698,12 +850,7 @@ namespace GateRush.UI.Editor
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            var scrollRect = scroll.gameObject.AddComponent<ScrollRect>();
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.scrollSensitivity = ScrollSensitivity;
-            scrollRect.viewport = viewport;
-            scrollRect.content = content;
+            var scrollRect = AddVerticalScroll(scroll, viewport, content);
 
             var overlay = frame.Root.AddComponent<LevelsOverlay>();
             SetReferences(
@@ -835,12 +982,285 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
+        /// One reward's marker on the streak bar, the prefab the bar
+        /// instantiates per reward: the highlight behind (shown on the next
+        /// reward), the disc, the joker's icon, its count and the check
+        /// (shown once reached). Centred, so the bar only moves its anchor.
+        /// </summary>
+        private static GameObject BuildStreakMarker(Scene scene, Sources sources)
+        {
+            var root = CreateRoot(StreakMarkerName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(MarkerSize, MarkerSize));
+
+            var highlight = UiBuilder.CreateRect(HighlightName, rect);
+            UiBuilder.Stretch(highlight);
+            highlight.offsetMin = new Vector2(-MarkerHighlightOutset, -MarkerHighlightOutset);
+            highlight.offsetMax = new Vector2(MarkerHighlightOutset, MarkerHighlightOutset);
+            var highlightImage = AddSliced(highlight, sources.Panel, PanelColorHex);
+            AddTint(highlight.gameObject, highlightImage, UiColorRole.Streak);
+            highlight.gameObject.SetActive(false);
+
+            var disc = UiBuilder.CreateRect(DiscName, rect);
+            UiBuilder.Stretch(disc);
+            AddSliced(disc, sources.Panel, PanelColorHex);
+
+            var icon = UiBuilder.CreateRect(IconName, rect);
+            UiBuilder.PlaceCentered(icon, new Vector2(MarkerIconSize, MarkerIconSize));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(JokerKind.Rocket), ParseColor(OverlayTextColorHex));
+
+            var count = UiBuilder.CreateRect(CountName, rect);
+            UiBuilder.Place(count, new Vector2(AnchorHigh, AnchorLow), Vector2.zero, new Vector2(MarkerCountWidth, MarkerCountHeight));
+            var countLabel = AddText(
+                count, sources, StreakTexts.MarkerCount(PlaceholderMarkerCount, sources.Config), MarkerCountFontSize, OverlayTextColorHex);
+
+            var check = UiBuilder.CreateRect(CheckName, rect);
+            UiBuilder.Place(check, new Vector2(AnchorHigh, AnchorHigh), new Vector2(CheckOffset, CheckOffset), new Vector2(CheckWidth, CheckHeight));
+            UiBuilder.AddIcon(check, sources.Check, ParseColor(IconColorHex));
+
+            var marker = root.AddComponent<StreakMarker>();
+            SetReferences(
+                marker,
+                (IconField, iconImage),
+                (CountLabelField, countLabel),
+                (CheckField, check.gameObject),
+                (HighlightField, highlight.gameObject));
+            return root;
+        }
+
+        /// <summary>
+        /// The streak bar on Home: one pressable panel holding the fire and
+        /// the streak, the track with its fill and the markers' layer, and the
+        /// line under it. The markers are created at runtime, one per reward.
+        /// </summary>
+        private static GameObject BuildStreakBar(Scene scene, Sources sources, GameObject markerAsset)
+        {
+            var config = sources.Config;
+            var placeholder = StreakProgress.Of(StreakPlaceholder, PlaceholderStreakRewards());
+            var root = CreateRoot(StreakBarName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(StreakBarPreviewWidth, StreakBarPreviewHeight));
+            var background = AddSliced(rect, sources.Panel, PanelColorHex);
+            background.raycastTarget = true;
+            var button = UiBuilder.AddButton(rect, background);
+
+            var fire = UiBuilder.CreateRect(FireName, rect);
+            UiBuilder.Place(fire, new Vector2(AnchorLow, AnchorMid), new Vector2(FireInset, 0f), new Vector2(FireSize, FireSize));
+            var fireImage = UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
+            AddTint(fire.gameObject, fireImage, UiColorRole.Streak);
+
+            var count = UiBuilder.CreateRect(CountName, rect);
+            UiBuilder.Place(count, new Vector2(AnchorLow, AnchorMid), new Vector2(StreakCountLeft, 0f), new Vector2(StreakCountWidth, FireSize));
+            var countLabel = AddText(count, sources, StreakTexts.StreakCount(StreakPlaceholder, config), StreakCountFontSize, OverlayTextColorHex);
+            countLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            // Across the panel between the insets, its middle raised above the panel's.
+            var track = UiBuilder.CreateRect(TrackName, rect);
+            track.anchorMin = new Vector2(AnchorLow, AnchorMid);
+            track.anchorMax = new Vector2(AnchorHigh, AnchorMid);
+            track.pivot = new Vector2(AnchorMid, AnchorMid);
+            track.offsetMin = new Vector2(TrackLeft, TrackRaise - TrackHeight / 2f);
+            track.offsetMax = new Vector2(-TrackRight, TrackRaise + TrackHeight / 2f);
+            AddSliced(track, sources.Bar, StreakTrackColorHex);
+
+            var fill = UiBuilder.CreateRect(FillName, track);
+            UiBuilder.SetAnchors(fill, new Vector2(AnchorLow, AnchorLow), new Vector2(placeholder.Fill, AnchorHigh));
+            var fillImage = AddSliced(fill, sources.Bar, PanelColorHex);
+            AddTint(fill.gameObject, fillImage, UiColorRole.Streak);
+
+            var markers = UiBuilder.CreateRect(MarkersName, track);
+            UiBuilder.Stretch(markers);
+
+            var line = UiBuilder.CreateRect(LineName, rect);
+            BottomStretch(line, 0f, LineBottom, LineHeight);
+            line.offsetMin = new Vector2(LineLeft, line.offsetMin.y);
+            line.offsetMax = new Vector2(-LineRight, line.offsetMax.y);
+            var lineLabel = AddText(line, sources, StreakTexts.BarLine(placeholder, config), LineFontSize, OverlayTextColorHex);
+            lineLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            var bar = root.AddComponent<StreakBar>();
+            SetReferences(
+                bar,
+                (ButtonField, button),
+                (StreakLabelField, countLabel),
+                (FillField, fill),
+                (MarkersField, markers),
+                (MarkerPrefabField, Single<StreakMarker>(markerAsset, StreakMarkerName)),
+                (LineLabelField, lineLabel));
+            return root;
+        }
+
+        /// <summary>One row of the Win Streak ladder: the wins, the joker's icon, the reward and its state.</summary>
+        private static GameObject BuildStreakLadderRow(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var reward = new StreakReward(PlaceholderClockWins, JokerKind.Clock, PlaceholderRewardCount);
+            var root = CreateRoot(StreakLadderRowName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(LadderRowPreviewWidth, LadderRowHeight));
+            AddSliced(rect, sources.Panel, PanelColorHex);
+            root.AddComponent<LayoutElement>().preferredHeight = LadderRowHeight;
+
+            var wins = UiBuilder.CreateRect(WinsName, rect);
+            UiBuilder.SetAnchors(wins, new Vector2(AnchorLow, AnchorLow), new Vector2(AnchorLow, AnchorHigh));
+            wins.offsetMin = new Vector2(LadderWinsLeft, 0f);
+            wins.offsetMax = new Vector2(LadderWinsLeft + LadderWinsWidth, 0f);
+            var winsLabel = AddText(wins, sources, StreakTexts.LadderWins(reward.Wins, config), LadderFontSize, OverlayTextColorHex);
+            winsLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            var icon = UiBuilder.CreateRect(IconName, rect);
+            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(LadderIconLeft, 0f), new Vector2(LadderIconSize, LadderIconSize));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(reward.Joker), ParseColor(OverlayTextColorHex));
+
+            var rewardLabel = AddBandText(
+                rect, sources, RewardName, LadderRewardLeft, LadderRewardRight, StreakTexts.LadderReward(reward, config), LadderFontSize);
+
+            var state = UiBuilder.CreateRect(StateName, rect);
+            UiBuilder.SetAnchors(state, new Vector2(AnchorHigh, AnchorLow), new Vector2(AnchorHigh, AnchorHigh));
+            state.offsetMin = new Vector2(-(LadderStateInset + LadderStateWidth), 0f);
+            state.offsetMax = new Vector2(-LadderStateInset, 0f);
+            var stateLabel = AddText(
+                state, sources, StreakTexts.LadderState(StreakRewardState.Next, config), LadderStateFontSize, OverlayTextColorHex);
+            stateLabel.alignment = TextAlignmentOptions.MidlineRight;
+
+            var row = root.AddComponent<StreakLadderRow>();
+            SetReferences(
+                row,
+                (WinsLabelField, winsLabel),
+                (IconField, iconImage),
+                (RewardLabelField, rewardLabel),
+                (StateLabelField, stateLabel));
+            return root;
+        }
+
+        /// <summary>
+        /// The Win Streak overlay: the current and best streaks side by side,
+        /// the ladder in a scroll view — its rows created at runtime, one per
+        /// reward — and the rule at the bottom.
+        /// </summary>
+        private static GameObject BuildWinStreakOverlay(Scene scene, Sources sources, GameObject rowAsset)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(scene, sources, WinStreakOverlayName, WinStreakTitle, WinStreakPanelWidth, WinStreakPanelHeight, true);
+
+            var streak = UiBuilder.CreateRect(StreakName, frame.Panel);
+            TopStretch(streak, 0f, StreakLinePosY, StreakLineHeight);
+            streak.anchorMax = new Vector2(AnchorMid, AnchorHigh);
+            var streakLabel = AddText(streak, sources, StreakTexts.CurrentStreak(StreakPlaceholder, config), StreakLineFontSize, OverlayTextColorHex);
+
+            var best = UiBuilder.CreateRect(BestName, frame.Panel);
+            TopStretch(best, 0f, StreakLinePosY, StreakLineHeight);
+            best.anchorMin = new Vector2(AnchorMid, AnchorHigh);
+            var bestLabel = AddText(best, sources, StreakTexts.BestStreak(BestStreakPlaceholder, config), StreakLineFontSize, OverlayTextColorHex);
+
+            var scroll = UiBuilder.CreateRect(ScrollViewName, frame.Panel);
+            UiBuilder.Stretch(scroll);
+            scroll.offsetMin = new Vector2(ScrollInset, LadderBottom);
+            scroll.offsetMax = new Vector2(-ScrollInset, -LadderTop);
+            var viewport = AddViewport(scroll);
+            var content = UiBuilder.CreateRect(ContentName, viewport);
+            TopStretch(content, 0f, 0f, 0f);
+            var layout = AddColumn(content);
+            layout.spacing = LadderSpacing;
+            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            AddVerticalScroll(scroll, viewport, content);
+
+            var rule = UiBuilder.CreateRect(RuleName, frame.Panel);
+            BottomStretch(rule, OverlayTextInset, RulePosY, RuleHeight);
+            var ruleLabel = AddWrappingText(rule, sources, config.StreakRuleText, RuleFontSize, OverlayTextColorHex);
+
+            var overlay = frame.Root.AddComponent<WinStreakOverlay>();
+            SetReferences(
+                overlay,
+                (CloseButtonField, frame.Close),
+                (StreakLabelField, streakLabel),
+                (BestLabelField, bestLabel),
+                (RowsField, content),
+                (RowPrefabField, Single<StreakLadderRow>(rowAsset, StreakLadderRowName)),
+                (RuleLabelField, ruleLabel));
+            return frame.Root;
+        }
+
+        /// <summary>One line of the Streak Reward overlay: a joker's icon and "+1 Rocket".</summary>
+        private static GameObject BuildStreakPrize(Scene scene, Sources sources)
+        {
+            var prize = new JokerPrize(JokerKind.Rocket, PlaceholderRewardCount);
+            var root = CreateRoot(StreakPrizeName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(PrizePreviewWidth, PrizeHeight));
+            root.AddComponent<LayoutElement>().preferredHeight = PrizeHeight;
+
+            var icon = UiBuilder.CreateRect(IconName, rect);
+            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(PrizeIconLeft, 0f), new Vector2(PrizeIconSize, PrizeIconSize));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(prize.Joker), ParseColor(OverlayTextColorHex));
+
+            var label = AddBandText(
+                rect, sources, PrizeLabelName, PrizeLabelLeft, PrizeLabelRight, StreakTexts.Prize(prize, sources.Config), PrizeFontSize);
+
+            var component = root.AddComponent<StreakPrize>();
+            SetReferences(component, (IconField, iconImage), (LabelField, label));
+            return root;
+        }
+
+        /// <summary>
+        /// The Streak Reward overlay: the fire, the headline, a column of
+        /// prize lines created at runtime, and Collect. No close button:
+        /// Collect is its one button, and Back closes it too.
+        /// </summary>
+        private static GameObject BuildStreakRewardOverlay(Scene scene, Sources sources, GameObject prizeAsset)
+        {
+            var frame = BuildOverlayFrame(
+                scene, sources, StreakRewardOverlayName, StreakRewardTitle, StreakRewardPanelWidth, StreakRewardPanelHeight, false);
+
+            var fire = UiBuilder.CreateRect(FireName, frame.Panel);
+            UiBuilder.Place(fire, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, RewardFirePosY), new Vector2(RewardFireSize, RewardFireSize));
+            var fireImage = UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
+            AddTint(fire.gameObject, fireImage, UiColorRole.Streak);
+
+            var headline = UiBuilder.CreateRect(HeadlineName, frame.Panel);
+            TopStretch(headline, OverlayTextInset, HeadlinePosY, HeadlineHeight);
+            var headlineLabel = AddText(
+                headline, sources, StreakTexts.RewardHeadline(PlaceholderRocketWins, sources.Config), HeadlineFontSize, OverlayTextColorHex);
+
+            var prizes = UiBuilder.CreateRect(PrizesName, frame.Panel);
+            TopStretch(prizes, OverlayTextInset, PrizesPosY, 0f);
+            AddColumn(prizes);
+            var fitter = prizes.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var collect = Nest(sources.ButtonPrimary, frame.Panel);
+            PlaceAtPanelBottom(collect);
+            SetNestedLabel(collect, CollectText);
+
+            var overlay = frame.Root.AddComponent<StreakRewardOverlay>();
+            SetReferences(
+                overlay,
+                (HeadlineLabelField, headlineLabel),
+                (PrizesField, prizes),
+                (PrizePrefabField, Single<StreakPrize>(prizeAsset, StreakPrizeName)),
+                (CollectButtonField, Single<Button>(collect.gameObject, ButtonPrimaryName)));
+            return frame.Root;
+        }
+
+        /// <summary>The reward table of D61, for the placeholders the streak's prefabs show in the Editor.</summary>
+        private static StreakReward[] PlaceholderStreakRewards() => new[]
+        {
+            new StreakReward(PlaceholderClockWins, JokerKind.Clock, PlaceholderRewardCount),
+            new StreakReward(PlaceholderRocketWins, JokerKind.Rocket, PlaceholderRewardCount),
+            new StreakReward(PlaceholderBroomWins, JokerKind.Broom, PlaceholderRewardCount)
+        };
+
+        /// <summary>
         /// The front end, set as <see cref="FrontEnd.Show"/> leaves it: Home
         /// shown, the other pages and every overlay hidden. Its root is saved
         /// inactive, so only <see cref="FrontEnd.Show"/> opens it.
         /// </summary>
         private static GameObject BuildFrontEnd(
-            Scene scene, Sources sources, GameObject storeAsset, GameObject leaderboardAsset, OverlayAssets overlayAssets)
+            Scene scene, Sources sources, GameObject storeAsset, GameObject leaderboardAsset, GameObject streakBarAsset,
+            OverlayAssets overlayAssets)
         {
             var topBarHeight = ((RectTransform)sources.TopBar.transform).sizeDelta.y;
             var tabBarHeight = ((RectTransform)sources.TabBar.transform).sizeDelta.y;
@@ -867,6 +1287,18 @@ namespace GateRush.UI.Editor
             var home = NestStretched(sources.HomePage, pages, true);
             var leaderboard = NestStretched(leaderboardAsset, pages, false);
 
+            // Added to the Home Page instance, which stays linked; its own file
+            // is never written.
+            var streakArea = home.Find(StreakAreaName) as RectTransform;
+            if (streakArea == null)
+            {
+                throw new InvalidOperationException($"{HomePageName} has no child '{StreakAreaName}' for the streak bar.");
+            }
+
+            var streakBar = Nest(streakBarAsset, streakArea);
+            UiBuilder.Stretch(streakBar);
+            Record(streakBar);
+
             var topBar = Nest(sources.TopBar, safe);
             TopStretch(topBar, 0f, 0f, topBarHeight);
             Record(topBar);
@@ -888,6 +1320,8 @@ namespace GateRush.UI.Editor
             var notEnoughGold = NestStretched(overlayAssets.NotEnoughGold, overlays, false);
             var message = NestStretched(overlayAssets.Message, overlays, false);
             var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
+            var winStreak = NestStretched(overlayAssets.WinStreak, overlays, false);
+            var streakReward = NestStretched(overlayAssets.StreakReward, overlays, false);
 
             var frontEnd = root.AddComponent<FrontEnd>();
             SetReferences(
@@ -903,7 +1337,11 @@ namespace GateRush.UI.Editor
                 (LivesField, Single<LivesOverlay>(lives.gameObject, LivesOverlayName)),
                 (NotEnoughGoldField, Single<NotEnoughGoldOverlay>(notEnoughGold.gameObject, NotEnoughGoldOverlayName)),
                 (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)),
-                (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)));
+                (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
+                (WinStreakField, Single<WinStreakOverlay>(winStreak.gameObject, WinStreakOverlayName)),
+                (StreakRewardField, Single<StreakRewardOverlay>(streakReward.gameObject, StreakRewardOverlayName)),
+                (StreakBarField, Single<StreakBar>(streakBar.gameObject, StreakBarName)),
+                (JokerIconsField, sources.JokerIcons));
 
             root.SetActive(false);
             return root;
@@ -1088,6 +1526,78 @@ namespace GateRush.UI.Editor
             rect.offsetMax = new Vector2(-CardTextRight, 0f);
         }
 
+        /// <summary>
+        /// A scroll view's viewport, filling <paramref name="scroll"/>:
+        /// RectMask2D clips, and the clear image catches drags that start
+        /// between the items, so the whole viewport scrolls.
+        /// </summary>
+        private static RectTransform AddViewport(RectTransform scroll)
+        {
+            var viewport = UiBuilder.CreateRect(ViewportName, scroll);
+            UiBuilder.Stretch(viewport);
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var viewportImage = viewport.gameObject.AddComponent<Image>();
+            viewportImage.color = ParseColor(ViewportColorHex);
+            viewportImage.raycastTarget = true;
+            return viewport;
+        }
+
+        /// <summary>A vertical Scroll Rect on <paramref name="scroll"/> at the builder's scroll sensitivity.</summary>
+        private static ScrollRect AddVerticalScroll(RectTransform scroll, RectTransform viewport, RectTransform content)
+        {
+            var scrollRect = scroll.gameObject.AddComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.scrollSensitivity = ScrollSensitivity;
+            scrollRect.viewport = viewport;
+            scrollRect.content = content;
+            return scrollRect;
+        }
+
+        /// <summary>A 9-sliced <paramref name="sprite"/> on <paramref name="rect"/> in <paramref name="colorHex"/>; not a raycast target.</summary>
+        private static Image AddSliced(RectTransform rect, Sprite sprite, string colorHex)
+        {
+            var image = rect.gameObject.AddComponent<Image>();
+            image.sprite = sprite;
+            image.type = Image.Type.Sliced;
+            image.color = ParseColor(colorHex);
+            image.raycastTarget = false;
+            return image;
+        }
+
+        /// <summary>Spans <paramref name="rect"/> over its parent's full height, from <paramref name="left"/> to <paramref name="right"/> in from its sides.</summary>
+        private static void HorizontalBand(RectTransform rect, float left, float right)
+        {
+            UiBuilder.Stretch(rect);
+            rect.offsetMin = new Vector2(left, 0f);
+            rect.offsetMax = new Vector2(-right, 0f);
+        }
+
+        /// <summary>Anchors <paramref name="rect"/> across its parent's bottom edge, <paramref name="inset"/> in from both sides.</summary>
+        private static void BottomStretch(RectTransform rect, float inset, float posY, float height)
+        {
+            rect.anchorMin = new Vector2(AnchorLow, AnchorLow);
+            rect.anchorMax = new Vector2(AnchorHigh, AnchorLow);
+            rect.pivot = new Vector2(AnchorMid, AnchorLow);
+            rect.anchoredPosition = new Vector2(0f, posY);
+            rect.sizeDelta = new Vector2(-(inset + inset), height);
+        }
+
+        /// <summary>
+        /// A one-line label, left-aligned, in a band over the full height of
+        /// <paramref name="parent"/>, from <paramref name="left"/> to
+        /// <paramref name="right"/> in from its sides.
+        /// </summary>
+        private static TextMeshProUGUI AddBandText(
+            RectTransform parent, Sources sources, string name, float left, float right, string text, float fontSize)
+        {
+            var rect = UiBuilder.CreateRect(name, parent);
+            HorizontalBand(rect, left, right);
+            var label = AddText(rect, sources, text, fontSize, OverlayTextColorHex);
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+            return label;
+        }
+
         /// <summary>A vertical layout that sizes its children to its width and to their preferred heights.</summary>
         private static VerticalLayoutGroup AddColumn(RectTransform rect)
         {
@@ -1246,6 +1756,50 @@ namespace GateRush.UI.Editor
             return sprites[0];
         }
 
+        /// <summary>A sprite drawn 9-sliced: it must import as one sprite, with a border.</summary>
+        private static Sprite LoadSlicedSprite(string path)
+        {
+            var sprite = LoadSprite(path);
+            if (sprite.border == Vector4.zero)
+            {
+                throw new InvalidOperationException(
+                    $"{path} is drawn 9-sliced, so it needs a border (Sprite Editor: Border); it has none. Nothing was written.");
+            }
+
+            return sprite;
+        }
+
+        private static JokerIcons LoadJokerIcons()
+        {
+            var icons = AssetDatabase.LoadAssetAtPath<JokerIcons>(JokerIconsPath);
+            if (icons == null)
+            {
+                throw new InvalidOperationException(
+                    $"{JokerIconsPath} is missing (Create > Gate Rush > Joker Icons). Nothing was written.");
+            }
+
+            var problems = icons.Problems();
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException($"{JokerIconsPath} has problems: {string.Join(" ", problems)} Nothing was written.");
+            }
+
+            return icons;
+        }
+
+        /// <summary>Home Page, which must hold the Streak Area the streak bar is placed under.</summary>
+        private static GameObject LoadHomePage()
+        {
+            var homePage = LoadHandMade(HomePageName);
+            if (homePage.transform.Find(StreakAreaName) == null)
+            {
+                throw new InvalidOperationException(
+                    $"{HomePageName} has no child '{StreakAreaName}' for the streak bar. Nothing was written.");
+            }
+
+            return homePage;
+        }
+
         private static GameObject LoadHandMade(string name)
         {
             var path = PrefabPath(HandMadeFolder, name);
@@ -1276,7 +1830,8 @@ namespace GateRush.UI.Editor
         private readonly struct OverlayAssets
         {
             public OverlayAssets(
-                GameObject settings, GameObject levels, GameObject lives, GameObject notEnoughGold, GameObject message, GameObject testPurchase)
+                GameObject settings, GameObject levels, GameObject lives, GameObject notEnoughGold, GameObject message, GameObject testPurchase,
+                GameObject winStreak, GameObject streakReward)
             {
                 Settings = settings;
                 Levels = levels;
@@ -1284,6 +1839,8 @@ namespace GateRush.UI.Editor
                 NotEnoughGold = notEnoughGold;
                 Message = message;
                 TestPurchase = testPurchase;
+                WinStreak = winStreak;
+                StreakReward = streakReward;
             }
 
             public GameObject Settings { get; }
@@ -1292,6 +1849,8 @@ namespace GateRush.UI.Editor
             public GameObject NotEnoughGold { get; }
             public GameObject Message { get; }
             public GameObject TestPurchase { get; }
+            public GameObject WinStreak { get; }
+            public GameObject StreakReward { get; }
         }
 
         /// <summary>Every asset the build reads, loaded and checked before anything is written.</summary>
@@ -1307,9 +1866,10 @@ namespace GateRush.UI.Editor
             public Sprite Heart { get; private set; }
             public Sprite Coin { get; private set; }
             public Sprite CoinStack { get; private set; }
-            public Sprite Clock { get; private set; }
-            public Sprite Rocket { get; private set; }
-            public Sprite Broom { get; private set; }
+            public Sprite Fire { get; private set; }
+            public Sprite Check { get; private set; }
+            public Sprite Bar { get; private set; }
+            public JokerIcons JokerIcons { get; private set; }
             public GameObject ButtonClose { get; private set; }
             public GameObject ButtonPrimary { get; private set; }
             public GameObject ButtonRound { get; private set; }
@@ -1360,14 +1920,15 @@ namespace GateRush.UI.Editor
                     Heart = LoadSprite(HeartSpritePath),
                     Coin = LoadSprite(CoinSpritePath),
                     CoinStack = LoadSprite(CoinStackSpritePath),
-                    Clock = LoadSprite(ClockSpritePath),
-                    Rocket = LoadSprite(RocketSpritePath),
-                    Broom = LoadSprite(BroomSpritePath),
+                    Fire = LoadSprite(FireSpritePath),
+                    Check = LoadSprite(CheckSpritePath),
+                    Bar = LoadSlicedSprite(BarSpritePath),
+                    JokerIcons = LoadJokerIcons(),
                     ButtonClose = LoadHandMade(ButtonCloseName),
                     ButtonPrimary = buttonPrimary,
                     ButtonRound = LoadHandMade(ButtonRoundName),
                     ButtonSecondary = LoadHandMade(ButtonSecondaryName),
-                    HomePage = LoadHandMade(HomePageName),
+                    HomePage = LoadHomePage(),
                     TabBar = LoadHandMade(TabBarName),
                     TopBar = LoadHandMade(TopBarName),
                     LevelButton = Single<LevelButton>(LoadHandMade(LevelButtonName), LevelButtonName)

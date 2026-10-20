@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Meta;
 
 namespace GateRush.Runtime
@@ -97,6 +98,18 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentNullException"><paramref name="answer"/> is null.</exception>
         /// <exception cref="InvalidOperationException">The front end is not open, or a sheet is already waiting for its answer.</exception>
         void ConfirmTestPurchase(GoldOffer offer, Action<bool> answer);
+
+        /// <summary>
+        /// Opens the Streak Reward overlay over whatever is showing (Module
+        /// 37): the streak rewards campaign wins gave since the last
+        /// announcement, already in the inventory, merged by joker kind, under
+        /// a headline with <paramref name="latestStreak"/>, the streak of the
+        /// latest of those wins. Collect only closes it.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="rewards"/> is null.</exception>
+        /// <exception cref="ArgumentException"><paramref name="rewards"/> is empty: there is nothing to announce.</exception>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowStreakReward(int latestStreak, IReadOnlyList<StreakReward> rewards);
 
         /// <summary>Hides the front end. An open test purchase sheet is answered no.</summary>
         void Hide();
