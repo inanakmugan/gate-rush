@@ -306,7 +306,7 @@ insufficient-funds prompt routing to the store, quit-confirmation prompt.
 Meta is already tested by this point, so this phase is presentation only.
 
 Screens are uGUI prefabs in a `GateRush.UI` assembly, laid out after the
-reference game with CC0 art and an open font (D68, D69). Six modules (D68).
+reference game with CC0 art and an open font (D68, D69). Seven modules (D68, D74).
 Each spec is written when the module before it is merged.
 
 | # | Module | Spec | Status |
@@ -316,7 +316,8 @@ Each spec is written when the module before it is merged.
 | 6.3 | Win Streak: Home's progress bar and the ladder screen (D61) | `Modules/37-win-streak.md` | Done |
 | 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | `Modules/38-profile-settings.md` | Done |
 | 6.5 | Leaderboard behind `ILeaderboardService`, the player ranked among labelled demo players (D70, D73) | `Modules/39-leaderboard.md` | Done |
-| 6.6 | The level's interface in the new theme, as prefabs | — | Planned |
+| 6.6 | The level's HUD and joker bar as prefabs, and gold bought inside a level (D74) | `Modules/40-level-hud.md` | Planned |
+| 6.7 | The result panel, the leave and restart confirmation with the streak, and the introduction card in the new theme (D74) | — | Planned |
 
 ---
 

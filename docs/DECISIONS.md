@@ -2052,7 +2052,9 @@ merged:
 - 6.4 Profile and Settings (D71);
 - 6.5 the Leaderboard (D70);
 - 6.6 the level's own interface (HUD, joker bar, result panel,
-  confirmation, no-lives page) in the new theme, as prefabs.
+  confirmation, no-lives page) in the new theme, as prefabs. (D74 splits
+  it into 6.6 and 6.7; the no-lives page became the Lives overlay in
+  Module 35.)
 
 **Why.** Screens built from code were right for a prototype, but every
 layout tweak went through code and nothing could be seen in the Inspector.
@@ -2231,5 +2233,40 @@ for real players.
 **Rejected.** Only the player's own row (D70's first form): an empty
 screen in a portfolio. Unlabelled demo players: they would pass for real
 ones. Demo scores that move over time: more invention for little gain.
+
+---
+
+## D74 — The level's interface is two modules, with gold bought inside a level
+
+**Decision.** The last part of Phase 6 is two modules. 6.6 (Module 40)
+moves the HUD and the joker bar to prefabs in the new theme and adds gold
+bought inside a level: in the campaign, a joker the player holds none of
+and cannot afford can be pressed, and its press opens Not Enough Gold over
+the level; Get Gold opens the gold packs there. While either is open the
+countdown and the board stop, and the level goes on when they close; the
+player then presses the joker again. 6.7 (Module 41) moves the result
+panel, the leave and restart confirmation and the introduction card to the
+new theme. The confirmation also says that the win streak will be lost
+when there is one. The result panel stays without the streak (D64). The
+introduction card keeps its drawings and flow and only takes the new
+theme's panel, font and close button.
+
+**Why.** The two parts differ: the HUD and the bar are on screen for the
+whole level and carry the in-level purchase, while the panels open at its
+edges. Split, each module stays reviewable. Buying gold without leaving
+the level is the genre's usual loop, and leaving would cost a life (D57).
+A player who leaves a level on a streak should know the streak goes too.
+
+**Consequences.**
+- Phase 6 has seven modules, 35 to 41.
+- A campaign joker's button can be pressed when the balance is short;
+  `JokerButtons` changes accordingly. Free play is unchanged (D66).
+- The in-level overlays reuse the front end's prefabs; nothing is bought
+  for the player on return.
+
+**Rejected.** One module for all five parts: too large to review. A
+greyed button with no route to gold: the loop of D72 would stop at the
+level's edge. Sending the player to the Store: a life lost to buy gold.
+The streak on the result panel: the owner keeps the panel simple.
 
 ---
