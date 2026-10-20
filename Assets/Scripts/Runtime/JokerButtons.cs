@@ -1,65 +1,45 @@
-using System;
-using System.Globalization;
-using GateRush.Meta;
-
 namespace GateRush.Runtime
 {
     /// <summary>
     /// Decides what a joker button shows and whether it can be pressed
-    /// (Module 34, D65, D66): the plain rules behind <see cref="JokerBar"/>.
-    /// Every text comes from the config's names and format strings; the
-    /// counts and prices are the caller's, from <c>MetaGame</c>,
-    /// <c>MetaRules</c> and <see cref="FreePlayJokers"/>.
+    /// (Modules 34 and 40, D65, D66, D74): the plain rules behind the level's
+    /// joker bar. The counts and prices are the caller's, from
+    /// <c>MetaGame</c>, <c>MetaRules</c> and <see cref="FreePlayJokers"/>; the
+    /// text on the badge is formatted by the level's interface.
     /// </summary>
     /// <remarks>
     /// <c>isUsable</c> is the caller's answer to "could this joker be used at
-    /// all now": the level is being played, no introduction card or
-    /// confirmation holds it, and, for the Clock, it has a countdown. A button
-    /// that is not usable is never pressable, whatever is held.
+    /// all now": the level is being played, nothing holds it — no
+    /// introduction card, confirmation or in-level overlay — and, for the
+    /// Clock, it has a countdown. A button that is not usable is never
+    /// pressable, whatever is held.
     /// </remarks>
     public static class JokerButtons
     {
         /// <summary>
-        /// A campaign button: the name and the count while some are held;
-        /// with none held, the name and the price, pressable only when
-        /// <paramref name="balance"/> covers it — pressing then buys one and
-        /// uses it at once (D65).
+        /// A campaign button: the count while some are held; with none held,
+        /// the price, pressable whatever the balance. When the balance covers
+        /// the price, pressing buys one when it is used (D65); when it does
+        /// not, the button carries the shortfall and a press opens Not Enough
+        /// Gold (D74).
         /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="texts"/> is null.</exception>
-        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
-        public static JokerButton Campaign(JokerKind kind, int held, int price, int balance, bool isUsable, RuntimeConfig texts)
+        public static JokerButton Campaign(int held, int price, int balance, bool isUsable)
         {
-            RequireTexts(texts);
-            var name = texts.JokerName(kind);
             if (held > 0)
             {
-                return new JokerButton(Format(texts.JokerCountFormat, name, held), isUsable);
+                return new JokerButton(JokerBadge.Count, held, isUsable, 0);
             }
 
-            return new JokerButton(Format(texts.JokerPriceFormat, name, price), isUsable && balance >= price);
+            var shortfall = price > balance ? price - balance : 0;
+            return new JokerButton(JokerBadge.Price, price, isUsable, shortfall);
         }
 
         /// <summary>
-        /// A free-play button (D66): the name and how many of the level's
-        /// allowance are left, pressable while any are; never topped up.
+        /// A free-play button (D66): how many of the level's allowance are
+        /// left, pressable while any are; never topped up, so never short of
+        /// gold.
         /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="texts"/> is null.</exception>
-        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
-        public static JokerButton FreePlay(JokerKind kind, int left, bool isUsable, RuntimeConfig texts)
-        {
-            RequireTexts(texts);
-            return new JokerButton(Format(texts.JokerCountFormat, texts.JokerName(kind), left), isUsable && left > 0);
-        }
-
-        private static string Format(string format, string name, int number) =>
-            string.Format(CultureInfo.InvariantCulture, format, name, number);
-
-        private static void RequireTexts(RuntimeConfig texts)
-        {
-            if (texts == null)
-            {
-                throw new ArgumentNullException(nameof(texts));
-            }
-        }
+        public static JokerButton FreePlay(int left, bool isUsable) =>
+            new JokerButton(JokerBadge.Count, left, isUsable && left > 0, 0);
     }
 }
