@@ -78,6 +78,12 @@ namespace GateRush.Tests
             new GoldPack(LargePackId, LargePackGold),
         };
 
+        /// <summary>The name a new player gets by the test rules; not the config's "Player".</summary>
+        public const string DefaultPlayerName = "Tester";
+
+        /// <summary>The avatar a new player gets by the test rules; not the config's "bear".</summary>
+        public const string DefaultAvatarId = "owl";
+
         /// <summary>Rules with the test defaults, except the values given.</summary>
         public static MetaRules Build(
             int lifeCap = LifeCap,
@@ -88,7 +94,9 @@ namespace GateRush.Tests
             JokerAmounts? startingJokers = null,
             IReadOnlyList<StreakReward> streakRewards = null,
             int clockBonusSeconds = ClockBonusSeconds,
-            IReadOnlyList<GoldPack> goldPacks = null) =>
+            IReadOnlyList<GoldPack> goldPacks = null,
+            string defaultPlayerName = DefaultPlayerName,
+            string defaultAvatarId = DefaultAvatarId) =>
             new MetaRules(
                 lifeCap,
                 lifeRegenInterval ?? TimeSpan.FromMinutes(LifeRegenMinutes),
@@ -98,6 +106,8 @@ namespace GateRush.Tests
                 startingJokers ?? new JokerAmounts(StartingClocks, StartingRockets, StartingBrooms),
                 streakRewards ?? StreakRewards(),
                 clockBonusSeconds,
-                goldPacks ?? GoldPacks());
+                goldPacks ?? GoldPacks(),
+                defaultPlayerName,
+                defaultAvatarId);
     }
 }

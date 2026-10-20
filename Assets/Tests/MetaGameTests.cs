@@ -426,7 +426,8 @@ namespace GateRush.Tests
         private SaveData Save(
             Wallet wallet, Lives lives, WinStreak streak, CampaignProgress campaign, JokerInventory jokers = null) =>
             new SaveData(
-                new CompletedLevels(), new SoundSetting(), wallet, lives, jokers ?? JokerInventory.Starting(rules), streak, campaign);
+                new CompletedLevels(), new SoundSetting(), wallet, lives, jokers ?? JokerInventory.Starting(rules), streak, campaign,
+                PlayerProfile.Starting(rules), new HapticsSetting());
 
         /// <summary>An inventory holding <paramref name="count"/> of <paramref name="kind"/> and <see cref="OtherKindsHeld"/> of every other kind.</summary>
         private static JokerInventory Holding(JokerKind kind, int count) =>

@@ -1,10 +1,10 @@
 namespace GateRush.Meta
 {
     /// <summary>
-    /// Whether the player wants sound and vibration (Module 25): one switch
-    /// for both, on until the player turns it off. Kept as a section of
-    /// <see cref="SaveData"/> (Module 29) until Phase 6 builds a settings
-    /// screen.
+    /// Whether the player wants sound (Module 25), on until the player turns
+    /// it off. Kept as a section of <see cref="SaveData"/> (Module 29). Until
+    /// Module 38 it switched vibration too; vibration now has its own
+    /// <see cref="HapticsSetting"/>.
     /// </summary>
     /// <remarks>
     /// <para><b>Legacy data.</b> Before Module 29 the setting was saved on its
@@ -27,7 +27,7 @@ namespace GateRush.Meta
         private const string OnData = "on";
         private const string OffData = "off";
 
-        /// <summary>True when sound and vibration are wanted. Starts true.</summary>
+        /// <summary>True when sound is wanted. Starts true.</summary>
         public bool IsOn { get; set; } = true;
 
         /// <summary>

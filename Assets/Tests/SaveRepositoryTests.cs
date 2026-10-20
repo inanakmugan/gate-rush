@@ -2,6 +2,7 @@ using System;
 using GateRush.Meta;
 using GateRush.Serialization;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace GateRush.Tests
 {
@@ -15,7 +16,9 @@ namespace GateRush.Tests
     /// write fails is still played; a fresh store, a carry-over and a
     /// version-1 save all give a new player's gold, lives, jokers, streak and
     /// campaign by the rules; and a version-2 save keeps its gold and lives
-    /// with a new player's jokers, streak and campaign.
+    /// with a new player's jokers, streak and campaign. Module 38: a version-4
+    /// save with a refused name is still loaded, with one problem naming the
+    /// field, and a carried-over save gets a new player's profile with haptics on.
     /// </summary>
     public class SaveRepositoryTests
     {
@@ -67,7 +70,7 @@ namespace GateRush.Tests
             CollectionAssert.IsEmpty(load.Problems);
             CollectionAssert.AreEqual(new[] { SaveRepository.SaveKey }, store.SavedKeys, "exactly one save, under the new key");
             Assert.IsTrue(store.TryLoad(SaveRepository.SaveKey, out var written));
-            Assert.IsTrue(new JsonSaveCodec().TryDecode(written, SaveFixture.Rules, out var writtenSave, out var problem), problem);
+            Assert.IsTrue(new JsonSaveCodec().TryDecode(written, SaveFixture.Rules, out var writtenSave, out var problem, out _), problem);
             SaveFixture.AssertSameSave(load.Data, writtenSave);
         }
 
@@ -227,6 +230,40 @@ namespace GateRush.Tests
             Assert.IsFalse(load.Data.Sound.IsOn);
             Assert.AreEqual(1, load.Problems.Count);
             Assert.IsFalse(store.TryLoad(SaveRepository.SaveKey, out _), "nothing was written");
+        }
+
+        [Test]
+        public void Load_VersionFourSaveWithARefusedName_IsLoadedWithAProblemNamingTheField()
+        {
+            var store = new MemorySaveStore();
+            var dto = JsonUtility.FromJson<SaveDataDto>(new JsonSaveCodec().Encode(SaveFixture.EveryField()));
+            dto.playerName = "Ali!";
+            var text = JsonUtility.ToJson(dto);
+            store.Seed(SaveRepository.SaveKey, text);
+
+            var load = Repository(store).Load();
+
+            Assert.AreEqual(SaveLoadOutcome.Loaded, load.Outcome);
+            Assert.AreEqual(MetaRulesFixture.DefaultPlayerName, load.Data.Profile.Name);
+            Assert.AreEqual(SaveFixture.EveryFieldAvatarId, load.Data.Profile.AvatarId, "the rest of the save is read");
+            Assert.AreEqual(1, load.Problems.Count);
+            StringAssert.Contains(SaveRepository.SaveKey, load.Problems[0], "the problem names the key");
+            StringAssert.Contains("playerName", load.Problems[0], "the problem names the field");
+            AssertStoredUnchanged(store, text);
+        }
+
+        [Test]
+        public void Load_OnlyLegacyKeysWithSoundOff_HasANewPlayersProfileAndHapticsOn()
+        {
+            var store = new MemorySaveStore();
+            store.Seed(SoundSetting.LegacySaveKey, "off");
+
+            var load = Repository(store).Load();
+
+            Assert.AreEqual(SaveLoadOutcome.CarriedOver, load.Outcome);
+            Assert.AreEqual(MetaRulesFixture.DefaultPlayerName, load.Data.Profile.Name);
+            Assert.AreEqual(MetaRulesFixture.DefaultAvatarId, load.Data.Profile.AvatarId);
+            Assert.IsTrue(load.Data.Haptics.IsOn, "vibration no longer follows the old sound key");
         }
 
         [Test]

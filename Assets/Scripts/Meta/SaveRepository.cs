@@ -15,14 +15,18 @@ namespace GateRush.Meta
     /// <para><b>Loading</b>, in this order:</para>
     /// <list type="number">
     /// <item>A save under <see cref="SaveKey"/> is decoded:
-    /// <see cref="SaveLoadOutcome.Loaded"/>. One that cannot be read gives the
+    /// <see cref="SaveLoadOutcome.Loaded"/>; a field the codec read at its
+    /// default because its value broke a rule (a refused name, an empty avatar
+    /// id) is still loaded, with one problem naming it. One that cannot be read gives the
     /// defaults and <see cref="SaveLoadOutcome.Unreadable"/>, and nothing is
     /// written, so its text stays until the next change replaces it.</item>
     /// <item>Otherwise the old keys, <see cref="CompletedLevels.LegacySaveKey"/>
     /// and <see cref="SoundSetting.LegacySaveKey"/>, are read when either
     /// exists. One that cannot be read gives its default and a problem; the
     /// other is kept. Every section they never held — the wallet, the lives,
-    /// the jokers, the streak and the campaign — is a new player's. The save is written under <see cref="SaveKey"/> at once:
+    /// the jokers, the streak, the campaign, the profile and the haptics
+    /// setting — is a new player's; haptics are on whatever the old sound key
+    /// held. The save is written under <see cref="SaveKey"/> at once:
     /// <see cref="SaveLoadOutcome.CarriedOver"/>.</item>
     /// <item>Otherwise the defaults and <see cref="SaveLoadOutcome.Fresh"/>,
     /// and nothing is written.</item>
@@ -100,9 +104,16 @@ namespace GateRush.Meta
 
         private SaveLoad Decode(string text)
         {
-            if (codec.TryDecode(text, rules, out var data, out var problem))
+            if (codec.TryDecode(text, rules, out var data, out var problem, out var resets))
             {
-                return new SaveLoad(data, SaveLoadOutcome.Loaded, Array.Empty<string>());
+                var notes = new string[resets.Count];
+                for (var i = 0; i < notes.Length; i++)
+                {
+                    notes[i] = $"The save under '{SaveKey}' was read, but {resets[i]} " +
+                               "The saved text is left as it is until the next change replaces it.";
+                }
+
+                return new SaveLoad(data, SaveLoadOutcome.Loaded, notes);
             }
 
             var problems = new[]
@@ -139,7 +150,9 @@ namespace GateRush.Meta
                 Lives.Full(rules),
                 JokerInventory.Starting(rules),
                 WinStreak.Starting(),
-                CampaignProgress.Starting());
+                CampaignProgress.Starting(),
+                PlayerProfile.Starting(rules),
+                new HapticsSetting());
             try
             {
                 Save(data);

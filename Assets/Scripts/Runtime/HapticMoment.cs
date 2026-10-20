@@ -1,8 +1,8 @@
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// A moment the game vibrates at, where the platform can (Module 25). Each
-    /// has its pulse length in <see cref="SoundConfig"/>.
+    /// A moment the game vibrates at, where the platform can and haptics are
+    /// on (Modules 25 and 38). Each has its pulse length in <see cref="SoundConfig"/>.
     /// </summary>
     public enum HapticMoment
     {

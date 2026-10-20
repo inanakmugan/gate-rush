@@ -79,7 +79,9 @@ namespace GateRush.Runtime
     /// stage of its presentation starts, the timer's from
     /// <see cref="TimerTicks"/>. Voices are stopped on a restart, a level
     /// change and the way to the front end. The front end's sound toggle flips
-    /// <see cref="SoundSetting"/>, and the whole save is saved at once. With no Sound Player or Sound Config assigned, one error is
+    /// <see cref="SoundSetting"/> and its haptics toggle
+    /// <see cref="HapticsSetting"/>, each on its own (Module 38), and the whole
+    /// save is saved at once. With no Sound Player or Sound Config assigned, one error is
     /// logged and the game runs silently; the config's problems — a fresh
     /// one has no clips — are logged once, at start, and never stop the
     /// game.</para>
@@ -122,6 +124,12 @@ namespace GateRush.Runtime
     /// here. Every purchase leaves the player where they were. A pack id
     /// known to the rules or to the service but not both is logged as an
     /// error at start, and the Store shows only the packs both know.</para>
+    /// <para><b>Profile (Module 38, D71).</b> A name typed on Profile goes
+    /// through the name rule here (<see cref="PlayerProfile.TrySetName"/>):
+    /// refused, the front end shows its refusal line and the saved name;
+    /// accepted and changed, it is saved. A picked avatar is saved at once.
+    /// The Meta Config's default avatar is checked against the
+    /// <see cref="AvatarCatalog"/> at start and a mismatch logged.</para>
     /// </remarks>
     public sealed class LevelBootstrap : MonoBehaviour
     {
@@ -141,6 +149,9 @@ namespace GateRush.Runtime
 
         [Tooltip("What the simulated store sells: each gold pack's product id and the price its test sheet shows, charging nothing (Module 36): Assets/Config/SimulatedStoreConfig.asset. Left empty, or with a problem, it logs an error and nothing is drawn.")]
         [SerializeField] private SimulatedStoreConfig simulatedStore;
+
+        [Tooltip("The avatars a player can choose (Module 38): Assets/Config/AvatarCatalog.asset, the one the Front End holds. Left empty, or with a problem, it logs an error and nothing is drawn; a Meta Config Default Avatar Id the catalog lacks is logged as an error and the game goes on, showing the catalog's first avatar.")]
+        [SerializeField] private AvatarCatalog avatarCatalog;
 
         [Tooltip("The orthographic camera that shows the board. It is placed so the Board View sits centred between the HUD bands, below and above the screen's unsafe edges, and re-fitted when the screen size or safe area changes.")]
         [SerializeField] private Camera boardCamera;
@@ -318,6 +329,7 @@ namespace GateRush.Runtime
             clock = new SystemTimeProvider();
             metaGame = new MetaGame(save, metaRules, clock);
             CreatePurchases();
+            CheckDefaultAvatar();
             freePlayJokers = new FreePlayJokers(metaConfig.FreePlayJokersPerLevel);
             InitializeSound();
             ApplySoundSetting();
@@ -407,23 +419,26 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Makes the sound player follow the save's sound setting. The front
-        /// end's toggle reads it from <see cref="FrontEndState.IsSoundOn"/>.
+        /// Makes the sound player follow the save's sound and haptics
+        /// settings, each on its own (Module 38). The front end's toggles read
+        /// them from <see cref="FrontEndState.IsSoundOn"/> and
+        /// <see cref="FrontEndState.IsHapticsOn"/>.
         /// </summary>
         private void ApplySoundSetting()
         {
             if (hasSound)
             {
                 soundPlayer.IsOn = save.Sound.IsOn;
+                soundPlayer.IsHapticsOn = save.Haptics.IsOn;
             }
         }
 
         /// <summary>
-        /// The front end's sound toggle: turns sound and vibration off or on
-        /// together, saves the choice at once and shows it on the toggle.
-        /// Turning off stops what is playing; turning on affects the next cue.
-        /// A save that fails is logged and the game goes on; the choice then
-        /// lasts for this session.
+        /// The front end's sound toggle: turns sound off or on, leaving
+        /// vibration as it is, saves the choice at once and shows it on the
+        /// toggle. Turning off stops what is playing; turning on affects the
+        /// next cue. A save that fails is logged and the game goes on; the
+        /// choice then lasts for this session.
         /// </summary>
         private void OnSoundToggleRequested()
         {
@@ -432,6 +447,81 @@ namespace GateRush.Runtime
             SaveOrWarn("The sound setting was changed, but saving it failed; it is remembered until the game is closed.");
             ForgetShownMeta();
             RefreshMeta();
+        }
+
+        /// <summary>
+        /// The front end's haptics toggle (Module 38): turns vibration off or
+        /// on, leaving sound as it is, saves the choice at once and shows it on
+        /// the toggle. Where the browser cannot vibrate, the setting is kept and
+        /// nothing vibrates (<see cref="WebHaptics"/>).
+        /// </summary>
+        private void OnHapticsToggleRequested()
+        {
+            save.Haptics.IsOn = !save.Haptics.IsOn;
+            ApplySoundSetting();
+            SaveOrWarn("The haptics setting was changed, but saving it failed; it is remembered until the game is closed.");
+            ForgetShownMeta();
+            RefreshMeta();
+        }
+
+        /// <summary>
+        /// Profile's name field ended its edit with new text (Module 38). The
+        /// name rule decides: a refused name leaves the saved one, which the
+        /// front end puts back with its refusal line; an accepted one is saved
+        /// when it differs from the saved name, and shown in its normalized
+        /// form either way.
+        /// </summary>
+        private void OnNameChangeRequested(string raw)
+        {
+            var profile = save.Profile;
+            var before = profile.Name;
+            if (!profile.TrySetName(raw))
+            {
+                frontEndView.ShowNameRefused();
+                return;
+            }
+
+            if (!string.Equals(profile.Name, before, StringComparison.Ordinal))
+            {
+                SaveOrWarn("The name was changed, but saving it failed; it is remembered until the game is closed.");
+            }
+
+            ForgetShownMeta();
+            RefreshMeta();
+        }
+
+        /// <summary>
+        /// An avatar in Profile's grid (Module 38): chosen and saved at once
+        /// when it differs from the saved one. The grid only offers ids of the
+        /// catalog, which are never empty.
+        /// </summary>
+        private void OnAvatarChangeRequested(string avatarId)
+        {
+            var profile = save.Profile;
+            if (!string.Equals(profile.AvatarId, avatarId, StringComparison.Ordinal))
+            {
+                profile.SetAvatar(avatarId);
+                SaveOrWarn("The avatar was changed, but saving it failed; it is remembered until the game is closed.");
+            }
+
+            ForgetShownMeta();
+            RefreshMeta();
+        }
+
+        /// <summary>
+        /// Logs an error, once at start, when the Meta Config's default avatar
+        /// is not in the Avatar Catalog, as mismatched gold packs are. The game
+        /// goes on: a new player's avatar then shows the catalog's first.
+        /// </summary>
+        private void CheckDefaultAvatar()
+        {
+            if (!avatarCatalog.Contains(metaRules.DefaultAvatarId))
+            {
+                Debug.LogError(
+                    $"{metaConfig.name}: Default Avatar Id '{metaRules.DefaultAvatarId}' is not in {avatarCatalog.name}; " +
+                    $"a new player is shown '{avatarCatalog.ShownId(metaRules.DefaultAvatarId)}' instead.",
+                    metaConfig);
+            }
         }
 
         /// <summary>
@@ -1030,6 +1120,9 @@ namespace GateRush.Runtime
             frontEndView.PlayRequested += OnPlayRequested;
             frontEndView.LevelRequested += OnLevelRequested;
             frontEndView.SoundToggleRequested += OnSoundToggleRequested;
+            frontEndView.HapticsToggleRequested += OnHapticsToggleRequested;
+            frontEndView.NameChangeRequested += OnNameChangeRequested;
+            frontEndView.AvatarChangeRequested += OnAvatarChangeRequested;
             frontEndView.RefillRequested += OnRefillRequested;
             frontEndView.GoldPackRequested += OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
@@ -1070,6 +1163,9 @@ namespace GateRush.Runtime
             frontEndView.PlayRequested -= OnPlayRequested;
             frontEndView.LevelRequested -= OnLevelRequested;
             frontEndView.SoundToggleRequested -= OnSoundToggleRequested;
+            frontEndView.HapticsToggleRequested -= OnHapticsToggleRequested;
+            frontEndView.NameChangeRequested -= OnNameChangeRequested;
+            frontEndView.AvatarChangeRequested -= OnAvatarChangeRequested;
             frontEndView.RefillRequested -= OnRefillRequested;
             frontEndView.GoldPackRequested -= OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
@@ -2173,6 +2269,20 @@ namespace GateRush.Runtime
                 foreach (var problem in simulatedStore.Problems())
                 {
                     Debug.LogError($"{problem} Nothing is drawn.", simulatedStore);
+                    isAssigned = false;
+                }
+            }
+
+            if (avatarCatalog == null)
+            {
+                Debug.LogError("LevelBootstrap: Avatar Catalog is not assigned; nothing is drawn.", this);
+                isAssigned = false;
+            }
+            else
+            {
+                foreach (var problem in avatarCatalog.Problems())
+                {
+                    Debug.LogError($"{problem} Nothing is drawn.", avatarCatalog);
                     isAssigned = false;
                 }
             }

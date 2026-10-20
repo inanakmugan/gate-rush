@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using GateRush.Meta;
 using UnityEngine;
 
@@ -23,10 +24,15 @@ namespace GateRush.Serialization
     /// have takes a new player's value, built from the rules it is given
     /// through the section's own factory — <see cref="Wallet.Starting"/>,
     /// <see cref="Lives.Full"/>, <see cref="JokerInventory.Starting"/>,
-    /// <see cref="WinStreak.Starting"/>, <see cref="CampaignProgress.Starting"/>
+    /// <see cref="WinStreak.Starting"/>, <see cref="CampaignProgress.Starting"/>,
+    /// <see cref="PlayerProfile.Starting"/> and a new <see cref="HapticsSetting"/>
     /// — never from numbers of this codec's. Values
     /// this codec would never write, such as negative gold, make the save
     /// unreadable; they are not corrected.</para>
+    /// <para><b>Resets (Module 38).</b> The one exception: from version 4 a
+    /// name the name rule refuses, or an empty avatar id, reads as the
+    /// default for that field and is named in the resets, since losing a
+    /// whole save over a name would be worse than resetting the name.</para>
     /// <para><b>A limit.</b> <see cref="JsonUtility"/> is lenient: within
     /// readable JSON, a field of the wrong type can read as its default rather
     /// than fail. What it reports as an error is caught and refused.</para>
@@ -37,13 +43,16 @@ namespace GateRush.Serialization
         /// The newest schema version this build reads, and the one it writes.
         /// A save of any version above it is refused, never misread.
         /// </summary>
-        public const int CurrentFormatVersion = 3;
+        public const int CurrentFormatVersion = 4;
 
         /// <summary>The version that added the wallet and the lives (Module 30).</summary>
         private const int WalletAndLivesVersion = 2;
 
         /// <summary>The version that added the win streak, the campaign position and the jokers (Module 31).</summary>
         private const int MetaGameVersion = 3;
+
+        /// <summary>The version that added the name, the avatar and the haptics setting (Module 38).</summary>
+        private const int ProfileVersion = 4;
 
         /// <inheritdoc />
         /// <exception cref="ArgumentNullException"><paramref name="data"/> is null.</exception>
@@ -76,13 +85,16 @@ namespace GateRush.Serialization
                 clocks = data.Jokers.CountOf(JokerKind.Clock),
                 rockets = data.Jokers.CountOf(JokerKind.Rocket),
                 brooms = data.Jokers.CountOf(JokerKind.Broom),
+                playerName = data.Profile.Name,
+                avatarId = data.Profile.AvatarId,
+                hapticsOn = data.Haptics.IsOn,
             };
             return JsonUtility.ToJson(dto, prettyPrint: true);
         }
 
         /// <inheritdoc />
         /// <exception cref="ArgumentNullException"><paramref name="rules"/> is null.</exception>
-        public bool TryDecode(string text, MetaRules rules, out SaveData data, out string problem)
+        public bool TryDecode(string text, MetaRules rules, out SaveData data, out string problem, out IReadOnlyList<string> resets)
         {
             if (rules == null)
             {
@@ -90,6 +102,7 @@ namespace GateRush.Serialization
             }
 
             data = null;
+            resets = Array.Empty<string>();
             if (string.IsNullOrWhiteSpace(text))
             {
                 problem = "the save is empty.";
@@ -119,7 +132,7 @@ namespace GateRush.Serialization
                 return false;
             }
 
-            return TryFromDto(dto, version, rules, out data, out problem);
+            return TryFromDto(dto, version, rules, out data, out problem, out resets);
         }
 
         /// <summary>
@@ -130,11 +143,15 @@ namespace GateRush.Serialization
         /// by a version above <paramref name="version"/> is a new player's,
         /// by <paramref name="rules"/> (D60); one the version has is read, and
         /// a value this codec would never write gives false with
-        /// <paramref name="problem"/> naming the field.
+        /// <paramref name="problem"/> naming the field — except the profile's
+        /// two fields, which read as their default and are named in
+        /// <paramref name="resets"/>.
         /// </summary>
-        private static bool TryFromDto(SaveDataDto dto, int version, MetaRules rules, out SaveData data, out string problem)
+        private static bool TryFromDto(
+            SaveDataDto dto, int version, MetaRules rules, out SaveData data, out string problem, out IReadOnlyList<string> resets)
         {
             data = null;
+            resets = Array.Empty<string>();
             var completed = CompletedLevels.Of(dto.completedLevelIds ?? Array.Empty<int>());
             var sound = new SoundSetting { IsOn = dto.soundOn };
 
@@ -164,9 +181,50 @@ namespace GateRush.Serialization
                 return false;
             }
 
-            data = new SaveData(completed, sound, wallet, lives, jokers, streak, campaign);
+            PlayerProfile profile;
+            HapticsSetting haptics;
+            if (version < ProfileVersion)
+            {
+                profile = PlayerProfile.Starting(rules);
+                haptics = new HapticsSetting();
+            }
+            else
+            {
+                profile = ReadProfile(dto, rules, out resets);
+                haptics = new HapticsSetting { IsOn = dto.hapticsOn };
+            }
+
+            data = new SaveData(completed, sound, wallet, lives, jokers, streak, campaign, profile, haptics);
             problem = null;
             return true;
+        }
+
+        /// <summary>
+        /// Reads the name and the avatar id. A name the name rule refuses —
+        /// missing or empty included — reads as <paramref name="rules"/>'
+        /// default name, and an empty avatar id as its default avatar, each
+        /// named in <paramref name="resets"/>; neither makes the save unreadable.
+        /// </summary>
+        private static PlayerProfile ReadProfile(SaveDataDto dto, MetaRules rules, out IReadOnlyList<string> resets)
+        {
+            var found = new List<string>();
+            if (!PlayerProfile.TryNormalizeName(dto.playerName, out var name))
+            {
+                name = rules.DefaultPlayerName;
+                found.Add($"its {nameof(dto.playerName)} '{dto.playerName}' is refused by the name rule, so the default name '{name}' is used.");
+            }
+
+            var avatarId = dto.avatarId;
+            if (string.IsNullOrWhiteSpace(avatarId))
+            {
+                avatarId = rules.DefaultAvatarId;
+                found.Add($"its {nameof(dto.avatarId)} is empty, so the default avatar '{avatarId}' is used.");
+            }
+
+            resets = found;
+
+            // The name passed the rule and the id is not empty, so the constructor cannot throw.
+            return new PlayerProfile(name, avatarId);
         }
 
         /// <summary>

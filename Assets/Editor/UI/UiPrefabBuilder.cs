@@ -19,7 +19,9 @@ namespace GateRush.UI.Editor
     /// Pack Card and Not Enough Gold, Message and Test Purchase overlays, with
     /// the Store Page now holding the Store, and Module 37's Streak Marker,
     /// Streak Bar, Streak Ladder Row, Win Streak Overlay, Streak Prize and
-    /// Streak Reward Overlay — from code, with every serialized field wired.
+    /// Streak Reward Overlay, and Module 38's Avatar Button and Profile
+    /// Overlay, with the Settings overlay now holding the Haptics row — from
+    /// code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -73,6 +75,10 @@ namespace GateRush.UI.Editor
         private const string FireSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/fire.png";
         private const string CheckSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/icon_checkmark.png";
 
+        private const string AvatarCatalogPath = "Assets/Config/AvatarCatalog.asset";
+        private const string PhoneSpritePath = "Assets/ThirdParty/Kenney/GameIcons/phone.png";
+        private const string CrossSpritePath = "Assets/ThirdParty/Kenney/GameIcons/cross.png";
+
         // The streak bar's track and fill: near-white, so a tint shows true.
         // Sliced, so it must have a border.
         private const string BarSpritePath = "Assets/ThirdParty/Kenney/UIPack/Extra/input_rectangle.png";
@@ -110,6 +116,8 @@ namespace GateRush.UI.Editor
         private const string WinStreakOverlayName = "Win Streak Overlay";
         private const string StreakPrizeName = "Streak Prize";
         private const string StreakRewardOverlayName = "Streak Reward Overlay";
+        private const string AvatarButtonName = "Avatar Button";
+        private const string ProfileOverlayName = "Profile Overlay";
         private const string FrontEndName = "Front End";
 
         // Child objects.
@@ -169,6 +177,23 @@ namespace GateRush.UI.Editor
         private const string HeadlineName = "Headline";
         private const string PrizesName = "Prizes";
         private const string PrizeLabelName = "Label";
+        private const string HapticsRowName = "Haptics Row";
+        private const string HapticsOnLookName = "Haptics On Look";
+        private const string HapticsOffLookName = "Haptics Off Look";
+        private const string CrossName = "Cross";
+        private const string SelectedName = "Selected";
+        private const string AvatarName = "Avatar";
+        private const string NameFieldName = "Name Field";
+        private const string TextAreaName = "Text Area";
+        private const string HintName = "Hint";
+        private const string RefusalName = "Refusal";
+        private const string StatisticsName = "Statistics";
+        private const string LevelsCompletedName = "Levels Completed";
+        private const string CampaignLevelName = "Campaign Level";
+        private const string BestStreakName = "Best Streak";
+        private const string LifetimeGoldName = "Lifetime Gold";
+        private const string StatisticLabelName = "Label";
+        private const string StatisticValueName = "Value";
 
         // Texts. Labels the game overwrites from the state only show in the
         // Editor; those it sets from the UI Config are written from it.
@@ -211,6 +236,13 @@ namespace GateRush.UI.Editor
         private const int StreakPlaceholder = 4;
         private const int BestStreakPlaceholder = 7;
 
+        // Placeholders for Profile: a name, and statistics of a player some
+        // way into the campaign, with lifetime gold that shows a separator.
+        private const string NamePlaceholder = "Player";
+        private const int LevelsCompletedPlaceholder = 12;
+        private const int CampaignLevelPlaceholder = 13;
+        private const int LifetimeGoldPlaceholder = 1250;
+
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
         private const string OverlayTextColorHex = "#3B2466";
@@ -224,6 +256,17 @@ namespace GateRush.UI.Editor
 
         // The streak bar's track: a dark tint of the theme's purple.
         private const string StreakTrackColorHex = "#2E1A52";
+
+        // The cross over the haptics phone: red, since a white cross would not
+        // show on the white phone.
+        private const string HapticsCrossColorHex = "#E8384F";
+
+        // The ring behind the chosen avatar in Profile's grid.
+        private const string SelectedAvatarColorHex = "#FFCC33";
+
+        // Under Profile's name field: the muted hint, and the refusal line.
+        private const string NameHintColorHex = "#6E7090";
+        private const string NameRefusalColorHex = "#D93A4A";
 
         // Anchor and pivot coordinates: a parent's low edge, middle and high edge.
         private const float AnchorLow = 0f;
@@ -277,14 +320,50 @@ namespace GateRush.UI.Editor
         private const float PanelButtonPosY = 70f;
         private const float OverlayTextInset = 60f;
 
-        // Settings overlay.
+        // Settings overlay: the Haptics row under the Sound row, one row
+        // height and a gap lower.
         private const float SettingsPanelWidth = 820f;
-        private const float SettingsPanelHeight = 700f;
+        private const float SettingsPanelHeight = 880f;
         private const float SoundRowInset = 80f;
         private const float SoundRowPosY = -200f;
         private const float SoundRowHeight = 140f;
+        private const float SettingsRowSpacing = 40f;
+        private const float HapticsRowPosY = SoundRowPosY - SoundRowHeight - SettingsRowSpacing;
         private const float SoundLabelWidthFraction = 0.5f;
         private const float SoundLabelFontSize = 64f;
+
+        // The cross over the haptics phone: inset by this fraction of the
+        // icon on every side, so it covers its middle 70%.
+        private const float HapticsCrossInset = 0.15f;
+
+        // Avatar Button, one cell of Profile's grid. The grid sets its size;
+        // this one is the prefab's own, the same, for the Editor.
+        private const float AvatarCellSize = 140f;
+        private const float AvatarIconInset = 6f;
+        private const float AvatarSelectedOutset = 8f;
+
+        // Profile overlay.
+        private const float ProfilePanelWidth = 900f;
+        private const float ProfilePanelHeight = 1600f;
+        private const float ProfileAvatarSize = 260f;
+        private const float ProfileAvatarPosY = -160f;
+        private const float NameFieldWidth = 640f;
+        private const float NameFieldHeight = 120f;
+        private const float NameFieldPosY = -440f;
+        private const float NameFieldTextInset = 24f;
+        private const float NameFontSize = 64f;
+        private const float NameHintPosY = -570f;
+        private const float NameRefusalPosY = -620f;
+        private const float NameLineHeight = 50f;
+        private const float NameLineFontSize = 36f;
+        private const float ProfileGridTop = 690f;
+        private const float ProfileGridBottom = 420f;
+        private const int ProfileGridColumns = 5;
+        private const float StatisticsInset = 40f;
+        private const float StatisticsPosY = 40f;
+        private const float StatisticsHeight = 340f;
+        private const float StatisticLabelFontSize = 40f;
+        private const float StatisticValueFontSize = 60f;
 
         // Levels overlay.
         private const float LevelsPanelWidth = 900f;
@@ -495,6 +574,26 @@ namespace GateRush.UI.Editor
         private const string StreakRewardField = "streakReward";
         private const string StreakBarField = "streakBar";
         private const string JokerIconsField = "jokerIcons";
+        private const string HapticsLabelField = "hapticsLabel";
+        private const string HapticsButtonField = "hapticsButton";
+        private const string HapticsOnLookField = "hapticsOnLook";
+        private const string HapticsOffLookField = "hapticsOffLook";
+        private const string SelectedMarkField = "selectedMark";
+        private const string AvatarImageField = "avatarImage";
+        private const string NameFieldField = "nameField";
+        private const string HintLabelField = "hintLabel";
+        private const string RefusalLabelField = "refusalLabel";
+        private const string AvatarButtonPrefabField = "avatarButtonPrefab";
+        private const string LevelsCompletedLabelField = "levelsCompletedLabel";
+        private const string LevelsCompletedValueField = "levelsCompletedValue";
+        private const string CampaignLevelLabelField = "campaignLevelLabel";
+        private const string CampaignLevelValueField = "campaignLevelValue";
+        private const string BestStreakLabelField = "bestStreakLabel";
+        private const string BestStreakValueField = "bestStreakValue";
+        private const string LifetimeGoldLabelField = "lifetimeGoldLabel";
+        private const string LifetimeGoldValueField = "lifetimeGoldValue";
+        private const string ProfileField = "profile";
+        private const string AvatarCatalogField = "avatarCatalog";
 
         // The overwrite prompt.
         private const string DialogTitle = "Build UI Prefabs";
@@ -548,7 +647,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Builds the sixteen prefabs into <paramref name="outputFolder"/>,
+        /// Builds the eighteen prefabs into <paramref name="outputFolder"/>,
         /// overwriting any already there without asking. The hand-made
         /// prefabs are read from <see cref="HandMadeFolder"/>.
         /// </summary>
@@ -580,7 +679,10 @@ namespace GateRush.UI.Editor
                 var winStreak = Save(BuildWinStreakOverlay(scene, sources, ladderRow), sources, outputFolder);
                 var streakPrize = Save(BuildStreakPrize(scene, sources), sources, outputFolder);
                 var streakReward = Save(BuildStreakRewardOverlay(scene, sources, streakPrize), sources, outputFolder);
-                var overlays = new OverlayAssets(settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward);
+                var avatarButton = Save(BuildAvatarButton(scene, sources), sources, outputFolder);
+                var profile = Save(BuildProfileOverlay(scene, sources, avatarButton), sources, outputFolder);
+                var overlays = new OverlayAssets(
+                    settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile);
                 Save(BuildFrontEnd(scene, sources, storePage, leaderboardPage, streakBar, overlays), sources, outputFolder);
             }
             finally
@@ -593,7 +695,8 @@ namespace GateRush.UI.Editor
         {
             GoldPackCardName, StorePageName, LeaderboardPageName, SettingsOverlayName, LevelsOverlayName, LivesOverlayName,
             NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
-            StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, FrontEndName
+            StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, AvatarButtonName,
+            ProfileOverlayName, FrontEndName
         };
 
         private static string PrefabPath(string folder, string name) => $"{folder}/{name}{PrefabExtension}";
@@ -770,33 +873,20 @@ namespace GateRush.UI.Editor
         {
             var frame = BuildOverlayFrame(scene, sources, SettingsOverlayName, SettingsTitle, SettingsPanelWidth, SettingsPanelHeight, true);
 
-            var row = UiBuilder.CreateRect(SoundRowName, frame.Panel);
-            TopStretch(row, SoundRowInset, SoundRowPosY, SoundRowHeight);
-            var labelRect = UiBuilder.CreateRect(SoundLabelName, row);
-            UiBuilder.SetAnchors(labelRect, new Vector2(AnchorLow, AnchorLow), new Vector2(SoundLabelWidthFraction, AnchorHigh));
-            var label = AddText(labelRect, sources, SoundText, SoundLabelFontSize, OverlayTextColorHex);
-            label.alignment = TextAlignmentOptions.MidlineLeft;
-
-            var sound = Nest(sources.ButtonRound, row);
-            UiBuilder.Place(sound, new Vector2(AnchorHigh, AnchorMid), Vector2.zero, sound.sizeDelta);
-            Record(sound);
-            var soundButton = Single<Button>(sound.gameObject, ButtonRoundName);
-            soundButton.transition = Selectable.Transition.None;
-            Record(soundButton);
-
-            // The two looks take the place of Button Round's own icon, which
-            // stays in the prefab and is switched off on this instance.
-            var ownIcon = sound.Find(ButtonRoundIconName) as RectTransform;
-            if (ownIcon == null)
-            {
-                throw new InvalidOperationException($"{ButtonRoundName} has no child '{ButtonRoundIconName}' for the sound looks to replace.");
-            }
-
-            ownIcon.gameObject.SetActive(false);
-            Record(ownIcon.gameObject);
-            var soundOnLook = AddLook(sound, ownIcon, SoundOnLookName, sources.SoundOn);
-            var soundOffLook = AddLook(sound, ownIcon, SoundOffLookName, sources.SoundOff);
+            var sound = AddToggleRow(frame.Panel, sources, SoundRowName, SoundText, SoundRowPosY);
+            var soundOnLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOnLookName, sources.SoundOn);
+            var soundOffLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOffLookName, sources.SoundOff);
             soundOffLook.SetActive(false);
+
+            // Off is the phone with the red cross over its middle.
+            var haptics = AddToggleRow(frame.Panel, sources, HapticsRowName, sources.Config.HapticsLabel, HapticsRowPosY);
+            var hapticsOnLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOnLookName, sources.Phone);
+            var hapticsOffLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOffLookName, sources.Phone);
+            var cross = UiBuilder.CreateRect(CrossName, hapticsOffLook.transform);
+            UiBuilder.SetAnchors(
+                cross, new Vector2(HapticsCrossInset, HapticsCrossInset), new Vector2(AnchorHigh - HapticsCrossInset, AnchorHigh - HapticsCrossInset));
+            UiBuilder.AddIcon(cross, sources.Cross, ParseColor(HapticsCrossColorHex));
+            hapticsOffLook.SetActive(false);
 
             var levels = Nest(sources.ButtonPrimary, frame.Panel);
             PlaceAtPanelBottom(levels);
@@ -806,11 +896,50 @@ namespace GateRush.UI.Editor
             SetReferences(
                 overlay,
                 (CloseButtonField, frame.Close),
-                (SoundButtonField, soundButton),
+                (SoundButtonField, sound.Button),
                 (SoundOnLookField, soundOnLook),
                 (SoundOffLookField, soundOffLook),
+                (HapticsLabelField, haptics.Label),
+                (HapticsButtonField, haptics.Button),
+                (HapticsOnLookField, hapticsOnLook),
+                (HapticsOffLookField, hapticsOffLook),
                 (LevelsButtonField, Single<Button>(levels.gameObject, ButtonPrimaryName)));
             return frame.Root;
+        }
+
+        /// <summary>
+        /// One row of the Settings overlay at <paramref name="posY"/>: the
+        /// label at its left and a Button Round at its right, with no
+        /// transition, whose own icon is switched off on this instance for the
+        /// two looks the caller adds in its place.
+        /// </summary>
+        private static ToggleRow AddToggleRow(RectTransform panel, Sources sources, string name, string labelText, float posY)
+        {
+            var row = UiBuilder.CreateRect(name, panel);
+            TopStretch(row, SoundRowInset, posY, SoundRowHeight);
+            var labelRect = UiBuilder.CreateRect(SoundLabelName, row);
+            UiBuilder.SetAnchors(labelRect, new Vector2(AnchorLow, AnchorLow), new Vector2(SoundLabelWidthFraction, AnchorHigh));
+            var label = AddText(labelRect, sources, labelText, SoundLabelFontSize, OverlayTextColorHex);
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+
+            var toggle = Nest(sources.ButtonRound, row);
+            UiBuilder.Place(toggle, new Vector2(AnchorHigh, AnchorMid), Vector2.zero, toggle.sizeDelta);
+            Record(toggle);
+            var button = Single<Button>(toggle.gameObject, ButtonRoundName);
+            button.transition = Selectable.Transition.None;
+            Record(button);
+
+            // The looks take the place of Button Round's own icon, which stays
+            // in the prefab and is switched off on this instance.
+            var ownIcon = toggle.Find(ButtonRoundIconName) as RectTransform;
+            if (ownIcon == null)
+            {
+                throw new InvalidOperationException($"{ButtonRoundName} has no child '{ButtonRoundIconName}' for the {name} looks to replace.");
+            }
+
+            ownIcon.gameObject.SetActive(false);
+            Record(ownIcon.gameObject);
+            return new ToggleRow(toggle, ownIcon, button, label);
         }
 
         private static GameObject BuildLevelsOverlay(Scene scene, Sources sources)
@@ -826,29 +955,9 @@ namespace GateRush.UI.Editor
 
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
-
-            // One gap between the columns and at both sides, all equal, so the
-            // grid is centred in the viewport with the buttons at their own size.
-            var cell = ((RectTransform)sources.LevelButton.transform).sizeDelta;
-            var viewportWidth = LevelsPanelWidth - (ScrollInset + ScrollInset);
-            var gap = (viewportWidth - LevelGridColumns * cell.x) / (LevelGridColumns + 1);
-            if (gap < 0f)
-            {
-                throw new InvalidOperationException(
-                    $"{LevelGridColumns} {LevelButtonName}s of width {cell.x} do not fit the level grid's {viewportWidth} units.");
-            }
-
-            var padding = Mathf.FloorToInt(gap);
-            var grid = content.gameObject.AddComponent<GridLayoutGroup>();
-            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = LevelGridColumns;
-            grid.cellSize = cell;
-            grid.spacing = new Vector2(gap, gap);
-            grid.childAlignment = TextAnchor.UpperCenter;
-            grid.padding = new RectOffset(padding, padding, padding, padding);
-            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            AddCenteredGrid(
+                content, ((RectTransform)sources.LevelButton.transform).sizeDelta, LevelGridColumns,
+                LevelsPanelWidth - (ScrollInset + ScrollInset), LevelButtonName);
 
             var scrollRect = AddVerticalScroll(scroll, viewport, content);
 
@@ -1245,6 +1354,174 @@ namespace GateRush.UI.Editor
             return frame.Root;
         }
 
+        /// <summary>
+        /// One cell of Profile's avatar grid, the prefab Profile instantiates
+        /// per avatar: the ring behind (shown on the chosen one) and the
+        /// avatar, which takes the press for the button on the root.
+        /// </summary>
+        private static GameObject BuildAvatarButton(Scene scene, Sources sources)
+        {
+            var root = CreateRoot(AvatarButtonName, scene, sources.Layer);
+            var rect = (RectTransform)root.transform;
+            UiBuilder.PlaceCentered(rect, new Vector2(AvatarCellSize, AvatarCellSize));
+
+            var selected = UiBuilder.CreateRect(SelectedName, rect);
+            UiBuilder.Stretch(selected);
+            selected.offsetMin = new Vector2(-AvatarSelectedOutset, -AvatarSelectedOutset);
+            selected.offsetMax = new Vector2(AvatarSelectedOutset, AvatarSelectedOutset);
+            AddSliced(selected, sources.Panel, SelectedAvatarColorHex);
+            selected.gameObject.SetActive(false);
+
+            var icon = UiBuilder.CreateRect(IconName, rect);
+            UiBuilder.Stretch(icon);
+            icon.offsetMin = new Vector2(AvatarIconInset, AvatarIconInset);
+            icon.offsetMax = new Vector2(-AvatarIconInset, -AvatarIconInset);
+            var iconImage = UiBuilder.AddIcon(icon, sources.AvatarCatalog.SpriteAt(0), ParseColor(IconColorHex));
+            iconImage.raycastTarget = true;
+            var button = UiBuilder.AddButton(rect, iconImage);
+
+            var cell = root.AddComponent<AvatarButton>();
+            SetReferences(
+                cell,
+                (ButtonField, button),
+                (IconField, iconImage),
+                (SelectedMarkField, selected.gameObject));
+            return root;
+        }
+
+        /// <summary>
+        /// The Profile overlay: the chosen avatar, large; the name field with
+        /// the edit hint and the refusal line under it; the scrolling grid of
+        /// avatars, five per row, whose cells are created at runtime; and the
+        /// four statistics in two rows.
+        /// </summary>
+        private static GameObject BuildProfileOverlay(Scene scene, Sources sources, GameObject avatarButtonAsset)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(
+                scene, sources, ProfileOverlayName, config.ProfileTitle, ProfilePanelWidth, ProfilePanelHeight, true);
+
+            var avatar = UiBuilder.CreateRect(AvatarName, frame.Panel);
+            UiBuilder.Place(
+                avatar, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, ProfileAvatarPosY), new Vector2(ProfileAvatarSize, ProfileAvatarSize));
+            var avatarImage = UiBuilder.AddIcon(avatar, sources.AvatarCatalog.SpriteAt(0), ParseColor(IconColorHex));
+
+            var nameField = AddNameField(frame.Panel, sources);
+
+            var hint = UiBuilder.CreateRect(HintName, frame.Panel);
+            TopStretch(hint, OverlayTextInset, NameHintPosY, NameLineHeight);
+            var hintLabel = AddText(hint, sources, config.NameEditHint, NameLineFontSize, NameHintColorHex);
+
+            var refusal = UiBuilder.CreateRect(RefusalName, frame.Panel);
+            TopStretch(refusal, OverlayTextInset, NameRefusalPosY, NameLineHeight);
+            var refusalLabel = AddWrappingText(refusal, sources, string.Empty, NameLineFontSize, NameRefusalColorHex);
+
+            var scroll = UiBuilder.CreateRect(ScrollViewName, frame.Panel);
+            UiBuilder.Stretch(scroll);
+            scroll.offsetMin = new Vector2(ScrollInset, ProfileGridBottom);
+            scroll.offsetMax = new Vector2(-ScrollInset, -ProfileGridTop);
+            var viewport = AddViewport(scroll);
+            var content = UiBuilder.CreateRect(ContentName, viewport);
+            TopStretch(content, 0f, 0f, 0f);
+            var avatarButton = Single<AvatarButton>(avatarButtonAsset, AvatarButtonName);
+            AddCenteredGrid(
+                content, ((RectTransform)avatarButton.transform).sizeDelta, ProfileGridColumns,
+                ProfilePanelWidth - (ScrollInset + ScrollInset), AvatarButtonName);
+            AddVerticalScroll(scroll, viewport, content);
+
+            var statistics = UiBuilder.CreateRect(StatisticsName, frame.Panel);
+            BottomStretch(statistics, StatisticsInset, StatisticsPosY, StatisticsHeight);
+            var levelsCompleted = AddStatistic(
+                statistics, sources, LevelsCompletedName, new Vector2(AnchorLow, AnchorMid), new Vector2(AnchorMid, AnchorHigh),
+                config.LevelsCompletedLabel, ProfileTexts.Statistic(LevelsCompletedPlaceholder, config));
+            var campaignLevel = AddStatistic(
+                statistics, sources, CampaignLevelName, new Vector2(AnchorMid, AnchorMid), new Vector2(AnchorHigh, AnchorHigh),
+                config.CampaignLevelLabel, ProfileTexts.CampaignLevel(CampaignLevelPlaceholder, config));
+            var bestStreak = AddStatistic(
+                statistics, sources, BestStreakName, new Vector2(AnchorLow, AnchorLow), new Vector2(AnchorMid, AnchorMid),
+                config.BestStreakLabel, ProfileTexts.Statistic(BestStreakPlaceholder, config));
+            var lifetimeGold = AddStatistic(
+                statistics, sources, LifetimeGoldName, new Vector2(AnchorMid, AnchorLow), new Vector2(AnchorHigh, AnchorMid),
+                config.LifetimeGoldLabel, ProfileTexts.Statistic(LifetimeGoldPlaceholder, config));
+
+            var overlay = frame.Root.AddComponent<ProfileOverlay>();
+            SetReferences(
+                overlay,
+                (CloseButtonField, frame.Close),
+                (TitleLabelField, frame.Title),
+                (AvatarImageField, avatarImage),
+                (NameFieldField, nameField),
+                (HintLabelField, hintLabel),
+                (RefusalLabelField, refusalLabel),
+                (GridField, content),
+                (AvatarButtonPrefabField, avatarButton),
+                (LevelsCompletedLabelField, levelsCompleted.Label),
+                (LevelsCompletedValueField, levelsCompleted.Value),
+                (CampaignLevelLabelField, campaignLevel.Label),
+                (CampaignLevelValueField, campaignLevel.Value),
+                (BestStreakLabelField, bestStreak.Label),
+                (BestStreakValueField, bestStreak.Value),
+                (LifetimeGoldLabelField, lifetimeGold.Label),
+                (LifetimeGoldValueField, lifetimeGold.Value));
+            return frame.Root;
+        }
+
+        /// <summary>
+        /// Profile's name field: the input sprite as its box, a masked text
+        /// area holding the one-line text, and TextMeshPro's input field over
+        /// them — one line, no character limit, so a name too long can be
+        /// typed and refused, the text selected on focus and the old name
+        /// back on Escape. Its navigation is off, as every button's is.
+        /// </summary>
+        private static TMP_InputField AddNameField(RectTransform panel, Sources sources)
+        {
+            var field = UiBuilder.CreateRect(NameFieldName, panel);
+            UiBuilder.Place(
+                field, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, NameFieldPosY), new Vector2(NameFieldWidth, NameFieldHeight));
+            var box = AddSliced(field, sources.Bar, PanelColorHex);
+            box.raycastTarget = true;
+
+            var textArea = UiBuilder.CreateRect(TextAreaName, field);
+            UiBuilder.Stretch(textArea);
+            textArea.offsetMin = new Vector2(NameFieldTextInset, 0f);
+            textArea.offsetMax = new Vector2(-NameFieldTextInset, 0f);
+            textArea.gameObject.AddComponent<RectMask2D>();
+
+            var textRect = UiBuilder.CreateRect(TextName, textArea);
+            UiBuilder.Stretch(textRect);
+            var text = AddText(textRect, sources, NamePlaceholder, NameFontSize, OverlayTextColorHex);
+
+            var input = field.gameObject.AddComponent<TMP_InputField>();
+            input.targetGraphic = box;
+            input.textViewport = textArea;
+            input.textComponent = text;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            input.contentType = TMP_InputField.ContentType.Standard;
+            input.characterLimit = 0;
+            input.onFocusSelectAll = true;
+            input.restoreOriginalTextOnEscape = true;
+            input.navigation = new Navigation { mode = Navigation.Mode.None };
+            input.text = NamePlaceholder;
+            return input;
+        }
+
+        /// <summary>One of Profile's statistics between <paramref name="anchorMin"/> and <paramref name="anchorMax"/>: its label over its value.</summary>
+        private static StatisticParts AddStatistic(
+            RectTransform parent, Sources sources, string name, Vector2 anchorMin, Vector2 anchorMax, string labelText, string valueText)
+        {
+            var cell = UiBuilder.CreateRect(name, parent);
+            UiBuilder.SetAnchors(cell, anchorMin, anchorMax);
+
+            var labelRect = UiBuilder.CreateRect(StatisticLabelName, cell);
+            UiBuilder.SetAnchors(labelRect, new Vector2(AnchorLow, AnchorMid), new Vector2(AnchorHigh, AnchorHigh));
+            var label = AddText(labelRect, sources, labelText, StatisticLabelFontSize, OverlayTextColorHex);
+
+            var valueRect = UiBuilder.CreateRect(StatisticValueName, cell);
+            UiBuilder.SetAnchors(valueRect, new Vector2(AnchorLow, AnchorLow), new Vector2(AnchorHigh, AnchorMid));
+            var value = AddText(valueRect, sources, valueText, StatisticValueFontSize, OverlayTextColorHex);
+            return new StatisticParts(label, value);
+        }
+
         /// <summary>The reward table of D61, for the placeholders the streak's prefabs show in the Editor.</summary>
         private static StreakReward[] PlaceholderStreakRewards() => new[]
         {
@@ -1322,6 +1599,7 @@ namespace GateRush.UI.Editor
             var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
             var winStreak = NestStretched(overlayAssets.WinStreak, overlays, false);
             var streakReward = NestStretched(overlayAssets.StreakReward, overlays, false);
+            var profile = NestStretched(overlayAssets.Profile, overlays, false);
 
             var frontEnd = root.AddComponent<FrontEnd>();
             SetReferences(
@@ -1340,8 +1618,10 @@ namespace GateRush.UI.Editor
                 (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
                 (WinStreakField, Single<WinStreakOverlay>(winStreak.gameObject, WinStreakOverlayName)),
                 (StreakRewardField, Single<StreakRewardOverlay>(streakReward.gameObject, StreakRewardOverlayName)),
+                (ProfileField, Single<ProfileOverlay>(profile.gameObject, ProfileOverlayName)),
                 (StreakBarField, Single<StreakBar>(streakBar.gameObject, StreakBarName)),
-                (JokerIconsField, sources.JokerIcons));
+                (JokerIconsField, sources.JokerIcons),
+                (AvatarCatalogField, sources.AvatarCatalog));
 
             root.SetActive(false);
             return root;
@@ -1598,6 +1878,35 @@ namespace GateRush.UI.Editor
             return label;
         }
 
+        /// <summary>
+        /// A grid of <paramref name="columns"/> cells of <paramref name="cell"/>
+        /// size on <paramref name="content"/>, with one gap between the columns
+        /// and at both sides, all equal, so the grid is centred in a viewport
+        /// <paramref name="viewportWidth"/> wide with the cells at their own
+        /// size; the content grows with its rows.
+        /// </summary>
+        private static void AddCenteredGrid(RectTransform content, Vector2 cell, int columns, float viewportWidth, string cellName)
+        {
+            var gap = (viewportWidth - columns * cell.x) / (columns + 1);
+            if (gap < 0f)
+            {
+                throw new InvalidOperationException(
+                    $"{columns} {cellName}s of width {cell.x} do not fit the grid's {viewportWidth} units.");
+            }
+
+            var padding = Mathf.FloorToInt(gap);
+            var grid = content.gameObject.AddComponent<GridLayoutGroup>();
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = columns;
+            grid.cellSize = cell;
+            grid.spacing = new Vector2(gap, gap);
+            grid.childAlignment = TextAnchor.UpperCenter;
+            grid.padding = new RectOffset(padding, padding, padding, padding);
+            var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
+
         /// <summary>A vertical layout that sizes its children to its width and to their preferred heights.</summary>
         private static VerticalLayoutGroup AddColumn(RectTransform rect)
         {
@@ -1787,6 +2096,34 @@ namespace GateRush.UI.Editor
             return icons;
         }
 
+        /// <summary>
+        /// The Avatar Catalog, which must report no problem and whose every
+        /// sprite must import as exactly one sprite, as every sprite the build
+        /// reads must.
+        /// </summary>
+        private static AvatarCatalog LoadAvatarCatalog()
+        {
+            var catalog = AssetDatabase.LoadAssetAtPath<AvatarCatalog>(AvatarCatalogPath);
+            if (catalog == null)
+            {
+                throw new InvalidOperationException(
+                    $"{AvatarCatalogPath} is missing (Gate Rush > Fill Avatar Catalog). Nothing was written.");
+            }
+
+            var problems = catalog.Problems();
+            if (problems.Count > 0)
+            {
+                throw new InvalidOperationException($"{AvatarCatalogPath} has problems: {string.Join(" ", problems)} Nothing was written.");
+            }
+
+            for (var i = 0; i < catalog.Count; i++)
+            {
+                LoadSprite(AssetDatabase.GetAssetPath(catalog.SpriteAt(i)));
+            }
+
+            return catalog;
+        }
+
         /// <summary>Home Page, which must hold the Streak Area the streak bar is placed under.</summary>
         private static GameObject LoadHomePage()
         {
@@ -1826,13 +2163,47 @@ namespace GateRush.UI.Editor
             public TMP_Text Title { get; }
         }
 
+        /// <summary>A Settings row's toggle, the Button Round instance with its own icon switched off, its button and its label.</summary>
+        private readonly struct ToggleRow
+        {
+            public ToggleRow(RectTransform toggle, RectTransform ownIcon, Button button, TMP_Text label)
+            {
+                Toggle = toggle;
+                OwnIcon = ownIcon;
+                Button = button;
+                Label = label;
+            }
+
+            public RectTransform Toggle { get; }
+
+            /// <summary>Button Round's own icon, switched off; the looks take its place.</summary>
+            public RectTransform OwnIcon { get; }
+
+            public Button Button { get; }
+            public TMP_Text Label { get; }
+        }
+
+        /// <summary>One of Profile's statistics: its label and its value.</summary>
+        private readonly struct StatisticParts
+        {
+            public StatisticParts(TMP_Text label, TMP_Text value)
+            {
+                Label = label;
+                Value = value;
+            }
+
+            public TMP_Text Label { get; }
+            public TMP_Text Value { get; }
+        }
+
         /// <summary>The saved overlay prefabs Front End nests, in stacking order.</summary>
         private readonly struct OverlayAssets
         {
             public OverlayAssets(
                 GameObject settings, GameObject levels, GameObject lives, GameObject notEnoughGold, GameObject message, GameObject testPurchase,
-                GameObject winStreak, GameObject streakReward)
+                GameObject winStreak, GameObject streakReward, GameObject profile)
             {
+                Profile = profile;
                 Settings = settings;
                 Levels = levels;
                 Lives = lives;
@@ -1851,6 +2222,7 @@ namespace GateRush.UI.Editor
             public GameObject TestPurchase { get; }
             public GameObject WinStreak { get; }
             public GameObject StreakReward { get; }
+            public GameObject Profile { get; }
         }
 
         /// <summary>Every asset the build reads, loaded and checked before anything is written.</summary>
@@ -1869,7 +2241,10 @@ namespace GateRush.UI.Editor
             public Sprite Fire { get; private set; }
             public Sprite Check { get; private set; }
             public Sprite Bar { get; private set; }
+            public Sprite Phone { get; private set; }
+            public Sprite Cross { get; private set; }
             public JokerIcons JokerIcons { get; private set; }
+            public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
             public GameObject ButtonPrimary { get; private set; }
             public GameObject ButtonRound { get; private set; }
@@ -1923,7 +2298,10 @@ namespace GateRush.UI.Editor
                     Fire = LoadSprite(FireSpritePath),
                     Check = LoadSprite(CheckSpritePath),
                     Bar = LoadSlicedSprite(BarSpritePath),
+                    Phone = LoadSprite(PhoneSpritePath),
+                    Cross = LoadSprite(CrossSpritePath),
                     JokerIcons = LoadJokerIcons(),
+                    AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),
                     ButtonPrimary = buttonPrimary,
                     ButtonRound = LoadHandMade(ButtonRoundName),

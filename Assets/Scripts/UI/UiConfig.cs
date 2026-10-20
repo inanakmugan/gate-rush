@@ -8,7 +8,7 @@ namespace GateRush.UI
 {
     /// <summary>
     /// Every text, format string and colour the front end's screens set from
-    /// code (Modules 35, 36 and 37, D68, D69, D72): the texts that carry a number or change
+    /// code (Modules 35 to 38, D68, D69, D71, D72): the texts that carry a number or change
     /// with the state, the joker names, the theme's colours, and the
     /// colours that change at runtime. Fixed English titles, layout and
     /// colours that never change live on the prefabs.
@@ -143,6 +143,34 @@ namespace GateRush.UI
 
         [Tooltip("A line of the Streak Reward overlay; {0} is the count and {1} the joker's name.")]
         [SerializeField] private string prizeFormat = "+{0} {1}";
+
+        [Header("Profile and Settings texts (formats use the invariant culture)")]
+        [Tooltip("The Profile overlay's title.")]
+        [SerializeField] private string profileTitle = "Profile";
+
+        [Tooltip("The hint under Profile's name field.")]
+        [SerializeField] private string nameEditHint = "Tap to edit";
+
+        [Tooltip("The line under Profile's name field when a name is refused by the name rule; keep it in step with the rule's limits.")]
+        [SerializeField] private string nameRefusedText = "Use 1 to 16 letters, digits, spaces, - _ or .";
+
+        [Tooltip("Profile's statistic: the levels the save marks completed.")]
+        [SerializeField] private string levelsCompletedLabel = "Levels Completed";
+
+        [Tooltip("Profile's statistic: the campaign level, shown as Home's play button shows it.")]
+        [SerializeField] private string campaignLevelLabel = "Campaign Level";
+
+        [Tooltip("Profile's statistic: the best win streak.")]
+        [SerializeField] private string bestStreakLabel = "Best Streak";
+
+        [Tooltip("Profile's statistic: all the gold ever earned, not bought.")]
+        [SerializeField] private string lifetimeGoldLabel = "Lifetime Gold";
+
+        [Tooltip("A numeric statistic on Profile; {0} is the number. {0:N0} adds thousands separators: 1,250.")]
+        [SerializeField] private string statisticFormat = "{0:N0}";
+
+        [Tooltip("The label of the Settings overlay's haptics row.")]
+        [SerializeField] private string hapticsLabel = "Haptics";
 
         [Header("Joker names")]
         [SerializeField] private string clockName = "Clock";
@@ -283,6 +311,33 @@ namespace GateRush.UI
         /// <summary>A line of the Streak Reward overlay; {0} the count, {1} the joker's name.</summary>
         public string PrizeFormat => prizeFormat;
 
+        /// <summary>The Profile overlay's title.</summary>
+        public string ProfileTitle => profileTitle;
+
+        /// <summary>The hint under Profile's name field.</summary>
+        public string NameEditHint => nameEditHint;
+
+        /// <summary>The line under Profile's name field after a refused name.</summary>
+        public string NameRefusedText => nameRefusedText;
+
+        /// <summary>Profile's levels completed label.</summary>
+        public string LevelsCompletedLabel => levelsCompletedLabel;
+
+        /// <summary>Profile's campaign level label.</summary>
+        public string CampaignLevelLabel => campaignLevelLabel;
+
+        /// <summary>Profile's best streak label.</summary>
+        public string BestStreakLabel => bestStreakLabel;
+
+        /// <summary>Profile's lifetime gold label.</summary>
+        public string LifetimeGoldLabel => lifetimeGoldLabel;
+
+        /// <summary>A numeric statistic on Profile; {0} is the number.</summary>
+        public string StatisticFormat => statisticFormat;
+
+        /// <summary>The Settings overlay's haptics row label.</summary>
+        public string HapticsLabel => hapticsLabel;
+
         /// <summary>The flat colour behind every tab.</summary>
         public Color BackgroundColor => backgroundColor;
 
@@ -416,6 +471,15 @@ namespace GateRush.UI
             AddIfBlank(problems, streakRuleText, "Streak Rule Text");
             AddIfUnusableFormat(problems, rewardHeadlineFormat, 1, "Reward Headline Format", "{0} for the streak");
             AddIfUnusableFormat(problems, prizeFormat, 2, "Prize Format", "{0} for the count and {1} for the joker's name");
+            AddIfBlank(problems, profileTitle, "Profile Title");
+            AddIfBlank(problems, nameEditHint, "Name Edit Hint");
+            AddIfBlank(problems, nameRefusedText, "Name Refused Text");
+            AddIfBlank(problems, levelsCompletedLabel, "Levels Completed Label");
+            AddIfBlank(problems, campaignLevelLabel, "Campaign Level Label");
+            AddIfBlank(problems, bestStreakLabel, "Best Streak Label");
+            AddIfBlank(problems, lifetimeGoldLabel, "Lifetime Gold Label");
+            AddIfUnusableFormat(problems, statisticFormat, 1, "Statistic Format", "{0} for the number");
+            AddIfBlank(problems, hapticsLabel, "Haptics Label");
             AddIfBlank(problems, clockName, "Clock Name");
             AddIfBlank(problems, rocketName, "Rocket Name");
             AddIfBlank(problems, broomName, "Broom Name");

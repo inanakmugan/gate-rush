@@ -28,6 +28,8 @@ namespace GateRush.Runtime
     /// <para><b>Silence is not an error.</b> Before <see cref="Initialize"/>,
     /// while disabled, with <see cref="IsOn"/> false, and for a cue with no
     /// clip, <see cref="Play"/> does nothing; it never throws.</para>
+    /// <para><b>Sound and vibration are independent</b> (Module 38): cues
+    /// follow <see cref="IsOn"/>, pulses <see cref="IsHapticsOn"/>.</para>
     /// <para><b>Stopping.</b> Every voice stops on <see cref="StopVoices"/>,
     /// when <see cref="IsOn"/> goes false, and when this component is
     /// disabled or destroyed. Nothing here is static.</para>
@@ -53,9 +55,16 @@ namespace GateRush.Runtime
         private bool isOn = true;
 
         /// <summary>
-        /// True while sound and vibration are wanted; starts true. Setting it
-        /// false stops every voice at once; setting it true affects the next
-        /// cue.
+        /// True while vibration is wanted; starts true. Pulses follow this,
+        /// never <see cref="IsOn"/>: sound off leaves vibration on, and the
+        /// other way round.
+        /// </summary>
+        public bool IsHapticsOn { get; set; } = true;
+
+        /// <summary>
+        /// True while sound is wanted; starts true. Setting it false stops
+        /// every voice at once; setting it true affects the next cue. Pulses
+        /// do not follow it (<see cref="IsHapticsOn"/>).
         /// </summary>
         public bool IsOn
         {
@@ -168,12 +177,12 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Vibrates for the length the config gives <paramref name="moment"/>,
-        /// where the platform can. Does nothing while <see cref="IsOn"/> is
-        /// false or before <see cref="Initialize"/>.
+        /// where the platform can. Does nothing while <see cref="IsHapticsOn"/>
+        /// is false or before <see cref="Initialize"/>, whatever <see cref="IsOn"/> is.
         /// </summary>
         public void Pulse(HapticMoment moment)
         {
-            if (!isOn || config == null || haptics == null || !isActiveAndEnabled)
+            if (!IsHapticsOn || config == null || haptics == null || !isActiveAndEnabled)
             {
                 return;
             }

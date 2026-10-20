@@ -10,11 +10,17 @@ namespace GateRush.UI
     /// <summary>
     /// The bar over every tab (Module 35): the avatar, the gold with its "+",
     /// the lives with their status and "+", and the settings gear. Shows the
-    /// state it is given and raises an event for each button; the avatar is
-    /// not pressable until Module 6.4.
+    /// state it is given and raises an event for each button; the avatar
+    /// shows the chosen one and opens Profile (Module 38).
     /// </summary>
     public sealed class TopBar : MonoBehaviour
     {
+        [Tooltip("The Button on the Avatar image: opens Profile. The image must be a raycast target.")]
+        [SerializeField] private Button avatarButton;
+
+        [Tooltip("The Avatar image: shows the chosen avatar.")]
+        [SerializeField] private Image avatarImage;
+
         [SerializeField] private TMP_Text goldLabel;
 
         [Tooltip("The '+' beside the gold: selects the Store tab.")]
@@ -41,9 +47,13 @@ namespace GateRush.UI
         /// <summary>Raised when the gear is pressed.</summary>
         public event Action SettingsRequested;
 
-        /// <summary>Shows the gold and the lives of <paramref name="state"/>.</summary>
-        public void Show(FrontEndState state, UiConfig config)
+        /// <summary>Raised when the avatar is pressed.</summary>
+        public event Action ProfileRequested;
+
+        /// <summary>Shows the avatar, the gold and the lives of <paramref name="state"/>; the avatar as <paramref name="catalog"/> shows its id.</summary>
+        public void Show(FrontEndState state, UiConfig config, AvatarCatalog catalog)
         {
+            avatarImage.sprite = catalog.IconOf(state.AvatarId);
             goldLabel.text = HomeTexts.Gold(state.Gold, config);
             livesCountLabel.text = HomeTexts.LivesCount(state.Lives, config);
             livesStatusLabel.text = HomeTexts.LivesStatus(state.UntilNextLife, config);
@@ -52,6 +62,8 @@ namespace GateRush.UI
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
         public void AddMissing(List<string> missing)
         {
+            UiParts.AddIfMissing(missing, avatarButton, nameof(TopBar), nameof(avatarButton));
+            UiParts.AddIfMissing(missing, avatarImage, nameof(TopBar), nameof(avatarImage));
             UiParts.AddIfMissing(missing, goldLabel, nameof(TopBar), nameof(goldLabel));
             UiParts.AddIfMissing(missing, goldPlusButton, nameof(TopBar), nameof(goldPlusButton));
             UiParts.AddIfMissing(missing, livesCountLabel, nameof(TopBar), nameof(livesCountLabel));
@@ -62,6 +74,7 @@ namespace GateRush.UI
 
         private void OnEnable()
         {
+            UiParts.Listen(avatarButton, OnAvatarClicked);
             UiParts.Listen(goldPlusButton, OnGoldPlusClicked);
             UiParts.Listen(livesPlusButton, OnLivesPlusClicked);
             UiParts.Listen(settingsButton, OnSettingsClicked);
@@ -69,10 +82,13 @@ namespace GateRush.UI
 
         private void OnDisable()
         {
+            UiParts.Unlisten(avatarButton, OnAvatarClicked);
             UiParts.Unlisten(goldPlusButton, OnGoldPlusClicked);
             UiParts.Unlisten(livesPlusButton, OnLivesPlusClicked);
             UiParts.Unlisten(settingsButton, OnSettingsClicked);
         }
+
+        private void OnAvatarClicked() => ProfileRequested?.Invoke();
 
         private void OnGoldPlusClicked() => StoreRequested?.Invoke();
 

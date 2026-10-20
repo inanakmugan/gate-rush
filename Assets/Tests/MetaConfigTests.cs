@@ -18,7 +18,9 @@ namespace GateRush.Tests
     /// empty table is accepted; <see cref="MetaConfig.ToRules"/> carries the
     /// values over; and the free-play allowance is read back as set. Module
     /// 36's gold packs with an empty or repeated id, or gold below 1, are
-    /// reported, and are carried over to the rules.
+    /// reported, and are carried over to the rules. Module 38's default name
+    /// the name rule refuses and empty default avatar id are reported, and
+    /// valid ones are carried over.
     /// </summary>
     public class MetaConfigTests
     {
@@ -31,6 +33,8 @@ namespace GateRush.Tests
         private const string StreakRewardsLabel = "Streak Rewards";
         private const string GoldPacksField = "goldPacks";
         private const string GoldPacksLabel = "Gold Packs";
+        private const string DefaultPlayerNameField = "defaultPlayerName";
+        private const string DefaultAvatarIdField = "defaultAvatarId";
 
         private MetaConfig config;
 
@@ -123,6 +127,40 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains(StreakRewardsLabel), string.Join(" | ", problems));
+        }
+
+        [TestCase("")]
+        [TestCase("Pl@yer")]
+        public void Problems_DefaultPlayerNameRefusedByTheRule_IsReported(string name)
+        {
+            SetString(DefaultPlayerNameField, name);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Default Player Name"), string.Join(" | ", problems));
+        }
+
+        [TestCase("")]
+        [TestCase("  ")]
+        public void Problems_EmptyDefaultAvatarId_IsReported(string avatarId)
+        {
+            SetString(DefaultAvatarIdField, avatarId);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Default Avatar Id"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void ToRules_PlayerDefaults_AreCarriedOver()
+        {
+            SetString(DefaultPlayerNameField, "Gezgin");
+            SetString(DefaultAvatarIdField, "owl");
+
+            var rules = config.ToRules();
+
+            Assert.AreEqual("Gezgin", rules.DefaultPlayerName);
+            Assert.AreEqual("owl", rules.DefaultAvatarId);
         }
 
         [Test]
@@ -260,6 +298,15 @@ namespace GateRush.Tests
                 entry.FindPropertyRelative("gold").intValue = packs[i].Gold;
             }
 
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private void SetString(string field, string value)
+        {
+            var serialized = new SerializedObject(config);
+            var property = serialized.FindProperty(field);
+            Assert.IsNotNull(property, $"MetaConfig has no serialized field '{field}'.");
+            property.stringValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 
