@@ -8,7 +8,7 @@ namespace GateRush.UI
 {
     /// <summary>
     /// Every text, format string and colour the front end's screens set from
-    /// code (Modules 35 to 38, D68, D69, D71, D72): the texts that carry a number or change
+    /// code (Modules 35 to 39, D68, D69, D71 to D73): the texts that carry a number or change
     /// with the state, the joker names, the theme's colours, and the
     /// colours that change at runtime. Fixed English titles, layout and
     /// colours that never change live on the prefabs.
@@ -23,6 +23,11 @@ namespace GateRush.UI
     [CreateAssetMenu(fileName = "UiConfig", menuName = "Gate Rush/UI Config")]
     public sealed class UiConfig : ScriptableObject
     {
+        // The ranks that carry a medal (Module 39): fixed by the spec, not tuned.
+        private const int GoldRank = 1;
+        private const int SilverRank = 2;
+        private const int BronzeRank = 3;
+
         [Header("Texts (formats use the invariant culture)")]
         [Tooltip("Home's play button while the campaign has a level; {0} is its number.")]
         [SerializeField] private string playLevelFormat = "Level {0}";
@@ -172,6 +177,25 @@ namespace GateRush.UI
         [Tooltip("The label of the Settings overlay's haptics row.")]
         [SerializeField] private string hapticsLabel = "Haptics";
 
+        [Header("Leaderboard texts (formats use the invariant culture)")]
+        [Tooltip("The line under the Leaderboard's title, never hidden while the table is simulated (D73).")]
+        [SerializeField] private string leaderboardSimulatedNote = "Demo players. The online leaderboard is not connected.";
+
+        [Tooltip("The Leaderboard page while a fetch is pending.")]
+        [SerializeField] private string leaderboardLoadingText = "Loading…";
+
+        [Tooltip("The Leaderboard page after a fetch failed, above Retry.")]
+        [SerializeField] private string leaderboardFailedText = "Could not load the leaderboard.";
+
+        [Tooltip("The label of the Leaderboard page's Retry button.")]
+        [SerializeField] private string leaderboardRetryLabel = "Retry";
+
+        [Tooltip("A row's score beside the coin; {0} is the lifetime gold. {0:N0} adds thousands separators: 1,250.")]
+        [SerializeField] private string leaderboardScoreFormat = "{0:N0}";
+
+        [Tooltip("A row's rank; {0} is the rank, 1 at the top.")]
+        [SerializeField] private string leaderboardRankFormat = "{0}";
+
         [Header("Joker names")]
         [SerializeField] private string clockName = "Clock";
         [SerializeField] private string rocketName = "Rocket";
@@ -199,6 +223,21 @@ namespace GateRush.UI
 
         [Tooltip("A button's label while it cannot be pressed, readable on the grey sprite.")]
         [SerializeField] private Color disabledButtonLabelColor = new Color(0.43f, 0.44f, 0.56f);
+
+        [Tooltip("The medal on the Leaderboard's first rank.")]
+        [SerializeField] private Color goldMedalColor = new Color(0.961f, 0.718f, 0.039f);
+
+        [Tooltip("The medal on the Leaderboard's second rank.")]
+        [SerializeField] private Color silverMedalColor = new Color(0.722f, 0.761f, 0.800f);
+
+        [Tooltip("The medal on the Leaderboard's third rank.")]
+        [SerializeField] private Color bronzeMedalColor = new Color(0.804f, 0.498f, 0.196f);
+
+        [Tooltip("The player's own row on the Leaderboard.")]
+        [SerializeField] private Color leaderboardHighlightColor = new Color(1f, 0.914f, 0.659f);
+
+        [Tooltip("Every other row on the Leaderboard.")]
+        [SerializeField] private Color leaderboardRowColor = Color.white;
 
         /// <summary>Home's play button with a campaign level; {0} is its number.</summary>
         public string PlayLevelFormat => playLevelFormat;
@@ -338,6 +377,24 @@ namespace GateRush.UI
         /// <summary>The Settings overlay's haptics row label.</summary>
         public string HapticsLabel => hapticsLabel;
 
+        /// <summary>The Leaderboard's line saying the table is simulated.</summary>
+        public string LeaderboardSimulatedNote => leaderboardSimulatedNote;
+
+        /// <summary>The Leaderboard page while a fetch is pending.</summary>
+        public string LeaderboardLoadingText => leaderboardLoadingText;
+
+        /// <summary>The Leaderboard page after a failed fetch.</summary>
+        public string LeaderboardFailedText => leaderboardFailedText;
+
+        /// <summary>The Leaderboard page's Retry label.</summary>
+        public string LeaderboardRetryLabel => leaderboardRetryLabel;
+
+        /// <summary>A row's score; {0} is the lifetime gold.</summary>
+        public string LeaderboardScoreFormat => leaderboardScoreFormat;
+
+        /// <summary>A row's rank; {0} is the rank.</summary>
+        public string LeaderboardRankFormat => leaderboardRankFormat;
+
         /// <summary>The flat colour behind every tab.</summary>
         public Color BackgroundColor => backgroundColor;
 
@@ -361,6 +418,45 @@ namespace GateRush.UI
 
         /// <summary>A button's label while it cannot be pressed.</summary>
         public Color DisabledButtonLabelColor => disabledButtonLabelColor;
+
+        /// <summary>The player's own row on the Leaderboard.</summary>
+        public Color LeaderboardHighlightColor => leaderboardHighlightColor;
+
+        /// <summary>Every other row on the Leaderboard.</summary>
+        public Color LeaderboardRowColor => leaderboardRowColor;
+
+        /// <summary>The first rank's medal.</summary>
+        public Color GoldMedalColor => goldMedalColor;
+
+        /// <summary>The second rank's medal.</summary>
+        public Color SilverMedalColor => silverMedalColor;
+
+        /// <summary>The third rank's medal.</summary>
+        public Color BronzeMedalColor => bronzeMedalColor;
+
+        /// <summary>
+        /// The medal colour of <paramref name="rank"/>: gold, silver and bronze
+        /// for the first three ranks. False, with <paramref name="color"/>
+        /// clear, for every other rank, which has no medal.
+        /// </summary>
+        public bool TryGetMedalColor(int rank, out Color color)
+        {
+            switch (rank)
+            {
+                case GoldRank:
+                    color = goldMedalColor;
+                    return true;
+                case SilverRank:
+                    color = silverMedalColor;
+                    return true;
+                case BronzeRank:
+                    color = bronzeMedalColor;
+                    return true;
+                default:
+                    color = Color.clear;
+                    return false;
+            }
+        }
 
         /// <summary>The colour <paramref name="role"/> stands for.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="role"/> is not a declared role.</exception>
@@ -480,6 +576,12 @@ namespace GateRush.UI
             AddIfBlank(problems, lifetimeGoldLabel, "Lifetime Gold Label");
             AddIfUnusableFormat(problems, statisticFormat, 1, "Statistic Format", "{0} for the number");
             AddIfBlank(problems, hapticsLabel, "Haptics Label");
+            AddIfBlank(problems, leaderboardSimulatedNote, "Leaderboard Simulated Note");
+            AddIfBlank(problems, leaderboardLoadingText, "Leaderboard Loading Text");
+            AddIfBlank(problems, leaderboardFailedText, "Leaderboard Failed Text");
+            AddIfBlank(problems, leaderboardRetryLabel, "Leaderboard Retry Label");
+            AddIfUnusableFormat(problems, leaderboardScoreFormat, 1, "Leaderboard Score Format", "{0} for the score");
+            AddIfUnusableFormat(problems, leaderboardRankFormat, 1, "Leaderboard Rank Format", "{0} for the rank");
             AddIfBlank(problems, clockName, "Clock Name");
             AddIfBlank(problems, rocketName, "Rocket Name");
             AddIfBlank(problems, broomName, "Broom Name");
@@ -492,6 +594,11 @@ namespace GateRush.UI
             AddIfTransparent(problems, streakColor, "Streak Color");
             AddIfTransparent(problems, buttonLabelColor, "Button Label Color");
             AddIfTransparent(problems, disabledButtonLabelColor, "Disabled Button Label Color");
+            AddIfTransparent(problems, goldMedalColor, "Gold Medal Color");
+            AddIfTransparent(problems, silverMedalColor, "Silver Medal Color");
+            AddIfTransparent(problems, bronzeMedalColor, "Bronze Medal Color");
+            AddIfTransparent(problems, leaderboardHighlightColor, "Leaderboard Highlight Color");
+            AddIfTransparent(problems, leaderboardRowColor, "Leaderboard Row Color");
 
             return problems;
         }

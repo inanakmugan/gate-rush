@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Meta;
+using GateRush.Platform;
 using GateRush.Runtime;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -38,6 +39,9 @@ namespace GateRush.UI
     /// <para><b>The Store</b> scrolls to the top whenever it is selected —
     /// by its tab, the gold "+" or Get Gold — so the gold packs are the first
     /// thing seen.</para>
+    /// <para><b>The Leaderboard</b> (Module 39) shows Loading and asks for a
+    /// fresh table each time it is selected, and when Retry is pressed; a
+    /// result that arrives while another tab is selected is ignored.</para>
     /// <para><b>Back</b> is the Escape key, which is also Android's back
     /// button under the Input System.</para>
     /// <para>No animation yet: screen transitions are Phase 7.</para>
@@ -58,7 +62,7 @@ namespace GateRush.UI
         [SerializeField] private HomeScreen home;
 
         [Tooltip("The Leaderboard tab's page.")]
-        [SerializeField] private GameObject leaderboardPage;
+        [SerializeField] private LeaderboardScreen leaderboard;
 
         [SerializeField] private TopBar topBar;
         [SerializeField] private TabBar tabBar;
@@ -121,6 +125,9 @@ namespace GateRush.UI
         public event Action<JokerKind> JokerPurchaseRequested;
 
         /// <inheritdoc />
+        public event Action LeaderboardRequested;
+
+        /// <inheritdoc />
         public event Action ButtonPressed;
 
         /// <inheritdoc />
@@ -133,7 +140,7 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, config, nameof(FrontEnd), nameof(config));
             UiParts.AddIfMissing(missing, store, nameof(FrontEnd), nameof(store));
             UiParts.AddIfMissing(missing, home, nameof(FrontEnd), nameof(home));
-            UiParts.AddIfMissing(missing, leaderboardPage, nameof(FrontEnd), nameof(leaderboardPage));
+            UiParts.AddIfMissing(missing, leaderboard, nameof(FrontEnd), nameof(leaderboard));
             UiParts.AddIfMissing(missing, topBar, nameof(FrontEnd), nameof(topBar));
             UiParts.AddIfMissing(missing, tabBar, nameof(FrontEnd), nameof(tabBar));
             UiParts.AddIfMissing(missing, settings, nameof(FrontEnd), nameof(settings));
@@ -157,6 +164,11 @@ namespace GateRush.UI
             if (home != null)
             {
                 home.AddMissing(missing);
+            }
+
+            if (leaderboard != null)
+            {
+                leaderboard.AddMissing(missing);
             }
 
             if (topBar != null)
@@ -359,6 +371,23 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void ShowLeaderboard(LeaderboardResult result)
+        {
+            if (result == null)
+            {
+                throw new ArgumentNullException(nameof(result));
+            }
+
+            RequireOpen(nameof(ShowLeaderboard));
+            if (navigation.Tab != UiTab.Leaderboard)
+            {
+                return;
+            }
+
+            leaderboard.Show(result, config, avatarCatalog);
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
             gameObject.SetActive(false);
@@ -434,7 +463,7 @@ namespace GateRush.UI
             var tab = navigation.Tab;
             store.gameObject.SetActive(tab == UiTab.Store);
             home.gameObject.SetActive(tab == UiTab.Home);
-            leaderboardPage.SetActive(tab == UiTab.Leaderboard);
+            leaderboard.gameObject.SetActive(tab == UiTab.Leaderboard);
             tabBar.ShowSelected(tab);
 
             var open = navigation.Overlays;
@@ -500,7 +529,7 @@ namespace GateRush.UI
         /// </summary>
         private void Subscribe()
         {
-            if (isSubscribed || store == null || home == null || topBar == null || tabBar == null
+            if (isSubscribed || store == null || home == null || leaderboard == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
                 || notEnoughGold == null || message == null || testPurchase == null
                 || winStreak == null || streakReward == null || profile == null || streakBar == null)
@@ -513,6 +542,7 @@ namespace GateRush.UI
             store.GoldPackRequested += OnGoldPackRequested;
             store.JokerPurchaseRequested += OnJokerPurchaseRequested;
             store.RefillRequested += OnRefillRequested;
+            leaderboard.RetryRequested += OnLeaderboardRetryRequested;
             topBar.StoreRequested += OnStoreRequested;
             topBar.LivesRequested += OnLivesRequested;
             topBar.SettingsRequested += OnSettingsRequested;
@@ -554,6 +584,7 @@ namespace GateRush.UI
             store.GoldPackRequested -= OnGoldPackRequested;
             store.JokerPurchaseRequested -= OnJokerPurchaseRequested;
             store.RefillRequested -= OnRefillRequested;
+            leaderboard.RetryRequested -= OnLeaderboardRetryRequested;
             topBar.StoreRequested -= OnStoreRequested;
             topBar.LivesRequested -= OnLivesRequested;
             topBar.SettingsRequested -= OnSettingsRequested;
@@ -585,6 +616,8 @@ namespace GateRush.UI
         /// Shows where the navigation now is. A test purchase sheet that was
         /// closed by anything but Buy — Cancel, its close button, Back, a tab —
         /// is answered no here, the one place every way of closing it passes.
+        /// Arriving on the Leaderboard asks for a fresh table, after the page is
+        /// shown, so a result that comes back at once lands on a laid-out page.
         /// </summary>
         private void OnNavigationChanged()
         {
@@ -593,6 +626,10 @@ namespace GateRush.UI
             {
                 shownTab = navigation.Tab;
                 home.ClearNotice();
+                if (shownTab == UiTab.Leaderboard)
+                {
+                    RequestLeaderboard();
+                }
             }
 
             if (pendingAnswer != null && !Contains(navigation.Overlays, UiOverlay.TestPurchase))
@@ -623,6 +660,19 @@ namespace GateRush.UI
         {
             navigation.SelectTab(UiTab.Store);
             store.ScrollToTop();
+        }
+
+        /// <summary>Shows Loading on the Leaderboard page and asks the bootstrap for a table.</summary>
+        private void RequestLeaderboard()
+        {
+            leaderboard.ShowLoading(config);
+            LeaderboardRequested?.Invoke();
+        }
+
+        private void OnLeaderboardRetryRequested()
+        {
+            RequestLeaderboard();
+            ButtonPressed?.Invoke();
         }
 
         private void OnPlayRequested()
