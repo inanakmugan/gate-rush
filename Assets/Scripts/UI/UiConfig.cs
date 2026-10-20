@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GateRush.Meta;
 using GateRush.Runtime;
 using UnityEngine;
 
@@ -7,8 +8,8 @@ namespace GateRush.UI
 {
     /// <summary>
     /// Every text, format string and colour the front end's screens set from
-    /// code (Modules 35 and 36, D68, D69, D72): the texts that carry a number or change
-    /// with the state, the theme's background and icon colours, and the
+    /// code (Modules 35, 36 and 37, D68, D69, D72): the texts that carry a number or change
+    /// with the state, the joker names, the theme's colours, and the
     /// colours that change at runtime. Fixed English titles, layout and
     /// colours that never change live on the prefabs.
     /// </summary>
@@ -97,6 +98,57 @@ namespace GateRush.UI
             new RibbonEntry("gold_large", "Best Value"),
         };
 
+        [Header("Win streak texts (formats use the invariant culture)")]
+        [Tooltip("The streak beside the fire on Home's streak bar; {0} is the streak.")]
+        [SerializeField] private string streakCountFormat = "{0}";
+
+        [Tooltip("The streak bar's line at a streak of 0; {0} is the first reward's wins and {1} the reward.")]
+        [SerializeField] private string firstRewardFormat = "Win {0} in a row: {1}";
+
+        [Tooltip("The streak bar's line with more than one win to the next reward; {0} is the wins left and {1} the reward.")]
+        [SerializeField] private string moreWinsFormat = "{0} more wins: {1}";
+
+        [Tooltip("The streak bar's line with one win to the next reward; {0} is the reward.")]
+        [SerializeField] private string oneMoreWinFormat = "1 more win: {0}";
+
+        [Tooltip("The streak bar's line past the last reward.")]
+        [SerializeField] private string allRewardsCollectedLabel = "Every reward collected";
+
+        [Tooltip("The Win Streak overlay's current streak; {0} is the streak.")]
+        [SerializeField] private string currentStreakFormat = "Streak {0}";
+
+        [Tooltip("The Win Streak overlay's best streak; {0} is the best.")]
+        [SerializeField] private string bestStreakFormat = "Best {0}";
+
+        [Tooltip("A ladder row's wins; {0} is the wins.")]
+        [SerializeField] private string ladderWinsFormat = "{0} wins";
+
+        [Tooltip("A reward with its count, on a ladder row and wherever a count above 1 is named; {0} is the joker's name and {1} the count.")]
+        [SerializeField] private string ladderRewardFormat = "{0} x{1}";
+
+        [Tooltip("A marker's count on the streak bar, shown only above 1; {0} is the count.")]
+        [SerializeField] private string markerCountFormat = "x{0}";
+
+        [Tooltip("A ladder row's state when the reward was reached in the current streak.")]
+        [SerializeField] private string collectedLabel = "Collected";
+
+        [Tooltip("A ladder row's state on the first reward not reached.")]
+        [SerializeField] private string nextLabel = "Next";
+
+        [Tooltip("The rule at the bottom of the Win Streak overlay (D58, D61).")]
+        [SerializeField] private string streakRuleText = "Win campaign levels in a row. A lost level resets the streak. Free play does not count.";
+
+        [Tooltip("The Streak Reward overlay's headline; {0} is the streak of the latest rewarded win.")]
+        [SerializeField] private string rewardHeadlineFormat = "{0} wins in a row!";
+
+        [Tooltip("A line of the Streak Reward overlay; {0} is the count and {1} the joker's name.")]
+        [SerializeField] private string prizeFormat = "+{0} {1}";
+
+        [Header("Joker names")]
+        [SerializeField] private string clockName = "Clock";
+        [SerializeField] private string rocketName = "Rocket";
+        [SerializeField] private string broomName = "Broom";
+
         [Header("Theme colours (applied through UiTint)")]
         [Tooltip("The flat colour behind every tab: the reference game's purple.")]
         [SerializeField] private Color backgroundColor = new Color(0.36f, 0.20f, 0.62f);
@@ -109,6 +161,9 @@ namespace GateRush.UI
 
         [SerializeField] private Color coinColor = new Color(1f, 0.80f, 0.20f);
         [SerializeField] private Color heartColor = new Color(0.95f, 0.27f, 0.36f);
+
+        [Tooltip("The win streak's fire, the bar's fill and the next reward's highlight.")]
+        [SerializeField] private Color streakColor = new Color(1f, 0.55f, 0.12f);
 
         [Header("Colours that change")]
         [Tooltip("A button's label while it can be pressed.")]
@@ -183,6 +238,51 @@ namespace GateRush.UI
         /// <summary>The message prompt's line for a failed purchase.</summary>
         public string PurchaseFailedText => purchaseFailedText;
 
+        /// <summary>The streak beside the fire; {0} is the streak.</summary>
+        public string StreakCountFormat => streakCountFormat;
+
+        /// <summary>The bar's line at a streak of 0; {0} the first reward's wins, {1} the reward.</summary>
+        public string FirstRewardFormat => firstRewardFormat;
+
+        /// <summary>The bar's line with more than one win left; {0} the wins left, {1} the reward.</summary>
+        public string MoreWinsFormat => moreWinsFormat;
+
+        /// <summary>The bar's line with one win left; {0} the reward.</summary>
+        public string OneMoreWinFormat => oneMoreWinFormat;
+
+        /// <summary>The bar's line past the last reward.</summary>
+        public string AllRewardsCollectedLabel => allRewardsCollectedLabel;
+
+        /// <summary>The Win Streak overlay's current streak; {0} is the streak.</summary>
+        public string CurrentStreakFormat => currentStreakFormat;
+
+        /// <summary>The Win Streak overlay's best streak; {0} is the best.</summary>
+        public string BestStreakFormat => bestStreakFormat;
+
+        /// <summary>A ladder row's wins; {0} is the wins.</summary>
+        public string LadderWinsFormat => ladderWinsFormat;
+
+        /// <summary>A reward with its count; {0} the joker's name, {1} the count.</summary>
+        public string LadderRewardFormat => ladderRewardFormat;
+
+        /// <summary>A marker's count above 1; {0} is the count.</summary>
+        public string MarkerCountFormat => markerCountFormat;
+
+        /// <summary>A ladder row's state for a reward reached in the current streak.</summary>
+        public string CollectedLabel => collectedLabel;
+
+        /// <summary>A ladder row's state for the first reward not reached.</summary>
+        public string NextLabel => nextLabel;
+
+        /// <summary>The rule at the bottom of the Win Streak overlay.</summary>
+        public string StreakRuleText => streakRuleText;
+
+        /// <summary>The Streak Reward overlay's headline; {0} is the latest rewarded streak.</summary>
+        public string RewardHeadlineFormat => rewardHeadlineFormat;
+
+        /// <summary>A line of the Streak Reward overlay; {0} the count, {1} the joker's name.</summary>
+        public string PrizeFormat => prizeFormat;
+
         /// <summary>The flat colour behind every tab.</summary>
         public Color BackgroundColor => backgroundColor;
 
@@ -197,6 +297,9 @@ namespace GateRush.UI
 
         /// <summary>The lives' heart.</summary>
         public Color HeartColor => heartColor;
+
+        /// <summary>The win streak's fire, the bar's fill and the next reward's highlight.</summary>
+        public Color StreakColor => streakColor;
 
         /// <summary>A button's label while it can be pressed.</summary>
         public Color ButtonLabelColor => buttonLabelColor;
@@ -220,8 +323,27 @@ namespace GateRush.UI
                     return coinColor;
                 case UiColorRole.Heart:
                     return heartColor;
+                case UiColorRole.Streak:
+                    return streakColor;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(role), role, "Not a colour role.");
+            }
+        }
+
+        /// <summary>The name <paramref name="kind"/> is shown by, on the Store and the win streak's screens.</summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public string JokerName(JokerKind kind)
+        {
+            switch (kind)
+            {
+                case JokerKind.Clock:
+                    return clockName;
+                case JokerKind.Rocket:
+                    return rocketName;
+                case JokerKind.Broom:
+                    return broomName;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind, "Not a joker kind.");
             }
         }
 
@@ -279,11 +401,31 @@ namespace GateRush.UI
             AddIfBlank(problems, purchaseFailedText, "Purchase Failed Text");
             AddRibbonProblems(problems);
 
+            AddIfUnusableFormat(problems, streakCountFormat, 1, "Streak Count Format", "{0} for the streak");
+            AddIfUnusableFormat(problems, firstRewardFormat, 2, "First Reward Format", "{0} for the wins and {1} for the reward");
+            AddIfUnusableFormat(problems, moreWinsFormat, 2, "More Wins Format", "{0} for the wins left and {1} for the reward");
+            AddIfUnusableFormat(problems, oneMoreWinFormat, 1, "One More Win Format", "{0} for the reward");
+            AddIfBlank(problems, allRewardsCollectedLabel, "All Rewards Collected Label");
+            AddIfUnusableFormat(problems, currentStreakFormat, 1, "Current Streak Format", "{0} for the streak");
+            AddIfUnusableFormat(problems, bestStreakFormat, 1, "Best Streak Format", "{0} for the best");
+            AddIfUnusableFormat(problems, ladderWinsFormat, 1, "Ladder Wins Format", "{0} for the wins");
+            AddIfUnusableFormat(problems, ladderRewardFormat, 2, "Ladder Reward Format", "{0} for the joker's name and {1} for the count");
+            AddIfUnusableFormat(problems, markerCountFormat, 1, "Marker Count Format", "{0} for the count");
+            AddIfBlank(problems, collectedLabel, "Collected Label");
+            AddIfBlank(problems, nextLabel, "Next Label");
+            AddIfBlank(problems, streakRuleText, "Streak Rule Text");
+            AddIfUnusableFormat(problems, rewardHeadlineFormat, 1, "Reward Headline Format", "{0} for the streak");
+            AddIfUnusableFormat(problems, prizeFormat, 2, "Prize Format", "{0} for the count and {1} for the joker's name");
+            AddIfBlank(problems, clockName, "Clock Name");
+            AddIfBlank(problems, rocketName, "Rocket Name");
+            AddIfBlank(problems, broomName, "Broom Name");
+
             AddIfTransparent(problems, backgroundColor, "Background Color");
             AddIfTransparent(problems, iconColor, "Icon Color");
             AddIfTransparent(problems, idleTabIconColor, "Idle Tab Icon Color");
             AddIfTransparent(problems, coinColor, "Coin Color");
             AddIfTransparent(problems, heartColor, "Heart Color");
+            AddIfTransparent(problems, streakColor, "Streak Color");
             AddIfTransparent(problems, buttonLabelColor, "Button Label Color");
             AddIfTransparent(problems, disabledButtonLabelColor, "Disabled Button Label Color");
 

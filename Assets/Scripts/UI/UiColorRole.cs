@@ -20,6 +20,9 @@ namespace GateRush.UI
         Coin,
 
         /// <summary>The lives' heart (<see cref="UiConfig.HeartColor"/>).</summary>
-        Heart
+        Heart,
+
+        /// <summary>The win streak's fire, the bar's fill and the next reward's highlight (<see cref="UiConfig.StreakColor"/>).</summary>
+        Streak
     }
 }

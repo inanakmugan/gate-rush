@@ -8,10 +8,10 @@ using UnityEngine.InputSystem;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The front end (Modules 35 and 36, D68): three tabs — Store, Home and
+    /// The front end (Modules 35, 36 and 37, D68): three tabs — Store, Home and
     /// Leaderboard — under a top bar and over a tab bar, and a stack of
-    /// overlays — Settings, Levels, Lives, Not Enough Gold, Message and Test
-    /// Purchase — over them. Implements <see cref="IFrontEnd"/>, the one way
+    /// overlays — Settings, Levels, Lives, Not Enough Gold, Message, Test
+    /// Purchase, Win Streak and Streak Reward — over them. Implements <see cref="IFrontEnd"/>, the one way
     /// the bootstrap shows and hears it.
     /// </summary>
     /// <remarks>
@@ -23,7 +23,9 @@ namespace GateRush.UI
     /// code finds their parts only through the serialized fields here and on
     /// the views (<see cref="TopBar"/>, <see cref="TabBar"/>,
     /// <see cref="HomeScreen"/>, <see cref="StoreScreen"/>, the overlays).
-    /// <see cref="MissingSetup"/> names whatever is not assigned.</para>
+    /// <see cref="MissingSetup"/> names whatever is not assigned. The streak
+    /// bar sits inside Home Page, which is laid out by hand, so it is held
+    /// here rather than by <see cref="HomeScreen"/>.</para>
     /// <para><b>Open and closed.</b> <see cref="Show"/> and
     /// <see cref="Hide"/> switch this component's own GameObject, so nothing
     /// here runs, Back included, while it is closed. Nothing depends on the
@@ -69,6 +71,14 @@ namespace GateRush.UI
         [SerializeField] private NotEnoughGoldOverlay notEnoughGold;
         [SerializeField] private MessageOverlay message;
         [SerializeField] private TestPurchaseOverlay testPurchase;
+        [SerializeField] private WinStreakOverlay winStreak;
+        [SerializeField] private StreakRewardOverlay streakReward;
+
+        [Tooltip("The streak bar: a nested instance under the Home Page instance's Streak Area, placed by the UI builder.")]
+        [SerializeField] private StreakBar streakBar;
+
+        [Tooltip("Assets/Config/JokerIcons.asset: the joker icons the streak's screens draw.")]
+        [SerializeField] private JokerIcons jokerIcons;
 
         private readonly UiNavigation navigation = new UiNavigation();
 
@@ -119,6 +129,10 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, notEnoughGold, nameof(FrontEnd), nameof(notEnoughGold));
             UiParts.AddIfMissing(missing, message, nameof(FrontEnd), nameof(message));
             UiParts.AddIfMissing(missing, testPurchase, nameof(FrontEnd), nameof(testPurchase));
+            UiParts.AddIfMissing(missing, winStreak, nameof(FrontEnd), nameof(winStreak));
+            UiParts.AddIfMissing(missing, streakReward, nameof(FrontEnd), nameof(streakReward));
+            UiParts.AddIfMissing(missing, streakBar, nameof(FrontEnd), nameof(streakBar));
+            UiParts.AddIfMissing(missing, jokerIcons, nameof(FrontEnd), nameof(jokerIcons));
 
             if (store != null)
             {
@@ -170,6 +184,21 @@ namespace GateRush.UI
                 testPurchase.AddMissing(missing);
             }
 
+            if (winStreak != null)
+            {
+                winStreak.AddMissing(missing);
+            }
+
+            if (streakReward != null)
+            {
+                streakReward.AddMissing(missing);
+            }
+
+            if (streakBar != null)
+            {
+                streakBar.AddMissing(missing);
+            }
+
             var tints = GetComponentsInChildren<UiTint>(true);
             for (var i = 0; i < tints.Length; i++)
             {
@@ -184,12 +213,17 @@ namespace GateRush.UI
 
             if (!OverlaysShareOneParent())
             {
-                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message and Test Purchase overlays must share one parent, which stacks them");
+                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message, Test Purchase, Win Streak and Streak Reward overlays must share one parent, which stacks them");
             }
 
             if (config != null)
             {
                 missing.AddRange(config.Problems());
+            }
+
+            if (jokerIcons != null)
+            {
+                missing.AddRange(jokerIcons.Problems());
             }
 
             return missing.Count == 0
@@ -218,6 +252,8 @@ namespace GateRush.UI
             settings.Show(state);
             levels.Show(state.Levels ?? Array.Empty<LevelEntry>(), config);
             lives.Show(state, config);
+            streakBar.Show(state, config, jokerIcons);
+            winStreak.Show(state, config, jokerIcons);
         }
 
         /// <inheritdoc />
@@ -272,6 +308,24 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void ShowStreakReward(int latestStreak, IReadOnlyList<StreakReward> rewards)
+        {
+            if (rewards == null)
+            {
+                throw new ArgumentNullException(nameof(rewards));
+            }
+
+            if (rewards.Count == 0)
+            {
+                throw new ArgumentException("A streak reward announcement needs at least one reward.", nameof(rewards));
+            }
+
+            RequireOpen(nameof(ShowStreakReward));
+            streakReward.Show(latestStreak, rewards, config, jokerIcons);
+            navigation.Open(UiOverlay.StreakReward);
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
             gameObject.SetActive(false);
@@ -315,7 +369,7 @@ namespace GateRush.UI
 
         private bool OverlaysShareOneParent()
         {
-            var overlays = new Component[] { settings, levels, lives, notEnoughGold, message, testPurchase };
+            var overlays = new Component[] { settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward };
             Transform parent = null;
             for (var i = 0; i < overlays.Length; i++)
             {
@@ -357,6 +411,8 @@ namespace GateRush.UI
             notEnoughGold.gameObject.SetActive(Contains(open, UiOverlay.NotEnoughGold));
             message.gameObject.SetActive(Contains(open, UiOverlay.Message));
             testPurchase.gameObject.SetActive(Contains(open, UiOverlay.TestPurchase));
+            winStreak.gameObject.SetActive(Contains(open, UiOverlay.WinStreak));
+            streakReward.gameObject.SetActive(Contains(open, UiOverlay.StreakReward));
             for (var i = 0; i < open.Count; i++)
             {
                 OverlayObject(open[i]).transform.SetAsLastSibling();
@@ -392,6 +448,10 @@ namespace GateRush.UI
                     return message;
                 case UiOverlay.TestPurchase:
                     return testPurchase;
+                case UiOverlay.WinStreak:
+                    return winStreak;
+                case UiOverlay.StreakReward:
+                    return streakReward;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(overlay), overlay, "Not a front end overlay.");
             }
@@ -406,7 +466,8 @@ namespace GateRush.UI
         {
             if (isSubscribed || store == null || home == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
-                || notEnoughGold == null || message == null || testPurchase == null)
+                || notEnoughGold == null || message == null || testPurchase == null
+                || winStreak == null || streakReward == null || streakBar == null)
             {
                 return;
             }
@@ -432,6 +493,9 @@ namespace GateRush.UI
             message.CloseRequested += OnMessageCloseRequested;
             testPurchase.CloseRequested += OnTestPurchaseCloseRequested;
             testPurchase.BuyRequested += OnTestPurchaseBuyRequested;
+            streakBar.Pressed += OnStreakBarPressed;
+            winStreak.CloseRequested += OnWinStreakCloseRequested;
+            streakReward.CollectRequested += OnStreakRewardCollectRequested;
             isSubscribed = true;
         }
 
@@ -465,6 +529,9 @@ namespace GateRush.UI
             message.CloseRequested -= OnMessageCloseRequested;
             testPurchase.CloseRequested -= OnTestPurchaseCloseRequested;
             testPurchase.BuyRequested -= OnTestPurchaseBuyRequested;
+            streakBar.Pressed -= OnStreakBarPressed;
+            winStreak.CloseRequested -= OnWinStreakCloseRequested;
+            streakReward.CollectRequested -= OnStreakRewardCollectRequested;
             isSubscribed = false;
         }
 
@@ -603,6 +670,16 @@ namespace GateRush.UI
         private void OnMessageCloseRequested() => OnCloseClicked(UiOverlay.Message);
 
         private void OnTestPurchaseCloseRequested() => OnCloseClicked(UiOverlay.TestPurchase);
+
+        private void OnStreakBarPressed()
+        {
+            navigation.Open(UiOverlay.WinStreak);
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnWinStreakCloseRequested() => OnCloseClicked(UiOverlay.WinStreak);
+
+        private void OnStreakRewardCollectRequested() => OnCloseClicked(UiOverlay.StreakReward);
 
         /// <summary>
         /// Buy: the answer is taken before the sheet closes, so closing it

@@ -1,6 +1,6 @@
 namespace GateRush.UI
 {
-    /// <summary>The pages that open over a tab, newest on top (Modules 35 and 36).</summary>
+    /// <summary>The pages that open over a tab, newest on top (Modules 35, 36 and 37).</summary>
     public enum UiOverlay
     {
         /// <summary>The sound toggle and the Levels button.</summary>
@@ -19,6 +19,12 @@ namespace GateRush.UI
         Message,
 
         /// <summary>The simulated store's confirmation of a gold pack, Buy or Cancel (D72).</summary>
-        TestPurchase
+        TestPurchase,
+
+        /// <summary>The win streak's ladder: every reward, the current and best streaks, and the rule (D61).</summary>
+        WinStreak,
+
+        /// <summary>The streak rewards campaign wins gave since the last announcement, and Collect.</summary>
+        StreakReward
     }
 }
