@@ -172,7 +172,7 @@ RectTransform:
   - {fileID: 412920575041940884}
   - {fileID: 7374177376478858284}
   - {fileID: 6571646625387443591}
-  - {fileID: 8754030128480730930}
+  - {fileID: 2295599450172407842}
   m_Father: {fileID: 6785384175324722287}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
@@ -621,7 +621,7 @@ MonoBehaviour:
   titleLabel: {fileID: 3418740728689479765}
   offerLabel: {fileID: 5405649880601432724}
   noteLabel: {fileID: 4006187356104749855}
-  buyButton: {fileID: 3435050930027326910}
+  buyButton: {fileID: 5263805350889755310}
   cancelButton: {fileID: 1001062815891629835}
 --- !u!1001 &378786186150795755
 PrefabInstance:
@@ -837,7 +837,12 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
---- !u!114 &3435050930027326910 stripped
+--- !u!224 &2295599450172407842 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 3062869135034553234, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
+  m_PrefabInstance: {fileID: 3844636786758636464}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &5263805350889755310 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8959401123252289822, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
   m_PrefabInstance: {fileID: 3844636786758636464}
@@ -848,11 +853,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
---- !u!224 &8754030128480730930 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 3062869135034553234, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
-  m_PrefabInstance: {fileID: 3844636786758636464}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &6052256554996411552
 PrefabInstance:
   m_ObjectHideFlags: 0
