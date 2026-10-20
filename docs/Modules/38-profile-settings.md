@@ -228,3 +228,39 @@ that an older save is read with the defaults rather than refused, is not.
 - A version 3 save from before this module loads with every gold, life,
   joker and streak kept, named "Player".
 - On a phone browser, the name field opens the keyboard and Enter saves.
+
+---
+
+## Resolved during implementation
+
+- **Resets, not refusals.** `ISaveCodec.TryDecode` gains an `out` list of
+  the fields it reset. A version 4 save with a refused name or an empty
+  avatar id reads the default for that field; `SaveRepository` turns each
+  reset into a load problem, which the bootstrap logs as a warning, and
+  the save still loads. Nothing is written at load (D56).
+- **The name rule** keeps its limits as constants in `PlayerProfile`.
+  "Digits" are any Unicode decimal digit. A decomposed I with a combining
+  dot and letters outside the Basic Multilingual Plane are refused, since
+  the name is never normalized beyond trimming and collapsing spaces;
+  Turkish keyboards send the precomposed letters. The refusal line's "1 to
+  16" is configuration text, kept in step by hand.
+- **The avatar.** `AvatarCatalog.ShownId` gives the top bar, the large
+  avatar and the grid mark one answer, so an id the catalog no longer has
+  shows and marks the first avatar everywhere. A whitespace-only id counts
+  as empty. *Gate Rush → Fill Avatar Catalog* writes the catalog from the
+  thirty Round avatars in name order.
+- **The name field** is TMP_InputField's single line with the mobile
+  keyboard. It is not overwritten while focused, though the front end
+  refreshes every second; editing ends on Enter or losing focus, and a
+  request is raised only when the text changed. Escape cancels the edit
+  and may also close Profile in the same frame.
+- **Haptics.** `SoundPlayer.Pulse` follows `IsHapticsOn`; `IsOn` gates
+  only sounds. The off look is the phone icon with a red cross over it.
+- **Top Bar** is hand-made: its avatar got a `Button` and the two new
+  `TopBar` fields in the Editor.
+- **Nunito ExtraBold** is a dynamic font asset in the fallback list of
+  `Fredoka-Bold SDF`.
+- **Not checked by hand yet:** vibration independent of the sound on an
+  Android phone, and the name field with a phone's keyboard; both wait
+  for the next web build.
+- **Tests.** 110 new; 2,380 in all.

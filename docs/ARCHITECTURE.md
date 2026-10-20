@@ -279,7 +279,7 @@ runtime. Therefore:
 | No file system | `ISaveStore` → `PlayerPrefs` implementation on WebGL |
 | No async file reads | Levels ship in `Resources`, loaded synchronously |
 | No threads | Solver never runs at runtime — it is editor-only |
-| Haptics | `IHaptics` → `WebHaptics`, the browser's Vibration API through a `.jslib`; does nothing in the Editor and where the API is missing (every iOS browser) |
+| Haptics | `IHaptics` → `WebHaptics`, the browser's Vibration API through a `.jslib`; does nothing in the Editor and where the API is missing (every iOS browser). Switched by its own setting, independent of the sound (Module 38) |
 | Mouse vs. touch | Unified pointer handling in `InputController` |
 | Large build size | Code stripping, Brotli without decompression fallback: itch.io sends the right `Content-Encoding` (D51) |
 

@@ -24,7 +24,8 @@ a bar under the board, the Clock on a press, the Rocket and the Broom on a
 tap of a block. The interface is under way (Phase 6): the menu is a
 front end of tabs, overlays and a top bar built from uGUI prefabs, with
 a Store that sells gold packs through a simulated purchase service that
-charges nothing and a win streak bar that shows the rewards ahead. Sound
+charges nothing, a win streak bar that shows the rewards ahead, and a
+Profile with the player's name and avatar. Sound
 effects and haptics came forward from Phase 7. The
 itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -136,7 +137,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,270 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,380 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
@@ -144,8 +145,9 @@ are all tested headless.
 
 - Interface art: [Kenney](https://kenney.nl) — UI Pack, Game Icons, Board
   Game Icons and Animal Pack Redux, all CC0.
-- Font: [Fredoka](https://fonts.google.com/specimen/Fredoka), SIL Open Font
-  License 1.1.
+- Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka), with
+  [Nunito](https://fonts.google.com/specimen/Nunito) ExtraBold as the
+  fallback for Turkish letters, both SIL Open Font License 1.1.
 
 The licences are kept beside the files under `Assets/ThirdParty/`.
 
