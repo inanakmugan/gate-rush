@@ -179,3 +179,39 @@ come from `JokerButtons` in `Runtime`, is not.
 - Menu and Restart still open the leave confirmation.
 - The layout holds on a tall phone and in the web build's window, and the
   board still fits between the two bands.
+
+---
+
+## Resolved during implementation
+
+- **The buttons.** `JokerButton` holds the badge kind (count or price),
+  the number, whether it can be pressed and the shortfall; `JokerButtons`
+  still decides them. The badge text is formatted in `GateRush.UI` with
+  `UiConfig`, since `Runtime` cannot read it. A press reads the same
+  `LevelUiState` that drew the button, so the two never disagree; a short
+  press stops the level, opens Not Enough Gold and keeps any selection.
+- **One pause.** `IsPaused` is true while the leave confirmation or any
+  in-level overlay is open; it holds the board, the R key, Menu, Restart
+  and the joker buttons, and the countdown resumes only when the level is
+  being played and nothing is open. `UiNavigation.ReplaceTop` lets Get
+  Gold swap Not Enough Gold for the gold packs without emptying the stack,
+  so the countdown never resumes on the way.
+- **The overlay stack** in a level is `LevelOverlayStack`, plain C# and
+  tested; Level UI nests the front end's built overlays and drives them
+  without `FrontEnd`'s code. The test purchase sheet opens in whichever of
+  the front end or the level UI is open; the two never are together.
+  Escape closes the top in-level overlay and nothing else; with none open
+  a level reads no Escape, as before.
+- **The bands.** The camera fit gives the level UI the same band anchors
+  it keeps free, and `BandFit` scales each row down to its band, so the
+  board still fits between them.
+- **The look.** "Level N" and "Free Play" are plain right-aligned text;
+  the timer reads m:ss and the time bonus "+20". A button that cannot be
+  pressed is grey; a short price is drawn in its own colour. The timings
+  of the time bonus and the timer pulse moved to `UiConfig` with the
+  texts and colours.
+- **Removed.** `HudView`, `JokerBar`, their `RuntimeConfig` fields, the
+  `MetaText` members only they used, and 44 tests of them. The fields
+  still read by the camera fit, the board effects, the result panel, the
+  confirmation and the introduction card stay.
+- **Tests.** 102 new, 44 removed; 2,517 in all.
