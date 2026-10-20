@@ -36,7 +36,6 @@ MonoBehaviour:
   shutterSlatsSprite: {fileID: 21300000, guid: 18041f29213268c43a9bf2f689c5a938, type: 3}
   doorPanelSprite: {fileID: 21300000, guid: 40868de770378ac49b71f39dcc429d56, type: 3}
   clockSprite: {fileID: 21300000, guid: dd8716c6174b2bc4d981bce0856be4fc, type: 3}
-  restartSprite: {fileID: 21300000, guid: 89364eb0db9befd4c91a7efbf80332cb, type: 3}
   cubeSprite: {fileID: 21300000, guid: 37dd6b6b58c871e4b9a8596eb9eb91ab, type: 3}
   shardSprite: {fileID: 21300000, guid: f9efff3a6a10d7e4d8e4c4e166140569, type: 3}
   gateGlowSprite: {fileID: 21300000, guid: 5c6de48fd20565048a09c934e317d494, type: 3}
@@ -108,6 +107,8 @@ MonoBehaviour:
   peelCubeFraction: 0.5
   peelBumpCells: 0.15
   peelBumpEase: 6
+  breakFadeSeconds: 0.2
+  breakFadeEase: 6
   cubeCountPerCell: 8
   cubeCap: 40
   cubeSizeCells: {x: 0.16, y: 0.26}
@@ -157,116 +158,16 @@ MonoBehaviour:
   generatorPreviewCornerCells: 0.18
   generatorPreviewFadeInSeconds: 0.1
   generatorPreviewFadeOutSeconds: 0.12
-  hudSidePaddingUnits: 40
-  hudRestartSizeUnits: 120
-  hudRestartCornerUnits: 30
-  hudRestartIconSizeUnits: 72
-  hudPillHeightUnits: 96
-  timerPillWidthUnits: 280
-  levelPillWidthUnits: 260
-  hudClockIconSizeUnits: 60
-  hudIconGapUnits: 12
-  hudFontSize: 56
-  timerWarningSeconds: 10
-  hudPillColor: {r: 0.08, g: 0.08, b: 0.16, a: 0.9}
-  hudTextColor: {r: 1, g: 1, b: 1, a: 1}
-  hudIconColor: {r: 1, g: 1, b: 1, a: 1}
-  timerWarningColor: {r: 1, g: 0.32, b: 0.32, a: 1}
-  levelLabelFormat: Level {0}
-  timeBonusFormat: +{0} s
-  timeBonusColor: {r: 0.45, g: 1, b: 0.45, a: 1}
-  timeBonusFontSize: 56
-  timeBonusGapUnits: 16
-  timeBonusRiseUnits: 60
-  timeBonusSeconds: 0.9
-  timeBonusEase: 6
-  timerPulseScale: 1.15
-  timerPulseSeconds: 0.25
-  hudButtonGapUnits: 20
-  hudMenuBarSizeUnits: {x: 60, y: 10}
-  hudMenuBarGapUnits: 12
-  winTitle: Level Complete
-  allDoneTitle: All Levels Played
-  allDoneMessage: Thanks for playing!
-  lossTitle: Time's Up
-  resultMessageHeightUnits: 80
-  resultMessageFontSize: 56
-  resultMessageColor: {r: 1, g: 1, b: 1, a: 1}
-  menuLabel: Menu
-  menuButtonColor: {r: 0.33, g: 0.4, b: 0.62, a: 1}
-  resultBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
-  resultPanelSizeUnits: {x: 860, y: 860}
-  resultPanelCornerUnits: 60
-  resultPaddingUnits: 60
-  resultTitleFontSize: 110
-  resultTitleColor: {r: 1, g: 1, b: 1, a: 1}
-  resultButtonSizeUnits: {x: 340, y: 130}
-  resultButtonCornerUnits: 40
-  resultButtonGapUnits: 40
-  resultButtonFontSize: 64
-  resultButtonTextColor: {r: 1, g: 1, b: 1, a: 1}
-  nextButtonColor: {r: 0.3, g: 0.78, b: 0.32, a: 1}
-  restartButtonColor: {r: 1, g: 0.58, b: 0.15, a: 1}
-  nextLabel: Next
-  restartLabel: Restart
-  resultPopSeconds: 0.25
-  resultPopEase: 27
-  resultPopStartScale: 0.8
-  gameTitle: Gate Rush
-  playLabel: Play
-  levelsLabel: Levels
-  soundOnLabel: 'Sound: On'
-  soundOffLabel: 'Sound: Off'
-  levelSelectTitle: Levels
-  backLabel: Back
-  menuPaddingUnits: 60
-  menuTitleHeightUnits: 240
-  menuTitleWidthUnits: 900
-  menuTitleFontSize: 170
-  levelSelectTitleFontSize: 120
-  menuTitleColor: {r: 1, g: 1, b: 1, a: 1}
-  menuSectionGapUnits: 90
-  menuButtonSizeUnits: {x: 520, y: 150}
-  menuButtonCornerUnits: 46
-  menuButtonFontSize: 76
-  menuButtonGapUnits: 40
-  levelSelectColumns: 4
-  levelTileSizeUnits: 190
-  levelTileCornerUnits: 44
-  levelTileGapUnits: 30
-  levelTileFontSize: 84
-  levelTileColor: {r: 0.2, g: 0.24, b: 0.44, a: 1}
-  levelTileCompletedColor: {r: 0.3, g: 0.78, b: 0.32, a: 1}
-  levelTickSizeUnits: 60
-  levelTickThicknessUnits: 12
-  levelTickColor: {r: 1, g: 1, b: 1, a: 1}
-  levelTickInsetUnits: 10
-  settingsLabel: Settings
-  settingsTitle: Settings
-  metaSeparator: ' | '
-  goldFormat: Gold {0}
-  livesFullFormat: Lives {0}/{1}
-  livesWaitingFormat: Lives {0}/{1} | next {2}
-  freePlayLabel: Free Play
-  goldEarnedFormat: +{0} gold
   campaignDoneNotice: All levels played. Play any level from Settings.
-  noLivesTitle: No lives left
-  nextLifeFormat: Next life in {0}
-  refillFormat: Refill lives ({0} gold)
-  leaveLevelTitle: Leave level?
-  restartLevelTitle: Restart level?
-  loseLifeMessage: You will lose a life.
-  loseLifeLabel: Lose a life
-  keepPlayingLabel: Keep playing
-  menuMetaHeightUnits: 90
-  menuMetaFontSize: 50
-  menuNoticeHeightUnits: 140
-  menuNoticeFontSize: 48
-  menuWideButtonSizeUnits: {x: 860, y: 150}
-  hudMetaHeightUnits: 60
-  hudMetaFontSize: 40
-  hudMetaGapUnits: 12
-  confirmPanelSizeUnits: {x: 860, y: 900}
+  introFont: {fileID: 11400000, guid: 7e272475c6b4f394f96d8a8ed970fc53, type: 2}
+  introPanelSprite: {fileID: 8645894043717093507, guid: 3ad0f6aba8241994c89b92079e541106, type: 3}
+  introPanelPaddingUnits: 40
+  introCloseSprite: {fileID: 21300000, guid: fa9ddd220aa4aa84198a4a8ed4d7230f, type: 3}
+  introCloseCrossSprite: {fileID: 21300000, guid: 71fdee8eebf39b24a9361689ab6288e4, type: 3}
+  introBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
+  introPopSeconds: 0.25
+  introPopEase: 27
+  introPopStartScale: 0.8
   mechanicIntroductions:
   - mechanic: 0
     title: How to Play
@@ -303,11 +204,10 @@ MonoBehaviour:
   howToPlaySubtitle: Welcome!
   introTitleFontSize: 120
   introTitleHeightUnits: 160
-  introTitleColor: {r: 1, g: 1, b: 1, a: 1}
-  introTitleOutlineWidth: 0.2
+  introTitleColor: {r: 0.23137255, g: 0.14117648, b: 0.4, a: 1}
   introSubtitleFontSize: 56
   introSubtitleHeightUnits: 80
-  introSubtitleColor: {r: 1, g: 1, b: 1, a: 1}
+  introSubtitleColor: {r: 0.23137255, g: 0.14117648, b: 0.4, a: 1}
   introIllustrationSizeUnits: {x: 640, y: 480}
   introCellUnits: 170
   introHowToPlayArrowCells: 0.6
@@ -324,10 +224,7 @@ MonoBehaviour:
   introTextColor: {r: 0.2, g: 0.14, b: 0.3, a: 1}
   introSpacingUnits: 36
   introCloseSizeUnits: 110
-  introCloseColor: {r: 0.9, g: 0.22, b: 0.25, a: 1}
-  introCloseCrossSizeUnits: 56
-  introCloseCrossThicknessUnits: 14
-  introCloseCrossColor: {r: 1, g: 1, b: 1, a: 1}
+  introCloseCrossSizeUnits: 66
   introCloseSeconds: 0.15
   introCloseEase: 6
   introSparkles:
