@@ -6,20 +6,26 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The one way <see cref="LevelBootstrap"/> shows and hears the level's
-    /// own interface (Module 40, D74): the HUD in the top band, the joker bar
-    /// in the bottom band, and the in-level overlays — Not Enough Gold, the
-    /// gold packs, the test purchase sheet and the message. Declared here and
-    /// implemented in <c>GateRush.UI</c>, as <see cref="IFrontEnd"/> is, so
-    /// <c>Runtime</c> never references the screens.
+    /// own interface (Modules 40 and 41, D74): the HUD in the top band, the
+    /// joker bar in the bottom band, the in-level overlays — Not Enough Gold,
+    /// the gold packs, the test purchase sheet and the message — and the
+    /// level's panels, the result panel and the confirmation before a lost
+    /// life. Declared here and implemented in <c>GateRush.UI</c>, as
+    /// <see cref="IFrontEnd"/> is, so <c>Runtime</c> never references the
+    /// screens.
     /// </summary>
     /// <remarks>
-    /// <para>It decides nothing: it shows the <see cref="LevelUiState"/> it is
-    /// given and raises an event for every request. Moving between its
-    /// overlays is its own business; whether the countdown runs is the
-    /// bootstrap's, which stops it while <see cref="IsOverlayOpen"/> and
-    /// resumes it on <see cref="OverlaysClosed"/>.</para>
-    /// <para>Back (Escape) closes the top in-level overlay and does nothing
-    /// else; with none open it is not read here.</para>
+    /// <para>It decides nothing: it shows the <see cref="LevelUiState"/>, the
+    /// <see cref="LevelResult"/> and the <see cref="ConfirmKind"/> it is given
+    /// and raises an event for every request. Moving between its overlays is
+    /// its own business; whether the countdown runs is the bootstrap's, which
+    /// stops it while <see cref="IsOverlayOpen"/> or
+    /// <see cref="IsConfirmOpen"/>, and resumes it on
+    /// <see cref="OverlaysClosed"/> and <see cref="ConfirmKeepPlaying"/>.</para>
+    /// <para>Back (Escape) closes the top in-level overlay; with none open, it
+    /// answers the confirmation "Keep playing" (<see cref="ConfirmKeepPlaying"/>);
+    /// over the result panel, or with nothing open, it does nothing — there
+    /// is no back from a result.</para>
     /// </remarks>
     public interface ILevelUi
     {
@@ -50,11 +56,36 @@ namespace GateRush.Runtime
         /// </summary>
         event Action ButtonPressed;
 
+        /// <summary>Raised when the player presses Next on the result panel.</summary>
+        event Action NextRequested;
+
+        /// <summary>Raised when the player presses Restart on the result panel. The bootstrap decides what it costs.</summary>
+        event Action ResultRestartRequested;
+
+        /// <summary>Raised when the player presses Menu on the result panel.</summary>
+        event Action ResultMenuRequested;
+
+        /// <summary>Raised when the player presses "Lose a life" on the confirmation. It is still open; the listener hides it.</summary>
+        event Action ConfirmLoseLife;
+
+        /// <summary>
+        /// Raised when the player presses "Keep playing" on the confirmation,
+        /// or Back while it is open with no in-level overlay over it. It is
+        /// still open; the listener hides it.
+        /// </summary>
+        event Action ConfirmKeepPlaying;
+
         /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
         bool IsOpen { get; }
 
-        /// <summary>True while any in-level overlay is open: the countdown and the board stop (D74).</summary>
+        /// <summary>
+        /// True while any in-level overlay is open: the countdown and the board
+        /// stop (D74). The result panel and the confirmation are not among them.
+        /// </summary>
         bool IsOverlayOpen { get; }
+
+        /// <summary>True from <see cref="ShowConfirm"/> until <see cref="HideConfirm"/>: the countdown and the board stop (D64).</summary>
+        bool IsConfirmOpen { get; }
 
         /// <summary>
         /// Null when every part the level's interface needs is assigned and its
@@ -63,7 +94,10 @@ namespace GateRush.Runtime
         /// </summary>
         string MissingSetup();
 
-        /// <summary>Opens the HUD and the joker bar for a level, with no overlay and no time bonus, showing <paramref name="state"/>.</summary>
+        /// <summary>
+        /// Opens the HUD and the joker bar for a level, with no overlay, no
+        /// panel and no time bonus, showing <paramref name="state"/>.
+        /// </summary>
         void Show(LevelUiState state);
 
         /// <summary>Shows <paramref name="state"/> in place, whatever overlays are open.</summary>
@@ -112,7 +146,38 @@ namespace GateRush.Runtime
         /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
         void ShowPurchaseFailed();
 
-        /// <summary>Hides the level's interface and closes every overlay. An open test purchase sheet is answered no.</summary>
+        /// <summary>
+        /// Opens the result panel for a won level over everything, with the
+        /// buttons, the gold and the closing message <paramref name="result"/>
+        /// offers.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="result"/> is a loss.</exception>
+        /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
+        void ShowWin(LevelResult result);
+
+        /// <summary>Opens the result panel for a lost level, with the buttons <paramref name="result"/> offers.</summary>
+        /// <exception cref="ArgumentException"><paramref name="result"/> is a win.</exception>
+        /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
+        void ShowLoss(LevelResult result);
+
+        /// <summary>Hides the result panel, stopping its pop. Does nothing when it is not open.</summary>
+        void HideResult();
+
+        /// <summary>
+        /// Opens the confirmation that <paramref name="kind"/> will cost a life,
+        /// naming the win streak that goes with it when
+        /// <paramref name="streakAtRisk"/> is above 0.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
+        void ShowConfirm(ConfirmKind kind, int streakAtRisk);
+
+        /// <summary>Hides the confirmation, stopping its pop. Does nothing when it is not open.</summary>
+        void HideConfirm();
+
+        /// <summary>
+        /// Hides the level's interface and closes every overlay and panel. An
+        /// open test purchase sheet is answered no.
+        /// </summary>
         void Hide();
     }
 }
