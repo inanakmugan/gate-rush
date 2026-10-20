@@ -24,8 +24,22 @@ namespace GateRush.Runtime
         /// <summary>Raised when the player presses a level in the level grid, with its file name: free play (D58).</summary>
         event Action<string> LevelRequested;
 
-        /// <summary>Raised when the player presses the sound toggle; the bootstrap flips the setting and refreshes.</summary>
+        /// <summary>Raised when the player presses the sound toggle; the bootstrap flips the sound, not the vibration, and refreshes.</summary>
         event Action SoundToggleRequested;
+
+        /// <summary>Raised when the player presses the haptics toggle (Module 38); the bootstrap flips the setting and refreshes.</summary>
+        event Action HapticsToggleRequested;
+
+        /// <summary>
+        /// Raised when editing Profile's name field ends — Enter, or the field
+        /// losing focus — with text that differs from the name shown, as typed.
+        /// The bootstrap applies the name rule: an accepted name is saved and
+        /// shown by a refresh; a refused one calls <see cref="ShowNameRefused"/>.
+        /// </summary>
+        event Action<string> NameChangeRequested;
+
+        /// <summary>Raised when the player presses an avatar in Profile's grid, with its id; the bootstrap saves it at once.</summary>
+        event Action<string> AvatarChangeRequested;
 
         /// <summary>
         /// Raised when the player presses a refill button, on the Store or the
@@ -110,6 +124,14 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentException"><paramref name="rewards"/> is empty: there is nothing to announce.</exception>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowStreakReward(int latestStreak, IReadOnlyList<StreakReward> rewards);
+
+        /// <summary>
+        /// Puts the name last shown back in Profile's name field and shows the
+        /// refusal line under it (Module 38). The line stays until Profile is
+        /// opened again or editing starts again.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowNameRefused();
 
         /// <summary>Hides the front end. An open test purchase sheet is answered no.</summary>
         void Hide();

@@ -6,7 +6,7 @@ using GateRush.Platform;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Everything the front end shows (Modules 35, 36 and 37): plain numbers read
+    /// Everything the front end shows (Modules 35 to 38): plain numbers read
     /// once from the save, the rules and the purchase service's products by
     /// <see cref="Of"/>, so the screens hold no rule and every number on them
     /// comes from here.
@@ -38,7 +38,12 @@ namespace GateRush.Runtime
             IReadOnlyList<GoldOffer> goldOffers,
             int streak,
             int bestStreak,
-            IReadOnlyList<StreakReward> streakRewards)
+            IReadOnlyList<StreakReward> streakRewards,
+            string playerName,
+            string avatarId,
+            bool isHapticsOn,
+            int levelsCompleted,
+            int lifetimeGold)
         {
             Gold = gold;
             Lives = lives;
@@ -55,6 +60,11 @@ namespace GateRush.Runtime
             Streak = streak;
             BestStreak = bestStreak;
             StreakRewards = streakRewards;
+            PlayerName = playerName;
+            AvatarId = avatarId;
+            IsHapticsOn = isHapticsOn;
+            LevelsCompleted = levelsCompleted;
+            LifetimeGold = lifetimeGold;
         }
 
         /// <summary>The gold balance.</summary>
@@ -84,8 +94,26 @@ namespace GateRush.Runtime
         /// </summary>
         public bool IsLivesFull { get; }
 
-        /// <summary>Whether sound and vibration are on.</summary>
+        /// <summary>Whether sound is on.</summary>
         public bool IsSoundOn { get; }
+
+        /// <summary>Whether vibration is on (Module 38), apart from the sound.</summary>
+        public bool IsHapticsOn { get; }
+
+        /// <summary>The player's name, as the name rule normalized it.</summary>
+        public string PlayerName { get; }
+
+        /// <summary>
+        /// The id of the chosen avatar, as saved; it may be one the catalog no
+        /// longer has, which the screens show as the catalog's first.
+        /// </summary>
+        public string AvatarId { get; }
+
+        /// <summary>How many levels the save marks completed, as it holds them (Profile's statistic).</summary>
+        public int LevelsCompleted { get; }
+
+        /// <summary>All the gold ever earned (D22), never bought gold (Profile's statistic).</summary>
+        public int LifetimeGold { get; }
 
         /// <summary>
         /// Every level of the level order, in order, with its number and its
@@ -124,8 +152,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The front end's state at <paramref name="nowUtc"/>: the gold, the
-        /// lives, the jokers and the win streak of <paramref name="meta"/>'s
-        /// save; the cap, the prices, the gold packs and the streak's reward
+        /// lives, the jokers, the win streak, the name, the avatar, the haptics
+        /// setting, the levels completed and the lifetime gold of
+        /// <paramref name="meta"/>'s save; the cap, the prices, the gold packs and the streak's reward
         /// table of <paramref name="rules"/> — the rules the
         /// save was loaded with; the campaign level's number and the level
         /// list from <paramref name="catalog"/>, which may be null when the
@@ -179,7 +208,12 @@ namespace GateRush.Runtime
                 Runtime.GoldOffers.Match(rules.GoldPacks, products),
                 save.Streak.Current,
                 save.Streak.Best,
-                rules.StreakRewards);
+                rules.StreakRewards,
+                save.Profile.Name,
+                save.Profile.AvatarId,
+                save.Haptics.IsOn,
+                save.Completed.Count,
+                save.Wallet.LifetimeEarned);
         }
 
         /// <summary>

@@ -15,7 +15,9 @@ namespace GateRush.Tests
     /// with its marks; the jokers' counts and prices; and the gold offers,
     /// only packs both sides know, in the rules' order with the service's
     /// price text; the win streak and its best from the save, and the reward
-    /// table from the rules.
+    /// table from the rules. Module 38: the name, the avatar id, the haptics
+    /// setting apart from the sound, the levels completed and the lifetime
+    /// gold from the save.
     /// </summary>
     /// <remarks>
     /// The rules are <see cref="MetaRulesFixture"/>'s, unlike a fresh config,
@@ -73,6 +75,43 @@ namespace GateRush.Tests
             var state = FrontEndState.Of(meta, rules, twoIntervalsLater, Catalog(), true, Products());
 
             Assert.AreEqual(3, state.Lives);
+        }
+
+        [Test]
+        public void Of_SaveProfile_NameAndAvatarComeFromIt()
+        {
+            var meta = MetaOfEveryField();
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(SaveFixture.EveryFieldName, state.PlayerName);
+            Assert.AreEqual(SaveFixture.EveryFieldAvatarId, state.AvatarId);
+        }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void Of_SaveHaptics_IsHapticsOnComesFromItNotFromTheSound(bool isHapticsOn)
+        {
+            var meta = Meta(Gold, SomeLives);
+            meta.Save.Haptics.IsOn = isHapticsOn;
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), !isHapticsOn, Products());
+
+            Assert.AreEqual(isHapticsOn, state.IsHapticsOn);
+            Assert.AreEqual(!isHapticsOn, state.IsSoundOn, "the two settings stay apart");
+        }
+
+        [Test]
+        public void Of_SaveStatistics_LevelsCompletedAndLifetimeGoldComeFromIt()
+        {
+            var meta = MetaOfEveryField();
+            var save = meta.Save;
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(save.Completed.Count, state.LevelsCompleted, "every completed mark of the save, as it holds them");
+            Assert.AreEqual(save.Wallet.LifetimeEarned, state.LifetimeGold);
+            Assert.AreNotEqual(save.Wallet.Balance, state.LifetimeGold, "the lifetime gold, not the balance");
         }
 
         [Test]
@@ -317,9 +356,14 @@ namespace GateRush.Tests
                 new Lives(rules, lives, Noon),
                 jokers ?? new JokerInventory(0, 0, 0),
                 new WinStreak(0, 0),
-                new CampaignProgress(position));
+                new CampaignProgress(position),
+                PlayerProfile.Starting(rules),
+                new HapticsSetting());
             return new MetaGame(save, rules, new ManualClock(Noon));
         }
+
+        /// <summary>A meta game over <see cref="SaveFixture.EveryField"/>, whose sections are none at their default.</summary>
+        private MetaGame MetaOfEveryField() => new MetaGame(SaveFixture.EveryField(), rules, new ManualClock(Noon));
 
         /// <summary>A meta game over a save with <paramref name="streak"/> and otherwise what <see cref="Meta"/> gives by default.</summary>
         private MetaGame MetaWithStreak(WinStreak streak)
@@ -331,7 +375,9 @@ namespace GateRush.Tests
                 new Lives(rules, SomeLives, Noon),
                 new JokerInventory(0, 0, 0),
                 streak,
-                new CampaignProgress(0));
+                new CampaignProgress(0),
+                PlayerProfile.Starting(rules),
+                new HapticsSetting());
             return new MetaGame(save, rules, new ManualClock(Noon));
         }
     }
