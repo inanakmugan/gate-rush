@@ -10,7 +10,10 @@ namespace GateRush.Tests
     /// (Module 19): every <see cref="LevelMechanic"/> has one entry with a
     /// title and a text, and a missing, blank or duplicated entry is a problem
     /// naming the mechanic. Module 20: the layered-block values and orders
-    /// have their own checks, and the defaults pass them.
+    /// have their own checks, and the defaults pass them. Module 41: the
+    /// result panel's and the confirmation's values are gone; the card's
+    /// theme — its font and sprites assigned, a bordered panel sprite, the
+    /// padding, the close button's cross and the pop — is checked by name.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
@@ -20,6 +23,11 @@ namespace GateRush.Tests
     public class RuntimeConfigTests
     {
         private const string EntriesField = "mechanicIntroductions";
+
+        // A small stand-in for the card's panel sprite; only its border is read.
+        private const int PanelTextureSize = 64;
+        private const float PanelPixelsPerUnit = 100f;
+        private const float PanelBorder = 16f;
 
         private RuntimeConfig config;
 
@@ -293,77 +301,6 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_DefaultMenuValues_ReportNothingAboutThem()
-        {
-            var problems = config.Problems();
-
-            // Every message about the menu buttons and the result panel names
-            // one of these.
-            Assert.That(problems, Has.None.Contains("Menu "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Result "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Defaults_EndOfSetTexts_AreTheSpecified()
-        {
-            Assert.AreEqual("All Levels Played", config.AllDoneTitle);
-            Assert.AreEqual("Thanks for playing!", config.AllDoneMessage);
-        }
-
-        [TestCase("menuLabel", "Menu Label")]
-        [TestCase("allDoneMessage", "All Done Message")]
-        public void Problems_EmptyNewText_IsReportedByName(string field, string shownName)
-        {
-            SetString(field, "  ");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
-        }
-
-        [TestCase("menuButtonCornerUnits", "Menu Button Corner Units")]
-        [TestCase("menuButtonFontSize", "Menu Button Font Size")]
-        [TestCase("resultMessageHeightUnits", "Result Message Height Units")]
-        [TestCase("resultMessageFontSize", "Result Message Font Size")]
-        public void Problems_NonPositiveNewSize_IsReportedByName(string field, string shownName)
-        {
-            SetFloat(field, 0f);
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [TestCase("menuButtonSizeUnits", "Menu Button Size Units")]
-        public void Problems_NonPositiveNewVectorSize_IsReportedByName(string field, string shownName)
-        {
-            var serialized = new SerializedObject(config);
-            serialized.FindProperty(field).vector2Value = new Vector2(0f, 1f);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_ResultPanelTooShortForTwoButtonRows_IsReportedByName()
-        {
-            // One button row's height: room for the buttons the panel had
-            // before Menu got a row of its own, and no more.
-            var serialized = new SerializedObject(config);
-            var buttonHeight = serialized.FindProperty("resultButtonSizeUnits").vector2Value.y;
-            var panel = serialized.FindProperty("resultPanelSizeUnits");
-            panel.vector2Value = new Vector2(panel.vector2Value.x, buttonHeight);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
-        }
-
-        [Test]
         public void Problems_DefaultGeneratorPreviewValues_ReportNothingAboutThem()
         {
             var problems = config.Problems();
@@ -469,21 +406,11 @@ namespace GateRush.Tests
         [Test]
         public void Defaults_MetaTexts_AreTheSpecified()
         {
-            Assert.AreEqual("Leave level?", config.LeaveLevelTitle);
-            Assert.AreEqual("Restart level?", config.RestartLevelTitle);
-            Assert.AreEqual("You will lose a life.", config.LoseLifeMessage);
-            Assert.AreEqual("Lose a life", config.LoseLifeLabel);
-            Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
+            // The confirmation's texts moved to the UI Config (Module 41).
             Assert.AreEqual("All levels played. Play any level from Settings.", config.CampaignDoneNotice);
         }
 
         [TestCase("campaignDoneNotice", "Campaign Done Notice")]
-        [TestCase("leaveLevelTitle", "Leave Level Title")]
-        [TestCase("restartLevelTitle", "Restart Level Title")]
-        [TestCase("loseLifeMessage", "Lose Life Message")]
-        [TestCase("loseLifeLabel", "Lose Life Label")]
-        [TestCase("keepPlayingLabel", "Keep Playing Label")]
-        [TestCase("goldEarnedFormat", "Gold Earned Format")]
         public void Problems_EmptyMetaText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -493,62 +420,105 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
         }
 
-        // The format is given one placeholder more than it is formatted with.
-        [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
-        public void Problems_UnusableMetaFormat_IsReportedByName(string field, string shownName, string format)
+        // ----- Module 41: the introduction card's theme -------------------------
+        // The result panel's and the confirmation's values left with them.
+
+        [Test]
+        public void Problems_DefaultIntroLookValues_ReportNothingButTheUnassignedAssets()
         {
-            SetString(field, format);
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Intro Panel Padding Units"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Intro Close Size Units"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Intro Pop"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("needs a border"), string.Join(" | ", problems));
+        }
+
+        [TestCase("Intro Font")]
+        [TestCase("Intro Panel Sprite")]
+        [TestCase("Intro Close Sprite")]
+        [TestCase("Intro Close Cross Sprite")]
+        public void Problems_UnassignedIntroLookAsset_IsReportedByName(string shownName)
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} is not assigned"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_IntroPanelSpriteWithoutBorder_IsReportedByName()
+        {
+            var texture = new Texture2D(PanelTextureSize, PanelTextureSize);
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, PanelTextureSize, PanelTextureSize), Vector2.zero);
+            try
+            {
+                SetObject("introPanelSprite", sprite);
+
+                var problems = config.Problems();
+
+                Assert.That(problems, Has.Some.Contains("Intro Panel Sprite is drawn 9-sliced"), string.Join(" | ", problems));
+            }
+            finally
+            {
+                Object.DestroyImmediate(sprite);
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        [Test]
+        public void Problems_IntroPanelSpriteWithBorder_ReportsNothingAboutIt()
+        {
+            var texture = new Texture2D(PanelTextureSize, PanelTextureSize);
+            var sprite = Sprite.Create(
+                texture, new Rect(0f, 0f, PanelTextureSize, PanelTextureSize), Vector2.zero, PanelPixelsPerUnit, 0u,
+                SpriteMeshType.FullRect, Vector4.one * PanelBorder);
+            try
+            {
+                SetObject("introPanelSprite", sprite);
+
+                var problems = config.Problems();
+
+                Assert.That(problems, Has.None.Contains("Intro Panel Sprite"), string.Join(" | ", problems));
+            }
+            finally
+            {
+                Object.DestroyImmediate(sprite);
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        [Test]
+        public void Problems_NegativeIntroPanelPadding_IsReportedByName()
+        {
+            SetFloat("introPanelPaddingUnits", -1f);
 
             var problems = config.Problems();
 
-            Assert.That(problems, Has.Some.Contains($"{shownName} must be a format"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Intro Panel Padding Units must be at least 0"), string.Join(" | ", problems));
         }
 
-        [TestCase("confirmPanelSizeUnits", "Confirm Panel Size Units")]
-        public void Problems_NonPositiveMetaVectorSize_IsReportedByName(string field, string shownName)
+        [Test]
+        public void Problems_IntroCloseCrossLargerThanTheButton_IsReportedByName()
         {
             var serialized = new SerializedObject(config);
-            serialized.FindProperty(field).vector2Value = new Vector2(0f, 1f);
+            var size = serialized.FindProperty("introCloseSizeUnits").floatValue;
+            serialized.FindProperty("introCloseCrossSizeUnits").floatValue = size + 1f;
             serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Intro Close Cross Size Units positive and at most it"), string.Join(" | ", problems));
+        }
+
+        [TestCase("introPopSeconds", "Intro Pop Seconds")]
+        [TestCase("introPopStartScale", "Intro Pop Start Scale")]
+        public void Problems_NonPositiveIntroPop_IsReportedByName(string field, string shownName)
+        {
+            SetFloat(field, 0f);
 
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_ConfirmPanelTooShort_IsReportedByName()
-        {
-            // Two stacked buttons' height alone: no room for the line, the
-            // title or the padding.
-            var serialized = new SerializedObject(config);
-            var buttonHeight = serialized.FindProperty("menuButtonSizeUnits").vector2Value.y;
-            var panel = serialized.FindProperty("confirmPanelSizeUnits");
-            panel.vector2Value = new Vector2(panel.vector2Value.x, 2f * buttonHeight);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Confirm Panel Size Units must hold"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_ResultPanelWithoutRoomForBothLines_IsReportedByName()
-        {
-            // Exactly the height that held the title and one line before the
-            // gold line: no longer enough for the gold and the closing message.
-            var serialized = new SerializedObject(config);
-            var button = serialized.FindProperty("resultButtonSizeUnits").vector2Value;
-            var gap = serialized.FindProperty("resultButtonGapUnits").floatValue;
-            var padding = serialized.FindProperty("resultPaddingUnits").floatValue;
-            var line = serialized.FindProperty("resultMessageHeightUnits").floatValue;
-            var panel = serialized.FindProperty("resultPanelSizeUnits");
-            panel.vector2Value = new Vector2(panel.vector2Value.x, 2f * button.y + gap + 3f * padding + 1.5f * line);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains("two rows of them"), string.Join(" | ", problems));
         }
 
         // ----- Module 34: the joker break ---------------------------------------
@@ -584,6 +554,13 @@ namespace GateRush.Tests
         {
             var serialized = new SerializedObject(config);
             serialized.FindProperty(field).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private void SetObject(string field, Object value)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).objectReferenceValue = value;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

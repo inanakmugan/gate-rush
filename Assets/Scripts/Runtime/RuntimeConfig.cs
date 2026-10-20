@@ -13,13 +13,15 @@ namespace GateRush.Runtime
     /// Every tunable value the board's presentation and input read: the
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
     /// settings, label settings, the settle, the lift and every feedback
-    /// animation (Module 18), the HUD, the result panel and the introduction
-    /// cards with their texts (Module 19), and the meta game's lines and
-    /// confirmation (Module 32); the front end's are <c>UiConfig</c>'s (Module 35). Nothing in <c>GateRush.Runtime</c> hardcodes one of
-    /// these at a call site. Board sizes are in cells unless named otherwise,
-    /// so the board keeps its proportions whatever <see cref="CellSize"/> is;
-    /// HUD and panel sizes are in canvas units of a 1080 × 1920 portrait
-    /// screen, the canvas's reference resolution.
+    /// animation (Module 18), the introduction cards with their texts and the
+    /// theme's look (Modules 19 and 41), and Home's campaign-done notice
+    /// (Module 32); the front end's, the level HUD's and the level panels'
+    /// are <c>UiConfig</c>'s (Modules 35, 40 and 41). Nothing in
+    /// <c>GateRush.Runtime</c> hardcodes one of these at a call site. Board
+    /// sizes are in cells unless named otherwise, so the board keeps its
+    /// proportions whatever <see cref="CellSize"/> is; card sizes are in
+    /// canvas units of a 1080 × 1920 portrait screen, the canvas's reference
+    /// resolution.
     /// </summary>
     /// <remarks>
     /// <para>The art sprites are generated in greyscale from the
@@ -113,7 +115,7 @@ namespace GateRush.Runtime
         [Tooltip("Sprite-Unlit-Default. Under the 2D Renderer a lit sprite renders black with no Light 2D.")]
         [SerializeField] private Material spriteMaterial;
 
-        [Tooltip("TextMeshPro font asset for every label: the board's counts, the HUD and the result panel. Lilita One (D46), created from Assets/Art/Fonts.")]
+        [Tooltip("TextMeshPro font asset for the board's labels: its counts, and the counts and marks in the introduction cards' illustrations. Lilita One (D46), created from Assets/Art/Fonts. The cards' own texts use Intro Font.")]
         [SerializeField] private TMP_FontAsset labelFont;
 
         [Header("Generated art (Assets/Art/Generated)")]
@@ -498,96 +500,41 @@ namespace GateRush.Runtime
         [Tooltip("Seconds the preview takes to fade out fully when the block is released.")]
         [SerializeField] private float generatorPreviewFadeOutSeconds = 0.12f;
 
-        [Header("Result panel (canvas units; the panel is tinted the frame's colour)")]
-        [SerializeField] private string winTitle = "Level Complete";
-
-        [Tooltip("The win title after the last level in the level order, in place of Win Title.")]
-        [SerializeField] private string allDoneTitle = "All Levels Played";
-
-        [Tooltip("The smaller line under All Done Title, after the last level only.")]
-        [SerializeField] private string allDoneMessage = "Thanks for playing!";
-        [SerializeField] private string lossTitle = "Time's Up";
-
-        [Tooltip("Height kept for the line under the title, when there is one.")]
-        [SerializeField] private float resultMessageHeightUnits = 80f;
-
-        [SerializeField] private float resultMessageFontSize = 56f;
-        [SerializeField] private Color resultMessageColor = Color.white;
-
-        [Tooltip("Label of the Menu button: on the result panel, in a row of its own under Next and Restart.")]
-        [SerializeField] private string menuLabel = "Menu";
-
-        [Tooltip("Tint of the result panel's Menu button.")]
-        [SerializeField] private Color menuButtonColor = new Color(0.33f, 0.40f, 0.62f);
-
-        [Tooltip("The full-screen backdrop behind the panel; it covers the board and the HUD and swallows presses on them.")]
-        [SerializeField] private Color resultBackdropColor = new Color(0f, 0f, 0f, 0.6f);
-
-        [SerializeField] private Vector2 resultPanelSizeUnits = new Vector2(860f, 860f);
-        [SerializeField] private float resultPanelCornerUnits = 60f;
-
-        [Tooltip("Space inside the panel's edges, and between the title and the buttons.")]
-        [SerializeField] private float resultPaddingUnits = 60f;
-
-        [SerializeField] private float resultTitleFontSize = 110f;
-        [SerializeField] private Color resultTitleColor = Color.white;
-        [SerializeField] private Vector2 resultButtonSizeUnits = new Vector2(340f, 130f);
-        [SerializeField] private float resultButtonCornerUnits = 40f;
-
-        [Tooltip("Space between Next and Restart, and between their row and the Menu button under it.")]
-        [SerializeField] private float resultButtonGapUnits = 40f;
-
-        [SerializeField] private float resultButtonFontSize = 64f;
-        [SerializeField] private Color resultButtonTextColor = Color.white;
-        [SerializeField] private Color nextButtonColor = new Color(0.30f, 0.78f, 0.32f);
-        [SerializeField] private Color restartButtonColor = new Color(1.0f, 0.58f, 0.15f);
-        [SerializeField] private string nextLabel = "Next";
-        [SerializeField] private string restartLabel = "Restart";
-
-        [Tooltip("Seconds the panel's opening pop takes: it fades in and grows from Result Pop Start Scale. Runs on unscaled time.")]
-        [SerializeField] private float resultPopSeconds = 0.25f;
-
-        [SerializeField] private Ease resultPopEase = Ease.OutBack;
-
-        [Tooltip("The panel's scale when the pop starts; it ends at 1.")]
-        [SerializeField] private float resultPopStartScale = 0.8f;
-
-        [Header("Menu buttons (canvas units; the confirmation's two buttons)")]
-        [Tooltip("Size of the confirmation's two buttons.")]
-        [SerializeField] private Vector2 menuButtonSizeUnits = new Vector2(520f, 150f);
-
-        [SerializeField] private float menuButtonCornerUnits = 46f;
-        [SerializeField] private float menuButtonFontSize = 76f;
-
-        [Tooltip("Space between the confirmation's two buttons.")]
-        [SerializeField] private float menuButtonGapUnits = 40f;
-
-        [Header("Meta game (Module 32; the label font holds ASCII only, so no '·' in these texts)")]
-        [Tooltip("The line under a campaign win's title; {0} is the gold the level paid.")]
-        [SerializeField] private string goldEarnedFormat = "+{0} gold";
-
+        [Header("Meta game (Module 32; the result panel's and the confirmation's texts are the UI Config's, Module 41)")]
         [Tooltip("Shown under Home's play button when Play is pressed after the last campaign level (Module 35).")]
         [SerializeField] private string campaignDoneNotice = "All levels played. Play any level from Settings.";
 
-        [Tooltip("Title of the confirmation Menu opens while a campaign level is played.")]
-        [SerializeField] private string leaveLevelTitle = "Leave level?";
+        [Header("Introduction cards (canvas units; the theme's panel, font and close button, Module 41)")]
+        [Tooltip("The font of the card's title, subtitle and sentence: Assets/ThirdParty/Fonts/Fredoka/Fredoka-Bold SDF.asset, whose fallback list holds Nunito for what Fredoka lacks. The illustrations' counts and marks keep Label Font.")]
+        [SerializeField] private TMP_FontAsset introFont;
 
-        [Tooltip("Title of the confirmation Restart and R open while a campaign level is played.")]
-        [SerializeField] private string restartLevelTitle = "Restart level?";
+        [Tooltip("The card's panel, drawn 9-sliced behind its rows, so it needs a border: the theme's grey panel, Assets/ThirdParty/Kenney/UIPack/Grey/button_square_flat.png.")]
+        [SerializeField] private Sprite introPanelSprite;
 
-        [Tooltip("The line under the confirmation's title.")]
-        [SerializeField] private string loseLifeMessage = "You will lose a life.";
+        [Tooltip("Space between the panel's edges and the card's rows.")]
+        [SerializeField] private float introPanelPaddingUnits = 40f;
 
-        [Tooltip("Label of the confirmation's button that loses a life and then leaves or restarts. Tinted Restart Button Color.")]
-        [SerializeField] private string loseLifeLabel = "Lose a life";
+        [Tooltip("The face of the round close button, drawn in its own colours: Assets/ThirdParty/Kenney/UIPack/Red/button_round_depth_gradient.png, as Button Close's.")]
+        [SerializeField] private Sprite introCloseSprite;
 
-        [Tooltip("Label of the confirmation's button that closes it and resumes the countdown. Tinted Next Button Color.")]
-        [SerializeField] private string keepPlayingLabel = "Keep playing";
+        [Tooltip("The cross on the close button, drawn in its own colours: Assets/ThirdParty/Kenney/GameIcons/cross.png, as Button Close's.")]
+        [SerializeField] private Sprite introCloseCrossSprite;
 
-        [Tooltip("Size of the confirmation's panel. It holds the title, the line under it and two menu buttons stacked, inside Result Padding Units, and uses the result panel's fonts and backdrop.")]
-        [SerializeField] private Vector2 confirmPanelSizeUnits = new Vector2(860f, 900f);
+        [Tooltip("The full-screen dim behind the card; it covers the board and the HUD and swallows presses on them.")]
+        [FormerlySerializedAs("resultBackdropColor")]
+        [SerializeField] private Color introBackdropColor = new Color(0f, 0f, 0f, 0.6f);
 
-        [Header("Introduction cards (canvas units; backdrop and opening pop are the result panel's)")]
+        [Tooltip("Seconds the card's opening pop takes: it fades in and grows from Intro Pop Start Scale. Runs on unscaled time.")]
+        [FormerlySerializedAs("resultPopSeconds")]
+        [SerializeField] private float introPopSeconds = 0.25f;
+
+        [FormerlySerializedAs("resultPopEase")]
+        [SerializeField] private Ease introPopEase = Ease.OutBack;
+
+        [Tooltip("The card's scale when the pop starts; it ends at 1.")]
+        [FormerlySerializedAs("resultPopStartScale")]
+        [SerializeField] private float introPopStartScale = 0.8f;
+
         [Tooltip("One entry per mechanic: the card's title and its one or two lines of text.")]
         [SerializeField] private MechanicIntroduction[] mechanicIntroductions =
         {
@@ -614,18 +561,16 @@ namespace GateRush.Runtime
         [Tooltip("Height of the title's row.")]
         [SerializeField] private float introTitleHeightUnits = 160f;
 
-        [Tooltip("Fill of the title. Its outline is the frame's lip colour: Frame Color darkened by Lip Darken.")]
-        [SerializeField] private Color introTitleColor = Color.white;
-
-        [Tooltip("Thickness of the title's outline, as TextMeshPro measures it: above 0, at most 1. It is set on the title's own material, so no other label changes.")]
-        [SerializeField] private float introTitleOutlineWidth = 0.2f;
+        [Tooltip("Colour of the title: the theme's purple, #3B2466, as the overlays' titles.")]
+        [SerializeField] private Color introTitleColor = new Color(0.231f, 0.141f, 0.400f);
 
         [SerializeField] private float introSubtitleFontSize = 56f;
 
         [Tooltip("Height of the subtitle's row.")]
         [SerializeField] private float introSubtitleHeightUnits = 80f;
 
-        [SerializeField] private Color introSubtitleColor = Color.white;
+        [Tooltip("Colour of the subtitle: the theme's purple, #3B2466, readable on the grey panel.")]
+        [SerializeField] private Color introSubtitleColor = new Color(0.231f, 0.141f, 0.400f);
 
         [Tooltip("The area the illustration is centred in, and scaled down to when it is larger.")]
         [SerializeField] private Vector2 introIllustrationSizeUnits = new Vector2(640f, 480f);
@@ -665,18 +610,11 @@ namespace GateRush.Runtime
         [Tooltip("Space between the card's rows: close button, title, subtitle, illustration, text box.")]
         [SerializeField] private float introSpacingUnits = 36f;
 
-        [Tooltip("Diameter of the round close button at the card's top right.")]
+        [Tooltip("Diameter of the round close button at the card's top right, inside the panel's padding.")]
         [SerializeField] private float introCloseSizeUnits = 110f;
 
-        [SerializeField] private Color introCloseColor = new Color(0.90f, 0.22f, 0.25f);
-
-        [Tooltip("Length of each stroke of the close button's cross. At most the button's diameter.")]
-        [SerializeField] private float introCloseCrossSizeUnits = 56f;
-
-        [Tooltip("Thickness of each stroke of the cross. At most its length.")]
-        [SerializeField] private float introCloseCrossThicknessUnits = 14f;
-
-        [SerializeField] private Color introCloseCrossColor = Color.white;
+        [Tooltip("Size of the cross centred on the close button. At most the button's diameter.")]
+        [SerializeField] private float introCloseCrossSizeUnits = 66f;
 
         [Tooltip("Seconds a closing card takes to fade out. Runs on unscaled time.")]
         [SerializeField] private float introCloseSeconds = 0.15f;
@@ -853,7 +791,7 @@ namespace GateRush.Runtime
         /// <summary>The material every sprite uses: <c>Sprite-Unlit-Default</c>.</summary>
         public Material SpriteMaterial => spriteMaterial;
 
-        /// <summary>The font of every label, on the board and in the HUD and result panel: Lilita One.</summary>
+        /// <summary>The font of the board's labels and of the introduction cards' illustrations: Lilita One.</summary>
         public TMP_FontAsset LabelFont => labelFont;
 
         /// <summary>A block's 2×2 studs for one cell, tinted with its colour.</summary>
@@ -1199,122 +1137,38 @@ namespace GateRush.Runtime
         /// <summary>Easing of that fade.</summary>
         public Ease BreakFadeEase => breakFadeEase;
 
-        /// <summary>Result panel title after a win.</summary>
-        public string WinTitle => winTitle;
-
-        /// <summary>Result panel title after winning the last level (<see cref="ResultTitle"/>).</summary>
-        public string AllDoneTitle => allDoneTitle;
-
-        /// <summary>Result panel title after the countdown runs out.</summary>
-        public string LossTitle => lossTitle;
-
-        /// <summary>The line under <see cref="AllDoneTitle"/>, after the last level only (Module 23).</summary>
-        public string AllDoneMessage => allDoneMessage;
-
-        /// <summary>Height kept for the result panel's line under the title, in canvas units.</summary>
-        public float ResultMessageHeightUnits => resultMessageHeightUnits;
-
-        /// <summary>Font size of the result panel's line under the title.</summary>
-        public float ResultMessageFontSize => resultMessageFontSize;
-
-        /// <summary>Colour of the result panel's line under the title.</summary>
-        public Color ResultMessageColor => resultMessageColor;
-
-        /// <summary>Label of the result panel's Menu button.</summary>
-        public string MenuLabel => menuLabel;
-
-        /// <summary>Tint of the result panel's Menu button.</summary>
-        public Color MenuButtonColor => menuButtonColor;
-
-        /// <summary>Size of the confirmation's buttons, in canvas units.</summary>
-        public Vector2 MenuButtonSizeUnits => menuButtonSizeUnits;
-
-        /// <summary>Corner radius of the confirmation's buttons, in canvas units.</summary>
-        public float MenuButtonCornerUnits => menuButtonCornerUnits;
-
-        /// <summary>Font size of the confirmation's button labels.</summary>
-        public float MenuButtonFontSize => menuButtonFontSize;
-
-        /// <summary>Space between the confirmation's buttons, in canvas units.</summary>
-        public float MenuButtonGapUnits => menuButtonGapUnits;
-
-        /// <summary>The line under a campaign win's title; {0} is the gold paid.</summary>
-        public string GoldEarnedFormat => goldEarnedFormat;
-
         /// <summary>The notice under Home's play button when Play is pressed after the last campaign level.</summary>
         public string CampaignDoneNotice => campaignDoneNotice;
 
-        /// <summary>Title of the confirmation before leaving a campaign level.</summary>
-        public string LeaveLevelTitle => leaveLevelTitle;
+        /// <summary>
+        /// The font of an introduction card's title, subtitle and sentence:
+        /// the theme's (Module 41), whose fallback list covers what it lacks.
+        /// </summary>
+        public TMP_FontAsset IntroFont => introFont;
 
-        /// <summary>Title of the confirmation before restarting a campaign level.</summary>
-        public string RestartLevelTitle => restartLevelTitle;
+        /// <summary>The card's panel, drawn 9-sliced behind its rows.</summary>
+        public Sprite IntroPanelSprite => introPanelSprite;
 
-        /// <summary>The line under the confirmation's title.</summary>
-        public string LoseLifeMessage => loseLifeMessage;
+        /// <summary>Space between the card's panel edges and its rows, in canvas units.</summary>
+        public float IntroPanelPaddingUnits => introPanelPaddingUnits;
 
-        /// <summary>Label of the confirmation's button that loses a life.</summary>
-        public string LoseLifeLabel => loseLifeLabel;
+        /// <summary>The face of the card's round close button, drawn in its own colours.</summary>
+        public Sprite IntroCloseSprite => introCloseSprite;
 
-        /// <summary>Label of the confirmation's button that resumes the level.</summary>
-        public string KeepPlayingLabel => keepPlayingLabel;
+        /// <summary>The cross on the card's close button, drawn in its own colours.</summary>
+        public Sprite IntroCloseCrossSprite => introCloseCrossSprite;
 
-        /// <summary>Size of the confirmation's panel, in canvas units.</summary>
-        public Vector2 ConfirmPanelSizeUnits => confirmPanelSizeUnits;
+        /// <summary>Colour of the full-screen dim behind an introduction card.</summary>
+        public Color IntroBackdropColor => introBackdropColor;
 
-        /// <summary>Colour of the full-screen backdrop behind the result panel.</summary>
-        public Color ResultBackdropColor => resultBackdropColor;
+        /// <summary>Seconds an introduction card's opening pop takes.</summary>
+        public float IntroPopSeconds => introPopSeconds;
 
-        /// <summary>Size of the result panel, in canvas units.</summary>
-        public Vector2 ResultPanelSizeUnits => resultPanelSizeUnits;
+        /// <summary>Easing of an introduction card's opening pop.</summary>
+        public Ease IntroPopEase => introPopEase;
 
-        /// <summary>Corner radius of the result panel, in canvas units.</summary>
-        public float ResultPanelCornerUnits => resultPanelCornerUnits;
-
-        /// <summary>Space inside the panel's edges and between title and buttons, in canvas units.</summary>
-        public float ResultPaddingUnits => resultPaddingUnits;
-
-        /// <summary>Font size of the result panel's title.</summary>
-        public float ResultTitleFontSize => resultTitleFontSize;
-
-        /// <summary>Colour of the result panel's title.</summary>
-        public Color ResultTitleColor => resultTitleColor;
-
-        /// <summary>Size of each result panel button, in canvas units.</summary>
-        public Vector2 ResultButtonSizeUnits => resultButtonSizeUnits;
-
-        /// <summary>Corner radius of the result panel's buttons, in canvas units.</summary>
-        public float ResultButtonCornerUnits => resultButtonCornerUnits;
-
-        /// <summary>Space between the result panel's buttons, in canvas units.</summary>
-        public float ResultButtonGapUnits => resultButtonGapUnits;
-
-        /// <summary>Font size of the result panel's button labels.</summary>
-        public float ResultButtonFontSize => resultButtonFontSize;
-
-        /// <summary>Colour of the result panel's button labels.</summary>
-        public Color ResultButtonTextColor => resultButtonTextColor;
-
-        /// <summary>Tint of the Next button.</summary>
-        public Color NextButtonColor => nextButtonColor;
-
-        /// <summary>Tint of the result panel's Restart button.</summary>
-        public Color RestartButtonColor => restartButtonColor;
-
-        /// <summary>Label of the Next button.</summary>
-        public string NextLabel => nextLabel;
-
-        /// <summary>Label of the result panel's Restart button.</summary>
-        public string RestartLabel => restartLabel;
-
-        /// <summary>Seconds the result panel's opening pop takes.</summary>
-        public float ResultPopSeconds => resultPopSeconds;
-
-        /// <summary>Easing of the result panel's opening pop.</summary>
-        public Ease ResultPopEase => resultPopEase;
-
-        /// <summary>The result panel's scale when its pop starts.</summary>
-        public float ResultPopStartScale => resultPopStartScale;
+        /// <summary>An introduction card's scale when its pop starts.</summary>
+        public float IntroPopStartScale => introPopStartScale;
 
         /// <summary>Font size of an introduction card's title.</summary>
         public float IntroTitleFontSize => introTitleFontSize;
@@ -1322,18 +1176,8 @@ namespace GateRush.Runtime
         /// <summary>Height of an introduction card's title row, in canvas units.</summary>
         public float IntroTitleHeightUnits => introTitleHeightUnits;
 
-        /// <summary>Fill of an introduction card's title.</summary>
+        /// <summary>Colour of an introduction card's title.</summary>
         public Color IntroTitleColor => introTitleColor;
-
-        /// <summary>
-        /// Outline of an introduction card's title: the frame's lip colour —
-        /// <see cref="FrameColor"/> darkened as every lip is — so the title is
-        /// edged in the frame's own purple, deep enough to hold white.
-        /// </summary>
-        public Color IntroTitleOutlineColor => LipFill(frameColor);
-
-        /// <summary>Thickness of the title's outline, as TextMeshPro measures it.</summary>
-        public float IntroTitleOutlineWidth => introTitleOutlineWidth;
 
         /// <summary>Font size of an introduction card's subtitle.</summary>
         public float IntroSubtitleFontSize => introSubtitleFontSize;
@@ -1392,17 +1236,8 @@ namespace GateRush.Runtime
         /// <summary>Diameter of the close button, in canvas units.</summary>
         public float IntroCloseSizeUnits => introCloseSizeUnits;
 
-        /// <summary>Tint of the close button.</summary>
-        public Color IntroCloseColor => introCloseColor;
-
-        /// <summary>Length of each stroke of the close button's cross, in canvas units.</summary>
+        /// <summary>Size of the cross on the close button, in canvas units.</summary>
         public float IntroCloseCrossSizeUnits => introCloseCrossSizeUnits;
-
-        /// <summary>Thickness of each stroke of the cross, in canvas units.</summary>
-        public float IntroCloseCrossThicknessUnits => introCloseCrossThicknessUnits;
-
-        /// <summary>Colour of the close button's cross.</summary>
-        public Color IntroCloseCrossColor => introCloseCrossColor;
 
         /// <summary>Seconds a closing card takes to fade out.</summary>
         public float IntroCloseSeconds => introCloseSeconds;
@@ -1902,8 +1737,6 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Block Palette needs {colourCount} entries, one per BlockColor.");
             }
 
-            AddResultPanelProblems(problems);
-            AddMenuButtonProblems(problems);
             AddMetaProblems(problems);
             AddJokerBreakProblems(problems);
             AddMarkProblems(problems);
@@ -2066,10 +1899,7 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Intro Title Font Size, Intro Title Height Units, Intro Subtitle Font Size, Intro Subtitle Height Units and Intro Text Font Size must be positive.");
             }
 
-            if (!(introTitleOutlineWidth > 0f && introTitleOutlineWidth <= 1f))
-            {
-                problems.Add($"{name}: Intro Title Outline Width must be above 0 and at most 1.");
-            }
+            AddIntroLookProblems(problems);
 
             if (!(introIllustrationSizeUnits.x > 0f && introIllustrationSizeUnits.y > 0f))
             {
@@ -2111,10 +1941,10 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Intro Spacing Units must be at least 0 and finite.");
             }
 
-            if (!(introCloseSizeUnits > 0f && introCloseCrossSizeUnits > 0f && introCloseCrossSizeUnits <= introCloseSizeUnits
-                  && introCloseCrossThicknessUnits > 0f && introCloseCrossThicknessUnits <= introCloseCrossSizeUnits))
+            if (!(introCloseSizeUnits > 0f && introCloseCrossSizeUnits > 0f && introCloseCrossSizeUnits <= introCloseSizeUnits)
+                || float.IsInfinity(introCloseSizeUnits))
             {
-                problems.Add($"{name}: Intro Close Size Units must be positive, Intro Close Cross Size Units positive and at most it, and Intro Close Cross Thickness Units positive and at most the cross's size.");
+                problems.Add($"{name}: Intro Close Size Units must be positive and finite, and Intro Close Cross Size Units positive and at most it.");
             }
 
             AddIfNotPositive(problems, introCloseSeconds, "Intro Close Seconds");
@@ -2133,6 +1963,48 @@ namespace GateRush.Runtime
                     problems.Add($"{name}: Intro Sparkles' entry {i} must have a positive size and a phase from 0 to below 1.");
                 }
             }
+        }
+
+        /// <summary>
+        /// The constraints on the introduction card's theme (Module 41), each
+        /// message naming its field: the font and the three sprites are
+        /// assigned, the panel sprite has a border to be drawn 9-sliced, the
+        /// padding is not negative, and the pop takes a positive time from a
+        /// positive scale.
+        /// </summary>
+        private void AddIntroLookProblems(List<string> problems)
+        {
+            if (introFont == null)
+            {
+                problems.Add($"{name}: Intro Font is not assigned; assign Assets/ThirdParty/Fonts/Fredoka/Fredoka-Bold SDF.asset.");
+            }
+
+            if (introPanelSprite == null)
+            {
+                problems.Add($"{name}: Intro Panel Sprite is not assigned; assign Assets/ThirdParty/Kenney/UIPack/Grey/button_square_flat.png.");
+            }
+            else if (introPanelSprite.border == Vector4.zero)
+            {
+                problems.Add($"{name}: Intro Panel Sprite is drawn 9-sliced, so it needs a border (Sprite Editor: Border); it has none.");
+            }
+
+            if (introCloseSprite == null)
+            {
+                problems.Add($"{name}: Intro Close Sprite is not assigned; assign Assets/ThirdParty/Kenney/UIPack/Red/button_round_depth_gradient.png.");
+            }
+
+            if (introCloseCrossSprite == null)
+            {
+                problems.Add($"{name}: Intro Close Cross Sprite is not assigned; assign Assets/ThirdParty/Kenney/GameIcons/cross.png.");
+            }
+
+            if (!(introPanelPaddingUnits >= 0f) || float.IsInfinity(introPanelPaddingUnits))
+            {
+                problems.Add($"{name}: Intro Panel Padding Units must be at least 0 and finite.");
+            }
+
+            AddIfNotPositive(problems, introPopSeconds, "Intro Pop Seconds");
+            AddIfNotPositive(problems, introPopStartScale, "Intro Pop Start Scale");
         }
 
         /// <summary>The constraints on the feedback animations' values (Module 18), each message naming its field.</summary>
@@ -2272,82 +2144,14 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>The constraints on the result panel's values, each message naming its field.</summary>
-        private void AddResultPanelProblems(List<string> problems)
-        {
-            if (!(resultPanelSizeUnits.x > 0f && resultPanelSizeUnits.y > 0f && resultPanelCornerUnits > 0f
-                  && resultButtonSizeUnits.x > 0f && resultButtonSizeUnits.y > 0f && resultButtonCornerUnits > 0f))
-            {
-                problems.Add($"{name}: Result Panel Size Units, Result Panel Corner Units, Result Button Size Units and Result Button Corner Units must be positive.");
-            }
-
-            if (!(resultPaddingUnits >= 0f && resultButtonGapUnits >= 0f
-                  && 2f * resultButtonSizeUnits.x + resultButtonGapUnits <= resultPanelSizeUnits.x - 2f * resultPaddingUnits
-                  && 2f * resultButtonSizeUnits.y + resultButtonGapUnits + 3f * resultPaddingUnits
-                  + ResultPanel.MaxLinesUnderTitle * resultMessageHeightUnits < resultPanelSizeUnits.y))
-            {
-                problems.Add($"{name}: Result Panel Size Units must hold two Result Button Size Units side by side and two rows of them, with Result Button Gap Units between them, and leave room for {ResultPanel.MaxLinesUnderTitle} lines of Result Message Height Units and the title, inside Result Padding Units.");
-            }
-
-            AddIfBlank(problems, allDoneMessage, "All Done Message");
-            AddIfBlank(problems, menuLabel, "Menu Label");
-            AddIfNotPositive(problems, resultMessageHeightUnits, "Result Message Height Units");
-            AddIfNotPositive(problems, resultMessageFontSize, "Result Message Font Size");
-
-            if (!(resultTitleFontSize > 0f && resultButtonFontSize > 0f))
-            {
-                problems.Add($"{name}: Result Title Font Size and Result Button Font Size must be positive.");
-            }
-
-            if (!(resultPopSeconds > 0f && resultPopStartScale > 0f))
-            {
-                problems.Add($"{name}: Result Pop Seconds and Result Pop Start Scale must be positive.");
-            }
-        }
-
         /// <summary>
-        /// The constraints on the menu buttons' values, which the confirmation
-        /// uses, each message naming its field: every size is
-        /// positive and the gap is not negative.
-        /// </summary>
-        private void AddMenuButtonProblems(List<string> problems)
-        {
-            if (!(menuButtonGapUnits >= 0f))
-            {
-                problems.Add($"{name}: Menu Button Gap Units may not be negative.");
-            }
-
-            AddIfNotPositive(problems, menuButtonSizeUnits, "Menu Button Size Units");
-            AddIfNotPositive(problems, menuButtonCornerUnits, "Menu Button Corner Units");
-            AddIfNotPositive(problems, menuButtonFontSize, "Menu Button Font Size");
-        }
-
-        /// <summary>
-        /// The constraints on the meta game's values (Module 32), each message
-        /// naming its field: every text is there to read, every format takes
-        /// the numbers it is given, every size is positive, and the
-        /// confirmation's panel holds what it shows.
+        /// The constraint on the meta game's one value left here (Module 32):
+        /// Home's campaign-done notice is there to read. The result panel's
+        /// and the confirmation's texts are the UI Config's (Module 41).
         /// </summary>
         private void AddMetaProblems(List<string> problems)
         {
             AddIfBlank(problems, campaignDoneNotice, "Campaign Done Notice");
-            AddIfBlank(problems, leaveLevelTitle, "Leave Level Title");
-            AddIfBlank(problems, restartLevelTitle, "Restart Level Title");
-            AddIfBlank(problems, loseLifeMessage, "Lose Life Message");
-            AddIfBlank(problems, loseLifeLabel, "Lose Life Label");
-            AddIfBlank(problems, keepPlayingLabel, "Keep Playing Label");
-            AddIfUnusableFormat(problems, goldEarnedFormat, 1, "Gold Earned Format", "{0} for the gold paid");
-
-            AddIfNotPositive(problems, confirmPanelSizeUnits, "Confirm Panel Size Units");
-
-            // From the panel's foot: Keep playing, the gap, Lose a life, the
-            // padding, the line, the title; padding at the foot and the top.
-            if (!(menuButtonSizeUnits.x + 2f * resultPaddingUnits <= confirmPanelSizeUnits.x
-                  && 2f * menuButtonSizeUnits.y + menuButtonGapUnits + 3f * resultPaddingUnits + resultMessageHeightUnits
-                  < confirmPanelSizeUnits.y))
-            {
-                problems.Add($"{name}: Confirm Panel Size Units must hold a Menu Button Size Units button across and two of them stacked with Menu Button Gap Units between, and leave room for Result Message Height Units and the title, inside Result Padding Units.");
-            }
         }
 
         /// <summary>
@@ -2359,31 +2163,11 @@ namespace GateRush.Runtime
             AddIfNotPositive(problems, breakFadeSeconds, "Break Fade Seconds");
         }
 
-        private void AddIfUnusableFormat(List<string> problems, string format, int argumentCount, string field, string placeholders)
-        {
-            if (string.IsNullOrWhiteSpace(format))
-            {
-                problems.Add($"{name}: {field} is empty.");
-            }
-            else if (!IsUsableFormat(format, argumentCount))
-            {
-                problems.Add($"{name}: {field} must be a format with at most these placeholders: {placeholders}.");
-            }
-        }
-
         private void AddIfBlank(List<string> problems, string text, string field)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
                 problems.Add($"{name}: {field} is empty.");
-            }
-        }
-
-        private void AddIfNotPositive(List<string> problems, Vector2 value, string field)
-        {
-            if (!(value.x > 0f && value.y > 0f) || float.IsInfinity(value.x) || float.IsInfinity(value.y))
-            {
-                problems.Add($"{name}: {field} must be positive and finite on both axes.");
             }
         }
 

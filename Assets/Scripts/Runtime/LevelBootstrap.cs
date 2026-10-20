@@ -42,7 +42,8 @@ namespace GateRush.Runtime
     /// played, and the Store's purchases and the refill; every call that changed
     /// the save is followed by one <see cref="SaveOrWarn"/>, a loss's even
     /// when no life was left to lose. Leaving or restarting a campaign level
-    /// being played asks first (<see cref="ConfirmPrompt"/>), with the
+    /// being played asks first (<see cref="ILevelUi.ShowConfirm"/>), naming
+    /// the win streak that goes with the life (Module 41), with the
     /// countdown stopped and the board and the HUD's buttons held. A
     /// campaign win's panel has no Restart: a won campaign level is never
     /// replayed. The level's interface and the front end are refreshed only
@@ -103,10 +104,12 @@ namespace GateRush.Runtime
     /// (<see cref="ScreenBands.TryAddInsets"/>). It is refitted when the
     /// screen's size or safe area changes, and the level's interface is given
     /// the same bands (<see cref="ILevelUi.PlaceBands"/>) at the same time.</para>
-    /// <para><b>The level's interface (Module 40, D74).</b> The HUD, the joker
-    /// bar and the in-level overlays are a <c>GateRush.UI</c> component held
-    /// as a <see cref="MonoBehaviour"/> (<see cref="ILevelUi"/>), shown the
-    /// <see cref="LevelUiState"/> built here. One query,
+    /// <para><b>The level's interface (Modules 40 and 41, D74).</b> The HUD,
+    /// the joker bar, the in-level overlays, the result panel and the
+    /// confirmation are a <c>GateRush.UI</c> component held as a
+    /// <see cref="MonoBehaviour"/> (<see cref="ILevelUi"/>), shown the
+    /// <see cref="LevelUiState"/> and the <see cref="LevelResult"/> built
+    /// here. One query,
     /// <see cref="LevelUiStateAt"/>, draws the joker buttons and decides
     /// what a press does. The level stops — the drag cancelled, the
     /// countdown stopped, the board and the HUD's buttons held — while the
@@ -189,19 +192,13 @@ namespace GateRush.Runtime
         [SerializeField] private BackgroundView backgroundView;
         [SerializeField] private InputController inputController;
 
-        [Tooltip("The introduction card on the canvas: shown over the HUD and under the result panel when a level introduces a mechanic.")]
+        [Tooltip("The introduction card on the canvas: shown over the level's interface when a level introduces a mechanic.")]
         [SerializeField] private IntroductionCard introductionCard;
-
-        [Tooltip("The result panel on the canvas.")]
-        [SerializeField] private ResultPanel resultPanel;
 
         [Tooltip("The front end (Module 35): drag the FrontEnd component of the Front End instance under the canvas — the component's header, not the GameObject. Home, its tabs and overlays, shown while no level is loaded. It must implement IFrontEnd and report no missing part; otherwise an error is logged and nothing is drawn.")]
         [SerializeField] private MonoBehaviour frontEnd;
 
-        [Tooltip("The confirmation on the canvas before Menu or Restart costs a life while a campaign level is played (Module 32). Drawn over everything else on the canvas.")]
-        [SerializeField] private ConfirmPrompt confirmPrompt;
-
-        [Tooltip("The level's interface (Module 40): drag the LevelUi component of the Level UI instance under the canvas — the component's header, not the GameObject. The HUD, the joker bar and the in-level overlays, shown while a level is loaded. It must implement ILevelUi and report no missing part; otherwise an error is logged and nothing is drawn.")]
+        [Tooltip("The level's interface (Modules 40 and 41): drag the LevelUi component of the Level UI instance under the canvas — the component's header, not the GameObject. The HUD, the joker bar, the in-level overlays, the result panel and the confirmation, shown while a level is loaded. It must implement ILevelUi and report no missing part; otherwise an error is logged and nothing is drawn.")]
         [SerializeField] private MonoBehaviour levelUi;
 
         [Tooltip("Plays the sound cues and vibration pulses (Module 25). Left empty, the game runs silently and logs one error.")]
@@ -253,7 +250,7 @@ namespace GateRush.Runtime
         private PlayMode mode;
 
         // What the open confirmation will do once a life is lost.
-        private ConfirmedAction pendingConfirm;
+        private ConfirmKind pendingConfirm;
 
         // The gold the campaign win just reported paid, for its panel; null
         // after a free-play win, or when the win could not be reported.
@@ -331,16 +328,12 @@ namespace GateRush.Runtime
             isUsable = true;
             backgroundView.Initialize(config);
 
-            // Each puts what it builds last among the canvas's children, so
-            // this order leaves the result panel over the card. The front end
-            // and the level's interface, prefab instances under the canvas,
-            // stay where the scene put them, before everything built here, so
-            // the card, the panel and the confirmation draw over the HUD and
-            // the joker bar. The confirmation comes last and draws over
-            // everything; nothing it covers can be open together with it.
+            // The card puts what it builds last among the canvas's children.
+            // The front end and the level's interface, prefab instances under
+            // the canvas, stay where the scene put them, before it, so the
+            // card draws over the HUD, the joker bar and the level's panels,
+            // none of which can be open together with it.
             introductionCard.Initialize(config);
-            resultPanel.Initialize(config);
-            confirmPrompt.Initialize(config);
 
             boardCamera.orthographic = true;
             boardCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -960,8 +953,8 @@ namespace GateRush.Runtime
 
             boardView.Clear();
             introductionCard.Hide();
-            confirmPrompt.Hide();
-            resultPanel.Hide();
+            levelUiView.HideConfirm();
+            levelUiView.HideResult();
             return true;
         }
 
@@ -1245,9 +1238,11 @@ namespace GateRush.Runtime
             levelUiView.MenuRequested += OnMenuRequested;
             levelUiView.GoldPackRequested += OnGoldPackRequested;
             levelUiView.OverlaysClosed += OnLevelOverlaysClosed;
-            resultPanel.RestartRequested += OnRestartRequested;
-            resultPanel.NextRequested += Next;
-            resultPanel.MenuRequested += GoToMenu;
+            levelUiView.ResultRestartRequested += OnRestartRequested;
+            levelUiView.NextRequested += Next;
+            levelUiView.ResultMenuRequested += GoToMenu;
+            levelUiView.ConfirmLoseLife += OnConfirmed;
+            levelUiView.ConfirmKeepPlaying += OnConfirmCancelled;
             frontEndView.PlayRequested += OnPlayRequested;
             frontEndView.LevelRequested += OnLevelRequested;
             frontEndView.SoundToggleRequested += OnSoundToggleRequested;
@@ -1258,17 +1253,13 @@ namespace GateRush.Runtime
             frontEndView.GoldPackRequested += OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested += OnLeaderboardRequested;
-            confirmPrompt.Confirmed += OnConfirmed;
-            confirmPrompt.Cancelled += OnConfirmCancelled;
             boardView.LeaveStarted += OnLeaveStarted;
             boardView.ArriveStarted += OnArriveStarted;
             inputController.DragStarted += OnDragStarted;
             inputController.DragDropped += OnDragDropped;
             levelUiView.ButtonPressed += OnButtonPressed;
             introductionCard.ButtonPressed += OnButtonPressed;
-            resultPanel.ButtonPressed += OnButtonPressed;
             frontEndView.ButtonPressed += OnButtonPressed;
-            confirmPrompt.ButtonPressed += OnButtonPressed;
             inputController.BoardTapped += OnBoardTapped;
             levelUiView.JokerPressed += OnJokerPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -1290,9 +1281,11 @@ namespace GateRush.Runtime
             levelUiView.MenuRequested -= OnMenuRequested;
             levelUiView.GoldPackRequested -= OnGoldPackRequested;
             levelUiView.OverlaysClosed -= OnLevelOverlaysClosed;
-            resultPanel.RestartRequested -= OnRestartRequested;
-            resultPanel.NextRequested -= Next;
-            resultPanel.MenuRequested -= GoToMenu;
+            levelUiView.ResultRestartRequested -= OnRestartRequested;
+            levelUiView.NextRequested -= Next;
+            levelUiView.ResultMenuRequested -= GoToMenu;
+            levelUiView.ConfirmLoseLife -= OnConfirmed;
+            levelUiView.ConfirmKeepPlaying -= OnConfirmCancelled;
             frontEndView.PlayRequested -= OnPlayRequested;
             frontEndView.LevelRequested -= OnLevelRequested;
             frontEndView.SoundToggleRequested -= OnSoundToggleRequested;
@@ -1303,17 +1296,13 @@ namespace GateRush.Runtime
             frontEndView.GoldPackRequested -= OnGoldPackRequested;
             frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested -= OnLeaderboardRequested;
-            confirmPrompt.Confirmed -= OnConfirmed;
-            confirmPrompt.Cancelled -= OnConfirmCancelled;
             boardView.LeaveStarted -= OnLeaveStarted;
             boardView.ArriveStarted -= OnArriveStarted;
             inputController.DragStarted -= OnDragStarted;
             inputController.DragDropped -= OnDragDropped;
             levelUiView.ButtonPressed -= OnButtonPressed;
             introductionCard.ButtonPressed -= OnButtonPressed;
-            resultPanel.ButtonPressed -= OnButtonPressed;
             frontEndView.ButtonPressed -= OnButtonPressed;
-            confirmPrompt.ButtonPressed -= OnButtonPressed;
             inputController.BoardTapped -= OnBoardTapped;
             levelUiView.JokerPressed -= OnJokerPressed;
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -1352,7 +1341,7 @@ namespace GateRush.Runtime
                     ReportCampaignLoss();
                 }
 
-                resultPanel.ShowLoss(config.LossTitle);
+                levelUiView.ShowLoss(LevelResult.Loss());
                 PlayCue(SoundCue.Loss);
                 Pulse(HapticMoment.Loss);
             }
@@ -1389,7 +1378,7 @@ namespace GateRush.Runtime
             }
 
             frontEndView.Hide();
-            confirmPrompt.Hide();
+            levelUiView.HideConfirm();
             inputController.CancelDrag();
             ClearJokerSelection();
             freePlayJokers.Refill();
@@ -1452,7 +1441,6 @@ namespace GateRush.Runtime
             fittedScreenHeight = 0;
             FitCameraToScreen();
 
-            resultPanel.Hide();
             if (countdown == null)
             {
                 levelUiView.HideTime();
@@ -1505,7 +1493,7 @@ namespace GateRush.Runtime
         /// D74): the countdown stands still and the board takes no input. The
         /// one test both kinds of pause share.
         /// </summary>
-        private bool IsPaused() => confirmPrompt.IsOpen || levelUiView.IsOverlayOpen;
+        private bool IsPaused() => levelUiView.IsConfirmOpen || levelUiView.IsOverlayOpen;
 
         /// <summary>
         /// Stops the level for a pause that is about to open: the drag is
@@ -1565,7 +1553,7 @@ namespace GateRush.Runtime
             {
                 if (IsBeingPlayed())
                 {
-                    AskToConfirm(ConfirmedAction.Restart);
+                    AskToConfirm(ConfirmKind.Restart);
                     return;
                 }
 
@@ -1598,7 +1586,7 @@ namespace GateRush.Runtime
 
             if (mode == PlayMode.Campaign && IsBeingPlayed())
             {
-                AskToConfirm(ConfirmedAction.Leave);
+                AskToConfirm(ConfirmKind.Leave);
                 return;
             }
 
@@ -1606,23 +1594,28 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Opens the confirmation that <paramref name="action"/> will cost a
-        /// life (D57, D64), with the selection cleared (D67) and the level
-        /// paused (<see cref="PauseLevel"/>); the board and the HUD's buttons
-        /// are held while it is open (<see cref="IsHeld"/>).
+        /// Opens the confirmation that <paramref name="kind"/> will cost a
+        /// life (D57, D64) and the win streak of the save with it (D74), with
+        /// the selection cleared (D67) and the level paused
+        /// (<see cref="PauseLevel"/>); the board and the HUD's buttons are held
+        /// while it is open (<see cref="IsHeld"/>). Only a campaign level asks,
+        /// so the save's streak is the one a loss resets.
         /// </summary>
-        private void AskToConfirm(ConfirmedAction action)
+        private void AskToConfirm(ConfirmKind kind)
         {
             ClearJokerSelection();
             PauseLevel();
-            pendingConfirm = action;
-            confirmPrompt.Show(action == ConfirmedAction.Leave ? config.LeaveLevelTitle : config.RestartLevelTitle);
+            pendingConfirm = kind;
+            levelUiView.ShowConfirm(kind, metaGame.Save.Streak.Current);
         }
 
-        /// <summary>"Keep playing": closes the confirmation and resumes the countdown from the same remaining time.</summary>
+        /// <summary>
+        /// "Keep playing", or Back on the confirmation: closes it and resumes
+        /// the countdown from the same remaining time.
+        /// </summary>
         private void OnConfirmCancelled()
         {
-            confirmPrompt.Hide();
+            levelUiView.HideConfirm();
             ResumeIfFree();
         }
 
@@ -1633,14 +1626,14 @@ namespace GateRush.Runtime
         /// </summary>
         private void OnConfirmed()
         {
-            confirmPrompt.Hide();
+            levelUiView.HideConfirm();
             if (!IsBeingPlayed())
             {
                 return;
             }
 
             ReportCampaignLoss();
-            if (pendingConfirm == ConfirmedAction.Leave)
+            if (pendingConfirm == ConfirmKind.Leave)
             {
                 GoToMenu();
             }
@@ -1690,7 +1683,7 @@ namespace GateRush.Runtime
             freePlayJokers.Refill();
             levelUiView.CancelTimeBonus();
             boardView.Rebuild(run.Session.State);
-            resultPanel.Hide();
+            levelUiView.HideResult();
             ShowRemainingTime();
             ForgetShownMeta();
             RefreshMeta();
@@ -2133,33 +2126,16 @@ namespace GateRush.Runtime
 
             Debug.Log($"Level '{levelName}' solved.", this);
 
-            // One query decides Next and the closing title together: in the
-            // campaign, whether the position the win advanced to holds a
-            // level (the campaign's one source of truth); in free play,
-            // whether the level order has one after this level.
-            bool hasNext;
-            bool isLastLevel;
-            string goldText = null;
-            if (mode == PlayMode.Campaign)
-            {
-                hasNext = CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out _);
-                isLastLevel = !hasNext;
-                if (campaignGoldEarned.HasValue)
-                {
-                    goldText = MetaText.GoldEarned(campaignGoldEarned.Value, config);
-                }
-            }
-            else
-            {
-                hasNext = TryGetNextLevel(out _);
-                isLastLevel = ResultTitle.IsLastLevel(catalog, levelName, run.Session.Context.LevelId);
-            }
-
-            var title = isLastLevel ? config.AllDoneTitle : config.WinTitle;
-            var message = isLastLevel ? config.AllDoneMessage : null;
-
-            // A won campaign level is never replayed (D58): its panel has no Restart.
-            resultPanel.ShowWin(title, message, goldText, hasNext, mode == PlayMode.FreePlay);
+            // One query decides Next and, in the campaign, the closing message
+            // together: whether the position the win advanced to holds a
+            // level (the campaign's one source of truth). In free play, Next
+            // follows the level order, and there is no closing message. A
+            // won campaign level is never replayed (D58): its panel has no
+            // Restart (LevelResult).
+            var result = mode == PlayMode.Campaign
+                ? LevelResult.CampaignWin(campaignGoldEarned, CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out _))
+                : LevelResult.FreePlayWin(TryGetNextLevel(out _));
+            levelUiView.ShowWin(result);
             PlayCue(SoundCue.Win);
             Pulse(HapticMoment.Win);
         }
@@ -2434,12 +2410,11 @@ namespace GateRush.Runtime
             }
 
             if (boardCamera == null || boardView == null || backgroundView == null || inputController == null
-                || introductionCard == null || resultPanel == null || frontEnd == null
-                || confirmPrompt == null || levelUi == null)
+                || introductionCard == null || frontEnd == null || levelUi == null)
             {
                 Debug.LogError(
                     "LevelBootstrap: Board Camera, Board View, Background View, Input Controller, Introduction Card, " +
-                    "Result Panel, Front End, Confirm Prompt and Level Ui must all be assigned; nothing is drawn.",
+                    "Front End and Level Ui must all be assigned; nothing is drawn.",
                     this);
                 return false;
             }
@@ -2489,31 +2464,7 @@ namespace GateRush.Runtime
                 isAssigned = false;
             }
 
-            var panelProblem = resultPanel.MissingCanvas();
-            if (panelProblem.Length > 0)
-            {
-                Debug.LogError($"{panelProblem} Nothing is drawn.", resultPanel);
-                isAssigned = false;
-            }
-
-            var promptProblem = confirmPrompt.MissingCanvas();
-            if (promptProblem.Length > 0)
-            {
-                Debug.LogError($"{promptProblem} Nothing is drawn.", confirmPrompt);
-                isAssigned = false;
-            }
-
             return isAssigned;
-        }
-
-        /// <summary>What a confirmed prompt does once the life is lost.</summary>
-        private enum ConfirmedAction
-        {
-            /// <summary>Leave the level for Home.</summary>
-            Leave,
-
-            /// <summary>Restart the level, when a life is left for it.</summary>
-            Restart
         }
     }
 }

@@ -6,10 +6,10 @@ using UnityEngine.UI;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Builds the uGUI parts the HUD, the result panel and the introduction
-    /// card are made of, one way for all: rects, rounded boxes cut from the
-    /// generated rounded-box sprite, icons, labels in the label font, and
-    /// buttons. Sizes are in canvas units.
+    /// Builds the uGUI parts the introduction card is made of, and that the
+    /// UI prefab builder and the level's interface place, one way for all:
+    /// rects, rounded boxes cut from the generated rounded-box sprite, icons,
+    /// labels, and buttons. Sizes are in canvas units.
     /// </summary>
     public static class UiBuilder
     {

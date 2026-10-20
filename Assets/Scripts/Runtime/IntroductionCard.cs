@@ -9,29 +9,29 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The card that introduces a mechanic the first time the player meets it
-    /// (Module 19): a dim over the board, a title, a subtitle, the mechanic
-    /// drawn in the game's own art among twinkling sparkles, one sentence in a
-    /// text box, and a close button. Several mechanics show one card after
-    /// another. Builds its hierarchy from code and holds no rules — the
-    /// bootstrap decides which mechanics to show and what follows the last
-    /// card.
+    /// (Module 19): a dim over the board, and on the theme's grey panel a
+    /// title, a subtitle, the mechanic drawn in the game's own art among
+    /// twinkling sparkles, one sentence in a text box, and the red round close
+    /// button (Module 41). Several mechanics show one card after another.
+    /// Builds its hierarchy from code and holds no rules — the bootstrap
+    /// decides which mechanics to show and what follows the last card.
     /// </summary>
     /// <remarks>
     /// <para>Put this component on the screen-space canvas, which stays
     /// active; it builds one <c>Introduction</c> child under its own transform
     /// and shows and hides that child. <see cref="Initialize"/> puts the child
-    /// last among the canvas's children, so the bootstrap initialises the HUD,
-    /// then this card, then the result panel: the card then draws over the HUD
-    /// and under the result panel.</para>
+    /// last among the canvas's children, after the level's interface, so the
+    /// card draws over the HUD, the joker bar and the level's panels — which
+    /// are never open together with it.</para>
+    /// <para><b>The theme.</b> It stays in <c>Runtime</c> because its
+    /// drawings are the game's own art (D46). The panel, the font and the
+    /// close button's sprites are <see cref="RuntimeConfig"/>'s, drawn in
+    /// their own colours; nothing of them is drawn by hand.</para>
     /// <para><b>Closing.</b> The backdrop covers the whole screen, swallows
     /// every press, and is itself a button, and nothing else on the card but
     /// the close button takes a press: a tap anywhere closes the card.
     /// <see cref="IsOpen"/> holds from <see cref="Show"/> until the last
     /// card's fade has finished.</para>
-    /// <para><b>Title.</b> The title's outline is set on a material this card
-    /// creates as a copy of the label font's and destroys with itself. The
-    /// font asset's own material — which the board's counts, the HUD and the
-    /// result panel draw with — is only read.</para>
     /// <para><b>Tweens.</b> The pop, the fade and the twinkle run on unscaled
     /// time, carry this component as their id, and are killed by
     /// <see cref="Hide"/>, by the next card, and when this component is
@@ -45,8 +45,9 @@ namespace GateRush.Runtime
         private static readonly Vector2 TopRight = new Vector2(1f, 1f);
         private static readonly Vector2 Middle = new Vector2(0.5f, 0.5f);
 
-        /// <summary>The two strokes of the close button's cross lie on the diagonals.</summary>
-        private const float CrossStrokeDegrees = 45f;
+        // The panel and the close button are the theme's sprites in their own
+        // colours, as the front end's prefabs draw them: not a tunable.
+        private static readonly Color Untinted = Color.white;
 
         private readonly List<LevelMechanic> queue = new List<LevelMechanic>();
         private readonly List<RectTransform> sparkles = new List<RectTransform>();
@@ -64,11 +65,11 @@ namespace GateRush.Runtime
         private RectTransform fit;
         private RectTransform card;
         private Vector2 cardSize;
+        private float rowWidth;
         private Vector2 fittedSafeSize;
         private TMP_Text title;
         private TMP_Text subtitle;
         private TMP_Text text;
-        private Material titleMaterial;
         private RectTransform illustration;
         private RectTransform art;
         private Button backdropButton;
@@ -119,7 +120,6 @@ namespace GateRush.Runtime
                 Destroy(root.gameObject);
             }
 
-            DestroyTitleMaterial();
             sparkles.Clear();
             sparkleImages.Clear();
             sparklePhases.Clear();
@@ -136,7 +136,7 @@ namespace GateRush.Runtime
             var backdrop = UiBuilder.CreateRect("Backdrop", root);
             UiBuilder.Stretch(backdrop);
             var dim = backdrop.gameObject.AddComponent<Image>();
-            dim.color = config.ResultBackdropColor;
+            dim.color = config.IntroBackdropColor;
             backdropButton = UiBuilder.AddButton(backdrop, dim);
 
             // The dim must not flash as it is pressed.
@@ -151,25 +151,26 @@ namespace GateRush.Runtime
             card = UiBuilder.CreateRect("Card", fit);
 
             var spacing = config.IntroSpacingUnits;
+            var padding = config.IntroPanelPaddingUnits;
             var closeSize = config.IntroCloseSizeUnits;
             var illustrationSize = config.IntroIllustrationSizeUnits;
             var boxSize = config.IntroTextBoxSizeUnits;
-            var width = Mathf.Max(illustrationSize.x, boxSize.x);
+            rowWidth = Mathf.Max(illustrationSize.x, boxSize.x);
             cardSize = new Vector2(
-                width,
+                rowWidth + 2f * padding,
                 closeSize + config.IntroTitleHeightUnits + config.IntroSubtitleHeightUnits + illustrationSize.y + boxSize.y
-                + 4f * spacing);
+                + 4f * spacing + 2f * padding);
             UiBuilder.PlaceCentered(fit, cardSize);
             UiBuilder.PlaceCentered(card, cardSize);
+            BuildPanel();
 
-            // Rows from the top: close button, title, subtitle, illustration,
-            // text box.
-            var top = 0f;
-            BuildClose(referencePixelsPerUnit);
+            // Rows from the top, inside the padding: close button, title,
+            // subtitle, illustration, text box.
+            var top = padding;
+            BuildClose(padding);
             top += closeSize + spacing;
 
             title = BuildRow("Title", top, config.IntroTitleHeightUnits, config.IntroTitleFontSize, config.IntroTitleColor);
-            ApplyTitleOutline();
             top += config.IntroTitleHeightUnits + spacing;
 
             subtitle = BuildRow("Subtitle", top, config.IntroSubtitleHeightUnits, config.IntroSubtitleFontSize, config.IntroSubtitleColor);
@@ -274,7 +275,6 @@ namespace GateRush.Runtime
         private void OnDestroy()
         {
             DOTween.Kill(this);
-            DestroyTitleMaterial();
         }
 
         /// <summary>
@@ -322,19 +322,19 @@ namespace GateRush.Runtime
             PlayTwinkle();
         }
 
-        /// <summary>The result panel's pop: the whole card fades in while it grows to its size.</summary>
+        /// <summary>The opening pop: the whole card fades in while it grows to its size.</summary>
         private void PlayPop()
         {
             DOTween.Kill(this);
             group.alpha = 0f;
-            card.localScale = Vector3.one * config.ResultPopStartScale;
+            card.localScale = Vector3.one * config.IntroPopStartScale;
 
-            DOTween.To(() => group.alpha, alpha => group.alpha = alpha, 1f, config.ResultPopSeconds)
-                .SetEase(config.ResultPopEase)
+            DOTween.To(() => group.alpha, alpha => group.alpha = alpha, 1f, config.IntroPopSeconds)
+                .SetEase(config.IntroPopEase)
                 .SetUpdate(true)
                 .SetId(this);
-            card.DOScale(1f, config.ResultPopSeconds)
-                .SetEase(config.ResultPopEase)
+            card.DOScale(1f, config.IntroPopSeconds)
+                .SetEase(config.IntroPopEase)
                 .SetUpdate(true)
                 .SetId(this);
         }
@@ -433,61 +433,44 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>A one-line label filling a row of the card, <paramref name="top"/> below its top edge.</summary>
+        /// <summary>
+        /// The theme's grey panel behind the card's rows, 9-sliced. It takes
+        /// no press, so a tap on the panel closes the card too.
+        /// </summary>
+        private void BuildPanel()
+        {
+            var panel = card.gameObject.AddComponent<Image>();
+            panel.sprite = config.IntroPanelSprite;
+            panel.type = Image.Type.Sliced;
+            panel.color = Untinted;
+            panel.raycastTarget = false;
+        }
+
+        /// <summary>A one-line label in the card's font, filling a row of the card <paramref name="top"/> below its top edge.</summary>
         private TMP_Text BuildRow(string rowName, float top, float height, float fontSize, Color color)
         {
             var rect = UiBuilder.CreateRect(rowName, card);
-            UiBuilder.Place(rect, TopMiddle, new Vector2(0f, -top), new Vector2(cardSize.x, height));
-            return UiBuilder.AddLabel(rect, config.LabelFont, fontSize, color, false);
+            UiBuilder.Place(rect, TopMiddle, new Vector2(0f, -top), new Vector2(rowWidth, height));
+            return UiBuilder.AddLabel(rect, config.IntroFont, fontSize, color, false);
         }
 
         /// <summary>
-        /// Gives the title an outline on a material of its own. The material
-        /// is a copy of the label font's, made once per build of the card and
-        /// destroyed with it; only the title uses it, so no other label's
-        /// material changes.
+        /// The round close button in the card's top right corner, inside the
+        /// padding: the theme's red face with the cross centred on it.
         /// </summary>
-        private void ApplyTitleOutline()
-        {
-            titleMaterial = new Material(config.LabelFont.material) { name = "Introduction Title (outlined copy)" };
-            titleMaterial.EnableKeyword(ShaderUtilities.Keyword_Outline);
-            titleMaterial.SetFloat(ShaderUtilities.ID_OutlineWidth, config.IntroTitleOutlineWidth);
-            titleMaterial.SetColor(ShaderUtilities.ID_OutlineColor, config.IntroTitleOutlineColor);
-            title.fontSharedMaterial = titleMaterial;
-        }
-
-        private void DestroyTitleMaterial()
-        {
-            if (titleMaterial != null)
-            {
-                Destroy(titleMaterial);
-                titleMaterial = null;
-            }
-        }
-
-        /// <summary>The round close button in the card's top right corner: a red disc with a white cross.</summary>
-        private void BuildClose(float referencePixelsPerUnit)
+        private void BuildClose(float padding)
         {
             var rect = UiBuilder.CreateRect("Close", card);
-            var size = Vector2.one * config.IntroCloseSizeUnits;
-            UiBuilder.Place(rect, TopRight, Vector2.zero, size);
-            var face = UiBuilder.AddRoundedBox(
-                rect, size, config.RoundedRectSprite, config.IntroCloseColor, config.IntroCloseSizeUnits * 0.5f, referencePixelsPerUnit);
+            UiBuilder.Place(rect, TopRight, new Vector2(-padding, -padding), Vector2.one * config.IntroCloseSizeUnits);
+            var face = UiBuilder.AddIcon(rect, config.IntroCloseSprite, Untinted);
+
+            // AddIcon leaves an icon out of raycasts; the face is the button's.
+            face.raycastTarget = true;
             closeButton = UiBuilder.AddButton(rect, face);
 
-            var strokeSize = new Vector2(config.IntroCloseCrossSizeUnits, config.IntroCloseCrossThicknessUnits);
-            BuildCrossStroke(rect, strokeSize, CrossStrokeDegrees, referencePixelsPerUnit);
-            BuildCrossStroke(rect, strokeSize, -CrossStrokeDegrees, referencePixelsPerUnit);
-        }
-
-        private void BuildCrossStroke(RectTransform parent, Vector2 size, float degrees, float referencePixelsPerUnit)
-        {
-            var stroke = UiBuilder.CreateRect("Cross stroke", parent);
-            UiBuilder.PlaceCentered(stroke, size);
-            stroke.localRotation = Quaternion.Euler(0f, 0f, degrees);
-            UiBuilder.AddRoundedBox(
-                    stroke, size, config.RoundedRectSprite, config.IntroCloseCrossColor, size.y * 0.5f, referencePixelsPerUnit)
-                .raycastTarget = false;
+            var cross = UiBuilder.CreateRect("Cross", rect);
+            UiBuilder.PlaceCentered(cross, Vector2.one * config.IntroCloseCrossSizeUnits);
+            UiBuilder.AddIcon(cross, config.IntroCloseCrossSprite, Untinted);
         }
 
         /// <summary>The sparkles: each sits where its placement says, over the illustration.</summary>
@@ -509,8 +492,9 @@ namespace GateRush.Runtime
         /// <summary>
         /// The text box at the card's foot: a rounded box in the frame's colour
         /// with a smaller cream one on it, which leaves the frame's colour as a
-        /// border, and dark text that wraps inside the padding. Neither box
-        /// takes a press, so a tap on the text closes the card too.
+        /// border, and dark text in the card's font that wraps inside the
+        /// padding. Neither box takes a press, so a tap on the text closes the
+        /// card too.
         /// </summary>
         private void BuildTextBox(float top, float referencePixelsPerUnit)
         {
@@ -535,7 +519,7 @@ namespace GateRush.Runtime
             var padding = config.IntroTextPaddingUnits;
             label.offsetMin = new Vector2(padding, padding);
             label.offsetMax = new Vector2(-padding, -padding);
-            text = UiBuilder.AddLabel(label, config.LabelFont, config.IntroTextFontSize, config.IntroTextColor, true);
+            text = UiBuilder.AddLabel(label, config.IntroFont, config.IntroTextFontSize, config.IntroTextColor, true);
         }
 
         /// <summary>

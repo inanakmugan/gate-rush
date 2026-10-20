@@ -8,10 +8,11 @@ using UnityEngine.InputSystem;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The level's own interface (Module 40, D74): the HUD in the top band,
-    /// the joker bar in the bottom band, and a stack of overlays over the
+    /// The level's own interface (Modules 40 and 41, D74): the HUD in the top
+    /// band, the joker bar in the bottom band, a stack of overlays over the
     /// level — Not Enough Gold, the gold packs, the test purchase sheet and
-    /// the message, the same prefabs as the front end's. Implements
+    /// the message, the same prefabs as the front end's — and the result
+    /// panel and the confirmation before a lost life. Implements
     /// <see cref="ILevelUi"/>, the one way the bootstrap shows and hears it.
     /// </summary>
     /// <remarks>
@@ -29,10 +30,16 @@ namespace GateRush.UI
     /// so nothing under them can be pressed. Not Enough Gold's Get Gold opens
     /// the gold packs in its place. The test purchase sheet answers exactly
     /// once (<see cref="LevelOverlayStack"/>).</para>
+    /// <para><b>The level's panels (Module 41).</b> The result panel and the
+    /// confirmation sit beside the overlay stack, under the same parent, but
+    /// are not in it: they are opened and closed by the bootstrap alone, and
+    /// closing them never raises <see cref="OverlaysClosed"/>.
+    /// <see cref="Show"/> and <see cref="Hide"/> close them too.</para>
     /// <para><b>Back</b> is the Escape key, which is also Android's back
     /// button under the Input System. With an overlay open it closes the top
-    /// one and nothing else; with none open it is not read here, and nothing
-    /// else in a level reads it.</para>
+    /// one and nothing else; with none open and the confirmation open it
+    /// answers Keep playing; over the result panel, or with nothing open, it
+    /// does nothing, and nothing else in a level reads it.</para>
     /// <para><b>Bands.</b> The HUD and the bar are anchored to the bands the
     /// bootstrap gives (<see cref="PlaceBands"/>); each one's row fits its
     /// band (<see cref="BandFit"/>).</para>
@@ -59,6 +66,12 @@ namespace GateRush.UI
         [SerializeField] private TestPurchaseOverlay testPurchase;
         [SerializeField] private MessageOverlay message;
 
+        [Tooltip("The result panel (Module 41), under the overlays' parent; not in the overlay stack.")]
+        [SerializeField] private ResultOverlay resultOverlay;
+
+        [Tooltip("The confirmation before a lost life (Module 41), under the overlays' parent; not in the overlay stack.")]
+        [SerializeField] private ConfirmOverlay confirmOverlay;
+
         private readonly LevelOverlayStack overlays = new LevelOverlayStack();
         private bool isSubscribed;
 
@@ -81,10 +94,28 @@ namespace GateRush.UI
         public event Action ButtonPressed;
 
         /// <inheritdoc />
+        public event Action NextRequested;
+
+        /// <inheritdoc />
+        public event Action ResultRestartRequested;
+
+        /// <inheritdoc />
+        public event Action ResultMenuRequested;
+
+        /// <inheritdoc />
+        public event Action ConfirmLoseLife;
+
+        /// <inheritdoc />
+        public event Action ConfirmKeepPlaying;
+
+        /// <inheritdoc />
         public bool IsOpen => gameObject.activeSelf;
 
         /// <inheritdoc />
         public bool IsOverlayOpen => overlays.IsOpen;
+
+        /// <inheritdoc />
+        public bool IsConfirmOpen => confirmOverlay != null && confirmOverlay.IsOpen;
 
         /// <inheritdoc />
         public string MissingSetup()
@@ -97,6 +128,18 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, goldPacks, nameof(LevelUi), nameof(goldPacks));
             UiParts.AddIfMissing(missing, testPurchase, nameof(LevelUi), nameof(testPurchase));
             UiParts.AddIfMissing(missing, message, nameof(LevelUi), nameof(message));
+            UiParts.AddIfMissing(missing, resultOverlay, nameof(LevelUi), nameof(resultOverlay));
+            UiParts.AddIfMissing(missing, confirmOverlay, nameof(LevelUi), nameof(confirmOverlay));
+
+            if (resultOverlay != null)
+            {
+                resultOverlay.AddMissing(missing);
+            }
+
+            if (confirmOverlay != null)
+            {
+                confirmOverlay.AddMissing(missing);
+            }
 
             if (hud != null)
             {
@@ -138,7 +181,7 @@ namespace GateRush.UI
 
             if (!OverlaysShareOneParent())
             {
-                missing.Add("the Not Enough Gold, Gold Packs, Test Purchase and Message overlays must share one parent, which stacks them");
+                missing.Add("the Not Enough Gold, Gold Packs, Test Purchase, Message, Result and Confirm overlays must share one parent, which stacks them");
             }
 
             if (config != null)
@@ -158,6 +201,8 @@ namespace GateRush.UI
             UiTint.ApplyAll(this, config);
             overlays.Clear();
             ApplyOverlays();
+            HideResult();
+            HideConfirm();
             hud.CancelTimeBonus();
             Refresh(state);
         }
@@ -237,10 +282,61 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void ShowWin(LevelResult result)
+        {
+            if (!result.IsWin)
+            {
+                throw new ArgumentException("ShowWin was given a loss; use ShowLoss.", nameof(result));
+            }
+
+            RequireOpen(nameof(ShowWin));
+            resultOverlay.Show(result, config);
+        }
+
+        /// <inheritdoc />
+        public void ShowLoss(LevelResult result)
+        {
+            if (result.IsWin)
+            {
+                throw new ArgumentException("ShowLoss was given a win; use ShowWin.", nameof(result));
+            }
+
+            RequireOpen(nameof(ShowLoss));
+            resultOverlay.Show(result, config);
+        }
+
+        /// <inheritdoc />
+        public void HideResult()
+        {
+            if (resultOverlay != null)
+            {
+                resultOverlay.Hide();
+            }
+        }
+
+        /// <inheritdoc />
+        public void ShowConfirm(ConfirmKind kind, int streakAtRisk)
+        {
+            RequireOpen(nameof(ShowConfirm));
+            confirmOverlay.Show(kind, streakAtRisk, config);
+        }
+
+        /// <inheritdoc />
+        public void HideConfirm()
+        {
+            if (confirmOverlay != null)
+            {
+                confirmOverlay.Hide();
+            }
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
             overlays.Clear();
             ApplyOverlays();
+            HideResult();
+            HideConfirm();
             hud.CancelTimeBonus();
             gameObject.SetActive(false);
         }
@@ -258,8 +354,20 @@ namespace GateRush.UI
         private void Update()
         {
             var keyboard = Keyboard.current;
-            if (keyboard != null && keyboard[BackKey].wasPressedThisFrame && overlays.Back())
+            if (keyboard == null || !keyboard[BackKey].wasPressedThisFrame)
             {
+                return;
+            }
+
+            // The top in-level overlay first; then the confirmation, where
+            // Back is Keep playing. There is no back from a result.
+            if (overlays.Back())
+            {
+                ButtonPressed?.Invoke();
+            }
+            else if (IsConfirmOpen)
+            {
+                ConfirmKeepPlaying?.Invoke();
                 ButtonPressed?.Invoke();
             }
         }
@@ -274,7 +382,7 @@ namespace GateRush.UI
 
         private bool OverlaysShareOneParent()
         {
-            var parts = new Component[] { notEnoughGold, goldPacks, testPurchase, message };
+            var parts = new Component[] { notEnoughGold, goldPacks, testPurchase, message, resultOverlay, confirmOverlay };
             Transform parent = null;
             for (var i = 0; i < parts.Length; i++)
             {
@@ -349,7 +457,7 @@ namespace GateRush.UI
         private void Subscribe()
         {
             if (isSubscribed || hud == null || jokerBar == null || notEnoughGold == null || goldPacks == null
-                || testPurchase == null || message == null)
+                || testPurchase == null || message == null || resultOverlay == null || confirmOverlay == null)
             {
                 return;
             }
@@ -366,6 +474,11 @@ namespace GateRush.UI
             testPurchase.CloseRequested += OnTestPurchaseCloseRequested;
             testPurchase.BuyRequested += OnTestPurchaseBuyRequested;
             message.CloseRequested += OnMessageCloseRequested;
+            resultOverlay.NextRequested += OnNextRequested;
+            resultOverlay.RestartRequested += OnResultRestartRequested;
+            resultOverlay.MenuRequested += OnResultMenuRequested;
+            confirmOverlay.LoseLifeRequested += OnLoseLifeRequested;
+            confirmOverlay.KeepPlayingRequested += OnKeepPlayingRequested;
             isSubscribed = true;
         }
 
@@ -390,6 +503,11 @@ namespace GateRush.UI
             testPurchase.CloseRequested -= OnTestPurchaseCloseRequested;
             testPurchase.BuyRequested -= OnTestPurchaseBuyRequested;
             message.CloseRequested -= OnMessageCloseRequested;
+            resultOverlay.NextRequested -= OnNextRequested;
+            resultOverlay.RestartRequested -= OnResultRestartRequested;
+            resultOverlay.MenuRequested -= OnResultMenuRequested;
+            confirmOverlay.LoseLifeRequested -= OnLoseLifeRequested;
+            confirmOverlay.KeepPlayingRequested -= OnKeepPlayingRequested;
             isSubscribed = false;
         }
 
@@ -446,5 +564,37 @@ namespace GateRush.UI
         }
 
         private void OnMessageCloseRequested() => OnCloseClicked(UiOverlay.Message);
+
+        // Each panel press raises its own event, then the tap sound, so a
+        // listener that stops sounds has done so first (Module 25).
+        private void OnNextRequested()
+        {
+            NextRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnResultRestartRequested()
+        {
+            ResultRestartRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnResultMenuRequested()
+        {
+            ResultMenuRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnLoseLifeRequested()
+        {
+            ConfirmLoseLife?.Invoke();
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnKeepPlayingRequested()
+        {
+            ConfirmKeepPlaying?.Invoke();
+            ButtonPressed?.Invoke();
+        }
     }
 }
