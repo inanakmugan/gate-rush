@@ -14,12 +14,16 @@ namespace GateRush.Tests
     /// and valid values are carried as given, the table as a copy. Module
     /// 36's gold packs: a null list, a blank or repeated id, or gold below 1
     /// throws; an empty list is allowed; the packs are carried as a copy.
+    /// Module 38's defaults: a name the name rule refuses or an empty avatar
+    /// id throws; valid ones are carried, the name normalized.
     /// </summary>
     public class MetaRulesTests
     {
         private const int Cap = 3;
         private const int StartingGold = 250;
         private const int ClockSeconds = 18;
+        private const string PlayerName = "Rules Name";
+        private const string AvatarId = "moose";
 
         private static readonly TimeSpan Interval = TimeSpan.FromMinutes(7);
 
@@ -102,7 +106,7 @@ namespace GateRush.Tests
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
                 Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null, ClockSeconds,
-                MetaRulesFixture.GoldPacks()));
+                MetaRulesFixture.GoldPacks(), PlayerName, AvatarId));
         }
 
         [Test]
@@ -110,7 +114,41 @@ namespace GateRush.Tests
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
                 Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7),
-                MetaRulesFixture.StreakRewards(), ClockSeconds, null));
+                MetaRulesFixture.StreakRewards(), ClockSeconds, null, PlayerName, AvatarId));
+        }
+
+        [Test]
+        public void Constructor_PlayerDefaults_AreCarried()
+        {
+            var rules = MetaRulesFixture.Build(defaultPlayerName: "Ayşe 7", defaultAvatarId: "zebra");
+
+            Assert.AreEqual("Ayşe 7", rules.DefaultPlayerName);
+            Assert.AreEqual("zebra", rules.DefaultAvatarId);
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("Pl@yer")]
+        [TestCase("abcdefghijklmnopq")]
+        public void Constructor_DefaultNameRefusedByTheRule_Throws(string name)
+        {
+            Assert.Throws<ArgumentException>(() => MetaRulesFixture.Build(defaultPlayerName: name));
+        }
+
+        [TestCase(null)]
+        [TestCase("")]
+        [TestCase("   ")]
+        public void Constructor_EmptyDefaultAvatarId_Throws(string avatarId)
+        {
+            Assert.Throws<ArgumentException>(() => MetaRulesFixture.Build(defaultAvatarId: avatarId));
+        }
+
+        [Test]
+        public void Constructor_DefaultNameWithExtraSpaces_IsKeptNormalized()
+        {
+            var rules = MetaRulesFixture.Build(defaultPlayerName: "  New   Player ");
+
+            Assert.AreEqual("New Player", rules.DefaultPlayerName);
         }
 
         [TestCaseSource(nameof(PacksWithAProblem))]
@@ -161,7 +199,8 @@ namespace GateRush.Tests
             var packs = new[] { new GoldPack("first", 18), new GoldPack("second", 19) };
 
             var rules = new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds, packs);
+                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds, packs,
+                PlayerName, AvatarId);
 
             Assert.AreEqual(Cap, rules.LifeCap);
             Assert.AreEqual(Interval, rules.LifeRegenInterval);
@@ -176,6 +215,8 @@ namespace GateRush.Tests
             CollectionAssert.AreEqual(table, rules.StreakRewards);
             Assert.AreEqual(ClockSeconds, rules.ClockBonusSeconds);
             CollectionAssert.AreEqual(packs, rules.GoldPacks);
+            Assert.AreEqual(PlayerName, rules.DefaultPlayerName);
+            Assert.AreEqual(AvatarId, rules.DefaultAvatarId);
         }
 
         [Test]

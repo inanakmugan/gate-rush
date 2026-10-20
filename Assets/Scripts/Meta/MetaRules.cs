@@ -8,7 +8,8 @@ namespace GateRush.Meta
     /// lives a player can hold and how long one takes to come back (D59), the
     /// gold and jokers a new player starts with (D59, D61), the store's prices
     /// (D62), the win streak's reward table (D61), the seconds a Clock adds
-    /// (D65) and the gold packs sold for real money (Module 36, D72). Built by
+    /// (D65), the gold packs sold for real money (Module 36, D72) and the
+    /// name and avatar a new player gets (Module 38, D71). Built by
     /// <c>Runtime</c> from
     /// its configuration asset; this assembly holds no default of its own, so
     /// every default — a new player's, and that of a section an older save
@@ -29,8 +30,10 @@ namespace GateRush.Meta
         /// </exception>
         /// <exception cref="ArgumentNullException"><paramref name="streakRewards"/> or <paramref name="goldPacks"/> is null.</exception>
         /// <exception cref="ArgumentException">
-        /// <paramref name="streakRewards"/> has a problem <see cref="StreakReward.ProblemsOf"/> reports, or
-        /// <paramref name="goldPacks"/> one <see cref="GoldPack.ProblemsOf"/> reports.
+        /// <paramref name="streakRewards"/> has a problem <see cref="StreakReward.ProblemsOf"/> reports,
+        /// <paramref name="goldPacks"/> one <see cref="GoldPack.ProblemsOf"/> reports,
+        /// <paramref name="defaultPlayerName"/> is refused by <see cref="PlayerProfile.TryNormalizeName"/>, or
+        /// <paramref name="defaultAvatarId"/> is null, empty or white space.
         /// </exception>
         public MetaRules(
             int lifeCap,
@@ -41,7 +44,9 @@ namespace GateRush.Meta
             JokerAmounts startingJokers,
             IReadOnlyList<StreakReward> streakRewards,
             int clockBonusSeconds,
-            IReadOnlyList<GoldPack> goldPacks)
+            IReadOnlyList<GoldPack> goldPacks,
+            string defaultPlayerName,
+            string defaultAvatarId)
         {
             if (lifeCap < 1)
             {
@@ -107,6 +112,17 @@ namespace GateRush.Meta
                 throw new ArgumentException($"The gold packs are invalid: {packProblems[0]}", nameof(goldPacks));
             }
 
+            if (!PlayerProfile.TryNormalizeName(defaultPlayerName, out var playerName))
+            {
+                throw new ArgumentException(
+                    $"The default player name '{defaultPlayerName}' is refused by the name rule.", nameof(defaultPlayerName));
+            }
+
+            if (string.IsNullOrWhiteSpace(defaultAvatarId))
+            {
+                throw new ArgumentException("The default avatar id may not be empty.", nameof(defaultAvatarId));
+            }
+
             var packs = new GoldPack[goldPacks.Count];
             for (var i = 0; i < packs.Length; i++)
             {
@@ -128,6 +144,8 @@ namespace GateRush.Meta
             StreakRewards = Array.AsReadOnly(rewards);
             ClockBonusSeconds = clockBonusSeconds;
             GoldPacks = Array.AsReadOnly(packs);
+            DefaultPlayerName = playerName;
+            DefaultAvatarId = defaultAvatarId;
         }
 
         /// <summary>The most lives a player holds; lives never come back above it. At least 1.</summary>
@@ -162,6 +180,20 @@ namespace GateRush.Meta
         /// purchase service's, not a rule.
         /// </summary>
         public IReadOnlyList<GoldPack> GoldPacks { get; }
+
+        /// <summary>
+        /// The name of a new player and of a save older than format version 4
+        /// (D71), in the form the name rule normalizes it to; "Player" in a
+        /// fresh Meta Config.
+        /// </summary>
+        public string DefaultPlayerName { get; }
+
+        /// <summary>
+        /// The avatar id of a new player and of a save older than format
+        /// version 4 (D71): the first of the catalog, "bear" in a fresh Meta Config. Never
+        /// empty; whether the catalog has it is checked where the catalog is.
+        /// </summary>
+        public string DefaultAvatarId { get; }
 
         /// <summary>What one <paramref name="kind"/> costs in the store (D62). Never negative.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>

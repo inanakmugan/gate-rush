@@ -27,8 +27,9 @@ namespace GateRush.Tests
         /// differ from each other and from <see cref="Rules"/>' starting gold;
         /// lives below the cap, waiting since a moment that is not the default;
         /// joker counts that differ from each other and from the starting
-        /// ones; a streak below a best that differ; and a campaign past its
-        /// start.
+        /// ones; a streak below a best that differ; a campaign past its
+        /// start; a name with Turkish letters and an avatar, neither the
+        /// rules' default; and haptics off.
         /// </summary>
         public static SaveData EveryField() =>
             new SaveData(
@@ -38,7 +39,31 @@ namespace GateRush.Tests
                 new Lives(Rules, 2, new DateTime(2026, 10, 15, 12, 34, 56, DateTimeKind.Utc)),
                 new JokerInventory(1, 4, 6),
                 new WinStreak(2, 6),
-                new CampaignProgress(4));
+                new CampaignProgress(4),
+                new PlayerProfile(EveryFieldName, EveryFieldAvatarId),
+                new HapticsSetting { IsOn = false });
+
+        /// <summary>The name <see cref="EveryField"/> holds: Turkish letters Fredoka lacks, and a space.</summary>
+        public const string EveryFieldName = "Ayşe Nur İğde";
+
+        /// <summary>The avatar id <see cref="EveryField"/> holds.</summary>
+        public const string EveryFieldAvatarId = "panda";
+
+        /// <summary>
+        /// A save holding <paramref name="completed"/> and <paramref name="sound"/>,
+        /// and every other section a new player's by <see cref="Rules"/>.
+        /// </summary>
+        public static SaveData NewPlayerSave(CompletedLevels completed, SoundSetting sound) =>
+            new SaveData(
+                completed,
+                sound,
+                Wallet.Starting(Rules),
+                Lives.Full(Rules),
+                JokerInventory.Starting(Rules),
+                WinStreak.Starting(),
+                CampaignProgress.Starting(),
+                PlayerProfile.Starting(Rules),
+                new HapticsSetting());
 
         /// <summary>Asserts that <paramref name="actual"/> holds what <paramref name="expected"/> holds, field by field.</summary>
         public static void AssertSameSave(SaveData expected, SaveData actual)
@@ -59,6 +84,9 @@ namespace GateRush.Tests
             Assert.AreEqual(expected.Streak.Current, actual.Streak.Current, "win streak");
             Assert.AreEqual(expected.Streak.Best, actual.Streak.Best, "best win streak");
             Assert.AreEqual(expected.Campaign.Position, actual.Campaign.Position, "campaign position");
+            Assert.AreEqual(expected.Profile.Name, actual.Profile.Name, "player name");
+            Assert.AreEqual(expected.Profile.AvatarId, actual.Profile.AvatarId, "avatar id");
+            Assert.AreEqual(expected.Haptics.IsOn, actual.Haptics.IsOn, "haptics on");
         }
     }
 }

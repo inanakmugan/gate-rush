@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace GateRush.Meta
 {
     /// <summary>
@@ -26,7 +28,14 @@ namespace GateRush.Meta
         /// <paramref name="problem"/> says why. True leaves
         /// <paramref name="problem"/> null. Never throws for any text.
         /// </summary>
+        /// <param name="resets">
+        /// One sentence per field that was read at its default because its
+        /// value broke a rule — a refused name or an empty avatar id (Module
+        /// 38), where losing the whole save would be worse than resetting the
+        /// field — naming the field and the value used. Empty, never null,
+        /// when nothing was reset and whenever the result is false.
+        /// </param>
         /// <exception cref="System.ArgumentNullException"><paramref name="rules"/> is null.</exception>
-        bool TryDecode(string text, MetaRules rules, out SaveData data, out string problem);
+        bool TryDecode(string text, MetaRules rules, out SaveData data, out string problem, out IReadOnlyList<string> resets);
     }
 }

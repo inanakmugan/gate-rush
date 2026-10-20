@@ -9,8 +9,8 @@ namespace GateRush.Runtime
     /// Every tunable number of the meta game (Modules 30, 31, 33 and 36): the
     /// life cap, how long a life takes to come back, a new player's gold and
     /// jokers, the store's prices, the win streak's reward table, the seconds
-    /// a Clock adds, free play's jokers per level and the gold of each gold
-    /// pack. Nothing in
+    /// a Clock adds, free play's jokers per level, the gold of each gold
+    /// pack, and a new player's name and avatar (Module 38). Nothing in
     /// <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
     /// hands them over as <see cref="MetaRules"/>, all but free play's
     /// allowance, which <c>Meta</c> knows nothing of (D66) and
@@ -82,6 +82,13 @@ namespace GateRush.Runtime
             new GoldPackEntry("gold_large", 4000),
         };
 
+        [Header("Player")]
+        [Tooltip("The name of a new player, and of a save from before Module 38. It must pass the name rule: 1 to 16 letters, digits, spaces, - _ or ., after trimming.")]
+        [SerializeField] private string defaultPlayerName = "Player";
+
+        [Tooltip("The avatar id of a new player, and of a save from before Module 38: the first of the Avatar Catalog. Not empty; the bootstrap checks at start that the catalog has it.")]
+        [SerializeField] private string defaultAvatarId = "bear";
+
         /// <summary>
         /// How many of each joker a level played in free play starts with
         /// (D66). Never negative when <see cref="Problems"/> is empty. Not part
@@ -133,6 +140,18 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Gold Packs {problem}");
             }
 
+            if (!PlayerProfile.TryNormalizeName(defaultPlayerName, out _))
+            {
+                problems.Add(
+                    $"{name}: Default Player Name must be {PlayerProfile.MinNameLength} to {PlayerProfile.MaxNameLength} " +
+                    "letters, digits, spaces, - _ or . after trimming.");
+            }
+
+            if (string.IsNullOrWhiteSpace(defaultAvatarId))
+            {
+                problems.Add($"{name}: Default Avatar Id is empty.");
+            }
+
             return problems;
         }
 
@@ -151,7 +170,9 @@ namespace GateRush.Runtime
                 new JokerAmounts(startingClocks, startingRockets, startingBrooms),
                 StreakRewards(),
                 clockBonusSeconds,
-                GoldPacks());
+                GoldPacks(),
+                defaultPlayerName,
+                defaultAvatarId);
 
         private StreakReward[] StreakRewards()
         {
