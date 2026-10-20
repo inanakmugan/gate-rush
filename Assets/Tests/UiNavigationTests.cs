@@ -14,7 +14,9 @@ namespace GateRush.Tests
     /// Purchase overlays stack and close with Back like the others, and Get
     /// Gold — selecting the Store — closes every overlay. Module 37's Win
     /// Streak and Streak Reward overlays stack and close with Back too, and
-    /// Module 38's Profile opens over any tab and closes with Back.
+    /// Module 38's Profile opens over any tab and closes with Back. Module
+    /// 40's ReplaceTop swaps the top overlay in one change, opens one when
+    /// none is open, and changes nothing when it is already on top.
     /// </summary>
     public class UiNavigationTests
     {
@@ -285,6 +287,40 @@ namespace GateRush.Tests
         public void Open_UndeclaredOverlay_Throws()
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => navigation.Open((UiOverlay)(-1)));
+        }
+
+        [Test]
+        public void ReplaceTop_OverlayOpen_SwapsTheTopInOneChange()
+        {
+            navigation.Open(UiOverlay.Message);
+            navigation.Open(UiOverlay.NotEnoughGold);
+            changes = 0;
+
+            navigation.ReplaceTop(UiOverlay.GoldPacks);
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.Message, UiOverlay.GoldPacks }, navigation.Overlays);
+            Assert.AreEqual(1, changes);
+        }
+
+        [Test]
+        public void ReplaceTop_NoneOpen_OpensIt()
+        {
+            navigation.ReplaceTop(UiOverlay.GoldPacks);
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.GoldPacks }, navigation.Overlays);
+            Assert.AreEqual(1, changes);
+        }
+
+        [Test]
+        public void ReplaceTop_AlreadyOnTop_ChangesNothing()
+        {
+            navigation.Open(UiOverlay.GoldPacks);
+            changes = 0;
+
+            navigation.ReplaceTop(UiOverlay.GoldPacks);
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.GoldPacks }, navigation.Overlays);
+            Assert.AreEqual(0, changes);
         }
 
         private void OnChanged()

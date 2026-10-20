@@ -1,6 +1,10 @@
 namespace GateRush.UI
 {
-    /// <summary>The pages that open over a tab, newest on top (Modules 35 to 38).</summary>
+    /// <summary>
+    /// The pages that open over a tab, newest on top (Modules 35 to 38), and
+    /// over a level (Module 40): the level's interface opens Not Enough Gold,
+    /// Gold Packs, Test Purchase and Message only.
+    /// </summary>
     public enum UiOverlay
     {
         /// <summary>The sound and haptics toggles and the Levels button.</summary>
@@ -28,6 +32,9 @@ namespace GateRush.UI
         StreakReward,
 
         /// <summary>The player's name and avatar, the avatar grid and four statistics (D71).</summary>
-        Profile
+        Profile,
+
+        /// <summary>The gold packs over a level, opened by Not Enough Gold's Get Gold (D74). The front end never opens it.</summary>
+        GoldPacks
     }
 }

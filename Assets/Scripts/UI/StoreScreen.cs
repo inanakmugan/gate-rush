@@ -46,7 +46,7 @@ namespace GateRush.UI
         [SerializeField] private StoreItemCard broomCard;
         [SerializeField] private StoreItemCard livesCard;
 
-        private readonly List<GoldPackCard> packCards = new List<GoldPackCard>();
+        private GoldPackCards packCards;
         private bool isSubscribed;
 
         /// <summary>Raised with a gold pack's product id when its price button is pressed.</summary>
@@ -70,16 +70,7 @@ namespace GateRush.UI
             livesHeader.text = config.LivesHeader;
             testStoreNote.text = config.TestStoreNote;
 
-            var offers = state.GoldOffers ?? Array.Empty<GoldOffer>();
-            if (packCards.Count != offers.Count)
-            {
-                RebuildPackCards(offers.Count, config);
-            }
-
-            for (var i = 0; i < packCards.Count; i++)
-            {
-                packCards[i].Show(offers[i], StoreTexts.Ribbon(offers[i].ProductId, config), config);
-            }
+            PackCards.Show(state.GoldOffers ?? Array.Empty<GoldOffer>(), goldPackCardPrefab, goldPacks, config);
 
             ShowJoker(clockCard, JokerKind.Clock, state, config);
             ShowJoker(rocketCard, JokerKind.Rocket, state, config);
@@ -153,37 +144,8 @@ namespace GateRush.UI
                 config);
         }
 
-        private void RebuildPackCards(int count, UiConfig config)
-        {
-            DestroyPackCards();
-            for (var i = 0; i < count; i++)
-            {
-                var card = Instantiate(goldPackCardPrefab, goldPacks);
-                UiTint.ApplyAll(card, config);
-                card.BuyRequested += OnGoldPackPressed;
-                packCards.Add(card);
-            }
-        }
-
-        private void DestroyPackCards()
-        {
-            for (var i = 0; i < packCards.Count; i++)
-            {
-                var card = packCards[i];
-                if (ReferenceEquals(card, null))
-                {
-                    continue;
-                }
-
-                card.BuyRequested -= OnGoldPackPressed;
-                if (card != null)
-                {
-                    Destroy(card.gameObject);
-                }
-            }
-
-            packCards.Clear();
-        }
+        // Made on first use, so its buy handler is this instance's.
+        private GoldPackCards PackCards => packCards ?? (packCards = new GoldPackCards(OnGoldPackPressed));
 
         private void OnEnable()
         {
@@ -217,7 +179,7 @@ namespace GateRush.UI
 
         private void OnDestroy()
         {
-            DestroyPackCards();
+            packCards?.DestroyAll();
         }
 
         private void OnGoldPackPressed(string productId) => GoldPackRequested?.Invoke(productId);

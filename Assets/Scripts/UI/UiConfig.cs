@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using GateRush.Meta;
 using GateRush.Runtime;
 using UnityEngine;
@@ -7,18 +8,20 @@ using UnityEngine;
 namespace GateRush.UI
 {
     /// <summary>
-    /// Every text, format string and colour the front end's screens set from
-    /// code (Modules 35 to 39, D68, D69, D71 to D73): the texts that carry a number or change
-    /// with the state, the joker names, the theme's colours, and the
-    /// colours that change at runtime. Fixed English titles, layout and
-    /// colours that never change live on the prefabs.
+    /// Every text, format string and colour the front end's screens and the
+    /// level's interface set from code (Modules 35 to 40, D68, D69, D71 to
+    /// D74): the texts that carry a number or change with the state, the
+    /// joker names, the theme's colours, the colours that change at runtime,
+    /// and the level HUD's timing. Fixed English titles, layout and colours
+    /// that never change live on the prefabs.
     /// </summary>
     /// <remarks>
     /// Formats are read with the invariant culture (<see cref="HomeTexts"/>).
     /// <see cref="Problems"/> reports a blank text, a format with a
-    /// placeholder beyond the numbers it is given, and a fully transparent
-    /// colour, each by its field's name; the front end refuses to open with
-    /// one (<see cref="FrontEnd.MissingSetup"/>).
+    /// placeholder beyond the numbers it is given, a fully transparent
+    /// colour and an unusable timing, each by its field's name; the front end
+    /// and the level's interface refuse to open with one
+    /// (<see cref="FrontEnd.MissingSetup"/>, <see cref="LevelUi.MissingSetup"/>).
     /// </remarks>
     [CreateAssetMenu(fileName = "UiConfig", menuName = "Gate Rush/UI Config")]
     public sealed class UiConfig : ScriptableObject
@@ -196,6 +199,46 @@ namespace GateRush.UI
         [Tooltip("A row's rank; {0} is the rank, 1 at the top.")]
         [SerializeField] private string leaderboardRankFormat = "{0}";
 
+        [Header("Level HUD and joker bar texts (Module 40; formats use the invariant culture)")]
+        [Tooltip("The HUD's label at the right during free play, in place of the level number (D58).")]
+        [SerializeField] private string freePlayLabel = "Free Play";
+
+        [Tooltip("The HUD's label at the right in the campaign; {0} is the level's number.")]
+        [SerializeField] private string levelLabelFormat = "Level {0}";
+
+        [Tooltip("The timer; {0} is the minutes and {1} the seconds, rounded up as the countdown is.")]
+        [SerializeField] private string timerFormat = "{0}:{1:00}";
+
+        [Tooltip("Shown beside the timer when time is added (M10, the Clock); {0} is the seconds.")]
+        [SerializeField] private string timeBonusFormat = "+{0}";
+
+        [Tooltip("A joker button's badge while some are held, or left in free play; {0} is the count.")]
+        [SerializeField] private string jokerCountBadgeFormat = "{0}";
+
+        [Tooltip("A joker button's badge in the campaign with none held, beside the coin; {0} is the price.")]
+        [SerializeField] private string jokerPriceBadgeFormat = "{0}";
+
+        [Tooltip("The title of the gold packs over a level, opened by Get Gold.")]
+        [SerializeField] private string goldPacksTitle = "Get Gold";
+
+        [Header("Level HUD timing (Module 40; unscaled time)")]
+        [Tooltip("The timer turns Timer Warning Color once the displayed second is at most this. 0 turns it only at 0:00.")]
+        [SerializeField] private int timerWarningSeconds = 10;
+
+        [Tooltip("Seconds the time bonus takes to rise and fade.")]
+        [SerializeField] private float timeBonusSeconds = 0.9f;
+
+        [Tooltip("How far the time bonus rises while it fades, in canvas units.")]
+        [SerializeField] private float timeBonusRiseUnits = 60f;
+
+        [SerializeField] private Ease timeBonusEase = Ease.OutQuad;
+
+        [Tooltip("The scale the timer pulses to when time is added: at least 1.")]
+        [SerializeField] private float timerPulseScale = 1.15f;
+
+        [Tooltip("Seconds the timer's pulse takes, up and back.")]
+        [SerializeField] private float timerPulseSeconds = 0.25f;
+
         [Header("Joker names")]
         [SerializeField] private string clockName = "Clock";
         [SerializeField] private string rocketName = "Rocket";
@@ -216,6 +259,9 @@ namespace GateRush.UI
 
         [Tooltip("The win streak's fire, the bar's fill and the next reward's highlight.")]
         [SerializeField] private Color streakColor = new Color(1f, 0.55f, 0.12f);
+
+        [Tooltip("The ring around the selected Rocket or Broom in a level (D67).")]
+        [SerializeField] private Color jokerSelectedColor = new Color(1f, 0.76f, 0.2f);
 
         [Header("Colours that change")]
         [Tooltip("A button's label while it can be pressed.")]
@@ -238,6 +284,21 @@ namespace GateRush.UI
 
         [Tooltip("Every other row on the Leaderboard.")]
         [SerializeField] private Color leaderboardRowColor = Color.white;
+
+        [Tooltip("The timer's digits in a level.")]
+        [SerializeField] private Color timerColor = Color.white;
+
+        [Tooltip("The timer's digits once the displayed second reaches Timer Warning Seconds.")]
+        [SerializeField] private Color timerWarningColor = new Color(1f, 0.32f, 0.32f);
+
+        [Tooltip("The time bonus beside the timer; it fades from this.")]
+        [SerializeField] private Color timeBonusColor = new Color(0.45f, 1f, 0.45f);
+
+        [Tooltip("A joker button's badge text: its count, or a price the balance covers.")]
+        [SerializeField] private Color jokerBadgeTextColor = Color.white;
+
+        [Tooltip("A joker button's price while the balance is short of it: a press opens Not Enough Gold (D74).")]
+        [SerializeField] private Color shortPriceColor = new Color(1f, 0.45f, 0.45f);
 
         /// <summary>Home's play button with a campaign level; {0} is its number.</summary>
         public string PlayLevelFormat => playLevelFormat;
@@ -395,6 +456,63 @@ namespace GateRush.UI
         /// <summary>A row's rank; {0} is the rank.</summary>
         public string LeaderboardRankFormat => leaderboardRankFormat;
 
+        /// <summary>The HUD's label during free play.</summary>
+        public string FreePlayLabel => freePlayLabel;
+
+        /// <summary>The HUD's label in the campaign; {0} is the level's number.</summary>
+        public string LevelLabelFormat => levelLabelFormat;
+
+        /// <summary>The timer; {0} the minutes, {1} the seconds.</summary>
+        public string TimerFormat => timerFormat;
+
+        /// <summary>The time bonus beside the timer; {0} is the seconds.</summary>
+        public string TimeBonusFormat => timeBonusFormat;
+
+        /// <summary>A joker button's count badge; {0} is the count.</summary>
+        public string JokerCountBadgeFormat => jokerCountBadgeFormat;
+
+        /// <summary>A joker button's price badge; {0} is the price.</summary>
+        public string JokerPriceBadgeFormat => jokerPriceBadgeFormat;
+
+        /// <summary>The title of the gold packs over a level.</summary>
+        public string GoldPacksTitle => goldPacksTitle;
+
+        /// <summary>The displayed second at or below which the timer takes <see cref="TimerWarningColor"/>.</summary>
+        public int TimerWarningSeconds => timerWarningSeconds;
+
+        /// <summary>Seconds the time bonus takes to rise and fade.</summary>
+        public float TimeBonusSeconds => timeBonusSeconds;
+
+        /// <summary>How far the time bonus rises, in canvas units.</summary>
+        public float TimeBonusRiseUnits => timeBonusRiseUnits;
+
+        /// <summary>The easing of the time bonus's rise and fade.</summary>
+        public Ease TimeBonusEase => timeBonusEase;
+
+        /// <summary>The scale the timer pulses to when time is added.</summary>
+        public float TimerPulseScale => timerPulseScale;
+
+        /// <summary>Seconds the timer's pulse takes, up and back.</summary>
+        public float TimerPulseSeconds => timerPulseSeconds;
+
+        /// <summary>The ring around the selected joker's button.</summary>
+        public Color JokerSelectedColor => jokerSelectedColor;
+
+        /// <summary>The timer's digits.</summary>
+        public Color TimerColor => timerColor;
+
+        /// <summary>The timer's digits near the end.</summary>
+        public Color TimerWarningColor => timerWarningColor;
+
+        /// <summary>The time bonus beside the timer.</summary>
+        public Color TimeBonusColor => timeBonusColor;
+
+        /// <summary>A joker button's badge text, except a price the balance is short of.</summary>
+        public Color JokerBadgeTextColor => jokerBadgeTextColor;
+
+        /// <summary>A joker button's price while the balance is short of it.</summary>
+        public Color ShortPriceColor => shortPriceColor;
+
         /// <summary>The flat colour behind every tab.</summary>
         public Color BackgroundColor => backgroundColor;
 
@@ -476,6 +594,8 @@ namespace GateRush.UI
                     return heartColor;
                 case UiColorRole.Streak:
                     return streakColor;
+                case UiColorRole.JokerSelected:
+                    return jokerSelectedColor;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(role), role, "Not a colour role.");
             }
@@ -582,6 +702,14 @@ namespace GateRush.UI
             AddIfBlank(problems, leaderboardRetryLabel, "Leaderboard Retry Label");
             AddIfUnusableFormat(problems, leaderboardScoreFormat, 1, "Leaderboard Score Format", "{0} for the score");
             AddIfUnusableFormat(problems, leaderboardRankFormat, 1, "Leaderboard Rank Format", "{0} for the rank");
+            AddIfBlank(problems, freePlayLabel, "Free Play Label");
+            AddIfUnusableFormat(problems, levelLabelFormat, 1, "Level Label Format", "{0} for the number");
+            AddIfUnusableFormat(problems, timerFormat, 2, "Timer Format", "{0} for the minutes and {1} for the seconds");
+            AddIfUnusableFormat(problems, timeBonusFormat, 1, "Time Bonus Format", "{0} for the seconds");
+            AddIfUnusableFormat(problems, jokerCountBadgeFormat, 1, "Joker Count Badge Format", "{0} for the count");
+            AddIfUnusableFormat(problems, jokerPriceBadgeFormat, 1, "Joker Price Badge Format", "{0} for the price");
+            AddIfBlank(problems, goldPacksTitle, "Gold Packs Title");
+            AddLevelTimingProblems(problems);
             AddIfBlank(problems, clockName, "Clock Name");
             AddIfBlank(problems, rocketName, "Rocket Name");
             AddIfBlank(problems, broomName, "Broom Name");
@@ -599,8 +727,47 @@ namespace GateRush.UI
             AddIfTransparent(problems, bronzeMedalColor, "Bronze Medal Color");
             AddIfTransparent(problems, leaderboardHighlightColor, "Leaderboard Highlight Color");
             AddIfTransparent(problems, leaderboardRowColor, "Leaderboard Row Color");
+            AddIfTransparent(problems, jokerSelectedColor, "Joker Selected Color");
+            AddIfTransparent(problems, timerColor, "Timer Color");
+            AddIfTransparent(problems, timerWarningColor, "Timer Warning Color");
+            AddIfTransparent(problems, timeBonusColor, "Time Bonus Color");
+            AddIfTransparent(problems, jokerBadgeTextColor, "Joker Badge Text Color");
+            AddIfTransparent(problems, shortPriceColor, "Short Price Color");
 
             return problems;
+        }
+
+        /// <summary>
+        /// The level HUD's timing (Module 40): the warning second is not
+        /// negative, every time is positive, the rise is not negative, and the
+        /// pulse grows the timer; every number finite.
+        /// </summary>
+        private void AddLevelTimingProblems(List<string> problems)
+        {
+            if (timerWarningSeconds < 0)
+            {
+                problems.Add($"{name}: Timer Warning Seconds may not be negative.");
+            }
+
+            if (!(timeBonusSeconds > 0f) || float.IsInfinity(timeBonusSeconds))
+            {
+                problems.Add($"{name}: Time Bonus Seconds must be positive and finite.");
+            }
+
+            if (!(timerPulseSeconds > 0f) || float.IsInfinity(timerPulseSeconds))
+            {
+                problems.Add($"{name}: Timer Pulse Seconds must be positive and finite.");
+            }
+
+            if (!(timeBonusRiseUnits >= 0f) || float.IsInfinity(timeBonusRiseUnits))
+            {
+                problems.Add($"{name}: Time Bonus Rise Units must be at least 0 and finite.");
+            }
+
+            if (!(timerPulseScale >= 1f) || float.IsInfinity(timerPulseScale))
+            {
+                problems.Add($"{name}: Timer Pulse Scale must be at least 1 and finite.");
+            }
         }
 
         private void AddRibbonProblems(List<string> problems)

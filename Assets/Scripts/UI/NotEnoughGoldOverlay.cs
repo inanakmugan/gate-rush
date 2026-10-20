@@ -9,7 +9,8 @@ namespace GateRush.UI
     /// <summary>
     /// The Not Enough Gold prompt (Module 36, D72): the coin stack, the gold
     /// missing as the bootstrap worked it out, a Get Gold button that leads
-    /// to the Store's gold packs, and the red close button.
+    /// to the gold packs — the Store's on the front end, the level's own over
+    /// a level (Module 40, D74) — and the red close button.
     /// </summary>
     public sealed class NotEnoughGoldOverlay : MonoBehaviour
     {
@@ -19,7 +20,7 @@ namespace GateRush.UI
         [Tooltip("'You need N more gold.'")]
         [SerializeField] private TMP_Text shortfallLabel;
 
-        [Tooltip("Selects the Store tab, closing every overlay.")]
+        [Tooltip("Leads to the gold packs: on the front end it selects the Store tab, closing every overlay; over a level it opens the gold packs in this prompt's place (Module 40).")]
         [SerializeField] private Button getGoldButton;
 
         /// <summary>Raised when the close button is pressed.</summary>
