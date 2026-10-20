@@ -22,7 +22,9 @@ namespace GateRush.Tests
     /// their own medal colour while every other rank has none. Module 40's
     /// level HUD texts, formats and colours are checked the same way, an
     /// unusable timing is reported, the defaults read as specified, and the
-    /// selected joker's ring reads its own colour.
+    /// selected joker's ring reads its own colour. Module 41's level panel
+    /// texts and formats are checked the same way, an unusable pop is
+    /// reported, and the defaults read as specified.
     /// </summary>
     public class UiConfigTests
     {
@@ -110,6 +112,18 @@ namespace GateRush.Tests
         [TestCase("jokerCountBadgeFormat", "Joker Count Badge Format")]
         [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format")]
         [TestCase("goldPacksTitle", "Gold Packs Title")]
+        [TestCase("levelCompleteTitle", "Level Complete Title")]
+        [TestCase("timesUpTitle", "Times Up Title")]
+        [TestCase("nextButtonLabel", "Next Button Label")]
+        [TestCase("restartButtonLabel", "Restart Button Label")]
+        [TestCase("goldEarnedFormat", "Gold Earned Format")]
+        [TestCase("closingMessage", "Closing Message")]
+        [TestCase("leaveLevelTitle", "Leave Level Title")]
+        [TestCase("restartLevelTitle", "Restart Level Title")]
+        [TestCase("loseLifeLine", "Lose Life Line")]
+        [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format")]
+        [TestCase("loseLifeLabel", "Lose Life Label")]
+        [TestCase("keepPlayingLabel", "Keep Playing Label")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -151,6 +165,8 @@ namespace GateRush.Tests
         [TestCase("timeBonusFormat", "Time Bonus Format", "+{1}")]
         [TestCase("jokerCountBadgeFormat", "Joker Count Badge Format", "{1}")]
         [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format", "{1}")]
+        [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
+        [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format", "You will lose a life and your {1}-win streak.")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -224,6 +240,34 @@ namespace GateRush.Tests
         {
             var serialized = new SerializedObject(config);
             serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(expected), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Defaults_LevelPanelTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("Level Complete", config.LevelCompleteTitle);
+            Assert.AreEqual("Time's Up", config.TimesUpTitle);
+            Assert.AreEqual("+{0}", config.GoldEarnedFormat, "the gold reads +50 beside the coin");
+            Assert.AreEqual("Thanks for playing!", config.ClosingMessage);
+            Assert.AreEqual("Leave level?", config.LeaveLevelTitle);
+            Assert.AreEqual("Restart level?", config.RestartLevelTitle);
+            Assert.AreEqual("You will lose a life.", config.LoseLifeLine);
+            Assert.AreEqual("You will lose a life and your {0}-win streak.", config.LoseLifeAndStreakFormat);
+            Assert.AreEqual("Lose a life", config.LoseLifeLabel);
+            Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
+        }
+
+        [TestCase("overlayPopSeconds", "Overlay Pop Seconds must be positive")]
+        [TestCase("overlayPopStartScale", "Overlay Pop Start Scale must be positive")]
+        public void Problems_NonPositiveOverlayPop_IsReportedByName(string field, string expected)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = 0f;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var problems = config.Problems();

@@ -9,10 +9,11 @@ namespace GateRush.UI
 {
     /// <summary>
     /// Every text, format string and colour the front end's screens and the
-    /// level's interface set from code (Modules 35 to 40, D68, D69, D71 to
+    /// level's interface set from code (Modules 35 to 41, D68, D69, D71 to
     /// D74): the texts that carry a number or change with the state, the
-    /// joker names, the theme's colours, the colours that change at runtime,
-    /// and the level HUD's timing. Fixed English titles, layout and colours
+    /// level panels' titles, lines and labels, the joker names, the theme's
+    /// colours, the colours that change at runtime, and the level HUD's and
+    /// panels' timing. Fixed English titles, layout and colours
     /// that never change live on the prefabs.
     /// </summary>
     /// <remarks>
@@ -220,6 +221,52 @@ namespace GateRush.UI
 
         [Tooltip("The title of the gold packs over a level, opened by Get Gold.")]
         [SerializeField] private string goldPacksTitle = "Get Gold";
+
+        [Header("Level panels (Module 41; formats use the invariant culture)")]
+        [Tooltip("The result panel's title after a win.")]
+        [SerializeField] private string levelCompleteTitle = "Level Complete";
+
+        [Tooltip("The result panel's title after the countdown runs out.")]
+        [SerializeField] private string timesUpTitle = "Time's Up";
+
+        [Tooltip("The label of the result panel's Next button.")]
+        [SerializeField] private string nextButtonLabel = "Next";
+
+        [Tooltip("The label of the result panel's Restart buttons, after a free-play win and after a loss.")]
+        [SerializeField] private string restartButtonLabel = "Restart";
+
+        [Tooltip("The gold a campaign win paid, beside the coin; {0} is the gold.")]
+        [SerializeField] private string goldEarnedFormat = "+{0}";
+
+        [Tooltip("The line under the title after the last campaign level.")]
+        [SerializeField] private string closingMessage = "Thanks for playing!";
+
+        [Tooltip("The confirmation's title before Menu leaves a campaign level being played.")]
+        [SerializeField] private string leaveLevelTitle = "Leave level?";
+
+        [Tooltip("The confirmation's title before Restart or R restarts a campaign level being played.")]
+        [SerializeField] private string restartLevelTitle = "Restart level?";
+
+        [Tooltip("The confirmation's line with no win streak at risk.")]
+        [SerializeField] private string loseLifeLine = "You will lose a life.";
+
+        [Tooltip("The confirmation's line with a win streak at risk; {0} is the streak.")]
+        [SerializeField] private string loseLifeAndStreakFormat = "You will lose a life and your {0}-win streak.";
+
+        [Tooltip("The label of the confirmation's red button: loses a life, then leaves or restarts.")]
+        [SerializeField] private string loseLifeLabel = "Lose a life";
+
+        [Tooltip("The label of the confirmation's green button: closes it and resumes the countdown, as Back does.")]
+        [SerializeField] private string keepPlayingLabel = "Keep playing";
+
+        [Header("Level panel timing (Module 41; unscaled time)")]
+        [Tooltip("Seconds the result panel's and the confirmation's opening pop takes: the panel fades in and grows from Overlay Pop Start Scale.")]
+        [SerializeField] private float overlayPopSeconds = 0.25f;
+
+        [SerializeField] private Ease overlayPopEase = Ease.OutBack;
+
+        [Tooltip("The panel's scale when the pop starts; it ends at 1. Positive.")]
+        [SerializeField] private float overlayPopStartScale = 0.8f;
 
         [Header("Level HUD timing (Module 40; unscaled time)")]
         [Tooltip("The timer turns Timer Warning Color once the displayed second is at most this. 0 turns it only at 0:00.")]
@@ -477,6 +524,51 @@ namespace GateRush.UI
         /// <summary>The title of the gold packs over a level.</summary>
         public string GoldPacksTitle => goldPacksTitle;
 
+        /// <summary>The result panel's title after a win.</summary>
+        public string LevelCompleteTitle => levelCompleteTitle;
+
+        /// <summary>The result panel's title after a loss.</summary>
+        public string TimesUpTitle => timesUpTitle;
+
+        /// <summary>The result panel's Next label.</summary>
+        public string NextButtonLabel => nextButtonLabel;
+
+        /// <summary>The result panel's Restart label.</summary>
+        public string RestartButtonLabel => restartButtonLabel;
+
+        /// <summary>The gold a campaign win paid; {0} is the gold.</summary>
+        public string GoldEarnedFormat => goldEarnedFormat;
+
+        /// <summary>The line after the last campaign level.</summary>
+        public string ClosingMessage => closingMessage;
+
+        /// <summary>The confirmation's title before leaving.</summary>
+        public string LeaveLevelTitle => leaveLevelTitle;
+
+        /// <summary>The confirmation's title before restarting.</summary>
+        public string RestartLevelTitle => restartLevelTitle;
+
+        /// <summary>The confirmation's line with no streak at risk.</summary>
+        public string LoseLifeLine => loseLifeLine;
+
+        /// <summary>The confirmation's line with a streak at risk; {0} is the streak.</summary>
+        public string LoseLifeAndStreakFormat => loseLifeAndStreakFormat;
+
+        /// <summary>The confirmation's "Lose a life" label.</summary>
+        public string LoseLifeLabel => loseLifeLabel;
+
+        /// <summary>The confirmation's "Keep playing" label.</summary>
+        public string KeepPlayingLabel => keepPlayingLabel;
+
+        /// <summary>Seconds a level panel's opening pop takes.</summary>
+        public float OverlayPopSeconds => overlayPopSeconds;
+
+        /// <summary>The easing of a level panel's opening pop.</summary>
+        public Ease OverlayPopEase => overlayPopEase;
+
+        /// <summary>A level panel's scale when its pop starts.</summary>
+        public float OverlayPopStartScale => overlayPopStartScale;
+
         /// <summary>The displayed second at or below which the timer takes <see cref="TimerWarningColor"/>.</summary>
         public int TimerWarningSeconds => timerWarningSeconds;
 
@@ -710,6 +802,19 @@ namespace GateRush.UI
             AddIfUnusableFormat(problems, jokerPriceBadgeFormat, 1, "Joker Price Badge Format", "{0} for the price");
             AddIfBlank(problems, goldPacksTitle, "Gold Packs Title");
             AddLevelTimingProblems(problems);
+            AddIfBlank(problems, levelCompleteTitle, "Level Complete Title");
+            AddIfBlank(problems, timesUpTitle, "Times Up Title");
+            AddIfBlank(problems, nextButtonLabel, "Next Button Label");
+            AddIfBlank(problems, restartButtonLabel, "Restart Button Label");
+            AddIfUnusableFormat(problems, goldEarnedFormat, 1, "Gold Earned Format", "{0} for the gold");
+            AddIfBlank(problems, closingMessage, "Closing Message");
+            AddIfBlank(problems, leaveLevelTitle, "Leave Level Title");
+            AddIfBlank(problems, restartLevelTitle, "Restart Level Title");
+            AddIfBlank(problems, loseLifeLine, "Lose Life Line");
+            AddIfUnusableFormat(problems, loseLifeAndStreakFormat, 1, "Lose Life And Streak Format", "{0} for the streak");
+            AddIfBlank(problems, loseLifeLabel, "Lose Life Label");
+            AddIfBlank(problems, keepPlayingLabel, "Keep Playing Label");
+            AddOverlayPopProblems(problems);
             AddIfBlank(problems, clockName, "Clock Name");
             AddIfBlank(problems, rocketName, "Rocket Name");
             AddIfBlank(problems, broomName, "Broom Name");
@@ -767,6 +872,20 @@ namespace GateRush.UI
             if (!(timerPulseScale >= 1f) || float.IsInfinity(timerPulseScale))
             {
                 problems.Add($"{name}: Timer Pulse Scale must be at least 1 and finite.");
+            }
+        }
+
+        /// <summary>The level panels' pop (Module 41): a positive, finite time from a positive, finite scale.</summary>
+        private void AddOverlayPopProblems(List<string> problems)
+        {
+            if (!(overlayPopSeconds > 0f) || float.IsInfinity(overlayPopSeconds))
+            {
+                problems.Add($"{name}: Overlay Pop Seconds must be positive and finite.");
+            }
+
+            if (!(overlayPopStartScale > 0f) || float.IsInfinity(overlayPopStartScale))
+            {
+                problems.Add($"{name}: Overlay Pop Start Scale must be positive and finite.");
             }
         }
 
