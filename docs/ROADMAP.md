@@ -295,7 +295,9 @@ to the packs (Module 36, D72). 6.3 is done: a streak bar on Home, the
 Win Streak overlay with the reward ladder, and streak rewards announced
 on Home (Module 37). 6.4 is done: the player's name and avatar on a
 Profile overlay, a Haptics toggle of its own, save format version 4, and
-Nunito as the Turkish fallback font (Module 38).
+Nunito as the Turkish fallback font (Module 38). 6.5 is done: the
+Leaderboard ranks the player on lifetime gold among twenty labelled demo
+players behind `ILeaderboardService` (Module 39, D73).
 
 Home, bottom tabs (Store / Home / Leaderboard), overlay screens (Profile,
 Settings, Win Streak) with a navigation stack, life and gold displays,
@@ -313,7 +315,7 @@ Each spec is written when the module before it is merged.
 | 6.2 | Store: gold packs through a simulated purchase service, jokers and the refill for gold, and Not Enough Gold routing to it (D62, D72) | `Modules/36-store.md` | Done |
 | 6.3 | Win Streak: Home's progress bar and the ladder screen (D61) | `Modules/37-win-streak.md` | Done |
 | 6.4 | Profile and Settings: name, avatar, haptics, save format 4 (D71) | `Modules/38-profile-settings.md` | Done |
-| 6.5 | Leaderboard behind `ILeaderboardService`, the player ranked among labelled demo players (D70, D73) | `Modules/39-leaderboard.md` | Planned |
+| 6.5 | Leaderboard behind `ILeaderboardService`, the player ranked among labelled demo players (D70, D73) | `Modules/39-leaderboard.md` | Done |
 | 6.6 | The level's interface in the new theme, as prefabs | — | Planned |
 
 ---

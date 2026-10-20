@@ -172,3 +172,35 @@ and that a simulated table is always labelled, is not.
   tab.
 - The first three ranks carry gold, silver and bronze marks.
 - The layout holds on a tall phone and in the web build's window.
+
+---
+
+## Resolved during implementation
+
+- **Where the ranking lives.** `LeaderboardRanking` is in `Runtime`,
+  beside the simulated service it serves; `Platform` keeps the interface
+  and its data. Demo players with equal scores keep their config order,
+  so the table is the same on every fetch.
+- **The service contract** is stricter than the sketch: `IsBusy` is
+  cleared before `done` runs, a fetch while busy throws, and so does a
+  player with a null name or avatar id or a negative score.
+- **Stale results.** A result that arrives after the front end closed is
+  dropped. A request made while a fetch is pending drops the pending
+  result and fetches once more, so a name changed in Profile is never
+  shown out of date. A result for another tab is ignored; the next
+  selection asks again. Pressing the Leaderboard tab while on it does not
+  fetch.
+- **The demo players** are twenty invented handles, English and Turkish,
+  none using the default avatar so a new player's row stands out. A
+  player who has won the campaign's 750 gold ranks 7th of 21.
+- **Scrolling.** After the rows are laid out, the player's row is put at
+  the viewport's middle, clamped to the content (`LeaderboardScroll`,
+  plain C#). The list uses the builder's shared scroll sensitivity.
+- **Colours.** The row colour is a `UiConfig` field beside the highlight
+  colour, since rows switch between the two at runtime. The medal is
+  Game Icons' `medal1`, tinted gold, silver and bronze.
+- **Fonts.** The "…" of "Loading…" and the Turkish letters of the demo
+  names come from the Nunito fallback.
+- **Tests.** The screen tests build the page from code and drive it
+  through a stub service, so the test assembly now references
+  TextMeshPro and uGUI. 79 new; 2,459 in all.

@@ -25,7 +25,8 @@ tap of a block. The interface is under way (Phase 6): the menu is a
 front end of tabs, overlays and a top bar built from uGUI prefabs, with
 a Store that sells gold packs through a simulated purchase service that
 charges nothing, a win streak bar that shows the rewards ahead, and a
-Profile with the player's name and avatar. Sound
+Profile with the player's name and avatar, and a Leaderboard that ranks
+the player among labelled demo players. Sound
 effects and haptics came forward from Phase 7. The
 itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
@@ -137,7 +138,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,380 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,459 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 

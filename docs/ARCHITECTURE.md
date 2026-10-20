@@ -105,6 +105,7 @@ implementations supplied at startup:
 | `ITimeProvider` | Current UTC time; the frame delta stays in `Runtime` | Manually advanced clock |
 | `IHaptics` | Vibration feedback | No-op |
 | `IPurchaseService` | Buy a store product for real money (D72) | `SimulatedPurchaseService`, confirm delegate |
+| `ILeaderboardService` | Fetch the ranked leaderboard for the player (D70) | `StubLeaderboardService`, answers later, loaded or failed |
 
 `ISaveStore` (Module 23), `IHaptics` (Module 25), `ITimeProvider`
 (Module 30) and `IPurchaseService` (Module 36) exist so far; their
