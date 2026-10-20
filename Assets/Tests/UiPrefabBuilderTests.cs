@@ -2,9 +2,12 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using GateRush.Meta;
+using GateRush.Runtime;
 using GateRush.UI;
 using GateRush.UI.Editor;
 using NUnit.Framework;
+using TMPro;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -28,7 +31,14 @@ namespace GateRush.Tests
     /// five columns of the built Avatar Button, and Top Bar's file stays
     /// unwritten with the other hand-made prefabs. Module 39's Leaderboard
     /// page and Leaderboard Row are fully wired, the page creating its rows
-    /// from the built row, with Home Page and Top Bar still unwritten.
+    /// from the built row, with Home Page and Top Bar still unwritten. Module
+    /// 40's Level UI reports no missing part under a canvas, its views, the
+    /// joker buttons and the in-level overlays are fully wired, the overlays
+    /// are the built prefabs and start closed under a root saved inactive,
+    /// the HUD's texts and colours come from the UI Config, Menu and Restart
+    /// are Button Rounds with the home and return icons, and the bar's icons
+    /// are the Joker Icons'; the hand-made prefabs, Home Page and Top Bar
+    /// among them, stay unwritten.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -56,12 +66,26 @@ namespace GateRush.Tests
         private const string TintTargetField = "target";
         private const float ExpectedScrollSensitivity = 20f;
 
+        private const string LevelUiName = "Level UI";
+        private const string LevelHudName = "Level HUD";
+        private const string JokerBarName = "Joker Bar";
+        private const string GoldPacksOverlayName = "Gold Packs Overlay";
+        private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
+        private const string HomeSpritePath = "Assets/ThirdParty/Kenney/GameIcons/home.png";
+        private const string ReturnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/return.png";
+
         private static string[] OutputNames => new[]
         {
             GoldPackCardName, "Store Page", LeaderboardRowName, "Leaderboard Page", "Settings Overlay", "Levels Overlay", "Lives Overlay",
             "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", StreakMarkerName, StreakBarName,
             StreakLadderRowName, "Win Streak Overlay", StreakPrizeName, "Streak Reward Overlay", AvatarButtonName,
-            ProfileOverlayName, FrontEndName
+            ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName
+        };
+
+        private static (Type type, string prefabName)[] LevelOverlays => new[]
+        {
+            (typeof(NotEnoughGoldOverlay), "Not Enough Gold Overlay"), (typeof(GoldPacksOverlay), GoldPacksOverlayName),
+            (typeof(TestPurchaseOverlay), "Test Purchase Overlay"), (typeof(MessageOverlay), "Message Overlay")
         };
 
         private static string[] HandMadeNames => new[]
@@ -99,7 +123,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_IntoFolder_WritesExactlyTheNineteenPrefabs()
+        public void Build_IntoFolder_WritesExactlyTheTwentyThreePrefabs()
         {
             var names = AssetDatabase.FindAssets("t:Prefab", new[] { folder })
                 .Select(guid => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(guid)))
@@ -109,7 +133,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ExistingOutputs_AfterBuild_NamesAllNineteen()
+        public void ExistingOutputs_AfterBuild_NamesAllTwentyThree()
         {
             var existing = UiPrefabBuilder.ExistingOutputs(folder);
 
@@ -294,6 +318,7 @@ namespace GateRush.Tests
             var tints = LoadBuilt(FrontEndName).GetComponentsInChildren<UiTint>(true)
                 .Concat(LoadBuilt(GoldPackCardName).GetComponentsInChildren<UiTint>(true))
                 .Concat(LoadBuilt(LeaderboardRowName).GetComponentsInChildren<UiTint>(true))
+                .Concat(LoadBuilt(LevelUiName).GetComponentsInChildren<UiTint>(true))
                 .ToList();
             var wrong = new List<string>();
 
@@ -362,6 +387,165 @@ namespace GateRush.Tests
                 Assert.AreEqual(overlays, overlay.transform.parent, $"{overlayType.Name} is under Overlays");
                 Assert.IsFalse(overlay.gameObject.activeSelf, $"{overlayType.Name} starts closed");
             }
+        }
+
+        [Test]
+        public void Build_LevelUiUnderCanvas_MissingSetupReportsNothing()
+        {
+            var scene = EditorSceneManager.NewPreviewScene();
+            try
+            {
+                // LevelUi requires a Canvas above it, which the prefab leaves
+                // to the scene.
+                var canvas = new GameObject("Canvas", typeof(RectTransform), typeof(Canvas));
+                SceneManager.MoveGameObjectToScene(canvas, scene);
+                var instance = (GameObject)PrefabUtility.InstantiatePrefab(LoadBuilt(LevelUiName), canvas.transform);
+
+                var problem = instance.GetComponent<LevelUi>().MissingSetup();
+
+                Assert.IsNull(problem, problem);
+            }
+            finally
+            {
+                EditorSceneManager.ClosePreviewScene(scene);
+            }
+        }
+
+        [TestCase(typeof(LevelUi), 7)]
+        [TestCase(typeof(LevelHud), 11)]
+        [TestCase(typeof(JokerBarView), 3)]
+        [TestCase(typeof(GoldPacksOverlay), 5)]
+        [TestCase(typeof(NotEnoughGoldOverlay), 3)]
+        [TestCase(typeof(TestPurchaseOverlay), 6)]
+        [TestCase(typeof(MessageOverlay), 3)]
+        public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
+        {
+            var view = LoadBuilt(LevelUiName).GetComponentInChildren(viewType, true);
+            Assert.IsNotNull(view, viewType.Name);
+
+            AssertEveryReferenceAssigned(view, expectedFields);
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_EveryReferenceIsAssignedAndTheyRiseWhenSelected()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+            foreach (var button in buttons)
+            {
+                AssertEveryReferenceAssigned(button, 6);
+                using (var serialized = new SerializedObject(button))
+                {
+                    Assert.That(serialized.FindProperty("selectedRaise").floatValue, Is.GreaterThan(0f), $"{button.name} rises when selected");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBar_IconsAreTheJokerIconsInClockRocketBroomOrder()
+        {
+            var icons = AssetDatabase.LoadAssetAtPath<JokerIcons>(JokerIconsPath);
+            Assert.IsNotNull(icons, JokerIconsPath);
+            var bar = LoadBuilt(JokerBarName).GetComponent<JokerBarView>();
+            Assert.IsNotNull(bar, nameof(JokerBarView));
+
+            using (var serialized = new SerializedObject(bar))
+            {
+                Assert.AreEqual(icons.IconOf(JokerKind.Clock), IconOf(serialized, "clock"));
+                Assert.AreEqual(icons.IconOf(JokerKind.Rocket), IconOf(serialized, "rocket"));
+                Assert.AreEqual(icons.IconOf(JokerKind.Broom), IconOf(serialized, "broom"));
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_TextsAndColoursComeFromTheConfig()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var hud = LoadBuilt(LevelHudName).GetComponent<LevelHud>();
+            Assert.IsNotNull(hud, nameof(LevelHud));
+
+            using (var serialized = new SerializedObject(hud))
+            {
+                var timer = Label(serialized, "timerLabel");
+                var bonus = Label(serialized, "timeBonusLabel");
+                var level = Label(serialized, "levelLabel");
+                var status = Label(serialized, "livesStatusLabel");
+
+                Assert.AreEqual(config.TimerColor, timer.color);
+                Assert.AreEqual(config.TimeBonusColor, bonus.color);
+                StringAssert.StartsWith(config.LevelLabelFormat.Split('{')[0], level.text, "the level label's own words");
+                Assert.AreEqual(config.LivesFullLabel, status.text);
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_MenuAndRestartAreButtonRoundsWithHomeAndReturnIcons()
+        {
+            var hud = LoadBuilt(LevelHudName).GetComponent<LevelHud>();
+            Assert.IsNotNull(hud, nameof(LevelHud));
+
+            using (var serialized = new SerializedObject(hud))
+            {
+                var menu = (Button)serialized.FindProperty("menuButton").objectReferenceValue;
+                var restart = (Button)serialized.FindProperty("restartButton").objectReferenceValue;
+
+                Assert.AreEqual(HandMadePath("Button Round"), SourcePath(menu));
+                Assert.AreEqual(HandMadePath("Button Round"), SourcePath(restart));
+                Assert.AreEqual(HomeSpritePath, AssetDatabase.GetAssetPath(menu.transform.Find("Icon").GetComponent<Image>().sprite));
+                Assert.AreEqual(ReturnSpritePath, AssetDatabase.GetAssetPath(restart.transform.Find("Icon").GetComponent<Image>().sprite));
+            }
+        }
+
+        [Test]
+        public void Build_LevelUi_OverlaysAreTheBuiltPrefabs()
+        {
+            var levelUi = LoadBuilt(LevelUiName);
+
+            foreach (var (type, prefabName) in LevelOverlays)
+            {
+                var overlay = levelUi.GetComponentInChildren(type, true);
+                Assert.IsNotNull(overlay, type.Name);
+                Assert.AreEqual($"{folder}/{prefabName}.prefab", SourcePath(overlay), $"{type.Name} is the built {prefabName}");
+            }
+        }
+
+        [Test]
+        public void Build_LevelUi_StartsHiddenWithNoOverlay()
+        {
+            var root = LoadBuilt(LevelUiName).transform;
+
+            var overlays = root.Find("Overlays");
+
+            Assert.IsFalse(root.gameObject.activeSelf, "the root is saved closed");
+            Assert.IsNotNull(overlays, "Overlays sits directly under the root");
+            foreach (var (type, _) in LevelOverlays)
+            {
+                var overlay = root.GetComponentInChildren(type, true);
+                Assert.AreEqual(overlays, overlay.transform.parent, $"{type.Name} is under Overlays");
+                Assert.IsFalse(overlay.gameObject.activeSelf, $"{type.Name} starts closed");
+            }
+
+            Assert.IsTrue(root.GetComponentInChildren<LevelHud>(true).gameObject.activeSelf, "the HUD shows with the level");
+            Assert.IsTrue(root.GetComponentInChildren<JokerBarView>(true).gameObject.activeSelf, "the bar shows with the level");
+        }
+
+        private static Sprite IconOf(SerializedObject bar, string field)
+        {
+            var button = (JokerBarButton)bar.FindProperty(field).objectReferenceValue;
+            Assert.IsNotNull(button, field);
+            using (var serialized = new SerializedObject(button))
+            {
+                return ((Image)serialized.FindProperty("icon").objectReferenceValue).sprite;
+            }
+        }
+
+        private static TMP_Text Label(SerializedObject serialized, string field)
+        {
+            var label = (TMP_Text)serialized.FindProperty(field).objectReferenceValue;
+            Assert.IsNotNull(label, field);
+            return label;
         }
 
         private static string HandMadePath(string name) => $"{HandMadeFolder}/{name}.prefab";
