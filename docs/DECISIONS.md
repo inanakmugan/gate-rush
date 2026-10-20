@@ -2098,9 +2098,10 @@ were checked.
 - Art can be replaced later on the prefabs without code changes.
 - Only the sprites the screens use are imported, at the packs' larger
   size, so they stay sharp on phones.
-- Fredoka is imported as a TextMeshPro font asset. It lacks six Turkish
-  letters, among them Ğ, İ and Ş; the interface is English, and a
-  fallback font comes with Module 6.4, before player names can use them.
+- Fredoka is imported as a TextMeshPro font asset. It lacks Ğ, ğ, İ, Ş
+  and ş; the interface is English, and Module 38 (6.4) adds Nunito
+  ExtraBold, also under the SIL Open Font License, as a dynamic fallback,
+  so player names can use them.
 
 **Rejected.** The reference game's assets: not ours. Drawing art now: not
 the point of this phase. Plain rectangles: a portfolio screen should look
@@ -2150,6 +2151,8 @@ players expect a toggle of its own.
 - Profile's statistics come from what the save already holds: levels
   completed, the campaign level, the best streak and lifetime gold. A
   first-try win count is not tracked.
+- The characters a name may use, and how the avatar is saved (by its id,
+  never its position), are set in Module 38's spec.
 
 **Rejected.** A name only on the leaderboard: Profile is the natural
 place. Free-form avatars (photos): needs storage and moderation.
