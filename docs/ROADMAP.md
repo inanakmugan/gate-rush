@@ -344,6 +344,14 @@ Optimisation, carried over from Phase 3: profile the draw calls and the
 per-move board rebuild (Module 15), on a phone where possible. The WebGL build
 plays on an iPhone 13 Pro but feels heavier than a native app.
 
+Found in the Phase 6 web build on a Samsung M33: the joker buttons are
+small for a thumb, about an eighth of the screen's width, with wide empty
+space around them. Make them about 1.4 times larger, badge included, with
+more room between them, and raise the bar a little off the bottom edge so
+phones with a gesture bar or rounded corners do not crowd it. Builder
+constants and the bottom band's height only; no rule changes. The space
+above and below a short board stays: taller boards fill it.
+
 ---
 
 ## Phase 8 — Release
