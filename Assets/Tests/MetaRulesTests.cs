@@ -15,7 +15,11 @@ namespace GateRush.Tests
     /// 36's gold packs: a null list, a blank or repeated id, or gold below 1
     /// throws; an empty list is allowed; the packs are carried as a copy.
     /// Module 38's defaults: a name the name rule refuses or an empty avatar
-    /// id throws; valid ones are carried, the name normalized.
+    /// id throws; valid ones are carried, the name normalized. Module 43's
+    /// unlock levels: one below 1 throws; a joker is unlocked from its
+    /// level's position on, from the start at level 1 and for a finished
+    /// campaign; <see cref="MetaRules.JokersUnlockingAt"/> lists the jokers of
+    /// one level in kind order.
     /// </summary>
     public class MetaRulesTests
     {
@@ -105,15 +109,15 @@ namespace GateRush.Tests
         public void Constructor_NullRewards_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), null, ClockSeconds,
-                MetaRulesFixture.GoldPacks(), PlayerName, AvatarId));
+                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), new JokerAmounts(8, 9, 10), null,
+                ClockSeconds, MetaRulesFixture.GoldPacks(), PlayerName, AvatarId));
         }
 
         [Test]
         public void Constructor_NullGoldPacks_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7),
+                Cap, Interval, StartingGold, new JokerAmounts(1, 2, 3), 4, new JokerAmounts(5, 6, 7), new JokerAmounts(8, 9, 10),
                 MetaRulesFixture.StreakRewards(), ClockSeconds, null, PlayerName, AvatarId));
         }
 
@@ -199,8 +203,8 @@ namespace GateRush.Tests
             var packs = new[] { new GoldPack("first", 18), new GoldPack("second", 19) };
 
             var rules = new MetaRules(
-                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), table, ClockSeconds, packs,
-                PlayerName, AvatarId);
+                Cap, Interval, StartingGold, new JokerAmounts(11, 12, 13), 14, new JokerAmounts(15, 16, 17), new JokerAmounts(18, 19, 20),
+                table, ClockSeconds, packs, PlayerName, AvatarId);
 
             Assert.AreEqual(Cap, rules.LifeCap);
             Assert.AreEqual(Interval, rules.LifeRegenInterval);
@@ -212,6 +216,9 @@ namespace GateRush.Tests
             Assert.AreEqual(15, rules.StartingJokers(JokerKind.Clock));
             Assert.AreEqual(16, rules.StartingJokers(JokerKind.Rocket));
             Assert.AreEqual(17, rules.StartingJokers(JokerKind.Broom));
+            Assert.AreEqual(18, rules.JokerUnlockLevel(JokerKind.Clock));
+            Assert.AreEqual(19, rules.JokerUnlockLevel(JokerKind.Rocket));
+            Assert.AreEqual(20, rules.JokerUnlockLevel(JokerKind.Broom));
             CollectionAssert.AreEqual(table, rules.StreakRewards);
             Assert.AreEqual(ClockSeconds, rules.ClockBonusSeconds);
             CollectionAssert.AreEqual(packs, rules.GoldPacks);
@@ -258,7 +265,90 @@ namespace GateRush.Tests
 
             Assert.Throws<ArgumentOutOfRangeException>(() => rules.JokerPrice(undefined));
             Assert.Throws<ArgumentOutOfRangeException>(() => rules.StartingJokers(undefined));
+            Assert.Throws<ArgumentOutOfRangeException>(() => rules.JokerUnlockLevel(undefined));
+            Assert.Throws<ArgumentOutOfRangeException>(() => rules.IsJokerUnlocked(undefined, 0));
         }
+
+        [Test]
+        public void Constructor_UnlockLevelBelowOne_Throws([Values] JokerKind kind, [Values(0, -1)] int level)
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => MetaRulesFixture.Build(jokerUnlockLevels: UnlockLevelsWith(kind, level)));
+        }
+
+        [Test]
+        public void IsJokerUnlocked_BeforeAtAndAfterItsLevel_UnlocksFromTheLevelsPosition([Values] JokerKind kind)
+        {
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelPosition = rules.JokerUnlockLevel(kind) - 1;
+
+            var isUnlockedBefore = rules.IsJokerUnlocked(kind, levelPosition - 1);
+            var isUnlockedAt = rules.IsJokerUnlocked(kind, levelPosition);
+            var isUnlockedAfter = rules.IsJokerUnlocked(kind, levelPosition + 1);
+
+            Assert.IsFalse(isUnlockedBefore, "the level before");
+            Assert.IsTrue(isUnlockedAt, "its own level");
+            Assert.IsTrue(isUnlockedAfter, "the level after, and every one past it");
+        }
+
+        [Test]
+        public void IsJokerUnlocked_LevelOne_IsUnlockedFromTheStart([Values] JokerKind kind)
+        {
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: UnlockLevelsWith(kind, 1));
+
+            var isUnlocked = rules.IsJokerUnlocked(kind, 0);
+
+            Assert.IsTrue(isUnlocked);
+        }
+
+        [Test]
+        public void IsJokerUnlocked_FinishedCampaign_StaysUnlocked([Values] JokerKind kind)
+        {
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+
+            var isUnlocked = rules.IsJokerUnlocked(kind, int.MaxValue);
+
+            Assert.IsTrue(isUnlocked);
+        }
+
+        [Test]
+        public void JokersUnlockingAt_EachJokersLevel_ListsOnlyThatJoker([Values] JokerKind kind)
+        {
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+
+            var unlocking = rules.JokersUnlockingAt(rules.JokerUnlockLevel(kind) - 1);
+
+            CollectionAssert.AreEqual(new[] { kind }, unlocking);
+        }
+
+        [Test]
+        public void JokersUnlockingAt_LevelWithNoJoker_IsEmpty()
+        {
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelAfterTheClocks = MetaRulesFixture.ClockUnlockLevel + 1;
+            Assume.That(levelAfterTheClocks, Is.Not.EqualTo(MetaRulesFixture.RocketUnlockLevel), "the level after the Clock's has no joker");
+
+            var unlocking = rules.JokersUnlockingAt(levelAfterTheClocks - 1);
+
+            CollectionAssert.IsEmpty(unlocking);
+        }
+
+        [Test]
+        public void JokersUnlockingAt_TwoJokersShareALevel_ListsBothInKindOrder()
+        {
+            const int sharedLevel = 4;
+            var rules = MetaRulesFixture.Build(jokerUnlockLevels: new JokerAmounts(MetaRulesFixture.ClockUnlockLevel, sharedLevel, sharedLevel));
+
+            var unlocking = rules.JokersUnlockingAt(sharedLevel - 1);
+
+            CollectionAssert.AreEqual(new[] { JokerKind.Rocket, JokerKind.Broom }, unlocking);
+        }
+
+        /// <summary>Unlock levels with <paramref name="level"/> for <paramref name="kind"/> and the staggered level for every other kind.</summary>
+        private static JokerAmounts UnlockLevelsWith(JokerKind kind, int level) =>
+            new JokerAmounts(
+                kind == JokerKind.Clock ? level : MetaRulesFixture.ClockUnlockLevel,
+                kind == JokerKind.Rocket ? level : MetaRulesFixture.RocketUnlockLevel,
+                kind == JokerKind.Broom ? level : MetaRulesFixture.BroomUnlockLevel);
 
         private static JokerAmounts NegativeFor(JokerKind kind) =>
             new JokerAmounts(

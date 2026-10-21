@@ -18,6 +18,10 @@ namespace GateRush.Tests
     /// never touching the streak, the position or the lives (D65). Module
     /// 36's <see cref="MetaGame.ReportGoldPurchase"/> adds a pack's gold to
     /// the balance only and touches nothing else; an unknown id throws.
+    /// Module 43 (D76): a win onto a joker's level gives one of it and lists
+    /// it, once; a level with no joker lists none; a locked joker cannot be
+    /// bought or used, even when held; a streak reward of a locked joker is
+    /// still added; the unlock and the level's new jokers follow the position.
     /// </summary>
     public class MetaGameTests
     {
@@ -409,6 +413,146 @@ namespace GateRush.Tests
             Assert.AreEqual(Position, game.CampaignPosition);
             Assert.AreEqual(LivesHeld, save.Lives.CountAt(clock.UtcNow));
             AssertSameJokers(before, save.Jokers);
+        }
+
+        [Test]
+        public void ReportCampaignWin_OntoAJokersLevel_GivesOneOfItAndListsIt([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelBefore = new CampaignProgress(rules.JokerUnlockLevel(kind) - 2);
+            var save = Save(Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), levelBefore, Holding(kind, HeldOfTheUsedKind));
+            var game = Game(save);
+
+            var win = game.ReportCampaignWin(Reward);
+
+            CollectionAssert.AreEqual(new[] { kind }, win.JokersUnlocked);
+            AssertSameJokers(Holding(kind, HeldOfTheUsedKind + 1), save.Jokers);
+        }
+
+        [Test]
+        public void ReportCampaignWin_WinAfterTheUnlockingWin_GivesNothingMore()
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var save = Save(
+                Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(MetaRulesFixture.ClockUnlockLevel - 2));
+            var game = Game(save);
+            game.ReportCampaignWin(Reward);
+            var afterUnlock = Snapshot(save.Jokers);
+
+            var win = game.ReportCampaignWin(Reward);
+
+            CollectionAssert.IsEmpty(win.RewardsGiven, "the test needs a win that pays no streak reward");
+            CollectionAssert.IsEmpty(win.JokersUnlocked);
+            AssertSameJokers(afterUnlock, save.Jokers);
+        }
+
+        [Test]
+        public void ReportCampaignWin_OntoALevelWithNoJoker_ListsNoneAndGivesNone()
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var game = Game(SaveData.CreateDefault(rules));
+            var before = Snapshot(game.Save.Jokers);
+            Assume.That(MetaRulesFixture.ClockUnlockLevel, Is.GreaterThan(2), "the first win lands on level 2, which no joker unlocks at");
+
+            var win = game.ReportCampaignWin(Reward);
+
+            CollectionAssert.IsEmpty(win.JokersUnlocked);
+            AssertSameJokers(before, game.Save.Jokers);
+        }
+
+        [Test]
+        public void ReportCampaignWin_OntoALevelTwoJokersShare_GivesOneOfEachListedInKindOrder()
+        {
+            const int sharedLevel = 4;
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: new JokerAmounts(sharedLevel, MetaRulesFixture.RocketUnlockLevel, sharedLevel));
+            var save = Save(
+                Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(sharedLevel - 2), Holding(JokerKind.Rocket, 0));
+
+            var win = Game(save).ReportCampaignWin(Reward);
+
+            CollectionAssert.AreEqual(new[] { JokerKind.Clock, JokerKind.Broom }, win.JokersUnlocked);
+            Assert.AreEqual(OtherKindsHeld + 1, save.Jokers.CountOf(JokerKind.Clock));
+            Assert.AreEqual(0, save.Jokers.CountOf(JokerKind.Rocket));
+            Assert.AreEqual(OtherKindsHeld + 1, save.Jokers.CountOf(JokerKind.Broom));
+        }
+
+        [Test]
+        public void ReportCampaignWin_StreakRewardForALockedJoker_IsAddedToTheInventory()
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var game = Game(SaveData.CreateDefault(rules));
+            var reward = rules.StreakRewards[0];
+            var before = game.Save.Jokers.CountOf(reward.Joker);
+
+            var win = WinTimes(game, reward.Wins);
+
+            Assert.IsFalse(game.IsJokerUnlocked(reward.Joker), "the test needs the rewarded joker still locked");
+            CollectionAssert.AreEqual(new[] { reward }, win.RewardsGiven);
+            Assert.AreEqual(before + reward.Count, game.Save.Jokers.CountOf(reward.Joker));
+        }
+
+        [Test]
+        public void TryBuyJoker_Locked_IsLockedAndChangesNothing([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var balance = rules.JokerPrice(kind);
+            var save = Save(new Wallet(balance, Reward), Lives.Full(rules), WinStreak.Starting(), CampaignProgress.Starting());
+            var game = Game(save);
+            var before = Snapshot(save.Jokers);
+
+            var result = game.TryBuyJoker(kind);
+
+            Assert.AreEqual(PurchaseResult.Locked, result);
+            Assert.AreEqual(balance, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
+            AssertSameJokers(before, save.Jokers);
+        }
+
+        [Test]
+        public void TryUseJoker_LockedWithSomeHeld_IsLockedAndChangesNothing([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var balance = rules.JokerPrice(kind);
+            var save = Save(new Wallet(balance, Reward), Lives.Full(rules), WinStreak.Starting(), CampaignProgress.Starting(),
+                Holding(kind, HeldOfTheUsedKind));
+            var game = Game(save);
+
+            var result = game.TryUseJoker(kind);
+
+            Assert.AreEqual(JokerUse.Locked, result);
+            Assert.AreEqual(balance, save.Wallet.Balance);
+            Assert.AreEqual(Reward, save.Wallet.LifetimeEarned);
+            AssertSameJokers(Holding(kind, HeldOfTheUsedKind), save.Jokers);
+        }
+
+        [Test]
+        public void IsJokerUnlocked_BeforeAndAtItsLevel_FollowsTheCampaignPosition([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelPosition = rules.JokerUnlockLevel(kind) - 1;
+            var before = Game(Save(Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(levelPosition - 1)));
+            var at = Game(Save(Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(levelPosition)));
+
+            var isUnlockedBefore = before.IsJokerUnlocked(kind);
+            var isUnlockedAt = at.IsJokerUnlocked(kind);
+
+            Assert.IsFalse(isUnlockedBefore);
+            Assert.IsTrue(isUnlockedAt);
+        }
+
+        [Test]
+        public void JokersUnlockedAtCampaignLevel_AtAJokersLevelAndTheLevelAfter_ListsItThenNone([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelPosition = rules.JokerUnlockLevel(kind) - 1;
+            var at = Game(Save(Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(levelPosition)));
+            var after = Game(Save(Wallet.Starting(rules), Lives.Full(rules), WinStreak.Starting(), new CampaignProgress(levelPosition + 1)));
+
+            var atLevel = at.JokersUnlockedAtCampaignLevel();
+            var afterLevel = after.JokersUnlockedAtCampaignLevel();
+
+            CollectionAssert.AreEqual(new[] { kind }, atLevel);
+            CollectionAssert.IsEmpty(afterLevel);
         }
 
         [Test]

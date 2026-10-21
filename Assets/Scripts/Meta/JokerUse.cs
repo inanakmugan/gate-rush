@@ -15,5 +15,12 @@ namespace GateRush.Meta
 
         /// <summary>None was held and the balance does not cover the price. Nothing changed.</summary>
         NotEnoughGold,
+
+        /// <summary>
+        /// The joker has not unlocked yet in the campaign (D76), even if some
+        /// are held. Nothing changed; its button is never pressable, so this
+        /// is a guard.
+        /// </summary>
+        Locked,
     }
 }
