@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using DG.Tweening;
+using GateRush.Meta;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,9 +13,12 @@ namespace GateRush.Runtime
     /// (Module 19): a dim over the board, and on the theme's grey panel a
     /// title, a subtitle, the mechanic drawn in the game's own art among
     /// twinkling sparkles, one sentence in a text box, and the red round close
-    /// button (Module 41). Several mechanics show one card after another.
-    /// Builds its hierarchy from code and holds no rules — the bootstrap
-    /// decides which mechanics to show and what follows the last card.
+    /// button (Module 41). Several mechanics show one card after another, and
+    /// after them a New Joker card for each joker the level unlocks (Module
+    /// 43): the joker's name, "New Joker Unlocked!", its icon among the
+    /// sparkles in place of a drawing, and one sentence. Builds its hierarchy
+    /// from code and holds no rules — the bootstrap decides which mechanics
+    /// and jokers to show and what follows the last card.
     /// </summary>
     /// <remarks>
     /// <para>Put this component on the screen-space canvas, which stays
@@ -50,6 +54,9 @@ namespace GateRush.Runtime
         private static readonly Color Untinted = Color.white;
 
         private readonly List<LevelMechanic> queue = new List<LevelMechanic>();
+
+        // The jokers' cards, shown after every mechanic's in queue.
+        private readonly List<JokerKind> jokerQueue = new List<JokerKind>();
         private readonly List<RectTransform> sparkles = new List<RectTransform>();
         private readonly List<Image> sparkleImages = new List<Image>();
 
@@ -77,11 +84,12 @@ namespace GateRush.Runtime
         private bool isSubscribed;
 
         private int shownIndex;
+        private int clockBonusSeconds;
         private Action onAllClosed;
         private bool isClosing;
 
         /// <summary>
-        /// True from <see cref="Show"/> with at least one mechanic until the
+        /// True from <see cref="Show"/> with at least one card until the
         /// last card has closed and faded, or <see cref="Hide"/>. While it
         /// holds, the level's countdown and input wait.
         /// </summary>
@@ -194,19 +202,27 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Shows one card per mechanic of <paramref name="mechanics"/>, in
-        /// order, each opening when the one before it has closed, and calls
-        /// <paramref name="onAllClosed"/> once the last has closed and faded.
-        /// Cards still showing from an earlier call are dropped without their
-        /// callback. With no mechanics, nothing shows and
-        /// <paramref name="onAllClosed"/> is called at once.
+        /// order, then one New Joker card per joker of
+        /// <paramref name="jokers"/>, in order, its sentence formatted with
+        /// <paramref name="clockBonusSeconds"/>; each opens when the one
+        /// before it has closed, and <paramref name="onAllClosed"/> is called
+        /// once the last has closed and faded. Cards still showing from an
+        /// earlier call are dropped without their callback. With no card,
+        /// nothing shows and <paramref name="onAllClosed"/> is called at once.
         /// </summary>
-        /// <exception cref="ArgumentNullException"><paramref name="mechanics"/> is null.</exception>
+        /// <exception cref="ArgumentNullException"><paramref name="mechanics"/> or <paramref name="jokers"/> is null.</exception>
         /// <exception cref="InvalidOperationException"><see cref="Initialize"/> has not been called.</exception>
-        public void Show(IReadOnlyList<LevelMechanic> mechanics, Action onAllClosed)
+        public void Show(
+            IReadOnlyList<LevelMechanic> mechanics, IReadOnlyList<JokerKind> jokers, int clockBonusSeconds, Action onAllClosed)
         {
             if (mechanics == null)
             {
                 throw new ArgumentNullException(nameof(mechanics));
+            }
+
+            if (jokers == null)
+            {
+                throw new ArgumentNullException(nameof(jokers));
             }
 
             if (root == null)
@@ -215,13 +231,15 @@ namespace GateRush.Runtime
             }
 
             Hide();
-            if (mechanics.Count == 0)
+            if (mechanics.Count == 0 && jokers.Count == 0)
             {
                 onAllClosed?.Invoke();
                 return;
             }
 
             queue.AddRange(mechanics);
+            jokerQueue.AddRange(jokers);
+            this.clockBonusSeconds = clockBonusSeconds;
             shownIndex = 0;
             this.onAllClosed = onAllClosed;
             IsOpen = true;
@@ -300,20 +318,34 @@ namespace GateRush.Runtime
             fit.localScale = new Vector3(scale, scale, 1f);
         }
 
-        /// <summary>Fills the card for the mechanic at <see cref="shownIndex"/> and opens it with the pop.</summary>
+        /// <summary>
+        /// Fills the card at <see cref="shownIndex"/> — a mechanic's while the
+        /// index is within <see cref="queue"/>, a joker's after — and opens it
+        /// with the pop.
+        /// </summary>
         private void ShowCurrent()
         {
-            var mechanic = queue[shownIndex];
-            title.text = config.IntroductionTitle(mechanic);
-            subtitle.text = config.IntroductionSubtitle(mechanic);
-            text.text = config.IntroductionText(mechanic);
-
             if (art != null)
             {
                 Destroy(art.gameObject);
             }
 
-            art = illustrator.Build(illustration, mechanic);
+            if (shownIndex < queue.Count)
+            {
+                var mechanic = queue[shownIndex];
+                title.text = config.IntroductionTitle(mechanic);
+                subtitle.text = config.IntroductionSubtitle(mechanic);
+                text.text = config.IntroductionText(mechanic);
+                art = illustrator.Build(illustration, mechanic);
+            }
+            else
+            {
+                var joker = jokerQueue[shownIndex - queue.Count];
+                title.text = config.NewJokerTitle(joker);
+                subtitle.text = config.NewJokerSubtitle;
+                text.text = config.NewJokerText(joker, clockBonusSeconds);
+                art = BuildJokerArt(joker);
+            }
 
             // Sparkles draw over the illustration.
             art.SetAsFirstSibling();
@@ -396,7 +428,7 @@ namespace GateRush.Runtime
         {
             isClosing = false;
             shownIndex++;
-            if (shownIndex < queue.Count)
+            if (shownIndex < queue.Count + jokerQueue.Count)
             {
                 ShowCurrent();
                 return;
@@ -415,6 +447,7 @@ namespace GateRush.Runtime
         private void Forget()
         {
             queue.Clear();
+            jokerQueue.Clear();
             shownIndex = 0;
             onAllClosed = null;
             isClosing = false;
@@ -471,6 +504,19 @@ namespace GateRush.Runtime
             var cross = UiBuilder.CreateRect("Cross", rect);
             UiBuilder.PlaceCentered(cross, Vector2.one * config.IntroCloseCrossSizeUnits);
             UiBuilder.AddIcon(cross, config.IntroCloseCrossSprite, Untinted);
+        }
+
+        /// <summary>
+        /// A New Joker card's picture: the joker's icon from the config's Joker
+        /// Icons, centred in the illustration area at its configured size and
+        /// colour, where a mechanic's drawing would be.
+        /// </summary>
+        private RectTransform BuildJokerArt(JokerKind joker)
+        {
+            var icon = UiBuilder.CreateRect("Joker Icon", illustration);
+            UiBuilder.PlaceCentered(icon, Vector2.one * config.NewJokerIconSizeUnits);
+            UiBuilder.AddIcon(icon, config.JokerIcons.IconOf(joker), config.NewJokerIconColor);
+            return icon;
         }
 
         /// <summary>The sparkles: each sits where its placement says, over the illustration.</summary>

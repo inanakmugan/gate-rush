@@ -67,6 +67,16 @@ namespace GateRush.Runtime
     /// until then input is held. A restart shows none. A level outside the
     /// level order, or any level while that order is unusable, shows none
     /// either.</para>
+    /// <para><b>Joker unlocks (Module 43, D76).</b> Meta decides, from the
+    /// campaign position, which jokers are locked and which the campaign
+    /// level unlocks. A campaign level that loads — first load or Next — adds
+    /// a New Joker card for each joker it unlocks
+    /// (<see cref="MetaGame.JokersUnlockedAtCampaignLevel"/>) after its
+    /// mechanic cards; when the last card closes, those jokers' buttons are
+    /// marked (<see cref="JokerMarks"/>) until each is used or the level
+    /// ends. Free play and a restart show no such card. A locked joker's
+    /// button raises no press. An unlock level past the campaign's last level
+    /// is logged as a warning at start.</para>
     /// <para><b>Development tools (Module 21).</b> In the editor, a level the
     /// editor tools asked for (<see cref="DevLevelOverride"/>) skips Home
     /// and is played at once, for one Play session. In the editor and in development builds, Page Down and Page Up
@@ -287,6 +297,13 @@ namespace GateRush.Runtime
         // The Rocket or Broom selected and not yet used (D67); never saved.
         private readonly JokerSelection jokerSelection = new JokerSelection();
 
+        // The jokers the level being played introduced with a New Joker card
+        // (D76), in the order of their cards; empty for every other level.
+        // Marked once the last card closes, each until it is used or the
+        // level ends; never saved, so the next load marks them again.
+        private IReadOnlyList<JokerKind> newJokers = Array.Empty<JokerKind>();
+        private readonly JokerMarks jokerMarks = new JokerMarks();
+
         // What the level's interface last showed, so it is refreshed only when
         // that changes (RefreshLevelUi).
         private bool hasShownLevelUi;
@@ -347,6 +364,7 @@ namespace GateRush.Runtime
             metaGame = new MetaGame(save, metaRules, clock);
             CreatePurchases();
             CheckDefaultAvatar();
+            CheckJokerUnlockLevels();
             CreateLeaderboard();
             freePlayJokers = new FreePlayJokers(metaConfig.FreePlayJokersPerLevel);
             InitializeSound();
@@ -539,6 +557,35 @@ namespace GateRush.Runtime
                     $"{metaConfig.name}: Default Avatar Id '{metaRules.DefaultAvatarId}' is not in {avatarCatalog.name}; " +
                     $"a new player is shown '{avatarCatalog.ShownId(metaRules.DefaultAvatarId)}' instead.",
                     metaConfig);
+            }
+        }
+
+        /// <summary>
+        /// Logs a warning, once at start, for each joker whose unlock level
+        /// (D76) is past the campaign's last level, naming the joker and both
+        /// numbers, as the default avatar and the gold packs are checked. The
+        /// game goes on: that joker stays locked in the campaign, and free
+        /// play still has it (D66). With no usable level order there is no
+        /// last level, and nothing is checked.
+        /// </summary>
+        private void CheckJokerUnlockLevels()
+        {
+            if (catalog == null)
+            {
+                return;
+            }
+
+            var lastLevel = catalog.Names.Count;
+            foreach (JokerKind kind in Enum.GetValues(typeof(JokerKind)))
+            {
+                var unlockLevel = metaRules.JokerUnlockLevel(kind);
+                if (unlockLevel > lastLevel)
+                {
+                    Debug.LogWarning(
+                        $"{metaConfig.name}: the {kind} unlocks at level {unlockLevel}, past the campaign's last level, {lastLevel}; " +
+                        "it stays locked in the campaign.",
+                        metaConfig);
+                }
             }
         }
 
@@ -863,8 +910,8 @@ namespace GateRush.Runtime
         /// </summary>
         private LevelUiState LevelUiStateAt(DateTime nowUtc) =>
             LevelUiState.Of(
-                mode, levelNumber, metaGame, metaRules, nowUtc, freePlayJokers, IsBeingPlayed() && !IsHeld(), run.Countdown != null,
-                jokerSelection.Selected, goldOffers);
+                mode, levelNumber, metaGame, metaRules, nowUtc, freePlayJokers, jokerMarks, IsBeingPlayed() && !IsHeld(),
+                run.Countdown != null, jokerSelection.Selected, goldOffers);
 
         /// <summary>Makes the next <see cref="RefreshMeta"/> show everything again, for a new screen, level or setting.</summary>
         private void ForgetShownMeta()
@@ -944,6 +991,7 @@ namespace GateRush.Runtime
 
             inputController.Unbind();
             ClearJokerSelection();
+            ForgetNewJokers();
             StopSounds();
             StopListeningForTimeBonus();
             run.Release();
@@ -1054,6 +1102,9 @@ namespace GateRush.Runtime
                 case PurchaseResult.NotEnoughGold:
                     ShowShortfall(metaRules.LivesRefillPrice);
                     break;
+                case PurchaseResult.Locked:
+                    Debug.LogError("Refilling the lives answered Locked, which only a joker can; nothing changes.", this);
+                    break;
             }
 
             ForgetShownMeta();
@@ -1063,7 +1114,8 @@ namespace GateRush.Runtime
         /// <summary>
         /// A joker's buy button on the Store (D62): one bought and saved, and
         /// its card's count goes up where the player is; too little gold opens
-        /// the Not Enough Gold prompt.
+        /// the Not Enough Gold prompt. A locked joker has no buy button (D76),
+        /// so a refusal for that is logged as a bug.
         /// </summary>
         private void OnJokerPurchaseRequested(JokerKind kind)
         {
@@ -1079,6 +1131,10 @@ namespace GateRush.Runtime
                     break;
                 case PurchaseResult.AlreadyFull:
                     Debug.LogError($"Buying a {kind} answered AlreadyFull, which only a refill can; nothing changes.", this);
+                    break;
+                case PurchaseResult.Locked:
+                    // The Store hides a locked joker's buy button (D76).
+                    Debug.LogError($"A {kind} was bought while it is locked, though the Store never offers it; nothing changes.", this);
                     break;
             }
         }
@@ -1336,6 +1392,7 @@ namespace GateRush.Runtime
             {
                 inputController.CancelDrag();
                 ClearJokerSelection();
+                jokerMarks.Clear();
                 if (mode == PlayMode.Campaign)
                 {
                     ReportCampaignLoss();
@@ -1381,6 +1438,7 @@ namespace GateRush.Runtime
             levelUiView.HideConfirm();
             inputController.CancelDrag();
             ClearJokerSelection();
+            ForgetNewJokers();
             freePlayJokers.Refill();
             StopSounds();
 
@@ -1450,11 +1508,14 @@ namespace GateRush.Runtime
 
             // The run is not started while a card is open: an unstarted
             // countdown ignores every tick, so the timer stands at the whole
-            // budget until the last card closes.
+            // budget until the last card closes. A campaign level that is a
+            // joker's unlock level adds its New Joker cards after the
+            // mechanics' (D76); Meta decides which, from the position.
             var introductions = IntroductionsOf(asset.name);
-            if (introductions.Count > 0)
+            newJokers = playMode == PlayMode.Campaign ? metaGame.JokersUnlockedAtCampaignLevel() : Array.Empty<JokerKind>();
+            if (introductions.Count > 0 || newJokers.Count > 0)
             {
-                introductionCard.Show(introductions, StartRun);
+                introductionCard.Show(introductions, newJokers, metaRules.ClockBonusSeconds, OnIntroductionsClosed);
             }
             else
             {
@@ -1475,6 +1536,33 @@ namespace GateRush.Runtime
         {
             run.Start();
             ShowRemainingTime();
+        }
+
+        /// <summary>
+        /// The last introduction card closed: marks every joker a New Joker
+        /// card introduced (D76) and starts the run, as <see cref="StartRun"/>
+        /// is called — only by the cards <see cref="Load"/> showed for this
+        /// run, since hiding them drops this callback.
+        /// </summary>
+        private void OnIntroductionsClosed()
+        {
+            for (var i = 0; i < newJokers.Count; i++)
+            {
+                jokerMarks.Mark(newJokers[i]);
+            }
+
+            StartRun();
+        }
+
+        /// <summary>
+        /// Unmarks every joker and forgets which the level introduced: the
+        /// level was loaded afresh or left. A restart keeps nothing to mark
+        /// either, since it shows no card; it only unmarks.
+        /// </summary>
+        private void ForgetNewJokers()
+        {
+            newJokers = Array.Empty<JokerKind>();
+            jokerMarks.Clear();
         }
 
         /// <summary>
@@ -1677,6 +1765,7 @@ namespace GateRush.Runtime
 
             inputController.CancelDrag();
             ClearJokerSelection();
+            jokerMarks.Clear();
             StopSounds();
             run.Restart();
             moveNumber = 0;
@@ -1808,6 +1897,7 @@ namespace GateRush.Runtime
             if (run.Outcome == LevelOutcome.Won)
             {
                 ClearJokerSelection();
+                jokerMarks.Clear();
                 RecordWin();
             }
 
@@ -1824,8 +1914,8 @@ namespace GateRush.Runtime
         /// (<see cref="UseClock"/>), and the Rocket and the Broom are selected,
         /// unselected or switched (<see cref="JokerSelection.Press"/>) with
         /// nothing spent (D67). The buttons are not pressable while the level
-        /// is not being played or is held; a press that comes then anyway
-        /// changes nothing.
+        /// is not being played or is held, nor while their joker is locked
+        /// (D76); a press that comes then anyway changes nothing.
         /// </summary>
         private void OnJokerPressed(JokerKind kind)
         {
@@ -1834,7 +1924,14 @@ namespace GateRush.Runtime
                 return;
             }
 
+            // A button that cannot be pressed — a locked joker's among them
+            // (D76) — raises nothing: no use, selection or Not Enough Gold.
             var button = LevelUiStateAt(clock.UtcNow).Button(kind);
+            if (!button.IsInteractable)
+            {
+                return;
+            }
+
             if (button.IsShortOfGold)
             {
                 PauseLevel();
@@ -1990,25 +2087,36 @@ namespace GateRush.Runtime
         /// <summary>
         /// Spends one <paramref name="kind"/> (D65, D66): in the campaign
         /// through <see cref="MetaGame.TryUseJoker"/>, from the inventory or
-        /// bought at once; in free play from the level's allowance. False,
-        /// with nothing spent, when there is none to spend — the button was
-        /// not pressable then, so that is logged as a bug.
+        /// bought at once; in free play from the level's allowance. A joker
+        /// spent is no longer marked (D76). False, with nothing spent, when
+        /// there is none to spend or it is locked — the button was not
+        /// pressable then, so that is logged as a bug.
         /// </summary>
         private bool TrySpendJoker(JokerKind kind)
         {
             if (mode == PlayMode.Campaign)
             {
-                if (metaGame.TryUseJoker(kind) != JokerUse.NotEnoughGold)
+                switch (metaGame.TryUseJoker(kind))
                 {
-                    return true;
+                    case JokerUse.Used:
+                    case JokerUse.BoughtAndUsed:
+                        jokerMarks.Unmark(kind);
+                        return true;
+                    case JokerUse.NotEnoughGold:
+                        Debug.LogError($"A {kind} was used with none held and too little gold to buy one; nothing is spent or used.", this);
+                        return false;
+                    case JokerUse.Locked:
+                        Debug.LogError($"A {kind} was used while it is locked (D76), though its button is never pressable then; nothing is spent or used.", this);
+                        return false;
+                    default:
+                        Debug.LogError($"Using a {kind} gave an unknown answer; nothing is used.", this);
+                        return false;
                 }
-
-                Debug.LogError($"A {kind} was used with none held and too little gold to buy one; nothing is spent or used.", this);
-                return false;
             }
 
             if (freePlayJokers.TryUse(kind))
             {
+                jokerMarks.Unmark(kind);
                 return true;
             }
 

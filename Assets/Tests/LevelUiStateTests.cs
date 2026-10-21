@@ -14,7 +14,10 @@ namespace GateRush.Tests
     /// gold; each joker's button from the inventory and the rules' price in
     /// the campaign and from the allowance in free play, the Clock usable only
     /// with a countdown; the selection and the offers as given; and equality,
-    /// the bootstrap's refresh test.
+    /// the bootstrap's refresh test. Module 43: a campaign joker the position
+    /// has not reached is locked with its level, and as before once reached;
+    /// free play is never locked or marked; a marked campaign joker's button,
+    /// only, is marked.
     /// </summary>
     /// <remarks>
     /// The rules are <see cref="MetaRulesFixture"/>'s, so a price or a cap
@@ -81,7 +84,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives, new JokerInventory(0, 0, 0));
 
-            var state = LevelUiState.Of(PlayMode.FreePlay, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), true, true, null, offers);
+            var state = LevelUiState.Of(PlayMode.FreePlay, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, true, null, offers);
 
             Assert.IsTrue(state.IsFreePlay);
             Assert.AreEqual(0, state.Lives, "free play shows no lives (D58)");
@@ -96,7 +99,7 @@ namespace GateRush.Tests
             var freePlay = new FreePlayJokers(Allowance);
             freePlay.TryUse(kind);
 
-            var state = LevelUiState.Of(PlayMode.FreePlay, LevelNumber, meta, rules, Noon, freePlay, true, true, null, offers);
+            var state = LevelUiState.Of(PlayMode.FreePlay, LevelNumber, meta, rules, Noon, freePlay, new JokerMarks(), true, true, null, offers);
 
             Assert.AreEqual(JokerButtons.FreePlay(Allowance - 1, true), state.Button(kind));
         }
@@ -108,7 +111,7 @@ namespace GateRush.Tests
 
             var state = Campaign(meta, Noon);
 
-            var expected = JokerButtons.Campaign(meta.Save.Jokers.CountOf(kind), rules.JokerPrice(kind), Gold, true);
+            var expected = JokerButtons.Campaign(meta.Save.Jokers.CountOf(kind), rules.JokerPrice(kind), Gold, true, false);
             Assert.AreEqual(expected, state.Button(kind));
         }
 
@@ -130,7 +133,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1));
 
-            var state = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), true, false, null, offers);
+            var state = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, false, null, offers);
 
             Assert.IsFalse(state.Button(JokerKind.Clock).IsInteractable);
             Assert.IsTrue(state.Button(JokerKind.Rocket).IsInteractable);
@@ -142,7 +145,7 @@ namespace GateRush.Tests
         {
             var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1));
 
-            var state = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), false, true, null, offers);
+            var state = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), false, true, null, offers);
 
             Assert.IsFalse(state.Button(kind).IsInteractable);
         }
@@ -153,7 +156,7 @@ namespace GateRush.Tests
             var meta = Meta(Gold, SomeLives, new JokerInventory(0, 0, 0));
 
             var state = LevelUiState.Of(
-                PlayMode.Campaign, null, meta, rules, Noon, new FreePlayJokers(Allowance), true, true, JokerKind.Broom, offers);
+                PlayMode.Campaign, null, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, true, JokerKind.Broom, offers);
 
             Assert.AreEqual(JokerKind.Broom, state.SelectedJoker);
             Assert.AreSame(offers, state.GoldOffers);
@@ -172,7 +175,7 @@ namespace GateRush.Tests
         public void Of_NullMeta_Throws()
         {
             Assert.Throws<ArgumentNullException>(
-                () => LevelUiState.Of(PlayMode.Campaign, LevelNumber, null, rules, Noon, new FreePlayJokers(Allowance), true, true, null, offers));
+                () => LevelUiState.Of(PlayMode.Campaign, LevelNumber, null, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, true, null, offers));
         }
 
         [Test]
@@ -193,15 +196,102 @@ namespace GateRush.Tests
 
             var none = Campaign(meta, Noon);
             var rocket = LevelUiState.Of(
-                PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), true, true, JokerKind.Rocket, offers);
+                PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, true, JokerKind.Rocket, offers);
 
             Assert.IsFalse(none.Equals(rocket));
         }
 
-        private LevelUiState Campaign(MetaGame meta, DateTime nowUtc) =>
-            LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, nowUtc, new FreePlayJokers(Allowance), true, true, null, offers);
+        [Test]
+        public void Of_NullMarks_Throws()
+        {
+            var meta = Meta(Gold, SomeLives, new JokerInventory(0, 0, 0));
 
-        private MetaGame Meta(int gold, int lives, JokerInventory jokers)
+            Assert.Throws<ArgumentNullException>(
+                () => LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), null, true, true, null, offers));
+        }
+
+        [Test]
+        public void Of_CampaignBeforeAJokersLevel_ItsButtonIsLockedWithItsLevel([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1), rules.JokerUnlockLevel(kind) - 2);
+
+            var state = Campaign(meta, Noon);
+
+            Assert.AreEqual(JokerButtons.Locked(rules.JokerUnlockLevel(kind)), state.Button(kind));
+        }
+
+        [Test]
+        public void Of_CampaignAtAJokersLevel_ItsButtonIsAsBefore([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1), rules.JokerUnlockLevel(kind) - 1);
+
+            var state = Campaign(meta, Noon);
+
+            var expected = JokerButtons.Campaign(1, rules.JokerPrice(kind), Gold, true, false);
+            Assert.AreEqual(expected, state.Button(kind));
+        }
+
+        [Test]
+        public void Of_FreePlayWithTheCampaignJokerLocked_ItsButtonIsNotLocked([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var meta = Meta(Gold, SomeLives, new JokerInventory(0, 0, 0));
+            Assume.That(meta.IsJokerUnlocked(kind), Is.False, "the campaign has not reached the joker");
+
+            var state = LevelUiState.Of(
+                PlayMode.FreePlay, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), new JokerMarks(), true, true, null, offers);
+
+            Assert.AreEqual(JokerButtons.FreePlay(Allowance, true), state.Button(kind), "free play is never locked (D66)");
+        }
+
+        [Test]
+        public void Of_CampaignMarkedJoker_OnlyItsButtonIsMarked([Values] JokerKind kind)
+        {
+            var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1));
+            var marks = new JokerMarks();
+            marks.Mark(kind);
+
+            var state = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), marks, true, true, null, offers);
+
+            foreach (JokerKind other in Enum.GetValues(typeof(JokerKind)))
+            {
+                Assert.AreEqual(other == kind, state.Button(other).IsMarked, $"{other}");
+            }
+        }
+
+        [Test]
+        public void Of_FreePlayMarkedJoker_IsNotMarked([Values] JokerKind kind)
+        {
+            var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1));
+            var marks = new JokerMarks();
+            marks.Mark(kind);
+
+            var state = LevelUiState.Of(PlayMode.FreePlay, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), marks, true, true, null, offers);
+
+            Assert.IsFalse(state.Button(kind).IsMarked, "free play shows no New Joker card, so nothing to mark");
+        }
+
+        [Test]
+        public void Equals_MarkDiffers_IsNotEqual()
+        {
+            var meta = Meta(Gold, SomeLives, new JokerInventory(1, 1, 1));
+            var marks = new JokerMarks();
+            marks.Mark(JokerKind.Clock);
+
+            var unmarked = Campaign(meta, Noon);
+            var marked = LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, Noon, new FreePlayJokers(Allowance), marks, true, true, null, offers);
+
+            Assert.IsFalse(unmarked.Equals(marked), "the bar refreshes when a mark comes or goes");
+        }
+
+        private LevelUiState Campaign(MetaGame meta, DateTime nowUtc) =>
+            LevelUiState.Of(PlayMode.Campaign, LevelNumber, meta, rules, nowUtc, new FreePlayJokers(Allowance), new JokerMarks(), true, true, null, offers);
+
+        private MetaGame Meta(int gold, int lives, JokerInventory jokers) => Meta(gold, lives, jokers, 0);
+
+        private MetaGame Meta(int gold, int lives, JokerInventory jokers, int campaignPosition)
         {
             var save = new SaveData(
                 new CompletedLevels(),
@@ -210,7 +300,7 @@ namespace GateRush.Tests
                 new Lives(rules, lives, Noon),
                 jokers,
                 new WinStreak(0, 0),
-                new CampaignProgress(0),
+                new CampaignProgress(campaignPosition),
                 PlayerProfile.Starting(rules),
                 new HapticsSetting());
             return new MetaGame(save, rules, new ManualClock(Noon));

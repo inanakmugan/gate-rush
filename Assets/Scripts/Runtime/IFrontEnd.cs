@@ -128,11 +128,13 @@ namespace GateRush.Runtime
         /// 37): the streak rewards campaign wins gave since the last
         /// announcement, already in the inventory, merged by joker kind, under
         /// a headline with <paramref name="latestStreak"/>, the streak of the
-        /// latest of those wins. Collect only closes it.
+        /// latest of those wins. Collect only closes it. A joker still locked
+        /// in the state last given to <see cref="Show"/> or
+        /// <see cref="Refresh"/> has its line say the level it opens at (D76).
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="rewards"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="rewards"/> is empty: there is nothing to announce.</exception>
-        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        /// <exception cref="InvalidOperationException">The front end is not open, or no state was given to it yet.</exception>
         void ShowStreakReward(int latestStreak, IReadOnlyList<StreakReward> rewards);
 
         /// <summary>

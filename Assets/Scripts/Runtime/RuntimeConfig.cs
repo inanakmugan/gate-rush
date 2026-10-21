@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using GateRush.Core;
+using GateRush.Meta;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
@@ -620,6 +621,27 @@ namespace GateRush.Runtime
         [SerializeField] private float introCloseSeconds = 0.15f;
 
         [SerializeField] private Ease introCloseEase = Ease.OutQuad;
+
+        [Header("New Joker card (Module 43; the introduction card's theme, after any mechanic cards)")]
+        [Tooltip("The joker icons the New Joker card draws in place of an illustration: Assets/Config/JokerIcons.asset, the one the UI prefabs are built from.")]
+        [SerializeField] private JokerIcons jokerIcons;
+
+        [Tooltip("One entry per joker: the card's title and its sentence. {0} in the sentence is the seconds a Clock adds, from the Meta Config (D65).")]
+        [SerializeField] private JokerIntroduction[] jokerIntroductions =
+        {
+            new JokerIntroduction(JokerKind.Clock, "Clock!", "Tap it to add {0} seconds to the clock."),
+            new JokerIntroduction(JokerKind.Rocket, "Rocket!", "Tap the Rocket, then a block, to clear its colour."),
+            new JokerIntroduction(JokerKind.Broom, "Broom!", "Tap the Broom, then a block, to clear that colour from every block.")
+        };
+
+        [Tooltip("The line under every New Joker card's title.")]
+        [SerializeField] private string newJokerSubtitle = "New Joker Unlocked!";
+
+        [Tooltip("The joker icon's size, centred in the illustration area with the sparkles around it.")]
+        [SerializeField] private float newJokerIconSizeUnits = 360f;
+
+        [Tooltip("The joker icon's colour, its white sprite tinted: the theme's purple, #3B2466, readable on the grey panel.")]
+        [SerializeField] private Color newJokerIconColor = new Color(0.231f, 0.141f, 0.400f);
 
         [Header("Sparkles (around a card's illustration)")]
         [Tooltip("One entry per sparkle: where it sits, from the illustration area's centre, as a fraction of the area's size; its size in canvas units; and where in the twinkle it starts, from 0 to below 1.")]
@@ -1248,6 +1270,18 @@ namespace GateRush.Runtime
         /// <summary>The sparkles around a card's illustration.</summary>
         public IReadOnlyList<SparklePlacement> IntroSparkles => introSparkles;
 
+        /// <summary>The joker icons the New Joker card draws (Module 43); null when unassigned, which <see cref="Problems"/> reports.</summary>
+        public JokerIcons JokerIcons => jokerIcons;
+
+        /// <summary>The line under every New Joker card's title.</summary>
+        public string NewJokerSubtitle => newJokerSubtitle;
+
+        /// <summary>The size of the joker icon on a New Joker card, in canvas units.</summary>
+        public float NewJokerIconSizeUnits => newJokerIconSizeUnits;
+
+        /// <summary>The colour of the joker icon on a New Joker card.</summary>
+        public Color NewJokerIconColor => newJokerIconColor;
+
         /// <summary>Tint of the sparkles.</summary>
         public Color SparkleColor => sparkleColor;
 
@@ -1518,6 +1552,37 @@ namespace GateRush.Runtime
         public string IntroductionSubtitle(LevelMechanic mechanic) =>
             mechanic == LevelMechanic.HowToPlay ? howToPlaySubtitle : introSubtitle;
 
+        /// <summary>The title of <paramref name="kind"/>'s New Joker card: "Rocket!" by default.</summary>
+        /// <exception cref="InvalidOperationException">No entry introduces it; see <see cref="Problems"/>.</exception>
+        public string NewJokerTitle(JokerKind kind) => IntroductionOf(kind).Title;
+
+        /// <summary>
+        /// The sentence of <paramref name="kind"/>'s New Joker card, with
+        /// <paramref name="clockBonusSeconds"/> — the rules' Clock seconds — in
+        /// place of {0}, read with the invariant culture.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">No entry introduces it; see <see cref="Problems"/>.</exception>
+        /// <exception cref="FormatException">The sentence is not a usable format; see <see cref="Problems"/>.</exception>
+        public string NewJokerText(JokerKind kind, int clockBonusSeconds) =>
+            string.Format(CultureInfo.InvariantCulture, IntroductionOf(kind).Text, clockBonusSeconds);
+
+        /// <summary>The first entry for <paramref name="kind"/>.</summary>
+        private JokerIntroduction IntroductionOf(JokerKind kind)
+        {
+            if (jokerIntroductions != null)
+            {
+                for (var i = 0; i < jokerIntroductions.Length; i++)
+                {
+                    if (jokerIntroductions[i] != null && jokerIntroductions[i].Joker == kind)
+                    {
+                        return jokerIntroductions[i];
+                    }
+                }
+            }
+
+            throw new InvalidOperationException($"{name}: Joker Introductions has no entry for {kind}.");
+        }
+
         /// <summary>The first entry for <paramref name="mechanic"/>.</summary>
         private MechanicIntroduction IntroductionOf(LevelMechanic mechanic)
         {
@@ -1741,6 +1806,7 @@ namespace GateRush.Runtime
             AddJokerBreakProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
+            AddNewJokerProblems(problems);
             return problems;
         }
 
@@ -1962,6 +2028,76 @@ namespace GateRush.Runtime
                 {
                     problems.Add($"{name}: Intro Sparkles' entry {i} must have a positive size and a phase from 0 to below 1.");
                 }
+            }
+        }
+
+        /// <summary>
+        /// The constraints on the New Joker card (Module 43), each message
+        /// naming its field or joker: the Joker Icons are assigned and report
+        /// no problem; every joker has exactly one entry, with a title and a
+        /// sentence that formats with the Clock's seconds; the subtitle is not
+        /// empty; the icon has a positive size and a colour that shows.
+        /// </summary>
+        private void AddNewJokerProblems(List<string> problems)
+        {
+            if (jokerIcons == null)
+            {
+                problems.Add($"{name}: Joker Icons is not assigned; assign Assets/Config/JokerIcons.asset.");
+            }
+            else
+            {
+                problems.AddRange(jokerIcons.Problems());
+            }
+
+            foreach (JokerKind kind in Enum.GetValues(typeof(JokerKind)))
+            {
+                var entries = 0;
+                JokerIntroduction first = null;
+                for (var i = 0; jokerIntroductions != null && i < jokerIntroductions.Length; i++)
+                {
+                    if (jokerIntroductions[i] != null && jokerIntroductions[i].Joker == kind)
+                    {
+                        first = first ?? jokerIntroductions[i];
+                        entries++;
+                    }
+                }
+
+                if (entries == 0)
+                {
+                    problems.Add($"{name}: Joker Introductions has no entry for {kind}.");
+                    continue;
+                }
+
+                if (entries > 1)
+                {
+                    problems.Add($"{name}: Joker Introductions has {entries} entries for {kind}; it needs exactly one.");
+                }
+
+                if (string.IsNullOrWhiteSpace(first.Title))
+                {
+                    problems.Add($"{name}: Joker Introductions' entry for {kind} has no title.");
+                }
+
+                if (string.IsNullOrWhiteSpace(first.Text))
+                {
+                    problems.Add($"{name}: Joker Introductions' entry for {kind} has no text.");
+                }
+                else if (!IsUsableFormat(first.Text))
+                {
+                    problems.Add($"{name}: Joker Introductions' entry for {kind} must have at most the placeholder {{0}}, for the Clock's seconds, and balanced braces.");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(newJokerSubtitle))
+            {
+                problems.Add($"{name}: New Joker Subtitle may not be empty.");
+            }
+
+            AddIfNotPositive(problems, newJokerIconSizeUnits, "New Joker Icon Size Units");
+
+            if (!(newJokerIconColor.a > 0f))
+            {
+                problems.Add($"{name}: New Joker Icon Color must not be fully transparent.");
             }
         }
 
@@ -2290,6 +2426,28 @@ namespace GateRush.Runtime
             }
 
             public LevelMechanic Mechanic => mechanic;
+
+            public string Title => title;
+
+            public string Text => text;
+        }
+
+        /// <summary>One joker's New Joker card: its title and its sentence.</summary>
+        [Serializable]
+        private sealed class JokerIntroduction
+        {
+            [SerializeField] private JokerKind joker;
+            [SerializeField] private string title;
+            [SerializeField, TextArea] private string text;
+
+            public JokerIntroduction(JokerKind joker, string title, string text)
+            {
+                this.joker = joker;
+                this.title = title;
+                this.text = text;
+            }
+
+            public JokerKind Joker => joker;
 
             public string Title => title;
 

@@ -3,10 +3,12 @@ using System;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// What one joker button shows and does (Modules 34 and 40): its badge —
-    /// a count or a price — and the number on it, whether it can be pressed,
-    /// and the gold missing to buy one. Decided by <see cref="JokerButtons"/>;
-    /// the level's interface only formats the number and picks the look.
+    /// What one joker button shows and does (Modules 34, 40 and 43): its
+    /// badge — a count, a price or the level a locked joker opens at — and the
+    /// number on it, whether it can be pressed, the gold missing to buy one,
+    /// and whether it is marked as the joker just introduced. Decided by
+    /// <see cref="JokerButtons"/>; the level's interface only formats the
+    /// number and picks the look.
     /// </summary>
     public readonly struct JokerButton : IEquatable<JokerButton>
     {
@@ -15,20 +17,21 @@ namespace GateRush.Runtime
         /// <paramref name="amount"/>, pressable when
         /// <paramref name="isInteractable"/>, with
         /// <paramref name="shortfall"/> gold missing to buy one (0 when none
-        /// is).
+        /// is), pulsing when <paramref name="isMarked"/>.
         /// </summary>
-        public JokerButton(JokerBadge badge, int amount, bool isInteractable, int shortfall)
+        public JokerButton(JokerBadge badge, int amount, bool isInteractable, int shortfall, bool isMarked)
         {
             Badge = badge;
             Amount = amount;
             IsInteractable = isInteractable;
             Shortfall = shortfall;
+            IsMarked = isMarked;
         }
 
-        /// <summary>Whether the badge shows a count or a price.</summary>
+        /// <summary>Whether the badge shows a count, a price or an unlock level.</summary>
         public JokerBadge Badge { get; }
 
-        /// <summary>The number on the badge: the count held or left, or the price.</summary>
+        /// <summary>The number on the badge: the count held or left, the price, or the unlock level.</summary>
         public int Amount { get; }
 
         /// <summary>True when the button can be pressed.</summary>
@@ -44,9 +47,20 @@ namespace GateRush.Runtime
         /// <summary>True when <see cref="Shortfall"/> is positive.</summary>
         public bool IsShortOfGold => Shortfall > 0;
 
+        /// <summary>
+        /// True while the joker its New Joker card just introduced has not been
+        /// used on that level (D76): the button pulses. Never in free play,
+        /// never while locked.
+        /// </summary>
+        public bool IsMarked { get; }
+
+        /// <summary>True while the joker is locked in the campaign: the badge shows its unlock level.</summary>
+        public bool IsLocked => Badge == JokerBadge.Locked;
+
         /// <inheritdoc />
         public bool Equals(JokerButton other) =>
-            Badge == other.Badge && Amount == other.Amount && IsInteractable == other.IsInteractable && Shortfall == other.Shortfall;
+            Badge == other.Badge && Amount == other.Amount && IsInteractable == other.IsInteractable && Shortfall == other.Shortfall
+            && IsMarked == other.IsMarked;
 
         /// <inheritdoc />
         public override bool Equals(object obj) => obj is JokerButton other && Equals(other);
@@ -59,7 +73,8 @@ namespace GateRush.Runtime
                 var hash = (int)Badge;
                 hash = hash * 31 + Amount;
                 hash = hash * 31 + (IsInteractable ? 1 : 0);
-                return hash * 31 + Shortfall;
+                hash = hash * 31 + Shortfall;
+                return hash * 31 + (IsMarked ? 1 : 0);
             }
         }
 
