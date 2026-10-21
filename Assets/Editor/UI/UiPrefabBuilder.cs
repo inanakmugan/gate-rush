@@ -24,7 +24,8 @@ namespace GateRush.UI.Editor
     /// Module 39's Leaderboard Row, with the Leaderboard Page now holding the
     /// leaderboard, Module 40's Gold Packs Overlay, Level HUD, Joker Bar and
     /// Level UI, and Module 41's Result Overlay and Confirm Overlay, nested in
-    /// Level UI — from code, with every serialized field wired.
+    /// Level UI, with Module 42's square joker buttons — from code, with every
+    /// serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -98,6 +99,13 @@ namespace GateRush.UI.Editor
         // Primary's green face is. Its pressed look is the red flat sprite the
         // ribbon uses (RibbonSpritePath).
         private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
+
+        // Module 42: the joker buttons' square looks, 9-sliced as Button
+        // Primary's three are — the face, the pressed look and the grey
+        // disabled look.
+        private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
+        private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
+        private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -338,8 +346,9 @@ namespace GateRush.UI.Editor
         private const string NameHintColorHex = "#6E7090";
         private const string NameRefusalColorHex = "#D93A4A";
 
-        // The HUD's pills and the joker badges, the top bar's pill colour, and
-        // the HUD's white text.
+        // The HUD's pills, the top bar's pill colour, and the HUD's white
+        // text. The joker badges are tinted red from the UI Config instead
+        // (Module 42).
         private const string PillColorHex = "#2E1A52";
         private const string HudTextColorHex = "#FFFFFF";
 
@@ -652,23 +661,31 @@ namespace GateRush.UI.Editor
         // scaled down by BandFit when the bottom band (0.10 of the screen's
         // height, 192 units there) is smaller. Each slot sits a little low,
         // so the selected button has room to rise with its ring.
+        //
+        // Module 42: each slot is a square button. The square sprites are 128
+        // pixels with an 8-pixel depth strip at the foot, drawn 9-sliced at
+        // one unit a pixel, so the strip is JokerFaceDepth units at any size
+        // and the icon is raised by half of it to sit centred on the face.
+        // The badge hangs BadgeOutset past the bottom-right corner; it is a
+        // BadgeSize square for a count and widens leftwards for a price. In
+        // the 190-unit row the raised ring's top reaches
+        // 70 - 10 + 20 + 8 = 88 and the badge's foot -70 - 10 - 12 = -92,
+        // both inside the row's 95.
         private const float JokerRowWidth = 1080f;
         private const float JokerRowHeight = 190f;
-        private const float JokerSlotWidth = 280f;
-        private const float JokerSlotHeight = 150f;
-        private const float JokerSlotGap = 40f;
-        private const float JokerSlotDrop = 12f;
+        private const float JokerButtonSize = 140f;
+        private const float JokerSlotGap = 140f;
+        private const float JokerSlotDrop = 10f;
         private const float JokerRaise = 20f;
         private const float JokerRingOutset = 8f;
-        private const float JokerIconSize = 100f;
-        private const float JokerIconInset = 30f;
-        private const float BadgeWidth = 130f;
-        private const float BadgeHeight = 64f;
-        private const float BadgeInset = 20f;
+        private const float JokerFaceDepth = 8f;
+        private const float JokerIconSize = 96f;
+        private const float BadgeSize = 52f;
+        private const float BadgeOutset = 12f;
         private const int BadgePadding = 10;
-        private const float BadgeSpacing = 6f;
-        private const float BadgeCoinSize = 44f;
-        private const float BadgeFontSize = 44f;
+        private const float BadgeSpacing = 4f;
+        private const float BadgeCoinSize = 40f;
+        private const float BadgeFontSize = 40f;
 
         // Module 41: the result panel. Under the title, the gold row (coin and
         // amount, centred) and the closing message; at the foot, one centred
@@ -2309,12 +2326,7 @@ namespace GateRush.UI.Editor
             Record(lose.gameObject);
             var loseLabel = SetNestedLabel(lose, config.LoseLifeLabel);
             var loseButton = Single<Button>(lose.gameObject, ButtonPrimaryName);
-            var loseFace = loseButton.image;
-            if (loseFace == null)
-            {
-                throw new InvalidOperationException($"{ButtonPrimaryName}'s Button has no Image as its target graphic for the red face.");
-            }
-
+            var loseFace = FaceOf(loseButton, "the red face");
             loseFace.sprite = sources.RedButton;
             Record(loseFace);
             var sprites = loseButton.spriteState;
@@ -2345,7 +2357,7 @@ namespace GateRush.UI.Editor
             var root = CreateRoot(JokerBarName, scene, sources.Layer);
             var row = AddBandRow(root.transform, new Vector2(JokerRowWidth, JokerRowHeight));
 
-            var pitch = JokerSlotWidth + JokerSlotGap;
+            var pitch = JokerButtonSize + JokerSlotGap;
             var clock = BuildJokerSlot(row, sources, JokerKind.Clock, -pitch);
             var rocket = BuildJokerSlot(row, sources, JokerKind.Rocket, 0f);
             var broom = BuildJokerSlot(row, sources, JokerKind.Broom, pitch);
@@ -2358,16 +2370,18 @@ namespace GateRush.UI.Editor
         /// <summary>
         /// One joker's slot, <paramref name="x"/> from the row's centre and a
         /// little low: the lift, raised while selected, holding the ring
-        /// (hidden) behind a Button Primary instance whose own label is
-        /// switched off on this instance; on the button, the joker's icon from
-        /// the Joker Icons asset and the badge with the coin (hidden) and the
-        /// count.
+        /// (hidden) behind a Button Primary instance made square on this
+        /// instance — the green square face, its flat pressed look and its
+        /// grey disabled look — with its own label switched off; on the
+        /// button, the joker's icon from the Joker Icons asset centred on the
+        /// face above the depth strip, and the red badge on the bottom-right
+        /// corner with the coin (hidden) and the count (Module 42).
         /// </summary>
         private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
         {
             var config = sources.Config;
             var slot = UiBuilder.CreateRect(kind.ToString(), row);
-            UiBuilder.PlaceCentered(slot, new Vector2(JokerSlotWidth, JokerSlotHeight));
+            UiBuilder.PlaceCentered(slot, new Vector2(JokerButtonSize, JokerButtonSize));
             slot.anchoredPosition = new Vector2(x, -JokerSlotDrop);
 
             var lift = UiBuilder.CreateRect(LiftName, slot);
@@ -2387,17 +2401,35 @@ namespace GateRush.UI.Editor
             Record(button);
             Record(button.gameObject);
             var buttonComponent = Single<Button>(button.gameObject, ButtonPrimaryName);
+            var face = FaceOf(buttonComponent, "the joker button's square face");
+            face.sprite = sources.JokerFace;
+            Record(face);
+            var looks = buttonComponent.spriteState;
+            looks.pressedSprite = sources.JokerFacePressed;
+            looks.disabledSprite = sources.JokerFaceDisabled;
+            buttonComponent.spriteState = looks;
+            Record(buttonComponent);
             var ownLabel = Single<TMP_Text>(button.gameObject, ButtonPrimaryName);
             ownLabel.gameObject.SetActive(false);
             Record(ownLabel.gameObject);
 
             var icon = UiBuilder.CreateRect(IconName, button);
-            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(JokerIconInset, 0f), new Vector2(JokerIconSize, JokerIconSize));
+            UiBuilder.Place(
+                icon, new Vector2(AnchorMid, AnchorMid), new Vector2(0f, JokerFaceDepth / 2f), new Vector2(JokerIconSize, JokerIconSize));
             var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(kind), config.IconColor);
 
+            // Pivoted on the button's bottom-right corner, so the fitter widens
+            // it leftwards across the face and it never leaves the corner.
             var badge = UiBuilder.CreateRect(BadgeName, button);
-            UiBuilder.Place(badge, new Vector2(AnchorHigh, AnchorMid), new Vector2(-BadgeInset, 0f), new Vector2(BadgeWidth, BadgeHeight));
-            AddSliced(badge, sources.Panel, PillColorHex);
+            UiBuilder.Place(
+                badge, new Vector2(AnchorHigh, AnchorLow), new Vector2(BadgeOutset, -BadgeOutset), new Vector2(BadgeSize, BadgeSize));
+            var badgeImage = AddSliced(badge, sources.Panel, PanelColorHex);
+            AddTint(badge.gameObject, badgeImage, UiColorRole.JokerBadge);
+            var badgeElement = badge.gameObject.AddComponent<LayoutElement>();
+            badgeElement.minWidth = BadgeSize;
+            var fitter = badge.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
             var layout = badge.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(BadgePadding, BadgePadding, 0, 0);
             layout.spacing = BadgeSpacing;
@@ -2863,6 +2895,23 @@ namespace GateRush.UI.Editor
             return label;
         }
 
+        /// <summary>
+        /// The Image a Button Primary instance draws its face with, whose
+        /// sprite an instance replaces for <paramref name="purpose"/>; throws
+        /// when the button's target graphic is not an Image.
+        /// </summary>
+        private static Image FaceOf(Button button, string purpose)
+        {
+            // Compared with ==, not ??, so Unity's destroyed-object null counts.
+            var face = button.image;
+            if (face == null)
+            {
+                throw new InvalidOperationException($"{ButtonPrimaryName}'s Button has no Image as its target graphic for {purpose}.");
+            }
+
+            return face;
+        }
+
         private static void AddTint(GameObject owner, Graphic target, UiColorRole role)
         {
             var tint = owner.AddComponent<UiTint>();
@@ -3177,6 +3226,15 @@ namespace GateRush.UI.Editor
             /// <summary>Lose a life's pressed look: the red flat sprite, the ribbon's.</summary>
             public Sprite RedButtonPressed { get; private set; }
 
+            /// <summary>A joker button's square green face, 9-sliced, its depth strip at the foot.</summary>
+            public Sprite JokerFace { get; private set; }
+
+            /// <summary>A joker button's pressed look: the square green flat sprite.</summary>
+            public Sprite JokerFacePressed { get; private set; }
+
+            /// <summary>A joker button's look while it cannot be pressed: the square grey face.</summary>
+            public Sprite JokerFaceDisabled { get; private set; }
+
             public JokerIcons JokerIcons { get; private set; }
             public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
@@ -3240,6 +3298,9 @@ namespace GateRush.UI.Editor
                     Hourglass = LoadSprite(HourglassSpritePath),
                     RedButton = LoadSlicedSprite(RedButtonSpritePath),
                     RedButtonPressed = LoadSlicedSprite(RibbonSpritePath),
+                    JokerFace = LoadSlicedSprite(JokerButtonSpritePath),
+                    JokerFacePressed = LoadSlicedSprite(JokerButtonPressedSpritePath),
+                    JokerFaceDisabled = LoadSlicedSprite(JokerButtonDisabledSpritePath),
                     JokerIcons = LoadJokerIcons(),
                     AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),

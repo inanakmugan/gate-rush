@@ -42,7 +42,10 @@ namespace GateRush.Tests
     /// fully wired, nested in Level UI's Overlays and saved closed; their
     /// buttons are the theme's prefabs, Lose a life a red Button Primary and
     /// Menu a Button Round with the home icon, neither has a close button,
-    /// and their texts come from the UI Config.
+    /// and their texts come from the UI Config. Module 42's joker buttons are
+    /// square Button Primaries with the square face, pressed and grey
+    /// disabled looks, the icon centred above the depth strip and the red
+    /// badge hanging off the bottom-right corner, widening leftwards.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -82,6 +85,10 @@ namespace GateRush.Tests
         private const string ConfirmOverlayName = "Confirm Overlay";
         private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
         private const string RedButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_flat.png";
+
+        private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
+        private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
+        private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
 
         private static string[] OutputNames => new[]
         {
@@ -468,6 +475,91 @@ namespace GateRush.Tests
                 Assert.AreEqual(icons.IconOf(JokerKind.Clock), IconOf(serialized, "clock"));
                 Assert.AreEqual(icons.IconOf(JokerKind.Rocket), IconOf(serialized, "rocket"));
                 Assert.AreEqual(icons.IconOf(JokerKind.Broom), IconOf(serialized, "broom"));
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_AreSquareButtonPrimariesWithTheSquareSprites()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var button = Reference<Button>(serialized, "button");
+                    var size = ((RectTransform)button.transform).rect.size;
+
+                    Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(button), view.name);
+                    Assert.That(size.x, Is.GreaterThan(0f), $"{view.name} has a size");
+                    Assert.AreEqual(size.x, size.y, $"{view.name} is square");
+                    Assert.AreEqual(JokerButtonSpritePath, AssetDatabase.GetAssetPath(button.image.sprite), $"{view.name}'s face");
+                    Assert.AreEqual(
+                        JokerButtonPressedSpritePath, AssetDatabase.GetAssetPath(button.spriteState.pressedSprite), $"{view.name}'s pressed look");
+                    Assert.AreEqual(
+                        JokerButtonDisabledSpritePath, AssetDatabase.GetAssetPath(button.spriteState.disabledSprite), $"{view.name} is grey disabled");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_IconIsCentredAboveTheDepthStrip()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var button = Reference<Button>(serialized, "button");
+                    var icon = Reference<Image>(serialized, "icon").rectTransform;
+                    var centre = new Vector2(0.5f, 0.5f);
+
+                    Assert.AreEqual(button.transform, icon.parent, $"{view.name}'s icon is on the face");
+                    Assert.AreEqual(centre, icon.anchorMin, $"{view.name}'s icon is anchored at the centre");
+                    Assert.AreEqual(centre, icon.anchorMax, $"{view.name}'s icon is anchored at the centre");
+                    Assert.AreEqual(0f, icon.anchoredPosition.x, $"{view.name}'s icon is centred across");
+                    Assert.That(icon.anchoredPosition.y, Is.GreaterThan(0f), $"{view.name}'s icon is raised above the depth strip");
+                    Assert.AreEqual(icon.sizeDelta.x, icon.sizeDelta.y, $"{view.name}'s icon is square");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_BadgeHangsOffTheBottomRightCornerAndGrowsLeft()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var button = Reference<Button>(serialized, "button");
+                    var badge = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
+                    var coin = Reference<GameObject>(serialized, "coin");
+                    var corner = new Vector2(1f, 0f);
+                    var fitter = badge.GetComponent<ContentSizeFitter>();
+                    var tint = badge.GetComponent<UiTint>();
+                    Assert.IsNotNull(fitter, $"{view.name}'s badge has a ContentSizeFitter");
+                    Assert.IsNotNull(tint, $"{view.name}'s badge has a UiTint");
+
+                    Assert.AreEqual(button.transform, badge.parent, $"{view.name}'s badge is on the button");
+                    Assert.AreEqual(badge, coin.transform.parent, $"{view.name}'s coin is in the badge");
+                    Assert.AreEqual(corner, badge.anchorMin, $"{view.name}'s badge is anchored at the bottom-right corner");
+                    Assert.AreEqual(corner, badge.anchorMax, $"{view.name}'s badge is anchored at the bottom-right corner");
+                    Assert.AreEqual(corner, badge.pivot, $"{view.name}'s badge grows leftwards from the corner");
+                    Assert.That(badge.anchoredPosition.x, Is.GreaterThan(0f), $"{view.name}'s badge overlaps the right edge");
+                    Assert.That(badge.anchoredPosition.y, Is.LessThan(0f), $"{view.name}'s badge overlaps the bottom edge");
+                    Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.horizontalFit, $"{view.name}'s badge widens for a price");
+                    using (var tintSerialized = new SerializedObject(tint))
+                    {
+                        Assert.AreEqual(
+                            UiColorRole.JokerBadge, (UiColorRole)tintSerialized.FindProperty(TintRoleField).intValue, $"{view.name}'s badge is red");
+                    }
+                }
             }
         }
 
