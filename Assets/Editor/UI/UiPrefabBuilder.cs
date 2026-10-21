@@ -72,8 +72,10 @@ namespace GateRush.UI.Editor
         private const string SoundOnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOn.png";
         private const string SoundOffSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOff.png";
         private const string HeartSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/suit_hearts.png";
-        private const string CoinSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/token.png";
-        private const string CoinStackSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/tokens_stack.png";
+        // Module 42: the game's own coin and pile of coins, drawn in greys so
+        // the Coin tint colours them (the Top Bar's hand-made coin is the same).
+        private const string CoinSpritePath = "Assets/Art/Sprites/UI/coin.png";
+        private const string CoinStackSpritePath = "Assets/Art/Sprites/UI/coins.png";
 
         private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
         private const string FireSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/fire.png";

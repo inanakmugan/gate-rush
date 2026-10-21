@@ -45,7 +45,8 @@ namespace GateRush.Tests
     /// and their texts come from the UI Config. Module 42's joker buttons are
     /// square Button Primaries with the square face, pressed and grey
     /// disabled looks, the icon centred above the depth strip and the red
-    /// badge hanging off the bottom-right corner, widening leftwards.
+    /// badge hanging off the bottom-right corner, widening leftwards; every
+    /// coin-tinted graphic draws the owner's coin or pile of coins.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -85,6 +86,9 @@ namespace GateRush.Tests
         private const string ConfirmOverlayName = "Confirm Overlay";
         private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
         private const string RedButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_flat.png";
+
+        private const string CoinSpritePath = "Assets/Art/Sprites/UI/coin.png";
+        private const string CoinsSpritePath = "Assets/Art/Sprites/UI/coins.png";
 
         private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
         private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
@@ -355,6 +359,35 @@ namespace GateRush.Tests
 
             Assert.That(tints.Count, Is.GreaterThan(OverlayTypes.Length), "the coins, hearts, icons and background are tinted");
             CollectionAssert.IsEmpty(wrong, "tinted graphics without their UI Config colour");
+        }
+
+        [Test]
+        public void Build_CoinGraphics_AreTheOwnersCoinSprites()
+        {
+            var coinTints = OutputNames
+                .SelectMany(name => LoadBuilt(name).GetComponentsInChildren<UiTint>(true))
+                .Where(tint => RoleOf(tint) == UiColorRole.Coin)
+                .ToList();
+            var paths = new List<string>();
+            var wrong = new List<string>();
+
+            foreach (var tint in coinTints)
+            {
+                using (var serialized = new SerializedObject(tint))
+                {
+                    var target = serialized.FindProperty(TintTargetField).objectReferenceValue as Image;
+                    var path = target == null ? null : AssetDatabase.GetAssetPath(target.sprite);
+                    paths.Add(path);
+                    if (path != CoinSpritePath && path != CoinsSpritePath)
+                    {
+                        wrong.Add($"{tint.name}: {path ?? "no image"}");
+                    }
+                }
+            }
+
+            CollectionAssert.Contains(paths, CoinSpritePath, "the single coin is drawn somewhere");
+            CollectionAssert.Contains(paths, CoinsSpritePath, "the pile of coins is drawn somewhere");
+            CollectionAssert.IsEmpty(wrong, "coin-tinted graphics drawing another sprite");
         }
 
         [Test]
@@ -742,6 +775,14 @@ namespace GateRush.Tests
         }
 
         private static string HandMadePath(string name) => $"{HandMadeFolder}/{name}.prefab";
+
+        private static UiColorRole RoleOf(UiTint tint)
+        {
+            using (var serialized = new SerializedObject(tint))
+            {
+                return (UiColorRole)serialized.FindProperty(TintRoleField).intValue;
+            }
+        }
 
         private static void AssertEveryReferenceAssigned(Object component, int expectedFields)
         {
