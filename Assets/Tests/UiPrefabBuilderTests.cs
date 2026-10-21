@@ -46,7 +46,11 @@ namespace GateRush.Tests
     /// square Button Primaries with the square face, pressed and grey
     /// disabled looks, the icon centred above the depth strip and the red
     /// badge hanging off the bottom-right corner, widening leftwards; every
-    /// coin-tinted graphic draws the owner's coin or pile of coins.
+    /// coin-tinted graphic draws the owner's coin or pile of coins. Module
+    /// 43: the joker buttons and the Store's cards have the lock wired,
+    /// centred on their icons and saved hidden; the joker buttons' glow is
+    /// saved hidden behind the ring and the button; a Store card shown locked
+    /// hides the count and the buy button, and shown again restores them.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -93,6 +97,7 @@ namespace GateRush.Tests
         private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
         private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
         private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
+        private const string LockSpritePath = "Assets/ThirdParty/Kenney/GameIcons/locked.png";
 
         private static string[] OutputNames => new[]
         {
@@ -223,7 +228,55 @@ namespace GateRush.Tests
             Assert.AreEqual(4, cards.Length, "the Clock, Rocket, Broom and Lives cards");
             foreach (var card in cards)
             {
-                AssertEveryReferenceAssigned(card, 4);
+                AssertEveryReferenceAssigned(card, 6);
+            }
+        }
+
+        [Test]
+        public void Build_StoreItemCards_LockIsTheLockedSpriteOnTheIconSavedHidden()
+        {
+            var cards = LoadBuilt(FrontEndName).GetComponentsInChildren<StoreItemCard>(true);
+            Assert.AreEqual(4, cards.Length, "the Clock, Rocket, Broom and Lives cards");
+
+            foreach (var card in cards)
+            {
+                using (var serialized = new SerializedObject(card))
+                {
+                    AssertLockOnIcon(serialized, card.name);
+                }
+            }
+        }
+
+        [Test]
+        public void StoreItemCard_ShowLockedThenShow_HidesThenRestoresTheCountAndTheBuyButton()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{FrontEndName}.prefab");
+            try
+            {
+                var card = contents.GetComponentsInChildren<StoreItemCard>(true)[0];
+                var count = StoreTexts.JokerCount(3, config);
+                var unlocksAt = StoreTexts.UnlocksAt(10, config);
+                var price = StoreTexts.GoldPrice(100, config);
+
+                card.ShowLocked(unlocksAt, config);
+                var locked = LookOf(card);
+                card.Show(count, price, true, true, config);
+                var unlocked = LookOf(card);
+
+                Assert.AreEqual(unlocksAt, locked.subText, "a locked card never shows the count held");
+                Assert.IsFalse(locked.isBuyShown, "a locked card has no buy button, so no price and no press");
+                Assert.IsTrue(locked.isLockShown);
+                Assert.AreEqual(config.LockedIconAlpha, locked.iconAlpha, "the icon is dimmed");
+                Assert.AreEqual(count, unlocked.subText, "the count comes back once unlocked");
+                Assert.IsTrue(unlocked.isBuyShown);
+                Assert.IsFalse(unlocked.isLockShown);
+                Assert.AreEqual(1f, unlocked.iconAlpha, "the icon is opaque again");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
             }
         }
 
@@ -487,7 +540,7 @@ namespace GateRush.Tests
             Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
             foreach (var button in buttons)
             {
-                AssertEveryReferenceAssigned(button, 6);
+                AssertEveryReferenceAssigned(button, 8);
                 using (var serialized = new SerializedObject(button))
                 {
                     Assert.That(serialized.FindProperty("selectedRaise").floatValue, Is.GreaterThan(0f), $"{button.name} rises when selected");
@@ -532,6 +585,44 @@ namespace GateRush.Tests
                         JokerButtonPressedSpritePath, AssetDatabase.GetAssetPath(button.spriteState.pressedSprite), $"{view.name}'s pressed look");
                     Assert.AreEqual(
                         JokerButtonDisabledSpritePath, AssetDatabase.GetAssetPath(button.spriteState.disabledSprite), $"{view.name} is grey disabled");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_LockIsTheLockedSpriteOnTheIconSavedHidden()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    AssertLockOnIcon(serialized, view.name);
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_GlowIsSavedHiddenBehindTheRingAndTheButton()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var glow = Reference<Image>(serialized, "glow").transform;
+                    var lift = Reference<RectTransform>(serialized, "lift");
+                    var ring = Reference<GameObject>(serialized, "ring").transform;
+                    var button = Reference<Button>(serialized, "button").transform;
+
+                    Assert.AreEqual(lift, glow.parent, $"{view.name}'s glow rises with the button");
+                    Assert.IsFalse(glow.gameObject.activeSelf, $"{view.name}'s glow is saved hidden");
+                    Assert.That(glow.GetSiblingIndex(), Is.LessThan(ring.GetSiblingIndex()), $"{view.name}'s glow draws behind the ring");
+                    Assert.That(glow.GetSiblingIndex(), Is.LessThan(button.GetSiblingIndex()), $"{view.name}'s glow draws behind the button");
                 }
             }
         }
@@ -781,6 +872,38 @@ namespace GateRush.Tests
             using (var serialized = new SerializedObject(tint))
             {
                 return (UiColorRole)serialized.FindProperty(TintRoleField).intValue;
+            }
+        }
+
+        /// <summary>
+        /// Module 43's lock: the serialized <c>lockIcon</c> is a child of the
+        /// <c>icon</c>, centred on it, drawing locked.png, and saved hidden.
+        /// </summary>
+        private static void AssertLockOnIcon(SerializedObject serialized, string owner)
+        {
+            var icon = Reference<Image>(serialized, "icon");
+            var lockIcon = Reference<GameObject>(serialized, "lockIcon");
+            var lockRect = (RectTransform)lockIcon.transform;
+            var centre = new Vector2(0.5f, 0.5f);
+
+            Assert.AreEqual(icon.transform, lockRect.parent, $"{owner}'s lock sits on its icon");
+            Assert.AreEqual(centre, lockRect.anchorMin, $"{owner}'s lock is centred on the icon");
+            Assert.AreEqual(centre, lockRect.anchorMax, $"{owner}'s lock is centred on the icon");
+            Assert.AreEqual(Vector2.zero, lockRect.anchoredPosition, $"{owner}'s lock is centred on the icon");
+            Assert.AreEqual(LockSpritePath, AssetDatabase.GetAssetPath(lockIcon.GetComponent<Image>().sprite), $"{owner}'s lock");
+            Assert.IsFalse(lockIcon.activeSelf, $"{owner}'s lock is saved hidden");
+        }
+
+        /// <summary>What a Store card shows: the line under the name, whether the buy button and the lock show, and the icon's opacity.</summary>
+        private static (string subText, bool isBuyShown, bool isLockShown, float iconAlpha) LookOf(StoreItemCard card)
+        {
+            using (var serialized = new SerializedObject(card))
+            {
+                return (
+                    Label(serialized, "subLabel").text,
+                    Reference<Button>(serialized, "buyButton").gameObject.activeSelf,
+                    Reference<GameObject>(serialized, "lockIcon").activeSelf,
+                    Reference<Image>(serialized, "icon").color.a);
             }
         }
 

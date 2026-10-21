@@ -24,8 +24,9 @@ namespace GateRush.UI.Editor
     /// Module 39's Leaderboard Row, with the Leaderboard Page now holding the
     /// leaderboard, Module 40's Gold Packs Overlay, Level HUD, Joker Bar and
     /// Level UI, and Module 41's Result Overlay and Confirm Overlay, nested in
-    /// Level UI, with Module 42's square joker buttons — from code, with every
-    /// serialized field wired.
+    /// Level UI, with Module 42's square joker buttons and Module 43's locks
+    /// and glow on the joker buttons and locks on the Store's cards — from
+    /// code, with every serialized field wired.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -108,6 +109,10 @@ namespace GateRush.UI.Editor
         private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
         private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
         private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
+
+        // Module 43: the lock over a locked joker's icon, on its button and
+        // its Store card.
+        private const string LockSpritePath = "Assets/ThirdParty/Kenney/GameIcons/locked.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -244,6 +249,8 @@ namespace GateRush.UI.Editor
         private const string GoldLabelName = "Gold";
         private const string LivesPillName = "Lives Pill";
         private const string LiftName = "Lift";
+        private const string GlowName = "Glow";
+        private const string LockName = "Lock";
         private const string RingName = "Ring";
         private const string ButtonName = "Button";
         private const string BadgeName = "Badge";
@@ -689,6 +696,19 @@ namespace GateRush.UI.Editor
         private const float BadgeCoinSize = 40f;
         private const float BadgeFontSize = 40f;
 
+        // Module 43: a locked joker's lock, centred on its 96-unit icon, and
+        // a marked joker's glow behind the button. With a 12-unit outset a
+        // raised glow's top reaches 70 - 10 + 20 + 12 = 92, inside the row's
+        // 95; the pulse scales only the button, whose raised top at the
+        // UI Config's default 1.06 is 74.2 - 10 + 20 = 84.2. "Lv 15" widens
+        // the badge to about 120 units, within the 140-unit button.
+        private const float JokerLockSize = 56f;
+        private const float JokerGlowOutset = 12f;
+
+        // Module 43: a locked joker's lock on its Store card, centred on the
+        // 140-unit card icon.
+        private const float CardLockSize = 80f;
+
         // Module 41: the result panel. Under the title, the gold row (coin and
         // amount, centred) and the closing message; at the foot, one centred
         // row of Next, the two Restarts (one shows at a time) and Menu, which
@@ -756,6 +776,8 @@ namespace GateRush.UI.Editor
         private const string PriceLabelField = "priceLabel";
         private const string SubLabelField = "subLabel";
         private const string CoinIconField = "coinIcon";
+        private const string LockIconField = "lockIcon";
+        private const string GlowField = "glow";
         private const string ScrollRectField = "scrollRect";
         private const string GoldHeaderField = "goldHeader";
         private const string JokersHeaderField = "jokersHeader";
@@ -1224,8 +1246,9 @@ namespace GateRush.UI.Editor
         /// <summary>
         /// A Store card bought for gold: the icon — tinted by
         /// <paramref name="role"/> when it has one, else drawn in
-        /// <paramref name="iconColorHex"/> — the name, the line under it, and
-        /// the buy button with the coin beside its label.
+        /// <paramref name="iconColorHex"/> — with the lock over it, saved
+        /// hidden (Module 43; the lives card's is never shown), the name, the
+        /// line under it, and the buy button with the coin beside its label.
         /// </summary>
         private static StoreItemCard BuildItemCard(
             RectTransform parent, Sources sources, string name, Sprite icon, string iconColorHex, UiColorRole? role,
@@ -1233,7 +1256,8 @@ namespace GateRush.UI.Editor
         {
             var card = UiBuilder.CreateRect(name, parent);
             AddCardFrame(card, sources);
-            AddCardIcon(card, icon, iconColorHex, role);
+            var iconImage = AddCardIcon(card, icon, iconColorHex, role);
+            var lockIcon = AddLock(iconImage.rectTransform, sources, CardLockSize, OverlayTextColorHex);
 
             var nameRect = UiBuilder.CreateRect(CardNameLabelName, card);
             CardTextBand(nameRect, AnchorMid, AnchorHigh);
@@ -1261,6 +1285,8 @@ namespace GateRush.UI.Editor
             var component = card.gameObject.AddComponent<StoreItemCard>();
             SetReferences(
                 component,
+                (IconField, iconImage),
+                (LockIconField, lockIcon),
                 (SubLabelField, subLabel),
                 (BuyButtonField, Single<Button>(button.gameObject, ButtonPrimaryName)),
                 (PriceLabelField, priceLabel),
@@ -2371,12 +2397,14 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// One joker's slot, <paramref name="x"/> from the row's centre and a
-        /// little low: the lift, raised while selected, holding the ring
-        /// (hidden) behind a Button Primary instance made square on this
+        /// little low: the lift, raised while selected, holding the glow
+        /// (hidden; shown while marked, Module 43) and the ring (hidden)
+        /// behind a Button Primary instance made square on this
         /// instance — the green square face, its flat pressed look and its
         /// grey disabled look — with its own label switched off; on the
         /// button, the joker's icon from the Joker Icons asset centred on the
-        /// face above the depth strip, and the red badge on the bottom-right
+        /// face above the depth strip with the lock (hidden; Module 43)
+        /// centred on it, and the red badge on the bottom-right
         /// corner with the coin (hidden) and the count (Module 42).
         /// </summary>
         private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
@@ -2388,6 +2416,16 @@ namespace GateRush.UI.Editor
 
             var lift = UiBuilder.CreateRect(LiftName, slot);
             UiBuilder.Stretch(lift);
+
+            // First under the lift, so it draws behind the ring and the
+            // button; JokerBarButton sets its colour while it pulses.
+            var glow = UiBuilder.CreateRect(GlowName, lift);
+            UiBuilder.Stretch(glow);
+            glow.offsetMin = new Vector2(-JokerGlowOutset, -JokerGlowOutset);
+            glow.offsetMax = new Vector2(JokerGlowOutset, JokerGlowOutset);
+            var glowImage = AddSliced(glow, sources.Panel, PanelColorHex);
+            glowImage.color = config.MarkedGlowColor;
+            glow.gameObject.SetActive(false);
 
             var ring = UiBuilder.CreateRect(RingName, lift);
             UiBuilder.Stretch(ring);
@@ -2419,6 +2457,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Place(
                 icon, new Vector2(AnchorMid, AnchorMid), new Vector2(0f, JokerFaceDepth / 2f), new Vector2(JokerIconSize, JokerIconSize));
             var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(kind), config.IconColor);
+            var lockIcon = AddLock(icon, sources, JokerLockSize, IconColorHex);
 
             // Pivoted on the button's bottom-right corner, so the fitter widens
             // it leftwards across the face and it never leaves the corner.
@@ -2450,7 +2489,7 @@ namespace GateRush.UI.Editor
             coin.gameObject.SetActive(false);
 
             var label = UiBuilder.CreateRect(BadgeLabelName, badge);
-            var placeholder = new JokerButton(JokerBadge.Count, CountPlaceholder, true, 0);
+            var placeholder = new JokerButton(JokerBadge.Count, CountPlaceholder, true, 0, false);
             var badgeLabel = AddText(label, sources, LevelHudTexts.JokerBadge(placeholder, config), BadgeFontSize, HudTextColorHex);
             badgeLabel.color = config.JokerBadgeTextColor;
 
@@ -2461,6 +2500,8 @@ namespace GateRush.UI.Editor
                 (LiftField, lift),
                 (RingField, ring.gameObject),
                 (IconField, iconImage),
+                (LockIconField, lockIcon),
+                (GlowField, glowImage),
                 (CoinField, coin.gameObject),
                 (BadgeLabelField, badgeLabel));
             SetFloat(view, SelectedRaiseField, JokerRaise);
@@ -2711,7 +2752,7 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>A Store card's icon at its left; tinted by <paramref name="role"/> when it has one.</summary>
-        private static void AddCardIcon(RectTransform card, Sprite sprite, string colorHex, UiColorRole? role)
+        private static Image AddCardIcon(RectTransform card, Sprite sprite, string colorHex, UiColorRole? role)
         {
             var icon = UiBuilder.CreateRect(IconName, card);
             UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(CardIconInset, 0f), new Vector2(CardIconSize, CardIconSize));
@@ -2720,6 +2761,22 @@ namespace GateRush.UI.Editor
             {
                 AddTint(icon.gameObject, image, role.Value);
             }
+
+            return image;
+        }
+
+        /// <summary>
+        /// The lock (Module 43): a <paramref name="size"/> square centred on
+        /// <paramref name="icon"/>, its own child so dimming the icon leaves it
+        /// whole, drawn in <paramref name="colorHex"/> and saved hidden.
+        /// </summary>
+        private static GameObject AddLock(RectTransform icon, Sources sources, float size, string colorHex)
+        {
+            var lockRect = UiBuilder.CreateRect(LockName, icon);
+            UiBuilder.PlaceCentered(lockRect, new Vector2(size, size));
+            UiBuilder.AddIcon(lockRect, sources.Lock, ParseColor(colorHex));
+            lockRect.gameObject.SetActive(false);
+            return lockRect.gameObject;
         }
 
         /// <summary>A Button Primary at a Store card's right, at the card button's size.</summary>
@@ -3237,6 +3294,9 @@ namespace GateRush.UI.Editor
             /// <summary>A joker button's look while it cannot be pressed: the square grey face.</summary>
             public Sprite JokerFaceDisabled { get; private set; }
 
+            /// <summary>The lock over a locked joker's icon (Module 43).</summary>
+            public Sprite Lock { get; private set; }
+
             public JokerIcons JokerIcons { get; private set; }
             public AvatarCatalog AvatarCatalog { get; private set; }
             public GameObject ButtonClose { get; private set; }
@@ -3303,6 +3363,7 @@ namespace GateRush.UI.Editor
                     JokerFace = LoadSlicedSprite(JokerButtonSpritePath),
                     JokerFacePressed = LoadSlicedSprite(JokerButtonPressedSpritePath),
                     JokerFaceDisabled = LoadSlicedSprite(JokerButtonDisabledSpritePath),
+                    Lock = LoadSprite(LockSpritePath),
                     JokerIcons = LoadJokerIcons(),
                     AvatarCatalog = LoadAvatarCatalog(),
                     ButtonClose = LoadHandMade(ButtonCloseName),
