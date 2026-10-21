@@ -2274,3 +2274,121 @@ level's edge. Sending the player to the Store: a life lost to buy gold.
 The streak on the result panel: the owner keeps the panel simple.
 
 ---
+
+## D75 — The campaign is thirty levels, with each new thing spread out
+
+**Decision.** The campaign grows from fifteen levels to thirty. The
+fifteen existing levels are kept and re-ordered, and fifteen new ones are
+placed between them, so that each new mechanic or joker is followed by one
+or two levels that practise it before the next arrives. The order is:
+
+- 1 to 3: the tutorial, the base rules, a harder base level.
+- 4 layered blocks, 5 the Clock (D76), 6 practice, 7 axis-restricted
+  blocks, 8 practice, 9 count-gated blocks, 10 the Rocket, 11 count-gated
+  gates, 12 a mix, 13 time-bonus blocks, 14 practice, 15 the Broom.
+- 16 locks and keys, 17 practice, 18 shutters, 19 practice, 20 a mix,
+  21 generators, 22 practice, 23 elevators, 24 practice, 25 a mix.
+- 26 to 29: harder mixes. 30: the existing final level.
+
+The existing levels keep their content and take positions 1, 2, 4, 6, 7,
+8, 9, 11, 12, 13, 16, 18, 21, 23 and 30. The new levels are designed with
+the solver, which checks that each is solvable and measures it, and are
+delivered in batches of five that the owner plays before they are merged.
+
+**Why.** The mentor's review of the Phase 6 build found the mechanics
+finished and asked for polish, including jokers that unlock with their own
+introductions. In fifteen levels, levels 10 to 14 each introduced a new
+mechanic in a row, with no level to practise any of them. Thirty levels
+leave room for that, and for the three joker levels, without a new
+mechanic.
+
+**Consequences.**
+- The mechanic introduction cards (Module 19) follow the new order by
+  themselves: a card shows on the first level a mechanic appears in.
+- A campaign win still pays 50 gold, so the whole campaign pays 1,500. The
+  store prices (D62) stay; the demo leaderboard's scores (D73) are spread
+  again so that a player who finishes the campaign climbs most of the
+  table and still does not reach the top.
+- The campaign position in the save is a position in the level order
+  (D58). A save made before the re-order points at the level now in that
+  position, and completed marks follow the level files. The build is not
+  released, so saves made before the change are reset by hand, and the
+  next build's notes say so; the save format does not change.
+
+**Rejected.** Keeping fifteen levels and moving the jokers into them: the
+last five levels would stay one new mechanic each. New levels only at the
+end: the dense stretch would stay. A save migration for the re-order: no
+released save needs one.
+
+---
+
+## D76 — Each joker unlocks at a campaign level and is introduced there
+
+**Decision.** In the campaign, the Clock unlocks at level 5, the Rocket at
+level 10 and the Broom at level 15; the levels are configuration. A joker
+is unlocked once the campaign position has reached its level, so it stays
+unlocked after that level and for a finished campaign. A new player starts
+with no jokers, and reaching a joker's level gives one of it. On that level
+a "New Joker" card in the introduction card's theme shows the joker's
+icon, name and one sentence on what it does; after it closes, the joker's
+button is marked until the joker is first used. Each of the three levels
+is designed so the joker helps.
+
+A locked joker's button shows a lock and the level it opens at ("Lv 10")
+and cannot be pressed. The Store shows a locked joker locked and does not
+sell it. A streak reward (D61) for a locked joker is added to the
+inventory as usual and appears when the joker unlocks. Free play is
+unchanged: every joker is available there, three of each (D66).
+
+**Why.** The mentor asked for jokers that open at set levels with their
+own introductions, as the genre does. Meeting all three at level 1, before
+the board's rules are clear, teaches none of them; one at a time, each
+with a level built for it, teaches each. Giving one on unlock lets the
+introduction say "try it" with something to try.
+
+**Consequences.**
+- `Meta` decides whether a joker is unlocked from the campaign position
+  and the configured levels, and gives the joker when the position
+  reaches its level; the save format does not change for unlocking.
+- The starting jokers of D61 become 0 of each, by configuration.
+- The joker bar and the Store draw a locked state; the leave confirmation
+  and the in-level gold loop (D74) never offer a locked joker.
+
+**Rejected.** Jokers open from the start: the mentor's point. Unlocking
+by streak or gold: harder to explain than a level. Separate tutorial
+levels outside the campaign: the unlock level is the tutorial. Hiding a
+streak reward until unlock by not giving it: the reward would be lost.
+
+---
+
+## D77 — The interface art is redrawn with an image generator
+
+**Decision.** Phase 7 replaces the interface's Kenney look with a richer,
+glossy style in the spirit of the Turkish puzzle studios the portfolio is
+aimed at. The art is generated with an image generator (ChatGPT) from a
+written style guide: palette, button and panel shapes, outline, light
+direction and the list of sprites needed. The owner generates the
+images; they are cleaned, trimmed, given their 9-slice borders and sized
+before they enter the project, under `Assets/Art/`. The prompts never use
+another game's screenshots, names or characters. README credits the art
+as AI-assisted. Kenney's avatars and any sprite not redrawn stay as they
+are (D69).
+
+**Why.** The mentor pointed out that the interface can reach the genre's
+level with generated art. The owner has no artist; CC0 packs look flat
+next to the studios' games. A style guide keeps the generated pieces
+consistent with each other.
+
+**Consequences.**
+- D69's rule of CC0 art and open fonts gains this exception; the fonts
+  stay.
+- The prefabs and the builder take the new sprites; colours and sizes
+  stay in `UiConfig` and the builder's constants, so no rule changes.
+- The larger joker bar found on the Samsung M33 build is done with the
+  new art.
+
+**Rejected.** Imitating a named game's screens: a clone in a portfolio and
+a copyright risk. Commissioned art: no budget. Keeping Kenney: the
+mentor's point.
+
+---

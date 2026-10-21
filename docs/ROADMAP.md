@@ -332,9 +332,10 @@ Each spec is written when the module before it is merged.
 
 ## Phase 7 — Polish
 
-Audio, haptics, notifications, screen transitions, privacy text, the
-end-of-content screen after the final authored level (a first version, "All
-Levels Played", came with 2.7).
+The mentor's review of the Phase 6 web build found the mechanics finished
+and asked for polish: richer interface art, effects, jokers that unlock
+with introductions, and balanced sound. With the remaining polish below,
+the end of this phase is the game's first full version.
 
 *7.1 — Sound and haptics* came forward and was built before Phase 4 (Module
 25, D52): sound effects tied to the presentation stages, a sound toggle on
@@ -350,7 +351,22 @@ space around them. Make them about 1.4 times larger, badge included, with
 more room between them, and raise the bar a little off the bottom edge so
 phones with a gesture bar or rounded corners do not crowd it. Builder
 constants and the bottom band's height only; no rule changes. The space
-above and below a short board stays: taller boards fill it.
+above and below a short board stays: taller boards fill it. Done with the
+new art (7.5, D77).
+
+The new levels of 7.4 are designed with the solver in batches of five and
+can be built alongside the other modules. Each spec is written when the
+module before it is merged.
+
+| # | Module | Spec | Status |
+|---|---|---|---|
+| 7.1 | Sound and haptics (D52) | `Modules/25-sound-and-haptics.md` | Done |
+| 7.2 | Sound balance: a volume per cue, missing and loud cues fixed | `Modules/43-sound-balance.md` | Planned |
+| 7.3 | Joker unlocks: the Clock, Rocket and Broom open at levels 5, 10 and 15 with a New Joker card; locked buttons and Store cards (D76) | `Modules/44-joker-unlocks.md` | Planned |
+| 7.4 | A campaign of thirty levels: the existing fifteen re-ordered and fifteen new ones (D75) | `Modules/45-campaign-thirty.md` | Planned |
+| 7.5 | Interface art: a style guide and generated sprites, the larger joker bar (D77) | `Modules/46-interface-art.md` | Planned |
+| 7.6 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes | `Modules/47-effects.md` | Planned |
+| 7.7 | The rest: privacy text, the end-of-content screen, optimisation on a phone | to be decided | Planned |
 
 ---
 
