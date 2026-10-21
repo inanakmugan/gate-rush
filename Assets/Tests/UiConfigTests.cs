@@ -124,6 +124,9 @@ namespace GateRush.Tests
         [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format")]
         [TestCase("loseLifeLabel", "Lose Life Label")]
         [TestCase("keepPlayingLabel", "Keep Playing Label")]
+        [TestCase("jokerLockedBadgeFormat", "Joker Locked Badge Format")]
+        [TestCase("unlocksAtFormat", "Unlocks At Format")]
+        [TestCase("lockedPrizeFormat", "Locked Prize Format")]
         public void Problems_EmptyText_IsReportedByName(string field, string shownName)
         {
             SetString(field, "  ");
@@ -167,6 +170,9 @@ namespace GateRush.Tests
         [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format", "{1}")]
         [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
         [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format", "You will lose a life and your {1}-win streak.")]
+        [TestCase("jokerLockedBadgeFormat", "Joker Locked Badge Format", "Lv {1}")]
+        [TestCase("unlocksAtFormat", "Unlocks At Format", "Unlocks at Level {1}")]
+        [TestCase("lockedPrizeFormat", "Locked Prize Format", "+{0} {1}, opens at Level {3}")]
         public void Problems_UnusableFormat_IsReportedByName(string field, string shownName, string format)
         {
             SetString(field, format);
@@ -196,6 +202,7 @@ namespace GateRush.Tests
         [TestCase("timeBonusColor", "Time Bonus Color")]
         [TestCase("jokerBadgeTextColor", "Joker Badge Text Color")]
         [TestCase("shortPriceColor", "Short Price Color")]
+        [TestCase("markedGlowColor", "Marked Glow Color")]
         public void Problems_TransparentColor_IsReportedByName(string field, string shownName)
         {
             SetColor(field, new Color(1f, 1f, 1f, 0f));
@@ -247,6 +254,31 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains(expected), string.Join(" | ", problems));
+        }
+
+        [TestCase("lockedIconAlpha", 0f, "Locked Icon Alpha must be above 0 and at most 1")]
+        [TestCase("lockedIconAlpha", 1.1f, "Locked Icon Alpha must be above 0 and at most 1")]
+        [TestCase("markedPulseSeconds", 0f, "Marked Pulse Seconds must be positive")]
+        [TestCase("markedPulseScale", 0.9f, "Marked Pulse Scale must be at least 1")]
+        [TestCase("markedGlowMinAlpha", -0.1f, "Marked Glow Min Alpha must be from 0 to 1")]
+        [TestCase("markedGlowMinAlpha", 1.1f, "Marked Glow Min Alpha must be from 0 to 1")]
+        public void Problems_UnusableJokerUnlockLook_IsReportedByName(string field, float value, string expected)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(expected), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Defaults_JokerUnlockTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("Lv {0}", config.JokerLockedBadgeFormat);
+            Assert.AreEqual("Unlocks at Level {0}", config.UnlocksAtFormat);
+            Assert.AreEqual("+{0} {1}, opens at Level {2}", config.LockedPrizeFormat);
         }
 
         [Test]

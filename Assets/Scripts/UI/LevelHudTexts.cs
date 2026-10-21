@@ -72,16 +72,32 @@ namespace GateRush.UI
 
         /// <summary>
         /// A joker button's badge: the count through
-        /// <see cref="UiConfig.JokerCountBadgeFormat"/>, or the price through
-        /// <see cref="UiConfig.JokerPriceBadgeFormat"/>, as
-        /// <paramref name="button"/>'s badge says.
+        /// <see cref="UiConfig.JokerCountBadgeFormat"/>, the price through
+        /// <see cref="UiConfig.JokerPriceBadgeFormat"/>, or a locked joker's
+        /// unlock level through <see cref="UiConfig.JokerLockedBadgeFormat"/>
+        /// ("Lv 10"), as <paramref name="button"/>'s badge says.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="config"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The badge is not a declared kind of badge.</exception>
         public static string JokerBadge(JokerButton button, UiConfig config)
         {
             Require(config);
-            var format = button.Badge == Runtime.JokerBadge.Price ? config.JokerPriceBadgeFormat : config.JokerCountBadgeFormat;
-            return string.Format(CultureInfo.InvariantCulture, format, button.Amount);
+            return string.Format(CultureInfo.InvariantCulture, BadgeFormat(button.Badge, config), button.Amount);
+        }
+
+        private static string BadgeFormat(Runtime.JokerBadge badge, UiConfig config)
+        {
+            switch (badge)
+            {
+                case Runtime.JokerBadge.Count:
+                    return config.JokerCountBadgeFormat;
+                case Runtime.JokerBadge.Price:
+                    return config.JokerPriceBadgeFormat;
+                case Runtime.JokerBadge.Locked:
+                    return config.JokerLockedBadgeFormat;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(badge), badge, "Not a joker badge.");
+            }
         }
 
         /// <summary>

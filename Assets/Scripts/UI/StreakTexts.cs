@@ -140,6 +140,18 @@ namespace GateRush.UI
             return Format(config.PrizeFormat, prize.Count, config.JokerName(prize.Joker));
         }
 
+        /// <summary>
+        /// A line of the Streak Reward overlay for a joker still locked (D76),
+        /// with the level it opens at: "+1 Rocket, opens at Level 10" by
+        /// default.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="config"/> is null.</exception>
+        public static string LockedPrize(JokerPrize prize, int unlockLevel, UiConfig config)
+        {
+            Require(config);
+            return Format(config.LockedPrizeFormat, prize.Count, config.JokerName(prize.Joker), unlockLevel);
+        }
+
         private static string Format(string format, params object[] arguments) =>
             string.Format(CultureInfo.InvariantCulture, format, arguments);
 

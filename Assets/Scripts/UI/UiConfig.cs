@@ -286,6 +286,33 @@ namespace GateRush.UI
         [Tooltip("Seconds the timer's pulse takes, up and back.")]
         [SerializeField] private float timerPulseSeconds = 0.25f;
 
+        [Header("Joker unlocks (Module 43; formats use the invariant culture)")]
+        [Tooltip("A locked joker button's badge in the campaign, in place of the count or price; {0} is the level it unlocks at.")]
+        [SerializeField] private string jokerLockedBadgeFormat = "Lv {0}";
+
+        [Tooltip("A locked joker's Store card, in place of the count and the price; {0} is the level it unlocks at.")]
+        [SerializeField] private string unlocksAtFormat = "Unlocks at Level {0}";
+
+        [Tooltip("A Streak Reward line for a joker still locked; {0} is the count, {1} the joker's name and {2} the level it unlocks at.")]
+        [SerializeField] private string lockedPrizeFormat = "+{0} {1}, opens at Level {2}";
+
+        [Tooltip("The opacity a locked joker's icon is drawn at, on its button and on its Store card: above 0, at most 1.")]
+        [SerializeField] private float lockedIconAlpha = 0.4f;
+
+        [Tooltip("Seconds one pulse of a marked joker button takes, from rest to its largest; it then eases back. Unscaled time. Positive.")]
+        [SerializeField] private float markedPulseSeconds = 0.9f;
+
+        [Tooltip("The scale a marked joker button pulses to: at least 1.")]
+        [SerializeField] private float markedPulseScale = 1.06f;
+
+        [SerializeField] private Ease markedPulseEase = Ease.InOutSine;
+
+        [Tooltip("The glow behind a marked joker button at the height of its pulse.")]
+        [SerializeField] private Color markedGlowColor = new Color(1f, 0.85f, 0.3f);
+
+        [Tooltip("The glow's opacity at rest, as a fraction of Marked Glow Color's: from 0 to 1.")]
+        [SerializeField] private float markedGlowMinAlpha = 0.25f;
+
         [Header("Joker names")]
         [SerializeField] private string clockName = "Clock";
         [SerializeField] private string rocketName = "Rocket";
@@ -590,6 +617,33 @@ namespace GateRush.UI
         /// <summary>Seconds the timer's pulse takes, up and back.</summary>
         public float TimerPulseSeconds => timerPulseSeconds;
 
+        /// <summary>A locked joker button's badge; {0} is the unlock level (Module 43).</summary>
+        public string JokerLockedBadgeFormat => jokerLockedBadgeFormat;
+
+        /// <summary>A locked joker's Store card line; {0} is the unlock level.</summary>
+        public string UnlocksAtFormat => unlocksAtFormat;
+
+        /// <summary>A Streak Reward line for a locked joker; {0} the count, {1} the name, {2} the unlock level.</summary>
+        public string LockedPrizeFormat => lockedPrizeFormat;
+
+        /// <summary>The opacity a locked joker's icon is drawn at, above 0 and at most 1.</summary>
+        public float LockedIconAlpha => lockedIconAlpha;
+
+        /// <summary>Seconds a marked joker button takes to grow to its largest; it eases back as long.</summary>
+        public float MarkedPulseSeconds => markedPulseSeconds;
+
+        /// <summary>The scale a marked joker button pulses to.</summary>
+        public float MarkedPulseScale => markedPulseScale;
+
+        /// <summary>The easing of a marked joker button's pulse.</summary>
+        public Ease MarkedPulseEase => markedPulseEase;
+
+        /// <summary>The glow behind a marked joker button at the height of its pulse.</summary>
+        public Color MarkedGlowColor => markedGlowColor;
+
+        /// <summary>The glow's opacity at rest, as a fraction of <see cref="MarkedGlowColor"/>'s.</summary>
+        public float MarkedGlowMinAlpha => markedGlowMinAlpha;
+
         /// <summary>The ring around the selected joker's button.</summary>
         public Color JokerSelectedColor => jokerSelectedColor;
 
@@ -823,6 +877,12 @@ namespace GateRush.UI
             AddIfBlank(problems, loseLifeLabel, "Lose Life Label");
             AddIfBlank(problems, keepPlayingLabel, "Keep Playing Label");
             AddOverlayPopProblems(problems);
+            AddIfUnusableFormat(problems, jokerLockedBadgeFormat, 1, "Joker Locked Badge Format", "{0} for the unlock level");
+            AddIfUnusableFormat(problems, unlocksAtFormat, 1, "Unlocks At Format", "{0} for the unlock level");
+            AddIfUnusableFormat(
+                problems, lockedPrizeFormat, 3, "Locked Prize Format",
+                "{0} for the count, {1} for the joker's name and {2} for the unlock level");
+            AddJokerUnlockLookProblems(problems);
             AddIfBlank(problems, clockName, "Clock Name");
             AddIfBlank(problems, rocketName, "Rocket Name");
             AddIfBlank(problems, broomName, "Broom Name");
@@ -895,6 +955,37 @@ namespace GateRush.UI
             if (!(overlayPopStartScale > 0f) || float.IsInfinity(overlayPopStartScale))
             {
                 problems.Add($"{name}: Overlay Pop Start Scale must be positive and finite.");
+            }
+        }
+
+        /// <summary>
+        /// The locked and marked joker looks (Module 43): the locked icon's
+        /// opacity above 0 and at most 1, the pulse's time positive and its
+        /// scale at least 1, both finite, the glow showing, and its resting
+        /// opacity from 0 to 1.
+        /// </summary>
+        private void AddJokerUnlockLookProblems(List<string> problems)
+        {
+            if (!(lockedIconAlpha > 0f && lockedIconAlpha <= 1f))
+            {
+                problems.Add($"{name}: Locked Icon Alpha must be above 0 and at most 1.");
+            }
+
+            if (!(markedPulseSeconds > 0f) || float.IsInfinity(markedPulseSeconds))
+            {
+                problems.Add($"{name}: Marked Pulse Seconds must be positive and finite.");
+            }
+
+            if (!(markedPulseScale >= 1f) || float.IsInfinity(markedPulseScale))
+            {
+                problems.Add($"{name}: Marked Pulse Scale must be at least 1 and finite.");
+            }
+
+            AddIfTransparent(problems, markedGlowColor, "Marked Glow Color");
+
+            if (!(markedGlowMinAlpha >= 0f && markedGlowMinAlpha <= 1f))
+            {
+                problems.Add($"{name}: Marked Glow Min Alpha must be from 0 to 1.");
             }
         }
 

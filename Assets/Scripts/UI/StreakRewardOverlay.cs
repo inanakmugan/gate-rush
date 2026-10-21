@@ -42,10 +42,12 @@ namespace GateRush.UI
         /// <summary>
         /// Shows <paramref name="rewards"/>, merged by joker kind, under a
         /// headline with <paramref name="latestStreak"/>; the icons from
-        /// <paramref name="icons"/>.
+        /// <paramref name="icons"/>. A joker <paramref name="state"/> says is
+        /// still locked has its line say the level it opens at (D76): it is in
+        /// the inventory already and appears when it unlocks.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="rewards"/> is null.</exception>
-        public void Show(int latestStreak, IReadOnlyList<StreakReward> rewards, UiConfig config, JokerIcons icons)
+        public void Show(int latestStreak, IReadOnlyList<StreakReward> rewards, FrontEndState state, UiConfig config, JokerIcons icons)
         {
             var merged = StreakPrizes.Merge(rewards);
             headlineLabel.text = StreakTexts.RewardHeadline(latestStreak, config);
@@ -56,7 +58,11 @@ namespace GateRush.UI
 
             for (var i = 0; i < shownPrizes.Count; i++)
             {
-                shownPrizes[i].Show(icons.IconOf(merged[i].Joker), StreakTexts.Prize(merged[i], config));
+                var joker = merged[i].Joker;
+                var line = state.IsJokerUnlocked(joker)
+                    ? StreakTexts.Prize(merged[i], config)
+                    : StreakTexts.LockedPrize(merged[i], state.JokerUnlockLevel(joker), config);
+                shownPrizes[i].Show(icons.IconOf(joker), line);
             }
         }
 

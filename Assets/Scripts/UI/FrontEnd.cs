@@ -97,6 +97,12 @@ namespace GateRush.UI
         // The open test purchase sheet's answer; null when none is waiting.
         private Action<bool> pendingAnswer;
 
+        // The state last given to Show or Refresh, which the Streak Reward
+        // overlay reads for the jokers still locked (D76); a default state
+        // holds no lists, so it is never read before hasShownState.
+        private FrontEndState shownState;
+        private bool hasShownState;
+
         /// <inheritdoc />
         public event Action PlayRequested;
 
@@ -283,6 +289,8 @@ namespace GateRush.UI
         /// <inheritdoc />
         public void Refresh(FrontEndState state)
         {
+            shownState = state;
+            hasShownState = true;
             topBar.Show(state, config, avatarCatalog);
             home.Show(state, config);
             store.Show(state, config);
@@ -359,7 +367,14 @@ namespace GateRush.UI
             }
 
             RequireOpen(nameof(ShowStreakReward));
-            streakReward.Show(latestStreak, rewards, config, jokerIcons);
+            if (!hasShownState)
+            {
+                throw new InvalidOperationException(
+                    $"{name}: FrontEnd.{nameof(ShowStreakReward)} was called before {nameof(Show)} or {nameof(Refresh)} gave it a " +
+                    $"{nameof(FrontEndState)}; the overlay needs it to tell which jokers are still locked. Call Show first.");
+            }
+
+            streakReward.Show(latestStreak, rewards, shownState, config, jokerIcons);
             navigation.Open(UiOverlay.StreakReward);
         }
 

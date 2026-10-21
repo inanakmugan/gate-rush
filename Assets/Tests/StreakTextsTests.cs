@@ -14,7 +14,8 @@ namespace GateRush.Tests
     /// win" with one left, empty for an empty table and naming a reward's
     /// count above 1; the streak's count; the current and best streaks; the
     /// ladder's wins, rewards and states; the markers' counts; the Streak
-    /// Reward headline and prize lines; and every text from the config.
+    /// Reward headline and prize lines, a locked joker's with the level it
+    /// opens at (Module 43); and every text from the config.
     /// </summary>
     public class StreakTextsTests
     {
@@ -164,6 +165,31 @@ namespace GateRush.Tests
         public void Prize_NullConfig_Throws()
         {
             Assert.Throws<ArgumentNullException>(() => StreakTexts.Prize(new JokerPrize(JokerKind.Clock, 1), null));
+        }
+
+        [Test]
+        public void LockedPrize_DefaultFormat_ReadsTheLevelItOpensAt()
+        {
+            var text = StreakTexts.LockedPrize(new JokerPrize(JokerKind.Rocket, 1), 10, config);
+
+            Assert.AreEqual("+1 Rocket, opens at Level 10", text);
+        }
+
+        [Test]
+        public void LockedPrize_OwnFormatAndName_AreUsed()
+        {
+            SetString("lockedPrizeFormat", "{1} x{0} (Lv {2})");
+            SetString("broomName", "Sweeper");
+
+            var text = StreakTexts.LockedPrize(new JokerPrize(JokerKind.Broom, 2), 15, config);
+
+            Assert.AreEqual("Sweeper x2 (Lv 15)", text);
+        }
+
+        [Test]
+        public void LockedPrize_NullConfig_Throws()
+        {
+            Assert.Throws<ArgumentNullException>(() => StreakTexts.LockedPrize(new JokerPrize(JokerKind.Clock, 1), 5, null));
         }
 
         /// <summary>The reward table of D61: 1 Clock at 3 wins, 1 Rocket at 5, 1 Broom at 10.</summary>
