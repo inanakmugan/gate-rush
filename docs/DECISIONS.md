@@ -2098,6 +2098,10 @@ were checked.
 
 **Consequences.**
 - Art can be replaced later on the prefabs without code changes.
+- One exception to CC0 (Module 42): the joker icons and the settings cog
+  come from game-icons.net under CC BY 3.0 (Clock, Rocket and cog by
+  Lorc, Broom by Delapouite), because no CC0 pack had a clear rocket or
+  broom. README credits them, and the licence sits beside the files.
 - Only the sprites the screens use are imported, at the packs' larger
   size, so they stay sharp on phones.
 - Fredoka is imported as a TextMeshPro font asset. It lacks Ğ, ğ, İ, Ş

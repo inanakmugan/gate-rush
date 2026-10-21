@@ -147,6 +147,8 @@ are all tested headless.
 
 - Interface art: [Kenney](https://kenney.nl) — UI Pack, Game Icons, Board
   Game Icons and Animal Pack Redux, all CC0.
+- Joker and settings icons: [game-icons.net](https://game-icons.net) —
+  Hourglass, Rocket and Cog by Lorc, Magic broom by Delapouite, CC BY 3.0.
 - Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka), with
   [Nunito](https://fonts.google.com/specimen/Nunito) ExtraBold as the
   fallback for Turkish letters, both SIL Open Font License 1.1.
