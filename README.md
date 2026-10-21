@@ -139,7 +139,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,544 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,553 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
@@ -152,6 +152,8 @@ are all tested headless.
 - Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka), with
   [Nunito](https://fonts.google.com/specimen/Nunito) ExtraBold as the
   fallback for Turkish letters, both SIL Open Font License 1.1.
+- The coin sprites and the avatar frame under `Assets/Art/Sprites/UI` are
+  drawn for this project.
 
 The licences are kept beside the files under `Assets/ThirdParty/`.
 

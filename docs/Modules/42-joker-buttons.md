@@ -76,3 +76,37 @@ joker buttons do (D65 to D67, D74), the HUD's other parts.
 - The Store and the Win Streak screens show the new icons.
 - The Top Bar shows the cog, centred on its button; every round button's
   icon sits in the middle of its face.
+
+---
+
+## Resolved during implementation
+
+- **Icons.** `JokerIcons.asset` holds the hourglass, rocket and magic
+  broom, so the joker bar, the Store and the streak screens changed
+  together; the owner reassigned them by hand. The cog replaces the gear
+  on the Top Bar's settings button.
+- **The joker button.** Square, green, grey when it cannot be pressed,
+  with the icon centred above the depth strip. The corner badge's colour
+  is a new `UiTint` role, JokerBadge, from `UiConfig`; a short price
+  keeps its own colour.
+- **Round buttons.** On the hand-made Button Round the root stays at 0
+  and the Icon child sits at Pos Y 3, centring every round button's icon
+  on its face. The Top Bar's plus icons also sit at Pos X -1, because the
+  Kenney plus is drawn off-centre in its file.
+- **Lives.** The Top Bar's heart is 96 by 96 and the count inside it is
+  size 38 with a bottom margin of 6.
+- **Coins, added in play.** The Kenney coin stand-ins read as empty
+  outlines at small sizes. `Assets/Art/Sprites/UI/coin.png` (a filled
+  coin with a star) and `coins.png` (two piles) are the project's own,
+  drawn in grey and tinted by the Coin role, imported with Max Size 512;
+  the builder reads them for every built prefab.
+- **The player's name, added in play.** `TopBar` gains `nameLabel`, filled
+  from the front end state and reported by `AddMissing` when unset. On
+  the hand-made Top Bar the avatar sits inside a 110 by 110 Avatar Frame
+  (`avatar_frame.png`, the project's own, in the greys of
+  `button_square_flat`, tinted like the pills), inset by 8. The name sits
+  on a 130 by 34 Name Tag, a sliced `button_square_flat` in the pills'
+  colour, centred on the frame's bottom edge; Fredoka, auto size 16 to
+  24, no wrapping, an ellipsis. The frame and the tag ignore raycasts, so
+  the avatar still opens Profile.
+- **Tests.** 9 new; 2,553 in all.

@@ -302,7 +302,10 @@ level's HUD and joker bar are prefabs behind `ILevelUi`, and gold is
 bought inside a level with the countdown stopped (Module 40, D74). 6.7 is
 done: the result panel and the confirmation, which names a streak about to
 be lost, are Level UI overlays, and the introduction card takes the theme
-(Module 41).
+(Module 41). 6.8 is done: square joker buttons with corner badges,
+game-icons.net joker and settings icons, centred round button icons, the
+project's own coin sprites, and the player's name under a framed avatar
+in the top bar (Module 42).
 
 Home, bottom tabs (Store / Home / Leaderboard), overlay screens (Profile,
 Settings, Win Streak) with a navigation stack, life and gold displays,
@@ -311,7 +314,7 @@ insufficient-funds prompt routing to the store, quit-confirmation prompt.
 Meta is already tested by this point, so this phase is presentation only.
 
 Screens are uGUI prefabs in a `GateRush.UI` assembly, laid out after the
-reference game with CC0 art and an open font (D68, D69). Seven modules (D68, D74).
+reference game with CC0 art and an open font (D68, D69). Eight modules (D68, D74).
 Each spec is written when the module before it is merged.
 
 | # | Module | Spec | Status |
@@ -323,7 +326,7 @@ Each spec is written when the module before it is merged.
 | 6.5 | Leaderboard behind `ILeaderboardService`, the player ranked among labelled demo players (D70, D73) | `Modules/39-leaderboard.md` | Done |
 | 6.6 | The level's HUD and joker bar as prefabs, and gold bought inside a level (D74) | `Modules/40-level-hud.md` | Done |
 | 6.7 | The result panel, the leave and restart confirmation with the streak, and the introduction card in the new theme (D74) | `Modules/41-level-panels.md` | Done |
-| 6.8 | Visual fixes: square joker buttons with corner badges, clearer joker and settings icons, centred round button icons (D69) | `Modules/42-joker-buttons.md` | Planned |
+| 6.8 | Visual fixes: square joker buttons with corner badges, clearer joker and settings icons, centred round button icons, own coin sprites, the name under a framed avatar (D69) | `Modules/42-joker-buttons.md` | Done |
 
 ---
 
