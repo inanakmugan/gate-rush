@@ -15,19 +15,27 @@
                 {
                     "x": 1,
                     "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1
                 }
             ],
             "colorStack": [
-                "Green"
+                "Purple"
             ],
             "startOrigin": {
                 "x": 0,
-                "y": 5
+                "y": 0
             },
             "axis": "Free",
             "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
+            "lockId": 1,
+            "requiredKeyCount": 2,
             "keyTargetLockId": -1,
             "timeBonusSeconds": 0
         },
@@ -44,10 +52,296 @@
                 }
             ],
             "colorStack": [
+                "Orange",
+                "Blue"
+            ],
+            "startOrigin": {
+                "x": 2,
+                "y": 0
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": 1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 3,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Blue"
+            ],
+            "startOrigin": {
+                "x": 4,
+                "y": 0
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 4,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
+                "Blue"
+            ],
+            "startOrigin": {
+                "x": 2,
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 5,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
+                "Purple"
+            ],
+            "startOrigin": {
+                "x": 4,
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 6,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Orange"
+            ],
+            "startOrigin": {
+                "x": 5,
+                "y": 1
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 7,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Green"
+            ],
+            "startOrigin": {
+                "x": 0,
+                "y": 2
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 8,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
+                "Blue"
+            ],
+            "startOrigin": {
+                "x": 0,
+                "y": 3
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": 1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 9,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                },
+                {
+                    "x": 1,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
                 "Purple"
             ],
             "startOrigin": {
                 "x": 2,
+                "y": 3
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 10,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
+                "Purple"
+            ],
+            "startOrigin": {
+                "x": 4,
+                "y": 3
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 11,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 0,
+                    "y": 1
+                }
+            ],
+            "colorStack": [
+                "Green"
+            ],
+            "startOrigin": {
+                "x": 5,
+                "y": 3
+            },
+            "axis": "Free",
+            "unfreezeAtClearCount": -1,
+            "lockId": -1,
+            "requiredKeyCount": 0,
+            "keyTargetLockId": -1,
+            "timeBonusSeconds": 0
+        },
+        {
+            "id": 12,
+            "cells": [
+                {
+                    "x": 0,
+                    "y": 0
+                },
+                {
+                    "x": 1,
+                    "y": 0
+                },
+                {
+                    "x": 2,
+                    "y": 0
+                }
+            ],
+            "colorStack": [
+                "Orange",
+                "Green"
+            ],
+            "startOrigin": {
+                "x": 0,
                 "y": 5
             },
             "axis": "Free",
@@ -58,7 +352,7 @@
             "timeBonusSeconds": 0
         },
         {
-            "id": 3,
+            "id": 13,
             "cells": [
                 {
                     "x": 0,
@@ -82,301 +376,13 @@
             "requiredKeyCount": 0,
             "keyTargetLockId": -1,
             "timeBonusSeconds": 0
-        },
-        {
-            "id": 4,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 1,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Cyan"
-            ],
-            "startOrigin": {
-                "x": 0,
-                "y": 3
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 5,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Cyan"
-            ],
-            "startOrigin": {
-                "x": 2,
-                "y": 3
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 6,
-            "cells": [
-                {
-                    "x": 1,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 1,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Yellow"
-            ],
-            "startOrigin": {
-                "x": 3,
-                "y": 3
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 7,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 0,
-                    "y": 2
-                }
-            ],
-            "colorStack": [
-                "Green"
-            ],
-            "startOrigin": {
-                "x": 5,
-                "y": 1
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 8,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Yellow"
-            ],
-            "startOrigin": {
-                "x": 0,
-                "y": 1
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 9,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                }
-            ],
-            "colorStack": [
-                "Blue"
-            ],
-            "startOrigin": {
-                "x": 1,
-                "y": 2
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 10,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                }
-            ],
-            "colorStack": [
-                "Purple"
-            ],
-            "startOrigin": {
-                "x": 3,
-                "y": 2
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 11,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Yellow"
-            ],
-            "startOrigin": {
-                "x": 1,
-                "y": 0
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 12,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Blue"
-            ],
-            "startOrigin": {
-                "x": 2,
-                "y": 0
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
-        },
-        {
-            "id": 13,
-            "cells": [
-                {
-                    "x": 0,
-                    "y": 0
-                },
-                {
-                    "x": 1,
-                    "y": 0
-                },
-                {
-                    "x": 0,
-                    "y": 1
-                },
-                {
-                    "x": 1,
-                    "y": 1
-                }
-            ],
-            "colorStack": [
-                "Purple"
-            ],
-            "startOrigin": {
-                "x": 3,
-                "y": 0
-            },
-            "axis": "Free",
-            "unfreezeAtClearCount": -1,
-            "lockId": -1,
-            "requiredKeyCount": 0,
-            "keyTargetLockId": -1,
-            "timeBonusSeconds": 0
         }
     ],
     "gates": [
         {
             "id": 1,
             "edge": "Bottom",
-            "offset": 1,
+            "offset": 3,
             "width": 2,
             "color": "Blue",
             "openAtClearCount": -1
@@ -384,53 +390,31 @@
         {
             "id": 2,
             "edge": "Left",
-            "offset": 4,
+            "offset": 3,
             "width": 2,
-            "color": "Cyan",
+            "color": "Orange",
             "openAtClearCount": -1
         },
         {
             "id": 3,
-            "edge": "Left",
-            "offset": 1,
-            "width": 3,
-            "color": "Green",
-            "openAtClearCount": -1
-        },
-        {
-            "id": 4,
-            "edge": "Top",
-            "offset": 4,
+            "edge": "Bottom",
+            "offset": 0,
             "width": 2,
             "color": "Purple",
             "openAtClearCount": -1
         },
         {
-            "id": 5,
-            "edge": "Bottom",
-            "offset": 4,
-            "width": 2,
-            "color": "Yellow",
+            "id": 4,
+            "edge": "Right",
+            "offset": 2,
+            "width": 3,
+            "color": "Green",
             "openAtClearCount": -1
         }
     ],
-    "shutters": [
-        {
-            "id": 1,
-            "min": {
-                "x": 0,
-                "y": 3
-            },
-            "max": {
-                "x": 1,
-                "y": 4
-            },
-            "threshold": 4,
-            "requiredColor": ""
-        }
-    ],
+    "shutters": [],
     "generators": [],
     "elevators": [],
-    "suggestedTimeBudgetSeconds": 90,
+    "suggestedTimeBudgetSeconds": 85,
     "goldReward": 50
 }
