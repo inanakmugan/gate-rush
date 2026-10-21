@@ -11,7 +11,8 @@ namespace GateRush.UI
     /// The bar over every tab (Module 35): the avatar, the gold with its "+",
     /// the lives with their status and "+", and the settings gear. Shows the
     /// state it is given and raises an event for each button; the avatar
-    /// shows the chosen one and opens Profile (Module 38).
+    /// shows the chosen one and opens Profile (Module 38), with the player's
+    /// name under it (Module 42).
     /// </summary>
     public sealed class TopBar : MonoBehaviour
     {
@@ -20,6 +21,9 @@ namespace GateRush.UI
 
         [Tooltip("The Avatar image: shows the chosen avatar.")]
         [SerializeField] private Image avatarImage;
+
+        [Tooltip("The player's name under the avatar; cut with an ellipsis within the avatar's column.")]
+        [SerializeField] private TMP_Text nameLabel;
 
         [SerializeField] private TMP_Text goldLabel;
 
@@ -50,10 +54,18 @@ namespace GateRush.UI
         /// <summary>Raised when the avatar is pressed.</summary>
         public event Action ProfileRequested;
 
-        /// <summary>Shows the avatar, the gold and the lives of <paramref name="state"/>; the avatar as <paramref name="catalog"/> shows its id.</summary>
+        /// <summary>
+        /// Shows the avatar, the name, the gold and the lives of
+        /// <paramref name="state"/>; the avatar as <paramref name="catalog"/>
+        /// shows its id. The front end calls this on every refresh, so a new
+        /// name shows at once.
+        /// </summary>
         public void Show(FrontEndState state, UiConfig config, AvatarCatalog catalog)
         {
             avatarImage.sprite = catalog.IconOf(state.AvatarId);
+
+            // Only a default state has no name; the name rule gives every save one.
+            nameLabel.text = state.PlayerName ?? string.Empty;
             goldLabel.text = HomeTexts.Gold(state.Gold, config);
             livesCountLabel.text = HomeTexts.LivesCount(state.Lives, config);
             livesStatusLabel.text = HomeTexts.LivesStatus(state.UntilNextLife, config);
@@ -64,6 +76,7 @@ namespace GateRush.UI
         {
             UiParts.AddIfMissing(missing, avatarButton, nameof(TopBar), nameof(avatarButton));
             UiParts.AddIfMissing(missing, avatarImage, nameof(TopBar), nameof(avatarImage));
+            UiParts.AddIfMissing(missing, nameLabel, nameof(TopBar), nameof(nameLabel));
             UiParts.AddIfMissing(missing, goldLabel, nameof(TopBar), nameof(goldLabel));
             UiParts.AddIfMissing(missing, goldPlusButton, nameof(TopBar), nameof(goldPlusButton));
             UiParts.AddIfMissing(missing, livesCountLabel, nameof(TopBar), nameof(livesCountLabel));

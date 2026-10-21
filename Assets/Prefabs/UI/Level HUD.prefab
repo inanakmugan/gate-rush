@@ -157,7 +157,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d3145c236647ec540adbbbc1d632af1f, type: 3}
+  m_Sprite: {fileID: 21300000, guid: f53c02749f742374daa050dc60c4f179, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -1050,7 +1050,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 8264928398203541310}
-  - {fileID: 6265703884169031762}
+  - {fileID: 5635423066261497566}
   - {fileID: 7094585225078179298}
   - {fileID: 6100409585731206038}
   - {fileID: 8930131761876479650}
@@ -1126,7 +1126,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: GateRush.UI::GateRush.UI.LevelHud
   menuButton: {fileID: 2087214891310824478}
-  restartButton: {fileID: 6265703884169031763}
+  restartButton: {fileID: 2337545364963741182}
   timer: {fileID: 7094585225078179298}
   timerLabel: {fileID: 1458331934471546543}
   timeBonus: {fileID: 6100409585731206038}
@@ -1541,12 +1541,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 79674c3169a6bf7489e1a9f94e17711e, type: 3}
---- !u!224 &6265703884169031762 stripped
-RectTransform:
-  m_CorrespondingSourceObject: {fileID: 1783789491922736783, guid: 79674c3169a6bf7489e1a9f94e17711e, type: 3}
-  m_PrefabInstance: {fileID: 6265703884169031761}
-  m_PrefabAsset: {fileID: 0}
---- !u!114 &6265703884169031763 stripped
+--- !u!114 &2337545364963741182 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8540198611649592751, guid: 79674c3169a6bf7489e1a9f94e17711e, type: 3}
   m_PrefabInstance: {fileID: 6265703884169031761}
@@ -1557,6 +1552,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
+--- !u!224 &5635423066261497566 stripped
+RectTransform:
+  m_CorrespondingSourceObject: {fileID: 1783789491922736783, guid: 79674c3169a6bf7489e1a9f94e17711e, type: 3}
+  m_PrefabInstance: {fileID: 6265703884169031761}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &7670658763788173745
 PrefabInstance:
   m_ObjectHideFlags: 0

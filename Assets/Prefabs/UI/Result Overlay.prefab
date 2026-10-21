@@ -360,12 +360,12 @@ MonoBehaviour:
   goldRow: {fileID: 7214452018052493116}
   goldLabel: {fileID: 2433853457409405118}
   messageLabel: {fileID: 49734944462910513}
-  nextButton: {fileID: 6670566406426287505}
-  nextLabel: {fileID: 7541937926865094032}
+  nextButton: {fileID: 8540178138690822321}
+  nextLabel: {fileID: 4808730171188148400}
   winRestartButton: {fileID: 6185552756096253016}
   winRestartLabel: {fileID: 7057064945609368665}
-  lossRestartButton: {fileID: 8540178138690822321}
-  lossRestartLabel: {fileID: 4808730171188148400}
+  lossRestartButton: {fileID: 5416838339900316090}
+  lossRestartLabel: {fileID: 9157152424998191547}
   menuButton: {fileID: 4527462101477644497}
 --- !u!1 &3157529863937316431
 GameObject:
@@ -396,9 +396,9 @@ RectTransform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 740222390310473501}
-  - {fileID: 216225489583369940}
   - {fileID: 2329379561390174781}
+  - {fileID: 216225489583369940}
+  - {fileID: 2160365935795882806}
   - {fileID: 5805540962622452721}
   m_Father: {fileID: 3833180948219470935}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -520,7 +520,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: d3145c236647ec540adbbbc1d632af1f, type: 3}
+  m_Sprite: {fileID: 21300000, guid: f53c02749f742374daa050dc60c4f179, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -987,15 +987,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5219367963338348831, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_text
-      value: Restart
+      value: Next
       objectReference: {fileID: 0}
     - target: {fileID: 8138155750093085964, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_Name
-      value: Loss Restart
-      objectReference: {fileID: 0}
-    - target: {fileID: 8138155750093085964, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
-      propertyPath: m_IsActive
-      value: 0
+      value: Next
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -1157,7 +1153,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
---- !u!1001 &2361209019068128399
+--- !u!1001 &3997602312415205540
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -1247,26 +1243,30 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5219367963338348831, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_text
-      value: Next
+      value: Restart
       objectReference: {fileID: 0}
     - target: {fileID: 8138155750093085964, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_Name
-      value: Next
+      value: Loss Restart
+      objectReference: {fileID: 0}
+    - target: {fileID: 8138155750093085964, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
---- !u!224 &740222390310473501 stripped
+--- !u!224 &2160365935795882806 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 3062869135034553234, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
-  m_PrefabInstance: {fileID: 2361209019068128399}
+  m_PrefabInstance: {fileID: 3997602312415205540}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &6670566406426287505 stripped
+--- !u!114 &5416838339900316090 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 8959401123252289822, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
-  m_PrefabInstance: {fileID: 2361209019068128399}
+  m_PrefabInstance: {fileID: 3997602312415205540}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1
@@ -1274,10 +1274,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4e29b1a8efbd4b44bb3f3716e73f07ff, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Button
---- !u!114 &7541937926865094032 stripped
+--- !u!114 &9157152424998191547 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5219367963338348831, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
-  m_PrefabInstance: {fileID: 2361209019068128399}
+  m_PrefabInstance: {fileID: 3997602312415205540}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 0}
   m_Enabled: 1

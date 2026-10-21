@@ -190,6 +190,7 @@ namespace GateRush.Tests
         [TestCase("leaderboardHighlightColor", "Leaderboard Highlight Color")]
         [TestCase("leaderboardRowColor", "Leaderboard Row Color")]
         [TestCase("jokerSelectedColor", "Joker Selected Color")]
+        [TestCase("jokerBadgeColor", "Joker Badge Color")]
         [TestCase("timerColor", "Timer Color")]
         [TestCase("timerWarningColor", "Timer Warning Color")]
         [TestCase("timeBonusColor", "Time Bonus Color")]
@@ -211,6 +212,7 @@ namespace GateRush.Tests
         [TestCase(UiColorRole.Heart, "heartColor")]
         [TestCase(UiColorRole.Streak, "streakColor")]
         [TestCase(UiColorRole.JokerSelected, "jokerSelectedColor")]
+        [TestCase(UiColorRole.JokerBadge, "jokerBadgeColor")]
         public void ColorOf_Role_IsItsOwnField(UiColorRole role, string field)
         {
             // A colour no default has, so a role reading another field fails.

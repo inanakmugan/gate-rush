@@ -56,7 +56,7 @@ MonoBehaviour:
   jokerBar: {fileID: 1612446603982320626}
   notEnoughGold: {fileID: 5881564328009542716}
   goldPacks: {fileID: 7853804743526196951}
-  testPurchase: {fileID: 7940508945972803798}
+  testPurchase: {fileID: 3001561526864313809}
   message: {fileID: 1764147527601559620}
   resultOverlay: {fileID: 1690968609366212745}
   confirmOverlay: {fileID: 7051149584161754009}
@@ -92,7 +92,7 @@ RectTransform:
   - {fileID: 3107304868519830262}
   - {fileID: 2162773057882419309}
   - {fileID: 8675628384314004903}
-  - {fileID: 7309607467221873212}
+  - {fileID: 2514446606782281531}
   - {fileID: 4790449109970607114}
   m_Father: {fileID: 969181938491509798}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -1013,12 +1013,12 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2c221877b97352f4986fdb5f8df982b8, type: 3}
---- !u!224 &7309607467221873212 stripped
+--- !u!224 &2514446606782281531 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 6785384175324722287, guid: 2c221877b97352f4986fdb5f8df982b8, type: 3}
   m_PrefabInstance: {fileID: 8993579780724540244}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &7940508945972803798 stripped
+--- !u!114 &3001561526864313809 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6154218812767026821, guid: 2c221877b97352f4986fdb5f8df982b8, type: 3}
   m_PrefabInstance: {fileID: 8993579780724540244}

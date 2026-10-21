@@ -310,6 +310,9 @@ namespace GateRush.UI
         [Tooltip("The ring around the selected Rocket or Broom in a level (D67).")]
         [SerializeField] private Color jokerSelectedColor = new Color(1f, 0.76f, 0.2f);
 
+        [Tooltip("The badge on a joker button's corner in a level, behind its count or price: the UI Pack's red.")]
+        [SerializeField] private Color jokerBadgeColor = new Color(0.93f, 0.15f, 0.28f);
+
         [Header("Colours that change")]
         [Tooltip("A button's label while it can be pressed.")]
         [SerializeField] private Color buttonLabelColor = Color.white;
@@ -344,8 +347,8 @@ namespace GateRush.UI
         [Tooltip("A joker button's badge text: its count, or a price the balance covers.")]
         [SerializeField] private Color jokerBadgeTextColor = Color.white;
 
-        [Tooltip("A joker button's price while the balance is short of it: a press opens Not Enough Gold (D74).")]
-        [SerializeField] private Color shortPriceColor = new Color(1f, 0.45f, 0.45f);
+        [Tooltip("A joker button's price while the balance is short of it: a press opens Not Enough Gold (D74). Pale yellow, readable on the red badge.")]
+        [SerializeField] private Color shortPriceColor = new Color(1f, 0.88f, 0.4f);
 
         /// <summary>Home's play button with a campaign level; {0} is its number.</summary>
         public string PlayLevelFormat => playLevelFormat;
@@ -590,6 +593,9 @@ namespace GateRush.UI
         /// <summary>The ring around the selected joker's button.</summary>
         public Color JokerSelectedColor => jokerSelectedColor;
 
+        /// <summary>The badge on a joker button's corner.</summary>
+        public Color JokerBadgeColor => jokerBadgeColor;
+
         /// <summary>The timer's digits.</summary>
         public Color TimerColor => timerColor;
 
@@ -688,6 +694,8 @@ namespace GateRush.UI
                     return streakColor;
                 case UiColorRole.JokerSelected:
                     return jokerSelectedColor;
+                case UiColorRole.JokerBadge:
+                    return jokerBadgeColor;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(role), role, "Not a colour role.");
             }
@@ -833,6 +841,7 @@ namespace GateRush.UI
             AddIfTransparent(problems, leaderboardHighlightColor, "Leaderboard Highlight Color");
             AddIfTransparent(problems, leaderboardRowColor, "Leaderboard Row Color");
             AddIfTransparent(problems, jokerSelectedColor, "Joker Selected Color");
+            AddIfTransparent(problems, jokerBadgeColor, "Joker Badge Color");
             AddIfTransparent(problems, timerColor, "Timer Color");
             AddIfTransparent(problems, timerWarningColor, "Timer Warning Color");
             AddIfTransparent(problems, timeBonusColor, "Time Bonus Color");

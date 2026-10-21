@@ -26,6 +26,9 @@ namespace GateRush.UI
         Streak,
 
         /// <summary>The ring around the selected joker's button in a level (<see cref="UiConfig.JokerSelectedColor"/>).</summary>
-        JokerSelected
+        JokerSelected,
+
+        /// <summary>The badge on a joker button's corner in a level (<see cref="UiConfig.JokerBadgeColor"/>).</summary>
+        JokerBadge
     }
 }
