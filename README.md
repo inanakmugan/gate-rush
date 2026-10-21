@@ -14,8 +14,9 @@ Unity 6000.3.25f1 (6.3 LTS) · Universal Render Pipeline, 2D Renderer · WebGL a
 Android
 
 **Status:** work in progress. The puzzle core, the solver and the level editor
-are built (Phase 1). The game has 15 hand-made levels that introduce every
-mechanic in turn, a title screen and a level select (Phase 2), and the first
+are built (Phase 1). The game has 30 levels that introduce every mechanic and
+joker in turn (15 hand-made in Phase 2, 15 more designed with the solver
+in Phase 7), a title screen and a level select (Phase 2), and the first
 web build is live on itch.io (Phase 3). The meta game is built (Phase 4):
 gold, lives that come back on a real-time clock, a win streak that pays
 jokers, the store's rules and a campaign, shown in plain text, with every

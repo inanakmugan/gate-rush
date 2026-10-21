@@ -2218,7 +2218,8 @@ lifetime gold score, with the player ranked among them on their own
 lifetime gold (D22). The Leaderboard page says "Demo players. The online
 leaderboard is not connected." in a line that is never hidden while the
 table is simulated. The demo scores spread from 40 to 980, so the
-campaign's 750 gold climbs most of the table but not to the top.
+campaign's 750 gold climbs most of the table but not to the top
+(doubled to 80 to 1,960 for the thirty-level campaign, D75).
 
 **Why.** A table with one row shows almost nothing of the screen: no
 ranking, no scrolling, no highlighted row among others. The Store already
