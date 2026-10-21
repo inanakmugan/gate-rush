@@ -214,3 +214,41 @@ free play never sees a lock, is not.
 - Rocket at 10 and Broom at 15 behave the same.
 - Free play on any level has three of each joker and no card.
 - An existing save past level 15 keeps its jokers, all unlocked.
+
+---
+
+## Resolved during implementation
+
+- **Names.** `MetaRules` answers `JokerUnlockLevel`, `IsJokerUnlocked`
+  and `JokersUnlockingAt`, the one query behind both the gift on a win and
+  the card on a load. `MetaGame` adds `IsJokerUnlocked` and
+  `JokersUnlockedAtCampaignLevel`. `CampaignWin.JokersUnlocked` lists the
+  jokers a win gave, in kind order; the bootstrap asks Meta at each
+  campaign load instead, since the card shows again with no win.
+- **Locked results.** `PurchaseResult.Locked` and `JokerUse.Locked`,
+  checked before anything else, so a joker held from a streak reward
+  stays unusable until it opens. `TrySpendJoker` became a switch over
+  `JokerUse`; the purchase switches log a Locked result as a bug.
+- **Level 1.** A joker with unlock level 1 is open from the start, is
+  never given by a win, and shows its card on level 1 in the campaign.
+- **The mark.** `JokerMarks` in `Runtime`, reaching the bar as
+  `JokerButton.IsMarked`. It is set when the last card closes, cleared by
+  a spend of that joker, and cleared on load, restart, leaving, a loss
+  and a win; a restart therefore ends the pulse.
+- **The pulse.** A Yoyo tween on unscaled time scales the button to 1.06
+  over 0.9 seconds and fades a warm gold glow, 12 units outside the
+  button, from 0.25 to full. The raised, selected and pulsing button stays
+  inside the bottom band.
+- **Locked look.** The bar's lock is 56 units over the icon, the icon at
+  0.4 alpha. Every Store card carries an 80-unit lock, shown only on a
+  locked joker's card, which also hides the count line and the buy button.
+  Kenney's `locked.png` is imported as a single sprite.
+- **The card.** `IntroductionCard.Show` takes the jokers after the
+  mechanics and the Clock bonus. A joker card draws the icon from
+  `JokerIcons`, wired in `RuntimeConfig`, at 360 units in the theme's
+  purple.
+- **Additions.** `FrontEnd` keeps the last state for the Streak Reward
+  overlay and throws `InvalidOperationException` if `ShowStreakReward`
+  comes before any `Show`. The bootstrap warns at start about an unlock
+  level past the campaign's last level.
+- **Tests.** 136 new; 2,689 in all.

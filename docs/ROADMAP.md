@@ -362,7 +362,7 @@ module before it is merged.
 | # | Module | Spec | Status |
 |---|---|---|---|
 | 7.1 | Sound and haptics (D52) | `Modules/25-sound-and-haptics.md` | Done |
-| 7.2 | Joker unlocks: the Clock, Rocket and Broom open at levels 5, 10 and 15 with a New Joker card; locked buttons and Store cards (D76) | `Modules/43-joker-unlocks.md` | Planned |
+| 7.2 | Joker unlocks: the Clock, Rocket and Broom open at levels 5, 10 and 15 with a New Joker card; locked buttons and Store cards (D76) | `Modules/43-joker-unlocks.md` | Done |
 | 7.3 | A campaign of thirty levels: the existing fifteen re-ordered and fifteen new ones (D75) | `Modules/44-campaign-thirty.md` | Planned |
 | 7.4 | Interface art: a style guide and generated sprites, the larger joker bar (D77) | `Modules/45-interface-art.md` | Planned |
 | 7.5 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes | `Modules/46-effects.md` | Planned |
