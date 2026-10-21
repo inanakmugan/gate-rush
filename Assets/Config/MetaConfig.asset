@@ -19,9 +19,12 @@ MonoBehaviour:
   rocketPrice: 200
   broomPrice: 300
   livesRefillPrice: 300
-  startingClocks: 1
-  startingRockets: 1
-  startingBrooms: 1
+  startingClocks: 0
+  startingRockets: 0
+  startingBrooms: 0
+  clockUnlockLevel: 5
+  rocketUnlockLevel: 10
+  broomUnlockLevel: 15
   streakRewards:
   - wins: 3
     joker: 0
@@ -34,3 +37,12 @@ MonoBehaviour:
     count: 1
   clockBonusSeconds: 20
   freePlayJokersPerLevel: 3
+  goldPacks:
+  - productId: gold_small
+    gold: 500
+  - productId: gold_medium
+    gold: 1500
+  - productId: gold_large
+    gold: 4000
+  defaultPlayerName: Player
+  defaultAvatarId: bear

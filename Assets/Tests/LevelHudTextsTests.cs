@@ -13,7 +13,8 @@ namespace GateRush.Tests
     /// level label reads Free Play in free play and the level's number in the
     /// campaign; the timer reads minutes and seconds rounded up as the
     /// countdown is, and warns at the configured second; the time bonus and
-    /// the joker badges read through their formats; the lives' status reads
+    /// the joker badges read through their formats, a locked joker's "Lv 10"
+    /// (Module 43) among them; the lives' status reads
     /// Full or the wait as the top bar does. Every text comes from the UI
     /// Config.
     /// </summary>
@@ -113,11 +114,29 @@ namespace GateRush.Tests
             SetString("jokerCountBadgeFormat", "x{0}");
             SetString("jokerPriceBadgeFormat", "{0}g");
 
-            var count = LevelHudTexts.JokerBadge(JokerButtons.Campaign(3, 70, 0, true), config);
-            var price = LevelHudTexts.JokerBadge(JokerButtons.Campaign(0, 70, 0, true), config);
+            var count = LevelHudTexts.JokerBadge(JokerButtons.Campaign(3, 70, 0, true, false), config);
+            var price = LevelHudTexts.JokerBadge(JokerButtons.Campaign(0, 70, 0, true, false), config);
 
             Assert.AreEqual("x3", count);
             Assert.AreEqual("70g", price);
+        }
+
+        [Test]
+        public void JokerBadge_LockedDefault_ReadsLvAndTheUnlockLevel()
+        {
+            var text = LevelHudTexts.JokerBadge(JokerButtons.Locked(10), config);
+
+            Assert.AreEqual("Lv 10", text);
+        }
+
+        [Test]
+        public void JokerBadge_LockedOwnFormat_IsUsed()
+        {
+            SetString("jokerLockedBadgeFormat", "L{0}");
+
+            var text = LevelHudTexts.JokerBadge(JokerButtons.Locked(15), config);
+
+            Assert.AreEqual("L15", text);
         }
 
         [Test]

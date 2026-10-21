@@ -5,9 +5,10 @@ using GateRush.Meta;
 namespace GateRush.Runtime
 {
     /// <summary>
-    /// Everything the level's interface shows besides the timer (Module 40):
-    /// the level number or free play, the lives and the wait to the next, the
-    /// gold, the three joker buttons and the selected joker, and the gold
+    /// Everything the level's interface shows besides the timer (Modules 40
+    /// and 43): the level number or free play, the lives and the wait to the
+    /// next, the gold, the three joker buttons — locked or marked in the
+    /// campaign — and the selected joker, and the gold
     /// offers of the in-level gold packs. Read once by <see cref="Of"/>, so
     /// the views hold no rule and every number on them comes from here.
     /// </summary>
@@ -102,13 +103,16 @@ namespace GateRush.Runtime
         /// The level's interface at <paramref name="nowUtc"/>, for a level
         /// played as <paramref name="mode"/> with <paramref name="levelNumber"/>:
         /// the lives of <paramref name="meta"/>'s save in the campaign, none in
-        /// free play (D58); its gold; each joker's button from the inventory
-        /// and <paramref name="rules"/>' price in the campaign, from
-        /// <paramref name="freePlay"/>'s allowance in free play; the Clock
-        /// usable only with <paramref name="hasCountdown"/>; and
-        /// <paramref name="selected"/> and <paramref name="goldOffers"/> as
-        /// given. Reading the lives settles them, which needs no save
-        /// (<see cref="MetaGame"/>). Allocates nothing.
+        /// free play (D58); its gold; each joker's button in the campaign
+        /// locked with <paramref name="rules"/>' unlock level while
+        /// <paramref name="meta"/> says it is locked (D76), otherwise from the
+        /// inventory and the price, marked as <paramref name="marks"/> says;
+        /// in free play from <paramref name="freePlay"/>'s allowance, never
+        /// locked or marked; the Clock usable only with
+        /// <paramref name="hasCountdown"/>; and <paramref name="selected"/> and
+        /// <paramref name="goldOffers"/> as given. Reading the lives settles
+        /// them, which needs no save (<see cref="MetaGame"/>). Allocates
+        /// nothing.
         /// </summary>
         /// <param name="isUsable">
         /// Whether a joker could be used now: the level is being played and
@@ -116,7 +120,8 @@ namespace GateRush.Runtime
         /// </param>
         /// <exception cref="ArgumentNullException">
         /// <paramref name="meta"/>, <paramref name="rules"/>,
-        /// <paramref name="freePlay"/> or <paramref name="goldOffers"/> is null.
+        /// <paramref name="freePlay"/>, <paramref name="marks"/> or
+        /// <paramref name="goldOffers"/> is null.
         /// </exception>
         public static LevelUiState Of(
             PlayMode mode,
@@ -125,6 +130,7 @@ namespace GateRush.Runtime
             MetaRules rules,
             DateTime nowUtc,
             FreePlayJokers freePlay,
+            JokerMarks marks,
             bool isUsable,
             bool hasCountdown,
             JokerKind? selected,
@@ -143,6 +149,11 @@ namespace GateRush.Runtime
             if (freePlay == null)
             {
                 throw new ArgumentNullException(nameof(freePlay));
+            }
+
+            if (marks == null)
+            {
+                throw new ArgumentNullException(nameof(marks));
             }
 
             if (goldOffers == null)
@@ -177,9 +188,9 @@ namespace GateRush.Runtime
                 rules.LifeCap,
                 untilNext.HasValue ? MetaText.WholeSeconds(untilNext.Value) : (int?)null,
                 gold,
-                CampaignButton(JokerKind.Clock, meta, rules, gold, isClockUsable),
-                CampaignButton(JokerKind.Rocket, meta, rules, gold, isUsable),
-                CampaignButton(JokerKind.Broom, meta, rules, gold, isUsable),
+                CampaignButton(JokerKind.Clock, meta, rules, marks, gold, isClockUsable),
+                CampaignButton(JokerKind.Rocket, meta, rules, marks, gold, isUsable),
+                CampaignButton(JokerKind.Broom, meta, rules, marks, gold, isUsable),
                 selected,
                 goldOffers);
         }
@@ -219,7 +230,10 @@ namespace GateRush.Runtime
             }
         }
 
-        private static JokerButton CampaignButton(JokerKind kind, MetaGame meta, MetaRules rules, int gold, bool isUsable) =>
-            JokerButtons.Campaign(meta.Save.Jokers.CountOf(kind), rules.JokerPrice(kind), gold, isUsable);
+        private static JokerButton CampaignButton(
+            JokerKind kind, MetaGame meta, MetaRules rules, JokerMarks marks, int gold, bool isUsable) =>
+            meta.IsJokerUnlocked(kind)
+                ? JokerButtons.Campaign(meta.Save.Jokers.CountOf(kind), rules.JokerPrice(kind), gold, isUsable, marks.IsMarked(kind))
+                : JokerButtons.Locked(rules.JokerUnlockLevel(kind));
     }
 }

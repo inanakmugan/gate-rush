@@ -20,7 +20,9 @@ namespace GateRush.Tests
     /// 36's gold packs with an empty or repeated id, or gold below 1, are
     /// reported, and are carried over to the rules. Module 38's default name
     /// the name rule refuses and empty default avatar id are reported, and
-    /// valid ones are carried over.
+    /// valid ones are carried over. Module 43's unlock levels below 1 are
+    /// reported; a fresh config unlocks at 5, 10 and 15 and gives a new player
+    /// no jokers; set levels are carried over.
     /// </summary>
     public class MetaConfigTests
     {
@@ -35,6 +37,9 @@ namespace GateRush.Tests
         private const string GoldPacksLabel = "Gold Packs";
         private const string DefaultPlayerNameField = "defaultPlayerName";
         private const string DefaultAvatarIdField = "defaultAvatarId";
+        private const string ClockUnlockLevelField = "clockUnlockLevel";
+        private const string RocketUnlockLevelField = "rocketUnlockLevel";
+        private const string BroomUnlockLevelField = "broomUnlockLevel";
 
         private MetaConfig config;
 
@@ -113,6 +118,58 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
+        }
+
+        [TestCase(ClockUnlockLevelField, "Clock Unlock Level", 0)]
+        [TestCase(ClockUnlockLevelField, "Clock Unlock Level", -1)]
+        [TestCase(RocketUnlockLevelField, "Rocket Unlock Level", 0)]
+        [TestCase(RocketUnlockLevelField, "Rocket Unlock Level", -1)]
+        [TestCase(BroomUnlockLevelField, "Broom Unlock Level", 0)]
+        [TestCase(BroomUnlockLevelField, "Broom Unlock Level", -1)]
+        public void Problems_UnlockLevelBelowOne_IsReported(string field, string label, int level)
+        {
+            SetInt(field, level);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void ToRules_FreshConfig_UnlocksTheClockAtFiveTheRocketAtTenAndTheBroomAtFifteen()
+        {
+            var rules = config.ToRules();
+
+            Assert.AreEqual(5, rules.JokerUnlockLevel(JokerKind.Clock));
+            Assert.AreEqual(10, rules.JokerUnlockLevel(JokerKind.Rocket));
+            Assert.AreEqual(15, rules.JokerUnlockLevel(JokerKind.Broom));
+        }
+
+        [Test]
+        public void ToRules_FreshConfig_NewPlayerHoldsNoJokers()
+        {
+            var rules = config.ToRules();
+
+            var jokers = JokerInventory.Starting(rules);
+
+            foreach (JokerKind kind in Enum.GetValues(typeof(JokerKind)))
+            {
+                Assert.AreEqual(0, jokers.CountOf(kind), $"{kind} jokers");
+            }
+        }
+
+        [Test]
+        public void ToRules_SetUnlockLevels_CarriesThemOver()
+        {
+            SetInt(ClockUnlockLevelField, 2);
+            SetInt(RocketUnlockLevelField, 7);
+            SetInt(BroomUnlockLevelField, 1);
+
+            var rules = config.ToRules();
+
+            Assert.AreEqual(2, rules.JokerUnlockLevel(JokerKind.Clock));
+            Assert.AreEqual(7, rules.JokerUnlockLevel(JokerKind.Rocket));
+            Assert.AreEqual(1, rules.JokerUnlockLevel(JokerKind.Broom));
         }
 
         [TestCase(4, 2, 1, TestName = "Problems_RewardTableOutOfOrder_IsReported")]

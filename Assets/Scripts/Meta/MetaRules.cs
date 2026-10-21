@@ -8,8 +8,9 @@ namespace GateRush.Meta
     /// lives a player can hold and how long one takes to come back (D59), the
     /// gold and jokers a new player starts with (D59, D61), the store's prices
     /// (D62), the win streak's reward table (D61), the seconds a Clock adds
-    /// (D65), the gold packs sold for real money (Module 36, D72) and the
-    /// name and avatar a new player gets (Module 38, D71). Built by
+    /// (D65), the gold packs sold for real money (Module 36, D72), the
+    /// name and avatar a new player gets (Module 38, D71) and the campaign
+    /// level each joker unlocks at (Module 43, D76). Built by
     /// <c>Runtime</c> from
     /// its configuration asset; this assembly holds no default of its own, so
     /// every default — a new player's, and that of a section an older save
@@ -20,13 +21,14 @@ namespace GateRush.Meta
     {
         private readonly JokerAmounts jokerPrices;
         private readonly JokerAmounts startingJokers;
+        private readonly JokerAmounts jokerUnlockLevels;
 
         /// <summary>Rules with the given values, every one of them checked.</summary>
         /// <exception cref="ArgumentOutOfRangeException">
         /// <paramref name="lifeCap"/> is below 1, <paramref name="lifeRegenInterval"/>
         /// is not positive, <paramref name="startingGold"/>, a joker price,
         /// <paramref name="livesRefillPrice"/> or a starting count is negative,
-        /// or <paramref name="clockBonusSeconds"/> is below 1.
+        /// a joker unlock level is below 1, or <paramref name="clockBonusSeconds"/> is below 1.
         /// </exception>
         /// <exception cref="ArgumentNullException"><paramref name="streakRewards"/> or <paramref name="goldPacks"/> is null.</exception>
         /// <exception cref="ArgumentException">
@@ -42,6 +44,7 @@ namespace GateRush.Meta
             JokerAmounts jokerPrices,
             int livesRefillPrice,
             JokerAmounts startingJokers,
+            JokerAmounts jokerUnlockLevels,
             IReadOnlyList<StreakReward> streakRewards,
             int clockBonusSeconds,
             IReadOnlyList<GoldPack> goldPacks,
@@ -76,6 +79,12 @@ namespace GateRush.Meta
                 {
                     throw new ArgumentOutOfRangeException(
                         nameof(startingJokers), startingJokers.Of(kind), $"The starting count of {kind} may not be negative.");
+                }
+
+                if (jokerUnlockLevels.Of(kind) < 1)
+                {
+                    throw new ArgumentOutOfRangeException(
+                        nameof(jokerUnlockLevels), jokerUnlockLevels.Of(kind), $"The unlock level of {kind} must be at least 1.");
                 }
             }
 
@@ -141,6 +150,7 @@ namespace GateRush.Meta
             this.jokerPrices = jokerPrices;
             LivesRefillPrice = livesRefillPrice;
             this.startingJokers = startingJokers;
+            this.jokerUnlockLevels = jokerUnlockLevels;
             StreakRewards = Array.AsReadOnly(rewards);
             ClockBonusSeconds = clockBonusSeconds;
             GoldPacks = Array.AsReadOnly(packs);
@@ -202,5 +212,44 @@ namespace GateRush.Meta
         /// <summary>How many of <paramref name="kind"/> a new player holds (D61). Never negative.</summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
         public int StartingJokers(JokerKind kind) => startingJokers.Of(kind);
+
+        /// <summary>
+        /// The campaign level <paramref name="kind"/> unlocks at (D76),
+        /// counted from 1 as the player counts levels. At least 1; a level of
+        /// 1 means unlocked from the start.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public int JokerUnlockLevel(JokerKind kind) => jokerUnlockLevels.Of(kind);
+
+        /// <summary>
+        /// True when <paramref name="kind"/> is unlocked at the 0-based
+        /// <paramref name="campaignPosition"/> (D58): the position has reached
+        /// its level's, <c>position &gt;= level - 1</c>. It stays unlocked past
+        /// its level and for a finished campaign. Free play never asks (D66).
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public bool IsJokerUnlocked(JokerKind kind, int campaignPosition) =>
+            campaignPosition >= JokerUnlockLevel(kind) - 1;
+
+        /// <summary>
+        /// The jokers whose unlock level is the one the 0-based
+        /// <paramref name="campaignPosition"/> names, in kind order; empty when
+        /// none is. The one query behind the joker a win gives and the New
+        /// Joker card a campaign level shows (D76). A new list on each call.
+        /// </summary>
+        public IReadOnlyList<JokerKind> JokersUnlockingAt(int campaignPosition)
+        {
+            var kinds = new List<JokerKind>();
+            for (var kind = JokerKinds.First; kind <= JokerKinds.Last; kind++)
+            {
+                // Levels are at least 1, so level - 1 never overflows.
+                if (JokerUnlockLevel(kind) - 1 == campaignPosition)
+                {
+                    kinds.Add(kind);
+                }
+            }
+
+            return kinds.AsReadOnly();
+        }
     }
 }

@@ -9,8 +9,9 @@ namespace GateRush.Meta
     /// reports campaign wins and losses here, buys here, and spends jokers
     /// here. One object keeps the rules of D57 (a loss costs one life,
     /// starting costs none), D58 (only the campaign counts), D61 (the streak
-    /// and its rewards), D62 (the store), D65 (spending a joker) and D72 (gold
-    /// bought for real money) together.
+    /// and its rewards), D62 (the store), D65 (spending a joker), D72 (gold
+    /// bought for real money) and D76 (jokers unlocked by the campaign)
+    /// together.
     /// </summary>
     /// <remarks>
     /// <para><b>It never saves.</b> It changes the <see cref="SaveData"/> it
@@ -29,6 +30,10 @@ namespace GateRush.Meta
     {
         // D62 sells jokers one at a time; a rule, not a tunable.
         private const int JokersPerPurchase = 1;
+
+        // D76 gives one of a joker when the campaign reaches its level; a
+        // rule, not a tunable.
+        private const int JokersPerUnlock = 1;
 
         private readonly MetaRules rules;
         private readonly ITimeProvider time;
@@ -56,12 +61,29 @@ namespace GateRush.Meta
         public bool CanStartCampaignLevel() => Save.Lives.CountAt(time.UtcNow) > 0;
 
         /// <summary>
+        /// True when <paramref name="kind"/> is unlocked at the campaign
+        /// position (D76, <see cref="MetaRules.IsJokerUnlocked"/>). Only the
+        /// campaign asks; free play never locks a joker (D66).
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public bool IsJokerUnlocked(JokerKind kind) => rules.IsJokerUnlocked(kind, CampaignPosition);
+
+        /// <summary>
+        /// The jokers whose unlock level is the campaign level the position
+        /// names, in kind order: those the New Joker card introduces each time
+        /// that level loads in the campaign (D76). Empty when it unlocks none.
+        /// </summary>
+        public IReadOnlyList<JokerKind> JokersUnlockedAtCampaignLevel() => rules.JokersUnlockingAt(CampaignPosition);
+
+        /// <summary>
         /// Reports a campaign win, in this order: pays
         /// <paramref name="goldReward"/> into the balance and the lifetime
         /// gold (D22, D58); adds one to the streak, raising the best; gives
         /// the jokers of every streak reward whose wins equal the new streak
-        /// (D61); and advances the campaign by one. It spends no life (D57).
-        /// Always changes the save.
+        /// (D61), locked or not; advances the campaign by one; and gives one
+        /// of each joker whose unlock level the new position is (D76), listed
+        /// in <see cref="CampaignWin.JokersUnlocked"/>. It spends no life
+        /// (D57). Always changes the save.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="goldReward"/> is negative; nothing changes.</exception>
         public CampaignWin ReportCampaignWin(int goldReward)
@@ -90,8 +112,20 @@ namespace GateRush.Meta
                 given.Add(reward);
             }
 
+            var positionBefore = Save.Campaign.Position;
             Save.Campaign.Advance();
-            return new CampaignWin(goldReward, streak, given);
+
+            // A position held at int.MaxValue did not move, so it reached no
+            // new level and unlocks nothing.
+            var unlocked = Save.Campaign.Position == positionBefore
+                ? (IReadOnlyList<JokerKind>)Array.Empty<JokerKind>()
+                : rules.JokersUnlockingAt(Save.Campaign.Position);
+            for (var i = 0; i < unlocked.Count; i++)
+            {
+                Save.Jokers.Add(unlocked[i], JokersPerUnlock);
+            }
+
+            return new CampaignWin(goldReward, streak, given, unlocked);
         }
 
         /// <summary>
@@ -111,13 +145,19 @@ namespace GateRush.Meta
 
         /// <summary>
         /// Buys one <paramref name="kind"/> at its price (D62):
-        /// <see cref="PurchaseResult.Bought"/> when the balance covers it,
-        /// otherwise <see cref="PurchaseResult.NotEnoughGold"/> with nothing
-        /// changed. The lifetime gold never changes.
+        /// <see cref="PurchaseResult.Locked"/> with nothing changed while it
+        /// is locked (D76); otherwise <see cref="PurchaseResult.Bought"/> when
+        /// the balance covers it, or <see cref="PurchaseResult.NotEnoughGold"/>
+        /// with nothing changed. The lifetime gold never changes.
         /// </summary>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
         public PurchaseResult TryBuyJoker(JokerKind kind)
         {
+            if (!IsJokerUnlocked(kind))
+            {
+                return PurchaseResult.Locked;
+            }
+
             if (!Save.Wallet.TrySpend(rules.JokerPrice(kind)))
             {
                 return PurchaseResult.NotEnoughGold;
@@ -157,7 +197,9 @@ namespace GateRush.Meta
         }
 
         /// <summary>
-        /// Spends one <paramref name="kind"/> on the board (D65): one from the
+        /// Spends one <paramref name="kind"/> on the board (D65): while it is
+        /// locked (D76), <see cref="JokerUse.Locked"/> with nothing changed,
+        /// even when some are held; otherwise one from the
         /// inventory when it holds one, <see cref="JokerUse.Used"/>; otherwise
         /// its store price when the balance covers it,
         /// <see cref="JokerUse.BoughtAndUsed"/>, bought and used in one step so
@@ -173,6 +215,11 @@ namespace GateRush.Meta
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind; nothing changes.</exception>
         public JokerUse TryUseJoker(JokerKind kind)
         {
+            if (!IsJokerUnlocked(kind))
+            {
+                return JokerUse.Locked;
+            }
+
             if (Save.Jokers.TryUse(kind))
             {
                 return JokerUse.Used;

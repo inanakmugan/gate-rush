@@ -36,6 +36,17 @@ namespace GateRush.UI
             return string.Format(CultureInfo.InvariantCulture, config.JokerCountFormat, count);
         }
 
+        /// <summary>
+        /// A locked joker's card line, in place of its count and price (D76):
+        /// "Unlocks at Level 10" by default.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="config"/> is null.</exception>
+        public static string UnlocksAt(int unlockLevel, UiConfig config)
+        {
+            Require(config);
+            return string.Format(CultureInfo.InvariantCulture, config.UnlocksAtFormat, unlockLevel);
+        }
+
         /// <summary>The Not Enough Gold line, with <paramref name="shortfall"/> as the bootstrap worked it out.</summary>
         /// <exception cref="ArgumentNullException"><paramref name="config"/> is null.</exception>
         public static string Shortfall(int shortfall, UiConfig config)

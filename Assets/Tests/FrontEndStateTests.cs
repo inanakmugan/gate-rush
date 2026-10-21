@@ -17,7 +17,8 @@ namespace GateRush.Tests
     /// price text; the win streak and its best from the save, and the reward
     /// table from the rules. Module 38: the name, the avatar id, the haptics
     /// setting apart from the sound, the levels completed and the lifetime
-    /// gold from the save.
+    /// gold from the save. Module 43: each joker's unlock level from the
+    /// rules, and whether it is unlocked, from the campaign position.
     /// </summary>
     /// <remarks>
     /// The rules are <see cref="MetaRulesFixture"/>'s, unlike a fresh config,
@@ -237,6 +238,39 @@ namespace GateRush.Tests
             var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
 
             Assert.AreEqual(rules.JokerPrice(kind), state.JokerPrice(kind));
+        }
+
+        [Test]
+        public void Of_JokerUnlockLevels_ComeFromTheRules([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var meta = Meta(Gold, SomeLives);
+
+            var state = FrontEndState.Of(meta, rules, Noon, Catalog(), true, Products());
+
+            Assert.AreEqual(rules.JokerUnlockLevel(kind), state.JokerUnlockLevel(kind));
+        }
+
+        [Test]
+        public void Of_BeforeAndAtAJokersLevel_ReportsItLockedThenUnlocked([Values] JokerKind kind)
+        {
+            rules = MetaRulesFixture.Build(jokerUnlockLevels: MetaRulesFixture.StaggeredUnlockLevels());
+            var levelPosition = rules.JokerUnlockLevel(kind) - 1;
+
+            var before = FrontEndState.Of(Meta(Gold, SomeLives, levelPosition - 1), rules, Noon, Catalog(), true, Products());
+            var at = FrontEndState.Of(Meta(Gold, SomeLives, levelPosition), rules, Noon, Catalog(), true, Products());
+
+            Assert.IsFalse(before.IsJokerUnlocked(kind), "the level before its own");
+            Assert.IsTrue(at.IsJokerUnlocked(kind), "its own level");
+        }
+
+        [Test]
+        public void IsJokerUnlocked_UndefinedKind_Throws()
+        {
+            var state = FrontEndState.Of(Meta(Gold, SomeLives), rules, Noon, Catalog(), true, Products());
+
+            Assert.Throws<ArgumentOutOfRangeException>(() => state.IsJokerUnlocked((JokerKind)99));
+            Assert.Throws<ArgumentOutOfRangeException>(() => state.JokerUnlockLevel((JokerKind)99));
         }
 
         [Test]

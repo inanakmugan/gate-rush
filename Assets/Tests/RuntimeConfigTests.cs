@@ -1,3 +1,4 @@
+using GateRush.Meta;
 using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEditor;
@@ -14,6 +15,11 @@ namespace GateRush.Tests
     /// result panel's and the confirmation's values are gone; the card's
     /// theme — its font and sprites assigned, a bordered panel sprite, the
     /// padding, the close button's cross and the pop — is checked by name.
+    /// Module 43: the New Joker card's titles, sentences (the Clock's with
+    /// the rules' seconds) and subtitle are the specified ones; a missing,
+    /// blank, duplicated or unusable entry, an empty subtitle, unassigned
+    /// Joker Icons, an icon size that is not positive and a transparent icon
+    /// colour are each reported by name.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
@@ -23,6 +29,10 @@ namespace GateRush.Tests
     public class RuntimeConfigTests
     {
         private const string EntriesField = "mechanicIntroductions";
+        private const string JokerEntriesField = "jokerIntroductions";
+
+        // The rules' Clock seconds the spec's sentence is written with.
+        private const int ClockSeconds = 20;
 
         // A small stand-in for the card's panel sprite; only its border is read.
         private const int PanelTextureSize = 64;
@@ -122,6 +132,133 @@ namespace GateRush.Tests
 
             Assert.That(problems, Has.Some.Contains($"2 entries for {LevelMechanic.IceBlock}"), string.Join(" | ", problems));
             Assert.That(problems, Has.Some.Contains($"no entry for {LevelMechanic.IceDoor}"), string.Join(" | ", problems));
+        }
+
+        [TestCase(JokerKind.Clock, "Clock!")]
+        [TestCase(JokerKind.Rocket, "Rocket!")]
+        [TestCase(JokerKind.Broom, "Broom!")]
+        public void NewJokerTitle_Default_IsTheJokersNameWithAnExclamation(JokerKind kind, string expected)
+        {
+            var title = config.NewJokerTitle(kind);
+
+            Assert.AreEqual(expected, title);
+        }
+
+        [TestCase(JokerKind.Clock, "Tap it to add 20 seconds to the clock.")]
+        [TestCase(JokerKind.Rocket, "Tap the Rocket, then a block, to clear its colour.")]
+        [TestCase(JokerKind.Broom, "Tap the Broom, then a block, to clear that colour from every block.")]
+        public void NewJokerText_DefaultWithTwentySeconds_IsTheSpecifiedSentence(JokerKind kind, string expected)
+        {
+            var text = config.NewJokerText(kind, ClockSeconds);
+
+            Assert.AreEqual(expected, text);
+        }
+
+        [Test]
+        public void NewJokerSubtitle_Default_IsNewJokerUnlocked()
+        {
+            Assert.AreEqual("New Joker Unlocked!", config.NewJokerSubtitle);
+        }
+
+        [Test]
+        public void Problems_DefaultJokerIntroductions_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Joker Introductions"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("New Joker"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_JokerWithoutAnEntry_IsReportedByName([Values] JokerKind kind)
+        {
+            var serialized = new SerializedObject(config);
+            var entries = serialized.FindProperty(JokerEntriesField);
+            entries.DeleteArrayElementAtIndex(IndexOf(entries, kind));
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"Joker Introductions has no entry for {kind}"), string.Join(" | ", problems));
+        }
+
+        [TestCase("title", "has no title")]
+        [TestCase("text", "has no text")]
+        public void Problems_BlankJokerTitleOrText_IsReportedByName(string field, string complaint)
+        {
+            const JokerKind kind = JokerKind.Rocket;
+            SetJokerEntryString(kind, field, "  ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"entry for {kind} {complaint}"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_JokerTextWithAPlaceholderPastTheSeconds_IsReportedByName()
+        {
+            const JokerKind kind = JokerKind.Clock;
+            SetJokerEntryString(kind, "text", "Adds {1} seconds.");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"entry for {kind} must have at most the placeholder"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DuplicateJokerEntry_IsReportedByName()
+        {
+            // The Broom's entry is turned into a second Rocket entry.
+            var serialized = new SerializedObject(config);
+            var entries = serialized.FindProperty(JokerEntriesField);
+            entries.GetArrayElementAtIndex(IndexOf(entries, JokerKind.Broom)).FindPropertyRelative("joker").intValue = (int)JokerKind.Rocket;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"2 entries for {JokerKind.Rocket}"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains($"Joker Introductions has no entry for {JokerKind.Broom}"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_EmptyNewJokerSubtitle_IsReportedByName()
+        {
+            SetString("newJokerSubtitle", " ");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("New Joker Subtitle may not be empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_JokerIconsUnassigned_IsReportedByName()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Joker Icons is not assigned"), string.Join(" | ", problems));
+        }
+
+        [TestCase(0f)]
+        [TestCase(-1f)]
+        public void Problems_NewJokerIconSizeNotPositive_IsReportedByName(float size)
+        {
+            SetFloat("newJokerIconSizeUnits", size);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("New Joker Icon Size Units must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_TransparentNewJokerIconColor_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("newJokerIconColor").colorValue = Color.clear;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("New Joker Icon Color must not be fully transparent"), string.Join(" | ", problems));
         }
 
         [Test]
@@ -584,6 +721,29 @@ namespace GateRush.Tests
 
             Assert.Fail($"the default config has an entry for {mechanic}");
             return -1;
+        }
+
+        /// <summary>The index of <paramref name="kind"/>'s New Joker entry in the serialized list.</summary>
+        private static int IndexOf(SerializedProperty entries, JokerKind kind)
+        {
+            for (var i = 0; i < entries.arraySize; i++)
+            {
+                if (entries.GetArrayElementAtIndex(i).FindPropertyRelative("joker").intValue == (int)kind)
+                {
+                    return i;
+                }
+            }
+
+            Assert.Fail($"the default config has a New Joker entry for {kind}");
+            return -1;
+        }
+
+        private void SetJokerEntryString(JokerKind kind, string field, string value)
+        {
+            var serialized = new SerializedObject(config);
+            var entries = serialized.FindProperty(JokerEntriesField);
+            entries.GetArrayElementAtIndex(IndexOf(entries, kind)).FindPropertyRelative(field).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

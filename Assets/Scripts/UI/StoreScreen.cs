@@ -9,8 +9,9 @@ using UnityEngine.UI;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The Store tab's page (Module 36, D62, D72): a vertical scroll of three
-    /// sections — the gold packs, the three jokers and the lives refill — and
+    /// The Store tab's page (Modules 36 and 43, D62, D72, D76): a vertical
+    /// scroll of three sections — the gold packs, the three jokers, each shown
+    /// locked until the campaign unlocks it, and the lives refill — and
     /// under them the line saying the store is simulated, which is never
     /// hidden. Shows the <see cref="FrontEndState"/> it is given and raises an
     /// event for each buy button; whether the player can afford something is
@@ -134,8 +135,19 @@ namespace GateRush.UI
             }
         }
 
+        /// <summary>
+        /// A joker's card: locked, with the level it unlocks at and neither
+        /// count nor price nor buy button, while the campaign has not reached
+        /// it (D76); otherwise the count held and the price.
+        /// </summary>
         private static void ShowJoker(StoreItemCard card, JokerKind kind, FrontEndState state, UiConfig config)
         {
+            if (!state.IsJokerUnlocked(kind))
+            {
+                card.ShowLocked(StoreTexts.UnlocksAt(state.JokerUnlockLevel(kind), config), config);
+                return;
+            }
+
             card.Show(
                 StoreTexts.JokerCount(state.JokerCount(kind), config),
                 StoreTexts.GoldPrice(state.JokerPrice(kind), config),

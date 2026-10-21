@@ -8,7 +8,9 @@ namespace GateRush.Tests
     /// Builds <see cref="MetaRules"/> for tests. Every default differs from a
     /// fresh <c>MetaConfig</c>'s, and the per-kind values differ from each
     /// other, so code that used numbers of its own, or mixed up two kinds,
-    /// fails. A test names only the values it is about.
+    /// fails — except the unlock levels, all <see cref="UnlockedFromStart"/>,
+    /// with <see cref="StaggeredUnlockLevels"/> for the tests about them. A
+    /// test names only the values it is about.
     /// </summary>
     public static class MetaRulesFixture
     {
@@ -44,6 +46,30 @@ namespace GateRush.Tests
 
         /// <summary>The seconds a Clock adds by the test rules.</summary>
         public const int ClockBonusSeconds = 12;
+
+        /// <summary>
+        /// The unlock level of every joker in the default test rules: 1,
+        /// unlocked from the start, unlike a fresh Meta Config's 5, 10 and 15,
+        /// so the tests of buying, using and streak rewards run unlocked. The
+        /// unlock tests pass <see cref="StaggeredUnlockLevels"/>.
+        /// </summary>
+        public const int UnlockedFromStart = 1;
+
+        /// <summary>The Clock's unlock level in <see cref="StaggeredUnlockLevels"/>.</summary>
+        public const int ClockUnlockLevel = 3;
+
+        /// <summary>The Rocket's unlock level in <see cref="StaggeredUnlockLevels"/>.</summary>
+        public const int RocketUnlockLevel = 6;
+
+        /// <summary>The Broom's unlock level in <see cref="StaggeredUnlockLevels"/>.</summary>
+        public const int BroomUnlockLevel = 9;
+
+        /// <summary>
+        /// Unlock levels that differ per kind and from a fresh Meta Config's:
+        /// <see cref="ClockUnlockLevel"/>, <see cref="RocketUnlockLevel"/> and
+        /// <see cref="BroomUnlockLevel"/>.
+        /// </summary>
+        public static JokerAmounts StaggeredUnlockLevels() => new JokerAmounts(ClockUnlockLevel, RocketUnlockLevel, BroomUnlockLevel);
 
         /// <summary>
         /// The reward table of the test rules: 2 Rockets at 3 wins, 3 Clocks
@@ -96,7 +122,8 @@ namespace GateRush.Tests
             int clockBonusSeconds = ClockBonusSeconds,
             IReadOnlyList<GoldPack> goldPacks = null,
             string defaultPlayerName = DefaultPlayerName,
-            string defaultAvatarId = DefaultAvatarId) =>
+            string defaultAvatarId = DefaultAvatarId,
+            JokerAmounts? jokerUnlockLevels = null) =>
             new MetaRules(
                 lifeCap,
                 lifeRegenInterval ?? TimeSpan.FromMinutes(LifeRegenMinutes),
@@ -104,6 +131,7 @@ namespace GateRush.Tests
                 jokerPrices ?? new JokerAmounts(ClockPrice, RocketPrice, BroomPrice),
                 livesRefillPrice,
                 startingJokers ?? new JokerAmounts(StartingClocks, StartingRockets, StartingBrooms),
+                jokerUnlockLevels ?? new JokerAmounts(UnlockedFromStart, UnlockedFromStart, UnlockedFromStart),
                 streakRewards ?? StreakRewards(),
                 clockBonusSeconds,
                 goldPacks ?? GoldPacks(),

@@ -10,7 +10,8 @@ namespace GateRush.Runtime
     /// life cap, how long a life takes to come back, a new player's gold and
     /// jokers, the store's prices, the win streak's reward table, the seconds
     /// a Clock adds, free play's jokers per level, the gold of each gold
-    /// pack, and a new player's name and avatar (Module 38). Nothing in
+    /// pack, a new player's name and avatar (Module 38), and the campaign
+    /// level each joker unlocks at (Module 43). Nothing in
     /// <c>GateRush.Meta</c> hardcodes one of these; <see cref="ToRules"/>
     /// hands them over as <see cref="MetaRules"/>, all but free play's
     /// allowance, which <c>Meta</c> knows nothing of (D66) and
@@ -48,14 +49,24 @@ namespace GateRush.Runtime
         [SerializeField] private int livesRefillPrice = 300;
 
         [Header("Starting jokers")]
-        [Tooltip("Clock jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
-        [SerializeField] private int startingClocks = 1;
+        [Tooltip("Clock jokers a new player holds, and what a save from before Module 31 gets. 0 since Module 43: the campaign gives one at its unlock level (D76). At least 0.")]
+        [SerializeField] private int startingClocks;
 
-        [Tooltip("Rocket jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
-        [SerializeField] private int startingRockets = 1;
+        [Tooltip("Rocket jokers a new player holds, and what a save from before Module 31 gets. 0 since Module 43: the campaign gives one at its unlock level (D76). At least 0.")]
+        [SerializeField] private int startingRockets;
 
-        [Tooltip("Broom jokers a new player holds, and what a save from before Module 31 gets. At least 0.")]
-        [SerializeField] private int startingBrooms = 1;
+        [Tooltip("Broom jokers a new player holds, and what a save from before Module 31 gets. 0 since Module 43: the campaign gives one at its unlock level (D76). At least 0.")]
+        [SerializeField] private int startingBrooms;
+
+        [Header("Joker unlocks (Module 43, D76)")]
+        [Tooltip("The campaign level, counted from 1, the Clock unlocks at: the first win onto it gives one, and its New Joker card shows each time it loads in the campaign. Until then its button and its Store card are locked. 1 unlocks it from the start. At least 1.")]
+        [SerializeField] private int clockUnlockLevel = 5;
+
+        [Tooltip("The campaign level, counted from 1, the Rocket unlocks at: the first win onto it gives one, and its New Joker card shows each time it loads in the campaign. Until then its button and its Store card are locked. 1 unlocks it from the start. At least 1.")]
+        [SerializeField] private int rocketUnlockLevel = 10;
+
+        [Tooltip("The campaign level, counted from 1, the Broom unlocks at: the first win onto it gives one, and its New Joker card shows each time it loads in the campaign. Until then its button and its Store card are locked. 1 unlocks it from the start. At least 1.")]
+        [SerializeField] private int broomUnlockLevel = 15;
 
         [Header("Win streak")]
         [Tooltip("The jokers given when the campaign win streak becomes exactly Wins; reaching it again after a loss pays again, and past the last entry nothing more is paid. Wins positive and strictly ascending, Count at least 1. May be empty.")]
@@ -122,6 +133,9 @@ namespace GateRush.Runtime
             AddIfNegative(problems, startingClocks, "Starting Clocks");
             AddIfNegative(problems, startingRockets, "Starting Rockets");
             AddIfNegative(problems, startingBrooms, "Starting Brooms");
+            AddIfBelowOne(problems, clockUnlockLevel, "Clock Unlock Level");
+            AddIfBelowOne(problems, rocketUnlockLevel, "Rocket Unlock Level");
+            AddIfBelowOne(problems, broomUnlockLevel, "Broom Unlock Level");
 
             foreach (var problem in StreakReward.ProblemsOf(StreakRewards()))
             {
@@ -168,6 +182,7 @@ namespace GateRush.Runtime
                 new JokerAmounts(clockPrice, rocketPrice, broomPrice),
                 livesRefillPrice,
                 new JokerAmounts(startingClocks, startingRockets, startingBrooms),
+                new JokerAmounts(clockUnlockLevel, rocketUnlockLevel, broomUnlockLevel),
                 StreakRewards(),
                 clockBonusSeconds,
                 GoldPacks(),
@@ -203,6 +218,14 @@ namespace GateRush.Runtime
             if (value < 0)
             {
                 problems.Add($"{name}: {field} may not be negative.");
+            }
+        }
+
+        private void AddIfBelowOne(List<string> problems, int value, string field)
+        {
+            if (value < 1)
+            {
+                problems.Add($"{name}: {field} must be at least 1.");
             }
         }
 

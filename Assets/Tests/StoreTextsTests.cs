@@ -12,8 +12,8 @@ namespace GateRush.Tests
     /// Covers Module 36's <see cref="StoreTexts"/>, formatting only: the gold
     /// amount with thousands separators; "You have N"; the shortfall line;
     /// the price beside the coin; the lives card and the refill button, "Full"
-    /// when full; the test sheet's offer; the ribbons; and every text from the
-    /// config.
+    /// when full; the test sheet's offer; the ribbons; a locked joker's
+    /// "Unlocks at Level 10" (Module 43); and every text from the config.
     /// </summary>
     /// <remarks>
     /// Most tests give the config texts of their own, unlike the defaults, so
@@ -61,6 +61,24 @@ namespace GateRush.Tests
             var text = StoreTexts.GoldPrice(200, config);
 
             Assert.AreEqual("x200", text);
+        }
+
+        [Test]
+        public void UnlocksAt_DefaultFormat_ReadsUnlocksAtLevel()
+        {
+            var text = StoreTexts.UnlocksAt(10, config);
+
+            Assert.AreEqual("Unlocks at Level 10", text);
+        }
+
+        [Test]
+        public void UnlocksAt_OwnFormat_IsUsed()
+        {
+            SetString("unlocksAtFormat", "Opens on {0}");
+
+            var text = StoreTexts.UnlocksAt(15, config);
+
+            Assert.AreEqual("Opens on 15", text);
         }
 
         [Test]

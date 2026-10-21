@@ -2,7 +2,7 @@ namespace GateRush.Meta
 {
     /// <summary>
     /// One number per <see cref="JokerKind"/>: what <see cref="MetaRules"/>
-    /// takes for the joker prices and for the starting jokers. Plain data with
+    /// takes for the joker prices, the starting jokers and the unlock levels. Plain data with
     /// no checks of its own; <see cref="MetaRules"/> checks the values, so a
     /// <c>default</c> instance is harmless.
     /// </summary>

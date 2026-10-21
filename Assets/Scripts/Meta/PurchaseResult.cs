@@ -11,5 +11,11 @@ namespace GateRush.Meta
 
         /// <summary>A refill was asked for with the lives already full. Nothing was spent.</summary>
         AlreadyFull,
+
+        /// <summary>
+        /// The joker has not unlocked yet in the campaign (D76). Nothing
+        /// changed; the screens never offer it, so this is a guard.
+        /// </summary>
+        Locked,
     }
 }

@@ -22,6 +22,10 @@ namespace GateRush.Runtime
     {
         private readonly JokerAmounts jokerCounts;
         private readonly JokerAmounts jokerPrices;
+        private readonly JokerAmounts jokerUnlockLevels;
+        private readonly bool isClockUnlocked;
+        private readonly bool isRocketUnlocked;
+        private readonly bool isBroomUnlocked;
 
         private FrontEndState(
             int gold,
@@ -35,6 +39,10 @@ namespace GateRush.Runtime
             IReadOnlyList<LevelEntry> levels,
             JokerAmounts jokerCounts,
             JokerAmounts jokerPrices,
+            JokerAmounts jokerUnlockLevels,
+            bool isClockUnlocked,
+            bool isRocketUnlocked,
+            bool isBroomUnlocked,
             IReadOnlyList<GoldOffer> goldOffers,
             int streak,
             int bestStreak,
@@ -56,6 +64,10 @@ namespace GateRush.Runtime
             Levels = levels;
             this.jokerCounts = jokerCounts;
             this.jokerPrices = jokerPrices;
+            this.jokerUnlockLevels = jokerUnlockLevels;
+            this.isClockUnlocked = isClockUnlocked;
+            this.isRocketUnlocked = isRocketUnlocked;
+            this.isBroomUnlocked = isBroomUnlocked;
             GoldOffers = goldOffers;
             Streak = streak;
             BestStreak = bestStreak;
@@ -151,10 +163,37 @@ namespace GateRush.Runtime
         public int JokerPrice(JokerKind kind) => jokerPrices.Of(kind);
 
         /// <summary>
+        /// Whether <paramref name="kind"/> is unlocked in the campaign (D76),
+        /// as <see cref="MetaGame.IsJokerUnlocked"/> decided it when the state
+        /// was read. A locked joker's Store card shows it locked, and a streak
+        /// reward of it says when it opens.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public bool IsJokerUnlocked(JokerKind kind)
+        {
+            switch (kind)
+            {
+                case JokerKind.Clock:
+                    return isClockUnlocked;
+                case JokerKind.Rocket:
+                    return isRocketUnlocked;
+                case JokerKind.Broom:
+                    return isBroomUnlocked;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(kind), kind, $"{(int)kind} is not a joker kind.");
+            }
+        }
+
+        /// <summary>The campaign level, counted from 1, <paramref name="kind"/> unlocks at (D76).</summary>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="kind"/> is not a declared kind.</exception>
+        public int JokerUnlockLevel(JokerKind kind) => jokerUnlockLevels.Of(kind);
+
+        /// <summary>
         /// The front end's state at <paramref name="nowUtc"/>: the gold, the
-        /// lives, the jokers, the win streak, the name, the avatar, the haptics
+        /// lives, the jokers and whether each is unlocked (D76), the win
+        /// streak, the name, the avatar, the haptics
         /// setting, the levels completed and the lifetime gold of
-        /// <paramref name="meta"/>'s save; the cap, the prices, the gold packs and the streak's reward
+        /// <paramref name="meta"/>'s save; the cap, the prices, the unlock levels, the gold packs and the streak's reward
         /// table of <paramref name="rules"/> — the rules the
         /// save was loaded with; the campaign level's number and the level
         /// list from <paramref name="catalog"/>, which may be null when the
@@ -205,6 +244,11 @@ namespace GateRush.Runtime
                 LevelsOf(catalog, save.Completed),
                 new JokerAmounts(jokers.CountOf(JokerKind.Clock), jokers.CountOf(JokerKind.Rocket), jokers.CountOf(JokerKind.Broom)),
                 new JokerAmounts(rules.JokerPrice(JokerKind.Clock), rules.JokerPrice(JokerKind.Rocket), rules.JokerPrice(JokerKind.Broom)),
+                new JokerAmounts(
+                    rules.JokerUnlockLevel(JokerKind.Clock), rules.JokerUnlockLevel(JokerKind.Rocket), rules.JokerUnlockLevel(JokerKind.Broom)),
+                meta.IsJokerUnlocked(JokerKind.Clock),
+                meta.IsJokerUnlocked(JokerKind.Rocket),
+                meta.IsJokerUnlocked(JokerKind.Broom),
                 Runtime.GoldOffers.Match(rules.GoldPacks, products),
                 save.Streak.Current,
                 save.Streak.Best,
