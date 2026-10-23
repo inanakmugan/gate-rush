@@ -29,7 +29,7 @@ MonoBehaviour:
   goldHeader: Gold
   jokersHeader: Jokers
   livesHeader: Lives
-  testStoreNote: 'Test store: purchases are simulated and no money is charged.'
+  testStoreNote: 'Test store: no real money is charged.'
   testPurchaseTitle: Test Purchase
   testPurchaseOfferFormat: '{0:N0} gold for {1}'
   testPurchaseNote: This is a simulated store. No money is charged.
@@ -45,8 +45,8 @@ MonoBehaviour:
   moreWinsFormat: '{0} more wins: {1}'
   oneMoreWinFormat: '1 more win: {0}'
   allRewardsCollectedLabel: Every reward collected
-  currentStreakFormat: 'Streak : {0}'
-  bestStreakFormat: 'Best : {0}'
+  currentStreakFormat: 'Streak: {0}'
+  bestStreakFormat: 'Best: {0}'
   ladderWinsFormat: '{0} wins'
   ladderRewardFormat: '{0} x{1}'
   markerCountFormat: x{0}
@@ -65,7 +65,7 @@ MonoBehaviour:
   lifetimeGoldLabel: Lifetime Gold
   statisticFormat: '{0:N0}'
   hapticsLabel: Haptics
-  leaderboardSimulatedNote: Demo players. The online leaderboard is not connected.
+  leaderboardSimulatedNote: 'Demo players: online leaderboard not connected.'
   leaderboardLoadingText: "Loading\u2026"
   leaderboardFailedText: Could not load the leaderboard.
   leaderboardRetryLabel: Retry
@@ -88,7 +88,7 @@ MonoBehaviour:
   leaveLevelTitle: Leave level?
   restartLevelTitle: Restart level?
   loseLifeLine: You will lose a life.
-  loseLifeAndStreakFormat: You will lose a life and your {0}-win streak.
+  loseLifeAndStreakFormat: You will lose a life and your win streak of {0}.
   loseLifeLabel: Lose a life
   keepPlayingLabel: Keep playing
   overlayPopSeconds: 0.25
@@ -103,7 +103,7 @@ MonoBehaviour:
   jokerLockedBadgeFormat: Lv {0}
   unlocksAtFormat: Unlocks at Level {0}
   lockedPrizeFormat: +{0} {1}, opens at Level {2}
-  lockedIconAlpha: 0.6
+  lockedIconAlpha: 0.7
   markedPulseSeconds: 0.9
   markedPulseScale: 1.06
   markedPulseEase: 4

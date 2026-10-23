@@ -43,7 +43,7 @@ MonoBehaviour:
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.16
-  bottomBandScreenFraction: 0.14
+  bottomBandScreenFraction: 0.145
   frameThicknessCells: 0.45
   floorUnderlayCells: 0.2
   lipOffsetCells: 0.09
