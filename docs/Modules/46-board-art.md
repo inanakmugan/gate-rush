@@ -103,8 +103,8 @@ The style guide of Module 45 applies, with these board rules:
   as today.
 - **Gloss.** A white band across the top of each block, never tinted, as
   the buttons have; the studs keep a small white shine each.
-- **Studs.** Two by two per cell, as today, raised and glossy, in the
-  block's colour.
+- **Studs.** One large stud per cell, raised and glossy, in the block's
+  colour, as in the target (Module 15 had two by two).
 - **One piece.** A block still reads as one piece across its cells, with
   no seams inside it (the quarter-tile shapes of Module 15).
 - **Palette.** The block palette moves to the interface's family. The
@@ -131,11 +131,66 @@ The style guide of Module 45 applies, with these board rules:
 
 ## The measured targets
 
-Filled in from the approved target images before implementation: the
-outline width, the lip height, the gloss band's height and opacity, the
-stud size and shine, the corner radius and the gap between blocks, each
-as a share of the cell; the face colour each palette entry must produce;
-the frame's width and the floor's grid; the gate's depth and arrow size.
+Measured from the approved targets (`docs/media/board-target.png`,
+`docs/media/board-target-mechanics.png`); a cell there is about 102
+pixels. Shares are of a cell's side. Where the target is a generated
+picture and not a real board (its blocks do not sit on one grid, and
+its gaps vary), the value chosen is given instead.
+
+**Blocks**
+- One stud per cell, centred, about 0.47 of the cell across, raised,
+  with a darker ring at its foot and a small white shine at its top
+  left. This replaces the two by two studs of Module 15.
+- Outline: dark purple, about 0.04 of the cell, the same on every
+  colour.
+- Corner radius: about 0.2 of the cell, as today.
+- Gloss: a light band along the top edge, about 0.12 of the cell, then
+  a face that darkens slightly toward the bottom (on red, #FC6167 at the
+  top to #F93239 at the bottom).
+- Lip: a darker band along the bottom edge, about 0.18 of the cell (on
+  red, #C01E26 to #AD1423), with a thin light line just above it.
+- Gap between blocks: about 0.05 of the cell (chosen; today 0.02, the
+  target's 0.1 or more is too loose for a packed board).
+
+**Palette (the faces' middle)**
+- Red #FC464E, Blue #16A0FE, Green #27CC42, Yellow #FECA24, Purple
+  #A348FD, Orange #FC7505. Pink and Cyan are not in the target and keep
+  the spec's #FF6FB5 and #2FD3E6, at the same brightness as the others.
+
+**Board**
+- Frame: face #492184, outline #1C0B3A, about 0.35 of a cell wide with
+  a lighter inner rim.
+- Floor between blocks: #281350, with a faint grid a little lighter.
+- Background: #602DA0 at the top to #200E3C at the bottom, a little
+  brighter than the look above asked; the target's values are used.
+- Gates: as wide as today, drawn as glossy openings in the gate's
+  colour with the blocks' gloss and lip, and a white arrow with a dark
+  purple outline pointing out of the board. The target's small bars that
+  stick out of the frame are not used.
+
+**Mechanics**
+- Ice: glassy and see-through, light blue with white cracks and frost
+  over the block, the block's own studs visible beneath.
+- Count badge: a red badge with a white digit outlined in dark purple,
+  from the interface's `badge` sprite (the target's round badge is
+  close enough to keep one badge across the game).
+- Chains: light grey (#C9C8E2) links with a dark purple outline, laid
+  out as today; the target's crossed chains are used only if the plan
+  finds a clean way to draw them on any shape.
+- Padlock: gold (#FFE041) with a keyhole and the keys still needed on
+  its body.
+- Key: gold with a round bow and a faceted gem in its lock's colour.
+- Shutter: dark purple slats (#422C75) in an orange frame (#FD6801)
+  with rivets at the corners and a yellow and black hazard stripe along
+  its foot.
+- Generator: a light grey metal box with rivets and a dark blue screen
+  (#081B55) showing the next block.
+- Elevator: dark purple doors (#422C71) with a centre seam, in an
+  orange frame (#FB5900) with hazard stripes up its sides.
+- One-way: a white double-headed arrow with a dark purple outline along
+  the block's axis.
+- Time bonus: a gold clock coin (#FED42A) with "+5" in white outlined
+  digits beside it.
 
 ---
 
