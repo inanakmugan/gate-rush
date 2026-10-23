@@ -126,7 +126,8 @@ MonoBehaviour:
   - startLevel: 21
     painting: {fileID: 21300000, guid: ea965f3f5037c6a4fba167e27ff68bf2, type: 3}
   buttonLabelColor: {r: 1, g: 1, b: 1, a: 1}
-  disabledButtonLabelColor: {r: 0.43, g: 0.44, b: 0.56, a: 1}
+  disabledButtonLabelColor: {r: 0.231, g: 0.141, b: 0.4, a: 1}
+  disabledJokerIconColor: {r: 0.43, g: 0.44, b: 0.56, a: 1}
   leaderboardHighlightColor: {r: 1, g: 0.914, b: 0.659, a: 1}
   leaderboardRowColor: {r: 1, g: 1, b: 1, a: 1}
   timerColor: {r: 1, g: 1, b: 1, a: 1}
