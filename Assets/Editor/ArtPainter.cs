@@ -12,21 +12,19 @@ namespace GateRush.Editor
         QuarterEdge,
         QuarterFill,
         QuarterConcave,
-        ContourOuter,
-        ContourEdge,
-        ContourConcave,
-        LightOuterTopLeft,
-        LightOuterTopRight,
-        LightOuterBottomLeft,
-        LightOuterBottomRight,
-        LightConcaveTopLeft,
-        LightConcaveTopRight,
-        LightConcaveBottomLeft,
-        LightConcaveBottomRight,
-        LightEdgeTop,
-        LightEdgeBottom,
-        LightEdgeLeft,
-        LightEdgeRight,
+        FaceOuterTopLeft,
+        FaceOuterTopRight,
+        FaceOuterBottomLeft,
+        FaceOuterBottomRight,
+        FaceConcaveTopLeft,
+        FaceConcaveTopRight,
+        FaceConcaveBottomLeft,
+        FaceConcaveBottomRight,
+        FaceEdgeTop,
+        FaceEdgeBottom,
+        FaceEdgeLeft,
+        FaceEdgeRight,
+        FaceFill,
         BodyOuterTopLeft,
         BodyOuterTopRight,
         BodyOuterBottomLeft,
@@ -39,6 +37,19 @@ namespace GateRush.Editor
         BodyEdgeBottom,
         BodyEdgeLeft,
         BodyEdgeRight,
+        BodyFill,
+        ShadowOuterTopLeft,
+        ShadowOuterTopRight,
+        ShadowOuterBottomLeft,
+        ShadowOuterBottomRight,
+        ShadowConcaveTopLeft,
+        ShadowConcaveTopRight,
+        ShadowConcaveBottomLeft,
+        ShadowConcaveBottomRight,
+        ShadowEdgeTop,
+        ShadowEdgeBottom,
+        ShadowEdgeLeft,
+        ShadowEdgeRight,
         Studs,
         StudGloss,
         SingleStud,
@@ -104,16 +115,15 @@ namespace GateRush.Editor
     /// <remarks>
     /// <para><b>Shapes</b> are signed distance functions evaluated at pixel
     /// centres: coverage is <c>0.5 − d / antiAlias</c>, clamped, and tone is a
-    /// function of the depth inside the shape. A face piece (Module 46) is
-    /// plain white; its outline is a separate contour piece drawn untinted
-    /// under it, and its lit and shaded edges a separate light piece drawn
-    /// untinted over it. Face and contour depend only on the distance to the
-    /// boundary, so mirroring or rotating them never turns anything the wrong
-    /// way; a light piece also depends on which way its edge faces the light
-    /// once posed, so there is one per corner of a cell and one per side for
-    /// an edge, and the runtime picks the one for the quarter's place. Fully
-    /// transparent pixels keep the edge's tone in RGB, so filtering never pulls
-    /// a dark fringe into the edge.</para>
+    /// function of the depth inside the shape. A block's body (Module 46) is
+    /// lit: its face pieces carry the shade of a height field under one light,
+    /// its body pieces the white highlight and its shadow pieces its shadow on
+    /// the floor (see <c>ArtPainter.Lighting.cs</c>). Those depend on which
+    /// way the edge faces once posed, so there is one per corner of a cell
+    /// and one per side for an edge, and the runtime picks the one for the
+    /// quarter's place; the plain pieces depend only on the distance to the
+    /// boundary. Fully transparent pixels keep the edge's tone in RGB, so
+    /// filtering never pulls a dark fringe into the edge.</para>
     /// <para><b>Quarter pieces</b> are drawn for the top-right quarter, in
     /// quarter-local pixels whose origin is the cell's centre: the cell's
     /// corner is at <c>(q, q)</c> and the outline runs at <c>e = q − gap/2</c>.
@@ -123,12 +133,13 @@ namespace GateRush.Editor
     /// <c>Math.Sqrt</c>, <c>Abs</c>, <c>Floor</c>, <c>Min</c> and <c>Max</c> are
     /// used, all exactly rounded — no <c>Mathf</c>,
     /// <c>Pow</c> or <c>Exp</c>, no randomness, no clock — and each value is
-    /// rounded to a byte with an explicit midpoint rule. The one exception,
-    /// the light's direction, takes a cosine and a sine once and rounds them
-    /// to nine decimals (<see cref="TowardLight"/>). The same recipe always
-    /// paints the same bytes.</para>
+    /// rounded to a byte with an explicit midpoint rule. The exceptions —
+    /// the highlight's and the stud rim's powers and the sRGB encoding — go
+    /// through <c>Math.Pow</c> and are rounded to nine decimals
+    /// (<see cref="StablePow"/>), so a last-bit difference never reaches a
+    /// byte. The same recipe always paints the same bytes.</para>
     /// </remarks>
-    public static class ArtPainter
+    public static partial class ArtPainter
     {
         /// <summary>
         /// Width of the background ramp. Not a look parameter: the ramp only
@@ -138,10 +149,11 @@ namespace GateRush.Editor
         private const int RampWidthPixels = 2;
 
         /// <summary>
-        /// The decimals the light's direction is rounded to (<see cref="TowardLight"/>).
-        /// Not a look parameter: it only keeps a platform's last bit out of the pixels.
+        /// The decimals a power or a square root of a power is rounded to
+        /// (<see cref="StablePow"/>). Not a look parameter: it only keeps a
+        /// platform's last bit out of the pixels.
         /// </summary>
-        private const int LightDirectionDecimals = 9;
+        private const int StableDecimals = 9;
 
         /// <summary>The four shapes a quarter piece takes (Module 15), whatever layer it is painted for.</summary>
         private enum QuarterShape
@@ -171,58 +183,47 @@ namespace GateRush.Editor
                 case ArtSprite.QuarterFill:
                 case ArtSprite.QuarterConcave:
                     return PaintQuarter(recipe, sprite);
-                case ArtSprite.ContourOuter:
-                case ArtSprite.ContourEdge:
-                case ArtSprite.ContourConcave:
-                    return PaintContour(recipe, sprite);
-                case ArtSprite.LightOuterTopLeft:
-                    return PaintLight(recipe, QuarterShape.Outer, -1, 1);
-                case ArtSprite.LightOuterTopRight:
-                    return PaintLight(recipe, QuarterShape.Outer, 1, 1);
-                case ArtSprite.LightOuterBottomLeft:
-                    return PaintLight(recipe, QuarterShape.Outer, -1, -1);
-                case ArtSprite.LightOuterBottomRight:
-                    return PaintLight(recipe, QuarterShape.Outer, 1, -1);
-                case ArtSprite.LightConcaveTopLeft:
-                    return PaintLight(recipe, QuarterShape.Concave, -1, 1);
-                case ArtSprite.LightConcaveTopRight:
-                    return PaintLight(recipe, QuarterShape.Concave, 1, 1);
-                case ArtSprite.LightConcaveBottomLeft:
-                    return PaintLight(recipe, QuarterShape.Concave, -1, -1);
-                case ArtSprite.LightConcaveBottomRight:
-                    return PaintLight(recipe, QuarterShape.Concave, 1, -1);
-                case ArtSprite.LightEdgeTop:
-                    return PaintLightEdge(recipe, 0, 1);
-                case ArtSprite.LightEdgeBottom:
-                    return PaintLightEdge(recipe, 0, -1);
-                case ArtSprite.LightEdgeLeft:
-                    return PaintLightEdge(recipe, -1, 0);
-                case ArtSprite.LightEdgeRight:
-                    return PaintLightEdge(recipe, 1, 0);
+                case ArtSprite.FaceOuterTopLeft:
+                case ArtSprite.FaceOuterTopRight:
+                case ArtSprite.FaceOuterBottomLeft:
+                case ArtSprite.FaceOuterBottomRight:
+                case ArtSprite.FaceConcaveTopLeft:
+                case ArtSprite.FaceConcaveTopRight:
+                case ArtSprite.FaceConcaveBottomLeft:
+                case ArtSprite.FaceConcaveBottomRight:
+                case ArtSprite.FaceEdgeTop:
+                case ArtSprite.FaceEdgeBottom:
+                case ArtSprite.FaceEdgeLeft:
+                case ArtSprite.FaceEdgeRight:
+                case ArtSprite.FaceFill:
+                    return PaintLit(recipe, PlaceOf(sprite), LitLayer.Face);
                 case ArtSprite.BodyOuterTopLeft:
-                    return PaintBody(recipe, QuarterShape.Outer, -1, 1, hasStreak: true);
                 case ArtSprite.BodyOuterTopRight:
-                    return PaintBody(recipe, QuarterShape.Outer, 1, 1, hasStreak: false);
                 case ArtSprite.BodyOuterBottomLeft:
-                    return PaintBody(recipe, QuarterShape.Outer, -1, -1, hasStreak: false);
                 case ArtSprite.BodyOuterBottomRight:
-                    return PaintBody(recipe, QuarterShape.Outer, 1, -1, hasStreak: false);
                 case ArtSprite.BodyConcaveTopLeft:
-                    return PaintBody(recipe, QuarterShape.Concave, -1, 1, hasStreak: false);
                 case ArtSprite.BodyConcaveTopRight:
-                    return PaintBody(recipe, QuarterShape.Concave, 1, 1, hasStreak: false);
                 case ArtSprite.BodyConcaveBottomLeft:
-                    return PaintBody(recipe, QuarterShape.Concave, -1, -1, hasStreak: false);
                 case ArtSprite.BodyConcaveBottomRight:
-                    return PaintBody(recipe, QuarterShape.Concave, 1, -1, hasStreak: false);
                 case ArtSprite.BodyEdgeTop:
-                    return PaintBodyEdge(recipe, 0, 1);
                 case ArtSprite.BodyEdgeBottom:
-                    return PaintBodyEdge(recipe, 0, -1);
                 case ArtSprite.BodyEdgeLeft:
-                    return PaintBodyEdge(recipe, -1, 0);
                 case ArtSprite.BodyEdgeRight:
-                    return PaintBodyEdge(recipe, 1, 0);
+                case ArtSprite.BodyFill:
+                    return PaintLit(recipe, PlaceOf(sprite), LitLayer.Specular);
+                case ArtSprite.ShadowOuterTopLeft:
+                case ArtSprite.ShadowOuterTopRight:
+                case ArtSprite.ShadowOuterBottomLeft:
+                case ArtSprite.ShadowOuterBottomRight:
+                case ArtSprite.ShadowConcaveTopLeft:
+                case ArtSprite.ShadowConcaveTopRight:
+                case ArtSprite.ShadowConcaveBottomLeft:
+                case ArtSprite.ShadowConcaveBottomRight:
+                case ArtSprite.ShadowEdgeTop:
+                case ArtSprite.ShadowEdgeBottom:
+                case ArtSprite.ShadowEdgeLeft:
+                case ArtSprite.ShadowEdgeRight:
+                    return PaintShadow(recipe, PlaceOf(sprite));
                 case ArtSprite.Studs:
                     return PaintStuds(recipe, recipe.StudsPerCellSide);
                 case ArtSprite.StudGloss:
@@ -295,275 +296,16 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// A face piece: the piece's silhouette pulled in by the outline, with
-        /// its own corners sharing the silhouette's centres, so the contour
-        /// under it shows as a ring of even width. White throughout, so the
-        /// tint shows exactly; its lit and shaded edges are the light pieces'
-        /// (<see cref="PaintLight"/>), drawn over it.
+        /// A plain piece: the piece's silhouette, white, for whatever draws a
+        /// block's shape flat — a grabbed block's outline, a preview. The lit
+        /// body is the face pieces' (<see cref="PaintFace"/>).
         /// </summary>
         private static ArtImage PaintQuarter(ArtRecipe recipe, ArtSprite sprite)
         {
             var shape = ShapeOf(sprite);
             return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-                (1.0, Coverage(recipe, FaceSd(recipe, shape, x, y))));
-        }
-
-        /// <summary>
-        /// A contour piece: the piece's whole silhouette, white, for the runtime
-        /// to draw untinted in the outline colour under the face. No fill piece
-        /// is painted; a fill's contour would be the opaque white the face
-        /// fill already is.
-        /// </summary>
-        private static ArtImage PaintContour(ArtRecipe recipe, ArtSprite sprite)
-        {
-            var shape = ShapeOf(sprite);
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
                 (1.0, Coverage(recipe, SilhouetteSd(recipe, shape, x, y))));
         }
-
-        /// <summary>
-        /// A light piece over a face piece of the same kind, for the quarter at
-        /// corner <c>(sx, sy)</c> of its cell (Module 46): white along the
-        /// edges that face the light, black along those that face away, each
-        /// band as strong as its edge faces that way and fading smoothly in
-        /// from the edge. The sprite is drawn for the top-right quarter and
-        /// mirrored onto its corner, so the edge's facing is worked out after
-        /// that mirroring: a top-left corner is lit along both its edges, a
-        /// bottom-right one shaded along both, and the other two turn from
-        /// one to the other round their arc.
-        /// </summary>
-        private static ArtImage PaintLight(ArtRecipe recipe, QuarterShape shape, int sx, int sy)
-        {
-            var toward = TowardLight(recipe);
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-            {
-                var (nx, ny) = OutwardNormal(recipe, shape, x, y);
-                return LightPixel(recipe, FaceSd(recipe, shape, x, y), Facing(sx * nx, sy * ny, toward));
-            });
-        }
-
-        /// <summary>
-        /// A light piece over an edge piece whose boundary faces
-        /// <c>(wx, wy)</c> once posed: the edge sprite's band, of one
-        /// strength along the whole edge.
-        /// </summary>
-        private static ArtImage PaintLightEdge(ArtRecipe recipe, int wx, int wy)
-        {
-            var facing = Facing(wx, wy, TowardLight(recipe));
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-                LightPixel(recipe, FaceSd(recipe, QuarterShape.Edge, x, y), facing));
-        }
-
-        /// <summary>
-        /// One light-piece pixel <c>−sd</c> inside the face's edge: white for a
-        /// lit edge (<paramref name="facing"/> above 0), black for a shaded
-        /// one, its alpha the band's strength times how squarely the edge
-        /// faces, easing to nothing across the band's width.
-        /// </summary>
-        private static (double tone, double alpha) LightPixel(ArtRecipe recipe, double sd, double facing)
-        {
-            var depth = -sd;
-            var isLit = facing >= 0.0;
-            double band = isLit ? recipe.LightBandPixels : recipe.ShadeBandPixels;
-            double strength = isLit ? recipe.LightAlpha : recipe.ShadeAlpha;
-            var fade = 1.0 - Smooth(Clamp01(depth / band));
-            return (isLit ? 1.0 : 0.0, Coverage(recipe, sd) * strength * Math.Abs(facing) * fade);
-        }
-
-        /// <summary>
-        /// A body piece over a face piece of the same kind, for the quarter at
-        /// corner <c>(sx, sy)</c> of its cell: what makes a block's face read
-        /// as a glossy, puffy button (Module 46). Drawn for the top-right
-        /// quarter and mirrored onto its corner, so, like a light piece, the
-        /// way its edge faces is worked out after that mirroring. The top-left
-        /// outer corner alone carries the gloss streak
-        /// (<paramref name="hasStreak"/>), so a block shows one at each of its
-        /// top-left corners.
-        /// </summary>
-        private static ArtImage PaintBody(ArtRecipe recipe, QuarterShape shape, int sx, int sy, bool hasStreak)
-        {
-            var toward = TowardLight(recipe);
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-            {
-                var (nx, ny) = OutwardNormal(recipe, shape, x, y);
-                var streak = hasStreak ? StreakAlpha(recipe, x, y) : 0.0;
-                return BodyPixel(recipe, FaceSd(recipe, shape, x, y), sx * nx, sy * ny, toward, streak);
-            });
-        }
-
-        /// <summary>
-        /// A body piece over an edge piece whose boundary faces
-        /// <c>(wx, wy)</c> once posed: of one strength along the whole edge.
-        /// </summary>
-        private static ArtImage PaintBodyEdge(ArtRecipe recipe, int wx, int wy)
-        {
-            var toward = TowardLight(recipe);
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-                BodyPixel(recipe, FaceSd(recipe, QuarterShape.Edge, x, y), wx, wy, toward, 0.0));
-        }
-
-        /// <summary>
-        /// One body-piece pixel <c>−sd</c> inside the face's edge, whose
-        /// nearest edge faces <c>(nx, ny)</c> on the board. Untinted layers,
-        /// bottom to top:
-        /// <list type="bullet">
-        /// <item>the bevel ring, easing from the edge into the flat middle:
-        /// black along the side away from the light and the bottom, white
-        /// along tops, turning with the edge;</item>
-        /// <item>a faint white in the ring along edges facing the light's
-        /// side;</item>
-        /// <item>the top band, white along edges facing up, full to its depth
-        /// and then softly fading;</item>
-        /// <item>the reflection line, a thin white along edges facing down,
-        /// just above the lip;</item>
-        /// <item>the gloss streak, where the caller puts one.</item>
-        /// </list>
-        /// </summary>
-        private static (double tone, double alpha) BodyPixel(
-            ArtRecipe recipe, double sd, double nx, double ny, (double x, double y) toward, double streak)
-        {
-            var depth = -sd;
-            var up = Clamp01(ny);
-            var down = Clamp01(-ny);
-            var ring = 1.0 - Smooth(Clamp01(depth / recipe.BodyBevelPixels));
-            var lightSide = toward.x > 0.0 ? Clamp01(nx) : toward.x < 0.0 ? Clamp01(-nx) : 0.0;
-
-            double bandDepth = recipe.BodyTopBandPixels;
-            var band = depth <= bandDepth ? 1.0 : 1.0 - Smooth(Clamp01((depth - bandDepth) / recipe.BodyTopBandSoftnessPixels));
-            var line = 1.0 - Clamp01(depth - recipe.BodyReflectionPixels + 0.5);
-
-            // The edge on the light's side is lightened, never shaded.
-            var layer = (tone: 0.0, alpha: recipe.BodyBevelShadeAlpha * (1.0 - up) * (1.0 - lightSide) * ring);
-            layer = Over((1.0, recipe.BodyBevelLightAlpha * up * ring), layer);
-            layer = Over((1.0, recipe.BodySideLightAlpha * lightSide * ring), layer);
-            layer = Over((1.0, recipe.BodyTopBandAlpha * Smooth(up) * band), layer);
-            layer = Over((1.0, recipe.BodyReflectionAlpha * down * line), layer);
-            layer = Over((1.0, streak), layer);
-            return (layer.tone, layer.alpha * Coverage(recipe, sd));
-        }
-
-        /// <summary>
-        /// The gloss streak's alpha at <c>(x, y)</c> of a top-right-quarter
-        /// sprite: a capsule along the face's straight top, its middle
-        /// <see cref="ArtRecipe.BodyStreakDepthPixels"/> below the edge, from
-        /// <see cref="ArtRecipe.BodyStreakGapPixels"/> short of the corner's
-        /// curve toward the cell's middle. Mirrored onto the top-left corner
-        /// it starts just right of that corner's curve.
-        /// </summary>
-        private static double StreakAlpha(ArtRecipe recipe, double x, double y)
-        {
-            double q = recipe.QuarterPixels;
-            var e = q - recipe.BlockGapPixels / 2.0;
-            var curveStart = e - recipe.CornerRadiusPixels;
-            var near = curveStart - recipe.BodyStreakGapPixels;
-            var far = near - recipe.BodyStreakLengthPixels;
-            var middle = e - recipe.PieceOutlinePixels - recipe.BodyStreakDepthPixels;
-            var along = Clamp(x, far, near);
-            var d = Length(x - along, y - middle) - recipe.BodyStreakThicknessPixels / 2.0;
-            return recipe.BodyStreakAlpha * Coverage(recipe, d);
-        }
-
-        /// <summary>
-        /// How squarely an edge with outward normal <c>(nx, ny)</c> faces the
-        /// light, from 1 (lit) to −1 (shaded): their dot product, scaled so
-        /// that the straight edges nearest the light — the top and the left,
-        /// from the top left — count fully.
-        /// </summary>
-        private static double Facing(double nx, double ny, (double x, double y) toward)
-        {
-            var nearest = Math.Max(Math.Abs(toward.x), Math.Abs(toward.y));
-            return Clamp((nx * toward.x + ny * toward.y) / nearest, -1.0, 1.0);
-        }
-
-        /// <summary>
-        /// The unit vector toward the light, from
-        /// <see cref="ArtRecipe.LightAngleDegrees"/>. Cosine and sine are not
-        /// exactly rounded, so the result is rounded to nine decimals: a
-        /// last-bit difference between platforms then never reaches a pixel.
-        /// </summary>
-        private static (double x, double y) TowardLight(ArtRecipe recipe)
-        {
-            var radians = recipe.LightAngleDegrees * Math.PI / 180.0;
-            return (Math.Round(Math.Cos(radians), LightDirectionDecimals, MidpointRounding.AwayFromZero),
-                Math.Round(Math.Sin(radians), LightDirectionDecimals, MidpointRounding.AwayFromZero));
-        }
-
-        /// <summary>
-        /// A grid of <paramref name="perSide"/> by <paramref name="perSide"/>
-        /// studs on a cell, <see cref="ArtRecipe.StudSpacingPixels"/> apart
-        /// and centred on it, each a short flat-topped cylinder lit from
-        /// <see cref="ArtRecipe.LightAngleDegrees"/>, matte: a flat top in the
-        /// face's tone, shifting only gently away from the light, inside a
-        /// crisp darker rim all round; a darker crescent — its side — falling
-        /// away from the light; and under both the stud's soft shadow on the
-        /// face, falling further. The top sits
-        /// <see cref="ArtRecipe.StudDiscRaisePixels"/> above its grid point.
-        /// The shadow fades in from its outline, so it reaches no further than
-        /// its offset. The recipe keeps the spacing above a stud's reach, so
-        /// every pixel belongs to its nearest stud. One per side is the lone
-        /// stud a layered block's inner block places on its own grid.
-        /// </summary>
-        private static ArtImage PaintStuds(ArtRecipe recipe, int perSide)
-        {
-            var radius = recipe.StudDiameterPixels / 2.0;
-            double drop = recipe.StudFootDropPixels;
-            double shadowFall = drop + recipe.StudShadowOffsetPixels;
-            double shadowSoftness = recipe.StudShadowSoftnessPixels;
-            double raise = recipe.StudDiscRaisePixels;
-            var toward = TowardLight(recipe);
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var (cx, cy) = NearestStud(recipe, perSide, x, y);
-                var discY = cy + raise;
-                var top = Length(x - cx, y - discY) - radius;
-                var side = Length(x - cx + toward.x * drop, y - discY + toward.y * drop) - radius;
-
-                // The shadow is the stud's whole outline — disc and side —
-                // carried further away from the light.
-                var shadow = Math.Min(
-                    Length(x - cx + toward.x * recipe.StudShadowOffsetPixels, y - discY + toward.y * recipe.StudShadowOffsetPixels),
-                    Length(x - cx + toward.x * shadowFall, y - discY + toward.y * shadowFall)) - radius;
-                var shadowAlpha = Coverage(recipe, shadow) * (shadowSoftness > 0.0 ? Smooth(Clamp01(-shadow / shadowSoftness)) : 1.0);
-
-                // Away from the light the flat top shifts gently; the rim
-                // runs all round it, crisp, with one pixel of antialiasing.
-                var away = Clamp01(-((x - cx) * toward.x + (y - discY) * toward.y) / radius);
-                var tone = Lerp(Lerp(recipe.StudTone, recipe.StudShadeTone, Smooth(away)), recipe.StudRingTone, InRing(top, recipe.StudRingWidthPixels));
-
-                var sideAndShadow = Over((recipe.StudFootTone, Coverage(recipe, side)), (recipe.StudShadowTone, shadowAlpha));
-                return Over((tone, Coverage(recipe, top)), sideAndShadow);
-            });
-        }
-
-        /// <summary>
-        /// What lies untinted over each stud of <see cref="PaintStuds"/>' grid:
-        /// a faint thin white arc just inside the top's edge, as strong as
-        /// that edge faces the light, so it runs round the side toward the
-        /// light and is gone a quarter turn away. Matte: no glossy spot.
-        /// </summary>
-        private static ArtImage PaintGloss(ArtRecipe recipe, int perSide)
-        {
-            var radius = recipe.StudDiameterPixels / 2.0;
-            double raise = recipe.StudDiscRaisePixels;
-            var toward = TowardLight(recipe);
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var (cx, cy) = NearestStud(recipe, perSide, x, y);
-                var discY = cy + raise;
-                var fromCentre = Length(x - cx, y - discY);
-                var top = fromCentre - radius;
-                var facing = fromCentre > 0.0 ? Clamp01(((x - cx) * toward.x + (y - discY) * toward.y) / fromCentre) : 0.0;
-                var arc = Coverage(recipe, top) * InRing(top, recipe.StudRimLightWidthPixels);
-                return (1.0, recipe.StudRimLightAlpha * arc * facing);
-            });
-        }
-
-        /// <summary>
-        /// How much a pixel <c>−sd</c> inside a disc's edge belongs to a ring
-        /// <paramref name="width"/> wide along that edge: 1 within it, 0 deeper,
-        /// with one pixel of antialiasing between, so the ring stays crisp.
-        /// </summary>
-        private static double InRing(double sd, double width) => 1.0 - Clamp01(-sd - width + 0.5);
 
         /// <summary>
         /// The centre of the stud nearest a cell-sprite pixel: one of
@@ -583,16 +325,14 @@ namespace GateRush.Editor
             return first + index * spacing;
         }
 
-        /// <summary>The quarter shape a face or contour sprite is painted for.</summary>
+        /// <summary>The quarter shape a plain sprite is painted for.</summary>
         private static QuarterShape ShapeOf(ArtSprite sprite)
         {
             switch (sprite)
             {
                 case ArtSprite.QuarterOuter:
-                case ArtSprite.ContourOuter:
                     return QuarterShape.Outer;
                 case ArtSprite.QuarterEdge:
-                case ArtSprite.ContourEdge:
                     return QuarterShape.Edge;
                 case ArtSprite.QuarterFill:
                     return QuarterShape.Fill;
@@ -602,9 +342,9 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Signed distance to a piece's whole silhouette, the outline's outer
-        /// edge, in quarter-local pixels: the cell's centre at the origin, its
-        /// corner at <c>(q, q)</c>, the edge at <c>e = q − gap/2</c>.
+        /// Signed distance to a piece's silhouette, the body's edge, in
+        /// quarter-local pixels: the cell's centre at the origin, its corner
+        /// at <c>(q, q)</c>, the edge at <c>e = q − gap/2</c>.
         /// </summary>
         private static double SilhouetteSd(ArtRecipe recipe, QuarterShape shape, double x, double y)
         {
@@ -628,19 +368,11 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Signed distance to a face piece: the silhouette's, offset inward by
-        /// the outline. Offsetting a signed distance keeps every corner's
-        /// centre, so the ring between the two is even all round.
-        /// </summary>
-        private static double FaceSd(ArtRecipe recipe, QuarterShape shape, double x, double y) =>
-            SilhouetteSd(recipe, shape, x, y) + recipe.PieceOutlinePixels;
-
-        /// <summary>
-        /// The outward normal of the boundary nearest <c>(x, y)</c>, in the
-        /// sprite's own frame (the top-right quarter). Exact wherever a light
-        /// band reaches, which <see cref="ArtRecipe.Problems"/> keeps within a
-        /// face corner's radius of the edge: there the normal turns smoothly,
-        /// never jumping across a corner's diagonal.
+        /// The outward direction of the boundary nearest <c>(x, y)</c>, in the
+        /// sprite's own frame (the top-right quarter). Exact wherever the
+        /// bevel reaches, which <see cref="ArtRecipe.Problems"/> keeps within a
+        /// corner's radius of the edge: there it turns smoothly, never jumping
+        /// across a corner's diagonal.
         /// </summary>
         private static (double x, double y) OutwardNormal(ArtRecipe recipe, QuarterShape shape, double x, double y)
         {

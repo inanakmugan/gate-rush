@@ -12,7 +12,8 @@ namespace GateRush.Editor
     /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15, 16, 17, 18, 19 and 46 from
     /// the project's <see cref="ArtRecipe"/> and writes it as a PNG under
     /// <see cref="OutputFolder"/>, with its import settings (D46), then sets
-    /// each into its <see cref="RuntimeConfig"/> field. The PNGs are
+    /// each into its <see cref="RuntimeConfig"/> field, with the four
+    /// materials the lit body draws with. The PNGs and materials are
     /// committed; the build never runs this.
     /// </summary>
     /// <remarks>
@@ -84,7 +85,98 @@ namespace GateRush.Editor
                 $"{report.Unchanged} unchanged.",
                 recipe);
 
-            AssignToRuntimeConfig();
+            var materials = GenerateMaterials(recipe);
+            AssignToRuntimeConfig(materials);
+        }
+
+        /// <summary>Where the generated materials live.</summary>
+        public const string MaterialFolder = "Assets/Art/Materials";
+
+        private const string MaterialFolderName = "Materials";
+
+        /// <summary>The shader the board's lit and highlight sprites draw with (Module 46).</summary>
+        public const string BoardShaderName = "Gate Rush/Board Sprite";
+
+        /// <summary>Its twin for the introduction cards' UI Images.</summary>
+        public const string BoardUiShaderName = "Gate Rush/Board UI Sprite";
+
+        /// <summary>
+        /// The four materials the lit body draws with (Module 46), keyed by
+        /// their <see cref="RuntimeConfig"/> field: for SpriteRenderers and
+        /// for UI Images, a lit one that multiplies faces and studs back by
+        /// <see cref="ArtRecipe.ShadeHeadroom"/>, and a highlight one that adds
+        /// its white. Each is created at <see cref="MaterialFolder"/> when
+        /// missing and brought to these settings, saved only when one changed.
+        /// </summary>
+        /// <returns>The materials made or found; empty when a shader could not be found, which is logged.</returns>
+        public static IReadOnlyDictionary<string, Material> GenerateMaterials(ArtRecipe recipe)
+        {
+            if (!AssetDatabase.IsValidFolder(MaterialFolder))
+            {
+                AssetDatabase.CreateFolder(ParentFolder, MaterialFolderName);
+            }
+
+            var board = Shader.Find(BoardShaderName);
+            var ui = Shader.Find(BoardUiShaderName);
+            if (board == null || ui == null)
+            {
+                Debug.LogError($"Generate Art: the shaders '{BoardShaderName}' and '{BoardUiShaderName}' must both be in the project; no material was made.");
+                return new Dictionary<string, Material>();
+            }
+
+            return new Dictionary<string, Material>
+            {
+                ["litMaterial"] = EnsureMaterial("BoardLit", board, recipe.ShadeHeadroom, isAdditive: false),
+                ["specularMaterial"] = EnsureMaterial("BoardSpecular", board, 1f, isAdditive: true),
+                ["uiLitMaterial"] = EnsureMaterial("BoardUiLit", ui, recipe.ShadeHeadroom, isAdditive: false),
+                ["uiSpecularMaterial"] = EnsureMaterial("BoardUiSpecular", ui, 1f, isAdditive: true),
+            };
+        }
+
+        /// <summary>
+        /// The material <paramref name="name"/> under <see cref="MaterialFolder"/>
+        /// on <paramref name="shader"/>, created when missing: alpha-blended and
+        /// scaled by <paramref name="colorScale"/>, or premultiplied so it adds
+        /// its colour (<paramref name="isAdditive"/>).
+        /// </summary>
+        private static Material EnsureMaterial(string name, Shader shader, float colorScale, bool isAdditive)
+        {
+            var path = $"{MaterialFolder}/{name}.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(shader);
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            var isChanged = material.shader != shader;
+            if (isChanged)
+            {
+                material.shader = shader;
+            }
+
+            isChanged |= SetFloat(material, "_ColorScale", colorScale);
+            isChanged |= SetFloat(material, "_Premultiply", isAdditive ? 1f : 0f);
+            isChanged |= SetFloat(material, "_SrcBlend", (float)(isAdditive ? UnityEngine.Rendering.BlendMode.One : UnityEngine.Rendering.BlendMode.SrcAlpha));
+            isChanged |= SetFloat(material, "_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+            if (isChanged)
+            {
+                EditorUtility.SetDirty(material);
+                AssetDatabase.SaveAssetIfDirty(material);
+            }
+
+            return material;
+        }
+
+        private static bool SetFloat(Material material, string property, float value)
+        {
+            if (material.GetFloat(property) == value)
+            {
+                return false;
+            }
+
+            material.SetFloat(property, value);
+            return true;
         }
 
         /// <summary>
@@ -109,12 +201,13 @@ namespace GateRush.Editor
 
         /// <summary>
         /// Sets every generated sprite into its field of the project's only
-        /// <see cref="RuntimeConfig"/> (<see cref="RuntimeConfigField"/>), so the
-        /// config always holds what the generator wrote. Saves only when a
-        /// field changed, and logs one line per field it set; logs an error
-        /// and sets nothing it cannot resolve.
+        /// <see cref="RuntimeConfig"/> (<see cref="RuntimeConfigField"/>), and
+        /// each of <paramref name="materials"/> into the field it is keyed by,
+        /// so the config always holds what the generator wrote. Saves only
+        /// when a field changed, and logs one line per field it set; logs an
+        /// error and sets nothing it cannot resolve.
         /// </summary>
-        private static void AssignToRuntimeConfig()
+        private static void AssignToRuntimeConfig(IReadOnlyDictionary<string, Material> materials)
         {
             var guids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
             if (guids.Length != 1)
@@ -161,6 +254,22 @@ namespace GateRush.Editor
                 {
                     property.objectReferenceValue = loaded;
                     set.Add($"{field} = {path}");
+                }
+            }
+
+            foreach (var pair in materials)
+            {
+                var property = serialized.FindProperty(pair.Key);
+                if (property == null || property.propertyType != SerializedPropertyType.ObjectReference)
+                {
+                    Debug.LogError($"Generate Art: {config.name} has no material field '{pair.Key}'.", config);
+                    continue;
+                }
+
+                if (property.objectReferenceValue != pair.Value)
+                {
+                    property.objectReferenceValue = pair.Value;
+                    set.Add($"{pair.Key} = {AssetDatabase.GetAssetPath(pair.Value)}");
                 }
             }
 
@@ -284,7 +393,11 @@ namespace GateRush.Editor
             return true;
         }
 
-        private static bool TryFindRecipe(out ArtRecipe recipe, out string error)
+        /// <summary>
+        /// The <see cref="ArtRecipe"/> selected in the Project window, or the
+        /// project's only one; false, with why, when there is neither.
+        /// </summary>
+        internal static bool TryFindRecipe(out ArtRecipe recipe, out string error)
         {
             recipe = Selection.activeObject as ArtRecipe;
             if (recipe != null)

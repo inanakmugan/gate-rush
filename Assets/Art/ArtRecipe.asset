@@ -14,29 +14,23 @@ MonoBehaviour:
   m_EditorClassIdentifier: GateRush.Editor::GateRush.Editor.ArtRecipe
   cellPixels: 128
   antiAliasPixels: 1
-  blockGapPixels: 3
-  cornerRadiusPixels: 26
+  blockGapPixels: 6
+  cornerRadiusPixels: 24
   concaveRadiusPixels: 1
-  pieceOutlinePixels: 5
-  lightAngleDegrees: 135
-  lightBandPixels: 10
-  lightAlpha: 0.12
-  shadeBandPixels: 8
-  shadeAlpha: 0.3
-  bodyBevelPixels: 13
-  bodyBevelShadeAlpha: 0.18
-  bodyBevelLightAlpha: 0.1
-  bodySideLightAlpha: 0.08
-  bodyTopBandPixels: 7
-  bodyTopBandSoftnessPixels: 6
-  bodyTopBandAlpha: 0.45
-  bodyStreakLengthPixels: 22
-  bodyStreakThicknessPixels: 3.5
-  bodyStreakDepthPixels: 4
-  bodyStreakGapPixels: 2.5
-  bodyStreakAlpha: 0.7
-  bodyReflectionPixels: 2
-  bodyReflectionAlpha: 0.35
+  bevelPixels: 16
+  bodyHeightPixels: 11
+  lightDirection: {x: -0.45, y: 0.55, z: 0.7}
+  ambient: 0.6
+  diffuse: 0.55
+  shininess: 30
+  specularStrength: 0.3
+  occlusionFoot: 0.16
+  occlusionFootPixels: 2
+  occlusionMinimum: 0.4
+  shadeHeadroom: 2
+  floorShadowAlpha: 0.5
+  floorShadowSpreadPixels: 11.3
+  floorShadowOffsetPixels: {x: 3, y: -5}
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10
@@ -45,18 +39,22 @@ MonoBehaviour:
   studsPerCellSide: 2
   studSpacingPixels: 59
   studDiameterPixels: 35
-  studTone: 1
-  studShadeTone: 0.95
-  studRingWidthPixels: 2
-  studRingTone: 0.8
-  studFootDropPixels: 7
-  studFootTone: 0.6
-  studShadowOffsetPixels: 3
-  studShadowTone: 0.7
-  studShadowSoftnessPixels: 2
-  studDiscRaisePixels: 3
-  studRimLightAlpha: 0.15
-  studRimLightWidthPixels: 1.5
+  studEdgePixels: 0.6
+  studContactOffsetPixels: {x: 2, y: -3}
+  studContactAlpha: 0.3
+  studContactInnerPixels: -1
+  studContactOuterPixels: 6
+  studWallOffsetPixels: {x: 1.2, y: -2.2}
+  studWallTone: 0.55
+  studTopOffsetPixels: {x: -0.6, y: 1}
+  studTopTone: 1.08
+  studRimInnerPixels: 3.5
+  studRimFullPixels: 1.2
+  studRimFadePixels: 1
+  studRimLightDirection: {x: -0.6, y: 0.8}
+  studRimLightAlpha: 0.35
+  studRimLightExponent: 1.5
+  studRimDarken: 0.12
   floorTone: 0.85
   gridLineTone: 1
   gridLinePixels: 2

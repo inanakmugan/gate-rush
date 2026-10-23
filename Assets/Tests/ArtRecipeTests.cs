@@ -9,7 +9,8 @@ namespace GateRush.Tests
     /// Covers <see cref="ArtRecipe.Problems"/>: the default recipe generates,
     /// and each constraint that keeps the pieces meeting at their seams and the
     /// state sprites (Module 16) drawable is reported, naming its field, when
-    /// broken.
+    /// broken. Module 46: the default occlusion falloff follows the reference
+    /// script's blur at a bevel's foot.
     /// </summary>
     public class ArtRecipeTests
     {
@@ -38,32 +39,24 @@ namespace GateRush.Tests
         [TestCase("concaveRadiusPixels", 6f, "Concave Radius Pixels")]
         [TestCase("cornerRadiusPixels", 63f, "Corner Radius Pixels")]
         [TestCase("rimWidthPixels", 60f, "Rim Width Pixels")]
-        [TestCase("pieceOutlinePixels", 0f, "Piece Outline Pixels")]
-        [TestCase("pieceOutlinePixels", 30f, "Piece Outline Pixels")]
-        [TestCase("lightBandPixels", 0f, "Light Band Pixels")]
-        [TestCase("lightBandPixels", 22f, "Light Band Pixels")]
-        [TestCase("shadeBandPixels", 0f, "Shade Band Pixels")]
-        [TestCase("shadeBandPixels", 22f, "Shade Band Pixels")]
-        [TestCase("studDiscRaisePixels", -1f, "Stud Disc Raise Pixels")]
-        [TestCase("studDiscRaisePixels", 11f, "Stud Disc Raise Pixels")]
-        [TestCase("studShadowOffsetPixels", -1f, "Stud Shadow Offset Pixels")]
-        [TestCase("studShadowOffsetPixels", 20f, "Stud Shadow Offset Pixels")]
-        [TestCase("studShadowSoftnessPixels", -1f, "Stud Shadow Softness Pixels")]
+        [TestCase("bevelPixels", 0f, "Bevel Pixels")]
+        [TestCase("bevelPixels", 30f, "Bevel Pixels")]
+        [TestCase("cornerRadiusPixels", 10f, "Bevel Pixels")]
+        [TestCase("bodyHeightPixels", 0f, "Body Height Pixels")]
+        [TestCase("shininess", 0.5f, "Shininess")]
+        [TestCase("occlusionFootPixels", 0f, "Occlusion Foot Pixels")]
+        [TestCase("occlusionFootPixels", 20f, "Occlusion Foot Pixels")]
+        [TestCase("shadeHeadroom", 1f, "Shade Headroom")]
+        [TestCase("floorShadowSpreadPixels", 0f, "Floor Shadow Spread Pixels")]
+        [TestCase("floorShadowSpreadPixels", 70f, "Floor Shadow Spread Pixels")]
         [TestCase("studDiameterPixels", 130f, "Stud Diameter Pixels")]
         [TestCase("studDiameterPixels", 62f, "Stud Diameter Pixels")]
-        [TestCase("studFootDropPixels", -1f, "Stud Foot Drop Pixels")]
-        [TestCase("studFootDropPixels", 30f, "Stud Foot Drop Pixels")]
-        [TestCase("bodyBevelPixels", 0f, "Body Bevel Pixels")]
-        [TestCase("bodyBevelPixels", 22f, "Body Bevel Pixels")]
-        [TestCase("bodyTopBandPixels", 20f, "Body Top Band Pixels")]
-        [TestCase("bodyTopBandSoftnessPixels", 0f, "Body Top Band Softness Pixels")]
-        [TestCase("bodyReflectionPixels", 0f, "Body Reflection Pixels")]
-        [TestCase("bodyStreakLengthPixels", 40f, "Body Streak")]
-        [TestCase("bodyStreakDepthPixels", 1f, "Body Streak")]
+        [TestCase("studEdgePixels", 0f, "Stud Edge Pixels")]
+        [TestCase("studContactInnerPixels", 7f, "Stud Contact Inner Pixels")]
+        [TestCase("studRimFullPixels", 4f, "Stud Rim")]
+        [TestCase("studRimLightExponent", 0f, "Stud Rim Light Exponent")]
         [TestCase("studSpacingPixels", 40f, "Stud Spacing Pixels")]
         [TestCase("studSpacingPixels", 80f, "Stud Spacing Pixels")]
-        [TestCase("studRimLightWidthPixels", 0f, "Stud Rim Light Width Pixels")]
-        [TestCase("studRimLightWidthPixels", 20f, "Stud Rim Light Width Pixels")]
         [TestCase("gateArrowOutlinePixels", 0f, "Gate Arrow Outline Pixels")]
         [TestCase("gateArrowOutlinePixels", 6f, "Gate Arrow Outline Pixels")]
         [TestCase("axisArrowHeadLengthPixels", 96f, "Axis Arrow Head Length Pixels")]
@@ -175,16 +168,65 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_LightFromBelow_PutsTheStudsOutsideTheFace()
+        public void Problems_LightBehindTheBoard_IsReported()
         {
-            // The crescent and shadow fall away from the light: from below,
-            // they fall up past the raised disc, where the default stud fits
-            // only from the top left.
-            SetFloat("lightAngleDegrees", 270f);
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("lightDirection").vector3Value = new Vector3(-0.45f, 0.55f, -0.7f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var problems = recipe.Problems();
 
-            Assert.That(problems, Has.Some.Contains("put the studs outside the face"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Light Direction"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void OcclusionPair_DefaultRecipe_MatchesTheReferenceBlurBesideANeighbour()
+        {
+            // The reference darkens a bevel's foot by how much a blur of the
+            // height rises above it: AO = clamp(1 − (blur(h) − h) · k, 0.4, 1),
+            // a Gaussian of 6 px, k 0.06 (reference_render.py). Across a
+            // straight edge, with the next block's bevel the gap away as on
+            // the board, the blur is one-dimensional. The recipe's falloff
+            // must follow it to within a few hundredths, foot to flat.
+            const double Sigma = 6.0;
+            const double K = 0.06;
+            const double Floor = 0.4;
+            const double Tolerance = 0.03;
+            const double Step = 0.05;
+            const double Reach = 40.0;
+            double gap = recipe.BlockGapPixels;
+            double bevel = recipe.BevelPixels;
+            double bodyHeight = recipe.BodyHeightPixels;
+
+            double Height(double depth)
+            {
+                // Inside this body, in the gap, or inside the neighbour.
+                var into = depth > 0.0 ? depth : depth < -gap ? -depth - gap : 0.0;
+                var t = System.Math.Min(1.0, into / bevel);
+                return into <= 0.0 ? 0.0 : System.Math.Sqrt(1.0 - (1.0 - t) * (1.0 - t)) * bodyHeight;
+            }
+
+            var compared = 0;
+            foreach (var depth in new[] { 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 6.0 })
+            {
+                var sum = 0.0;
+                var weights = 0.0;
+                for (var x = -Reach; x <= Reach; x += Step)
+                {
+                    var weight = System.Math.Exp(-x * x / (2.0 * Sigma * Sigma));
+                    sum += weight * Height(depth + x);
+                    weights += weight;
+                }
+
+                var reference = System.Math.Max(Floor, System.Math.Min(1.0, 1.0 - (sum / weights - Height(depth)) * K));
+                var t = System.Math.Min(1.0, depth / recipe.OcclusionFootPixels);
+                var recipes = System.Math.Max(recipe.OcclusionMinimum, 1.0 - recipe.OcclusionFoot * (1.0 - t * t * (3.0 - 2.0 * t)));
+
+                Assert.AreEqual(reference, recipes, Tolerance, $"the occlusion {depth} px in");
+                compared++;
+            }
+
+            Assert.AreEqual(7, compared);
         }
 
         private void SetFloat(string field, float value)
