@@ -74,8 +74,13 @@ namespace GateRush.UI.Editor
 
         // Home Page.
 
-        /// <summary>The Play button's foot above the page's foot, which is the tab bar's top: in the lower third, within a thumb's reach.</summary>
-        public const float PlayButtonBottomGap = 60f;
+        /// <summary>
+        /// The Play button's foot above the page's foot, which is the tab bar's
+        /// top: in the lower third, within a thumb's reach, and clear of the
+        /// selected tab's raised tile, which stands about 25 units above the
+        /// bar. The notice sits <see cref="NoticeGap"/> above the button.
+        /// </summary>
+        public const float PlayButtonBottomGap = 120f;
 
         /// <summary>The space between the Play button's top and the notice above it.</summary>
         public const float NoticeGap = 20f;

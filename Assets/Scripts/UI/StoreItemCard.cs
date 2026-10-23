@@ -37,6 +37,17 @@ namespace GateRush.UI
         [Tooltip("The coin beside the price; hidden when the button shows no price.")]
         [SerializeField] private GameObject coinIcon;
 
+        [Tooltip("How far the label's left edge is moved right on the prefab to make room for the coin; taken back while the coin is hidden. Written by the UI builder.")]
+        [SerializeField] private float coinLabelShift;
+
+        [Tooltip("How far a label with no coin is raised, so it is centred on the button's face above its lip. Written by the UI builder.")]
+        [SerializeField] private float textOnlyRaise;
+
+        private Vector2 labelRestOffsetMin;
+        private Vector2 labelRestOffsetMax;
+        private VerticalAlignmentOptions labelRestAlignment;
+        private bool hasLabelRest;
+
         /// <summary>Raised when the buy button is pressed.</summary>
         public event Action Pressed;
 
@@ -45,8 +56,11 @@ namespace GateRush.UI
         /// and <paramref name="priceText"/> on the button, with the coin when
         /// <paramref name="showsCoin"/>; the button can be pressed only when
         /// <paramref name="isPressable"/>, and its label then takes the
-        /// pressable colour. The icon is opaque, the lock hidden and the buy
-        /// button shown again after <see cref="ShowLocked"/>.
+        /// pressable colour. With the coin the label is where the prefab puts
+        /// it, beside the coin; without it the label is centred on the
+        /// button's face both ways — its drawn letters, not the font's line,
+        /// centred. The icon is opaque, the lock hidden and the buy button
+        /// shown again after <see cref="ShowLocked"/>.
         /// </summary>
         public void Show(string subText, string priceText, bool isPressable, bool showsCoin, UiConfig config)
         {
@@ -54,6 +68,7 @@ namespace GateRush.UI
             subLabel.text = subText;
             priceLabel.text = priceText;
             coinIcon.SetActive(showsCoin);
+            PlaceLabel(showsCoin);
             buyButton.interactable = isPressable;
             priceLabel.color = isPressable ? config.ButtonLabelColor : config.DisabledButtonLabelColor;
         }
@@ -80,6 +95,36 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, buyButton, owner, nameof(buyButton));
             UiParts.AddIfMissing(missing, priceLabel, owner, nameof(priceLabel));
             UiParts.AddIfMissing(missing, coinIcon, owner, nameof(coinIcon));
+        }
+
+        /// <summary>
+        /// The label beside the coin, as built, or — with the coin hidden —
+        /// spanning the button evenly, raised onto the face and centred on its
+        /// drawn letters. The built place is taken the first time, before
+        /// anything moves it.
+        /// </summary>
+        private void PlaceLabel(bool showsCoin)
+        {
+            var rect = priceLabel.rectTransform;
+            if (!hasLabelRest)
+            {
+                labelRestOffsetMin = rect.offsetMin;
+                labelRestOffsetMax = rect.offsetMax;
+                labelRestAlignment = priceLabel.verticalAlignment;
+                hasLabelRest = true;
+            }
+
+            if (showsCoin)
+            {
+                rect.offsetMin = labelRestOffsetMin;
+                rect.offsetMax = labelRestOffsetMax;
+                priceLabel.verticalAlignment = labelRestAlignment;
+                return;
+            }
+
+            rect.offsetMin = labelRestOffsetMin + new Vector2(-coinLabelShift, textOnlyRaise);
+            rect.offsetMax = labelRestOffsetMax + new Vector2(0f, textOnlyRaise);
+            priceLabel.verticalAlignment = VerticalAlignmentOptions.Geometry;
         }
 
         private void SetLocked(bool isLocked, UiConfig config)

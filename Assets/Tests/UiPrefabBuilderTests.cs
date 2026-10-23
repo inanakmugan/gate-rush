@@ -230,6 +230,11 @@ namespace GateRush.Tests
             "Win Streak Overlay", ProfileOverlayName, GoldPacksOverlayName
         };
 
+        // The Store's Refill Lives card, and how far a text-only buy label is
+        // raised onto the button's face above its lip.
+        private const string LivesCardName = "Lives Card";
+        private const float ButtonFaceRaise = 5f;
+
         // The streak marker: its round base, and the ring over its rim.
         private const string MarkerBaseSpritePath = "Assets/Art/Sprites/UI/button_round_blue.png";
 
@@ -426,6 +431,47 @@ namespace GateRush.Tests
                 Assert.IsTrue(unlocked.isBuyShown);
                 Assert.IsFalse(unlocked.isLockShown);
                 Assert.AreEqual(1f, unlocked.iconAlpha, "the icon is opaque again");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        [Test]
+        public void StoreItemCard_ShowWithoutCoin_CentresTheLabelOnTheFaceAndShowWithCoinRestoresIt()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{FrontEndName}.prefab");
+            try
+            {
+                var card = contents.GetComponentsInChildren<StoreItemCard>(true).Single(item => item.name == LivesCardName);
+                TMP_Text label;
+                using (var serialized = new SerializedObject(card))
+                {
+                    label = Label(serialized, "priceLabel");
+                }
+
+                var rect = label.rectTransform;
+                var builtMin = rect.offsetMin;
+                var builtMax = rect.offsetMax;
+                var builtAlignment = label.verticalAlignment;
+
+                card.Show(config.LivesFullLabel, config.LivesFullLabel, false, false, config);
+                var fullMin = rect.offsetMin;
+                var fullMax = rect.offsetMax;
+                var fullAlignment = label.verticalAlignment;
+                card.Show(config.LivesFullLabel, config.LivesFullLabel, true, true, config);
+
+                Assert.AreEqual(Vector2.zero, rect.anchorMin, "the label spans the button");
+                Assert.AreEqual(Vector2.one, rect.anchorMax, "the label spans the button");
+                Assert.AreEqual(fullMin.x, -fullMax.x, Tolerance, "full: symmetric about the button's centre, whichever way it was off");
+                Assert.AreEqual(ButtonFaceRaise, (fullMin.y + fullMax.y) / 2f, Tolerance, "full: raised onto the face above the lip");
+                Assert.AreEqual(VerticalAlignmentOptions.Geometry, fullAlignment, "full: the drawn letters are centred");
+                Assert.AreEqual(builtMin, rect.offsetMin, "with the coin: as built");
+                Assert.AreEqual(builtMax, rect.offsetMax, "with the coin: as built");
+                Assert.AreEqual(builtAlignment, label.verticalAlignment, "with the coin: as built");
             }
             finally
             {

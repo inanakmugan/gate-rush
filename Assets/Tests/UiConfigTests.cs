@@ -288,6 +288,7 @@ namespace GateRush.Tests
         [TestCase("streakColor", "Streak Color")]
         [TestCase("buttonLabelColor", "Button Label Color")]
         [TestCase("disabledButtonLabelColor", "Disabled Button Label Color")]
+        [TestCase("disabledJokerIconColor", "Disabled Joker Icon Color")]
         [TestCase("leaderboardHighlightColor", "Leaderboard Highlight Color")]
         [TestCase("leaderboardRowColor", "Leaderboard Row Color")]
         [TestCase("jokerSelectedColor", "Joker Selected Color")]
@@ -373,6 +374,16 @@ namespace GateRush.Tests
             Assert.AreEqual("Unlocks at Level {0}", config.UnlocksAtFormat);
             Assert.AreEqual("+{0} {1}, opens at Level {2}", config.LockedPrizeFormat);
             Assert.AreEqual(0.7f, config.LockedIconAlpha, "a locked joker's icon shows a little behind its lock");
+        }
+
+        [Test]
+        public void Defaults_DisabledLooks_AreThePurpleLabelAndTheGreyBlueJokerIcon()
+        {
+            var themePurple = new Color(0.231f, 0.141f, 0.400f);
+            var greyBlue = new Color(0.43f, 0.44f, 0.56f);
+
+            Assert.AreEqual(themePurple, config.DisabledButtonLabelColor, "readable on the grey button");
+            Assert.AreEqual(greyBlue, config.DisabledJokerIconColor, "a disabled joker's icon looks as before");
         }
 
         [Test]

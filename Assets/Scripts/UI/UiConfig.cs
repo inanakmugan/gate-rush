@@ -357,8 +357,11 @@ namespace GateRush.UI
         [Tooltip("A button's label while it can be pressed.")]
         [SerializeField] private Color buttonLabelColor = Color.white;
 
-        [Tooltip("A button's label while it cannot be pressed, readable on the grey sprite.")]
-        [SerializeField] private Color disabledButtonLabelColor = new Color(0.43f, 0.44f, 0.56f);
+        [Tooltip("A button's label while it cannot be pressed: the theme's dark purple, #3B2466, readable on the grey sprite.")]
+        [SerializeField] private Color disabledButtonLabelColor = new Color(0.231f, 0.141f, 0.400f);
+
+        [Tooltip("A joker button's icon while it cannot be pressed: the full-colour icon tinted towards grey.")]
+        [SerializeField] private Color disabledJokerIconColor = new Color(0.43f, 0.44f, 0.56f);
 
         [Tooltip("The player's own row on the Leaderboard.")]
         [SerializeField] private Color leaderboardHighlightColor = new Color(1f, 0.914f, 0.659f);
@@ -693,6 +696,9 @@ namespace GateRush.UI
         /// <summary>A button's label while it cannot be pressed.</summary>
         public Color DisabledButtonLabelColor => disabledButtonLabelColor;
 
+        /// <summary>A joker button's icon while it cannot be pressed.</summary>
+        public Color DisabledJokerIconColor => disabledJokerIconColor;
+
         /// <summary>The player's own row on the Leaderboard.</summary>
         public Color LeaderboardHighlightColor => leaderboardHighlightColor;
 
@@ -891,6 +897,7 @@ namespace GateRush.UI
             AddIfTransparent(problems, streakColor, "Streak Color");
             AddIfTransparent(problems, buttonLabelColor, "Button Label Color");
             AddIfTransparent(problems, disabledButtonLabelColor, "Disabled Button Label Color");
+            AddIfTransparent(problems, disabledJokerIconColor, "Disabled Joker Icon Color");
             AddIfTransparent(problems, leaderboardHighlightColor, "Leaderboard Highlight Color");
             AddIfTransparent(problems, leaderboardRowColor, "Leaderboard Row Color");
             AddIfTransparent(problems, jokerSelectedColor, "Joker Selected Color");

@@ -501,6 +501,12 @@ namespace GateRush.UI.Editor
         private const float ButtonCoinSize = 64f;
         private const float ButtonCoinInset = 30f;
         private const float ButtonLabelCoinShift = 70f;
+
+        // A buy button showing text alone ("Full") centres it on the face,
+        // which sits above the rect's centre: the rectangle sprites have 9
+        // pixels of outline at the top and 19 of lip and outline at the foot,
+        // drawn at their own scale, so the face's middle is 5 units higher.
+        private const float ButtonFaceRaise = 5f;
         private const float RibbonWidth = 220f;
         private const float RibbonHeight = 52f;
         private const float RibbonFontSize = 34f;
@@ -950,6 +956,8 @@ namespace GateRush.UI.Editor
         private const string SubLabelField = "subLabel";
         private const string CoinIconField = "coinIcon";
         private const string LockIconField = "lockIcon";
+        private const string CoinLabelShiftField = "coinLabelShift";
+        private const string TextOnlyRaiseField = "textOnlyRaise";
         private const string GlowField = "glow";
         private const string ScrollRectField = "scrollRect";
         private const string GoldHeaderField = "goldHeader";
@@ -1461,7 +1469,8 @@ namespace GateRush.UI.Editor
             var priceLabel = SetNestedLabel(button, priceText);
 
             // The coin is added to this instance only; the label moves right
-            // to make room for it.
+            // to make room for it, and StoreItemCard takes the move back, and
+            // raises the label onto the face, while the coin is hidden.
             var coin = UiBuilder.CreateRect(CoinName, button);
             UiBuilder.Place(coin, new Vector2(AnchorLow, AnchorMid), new Vector2(ButtonCoinInset, 0f), new Vector2(ButtonCoinSize, ButtonCoinSize));
             UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
@@ -1478,6 +1487,8 @@ namespace GateRush.UI.Editor
                 (BuyButtonField, Single<Button>(button.gameObject, ButtonPrimaryName)),
                 (PriceLabelField, priceLabel),
                 (CoinIconField, coin.gameObject));
+            SetFloat(component, CoinLabelShiftField, ButtonLabelCoinShift);
+            SetFloat(component, TextOnlyRaiseField, ButtonFaceRaise);
             return component;
         }
 
