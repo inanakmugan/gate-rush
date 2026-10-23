@@ -490,7 +490,7 @@ namespace GateRush.Runtime
             for (var i = 0; i < block.Tiles.Count; i++)
             {
                 var tile = block.Tiles[i];
-                PoseQuarter(block.OutlineQuarters[i], tile, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
+                PoseQuarter(block.OutlineQuarters[i], tile, QuarterLayer.Contour, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
             }
         }
 
@@ -1409,7 +1409,7 @@ namespace GateRush.Runtime
 
             var edgeInset = config.LayerInsetCells;
             var innerInset = config.LayerInnerInsetCells;
-            var shineTiles = QuarterLayers.Shine(block.Tiles, isTop: true);
+            var lightTiles = QuarterLayers.Contour(block.Tiles);
 
             // A footprint has at least one cell, so each quarter list holds
             // at least four quarters, all drawn in one colour.
@@ -1438,7 +1438,7 @@ namespace GateRush.Runtime
 
                     PoseInset(layer.Edge, block.Tiles, edgeInset * (1f - t));
                     PoseInset(layer.Face, block.Tiles, innerInset * (1f - t));
-                    PoseShineInset(layer.Shine, shineTiles, block.Tiles, innerInset * (1f - t));
+                    PoseShineInset(layer.Shine, lightTiles, block.Tiles, innerInset * (1f - t));
 
                     SetColor(block.LipQuarters, Color.Lerp(lipFrom, lipTo, t));
                     for (var i = 0; i < layer.Studs.Count; i++)

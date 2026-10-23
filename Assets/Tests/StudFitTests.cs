@@ -10,10 +10,11 @@ using Object = UnityEngine.Object;
 namespace GateRush.Tests
 {
     /// <summary>
-    /// Checks that a 1×1 block's grid of studs, with their feet, sits inside
-    /// its face (Module 46): clear of the outline at the top and the sides and
-    /// of the lip at the bottom, by at least <see cref="MinFacePixels"/> of
-    /// face. The fit depends on two assets that cannot see each other — the
+    /// Checks that a 1×1 block's grid of studs, with their crescents and
+    /// shadows falling away from the light, sits inside its face (Module 46):
+    /// clear of the outline at the top and the sides, of the lip at the
+    /// bottom, and of every rounded corner — the bottom ones squashed by the
+    /// lip — by at least <see cref="MinFacePixels"/> of face. The fit depends on two assets that cannot see each other — the
     /// <see cref="ArtRecipe"/> draws the studs, the gap and the outline, and
     /// <see cref="RuntimeConfig"/> sets the lip that shortens the face and
     /// raises the studs — so it is checked here, on the code defaults and on
@@ -73,26 +74,39 @@ namespace GateRush.Tests
             var faceBottom = bottomRight.yMax - faceShare * bottomRight.height;
 
             var perSide = recipe.StudsPerCellSide;
-            var radius = recipe.StudDiameterPixels / 2f / cell;
-            var drop = recipe.StudFootDropPixels / cell;
             var rise = FaceShape.ContentRise(lip);
             var lowest = 0.5f / perSide + rise;
             var highest = (perSide - 0.5f) / perSide + rise;
             var outermost = (perSide - 0.5f) / perSide;
+            var innermost = 0.5f / perSide;
 
-            // A stud is a disc raised off its grid point over a crescent
-            // hanging the rest of its depth below it.
+            // A stud is a disc raised off its grid point, with its crescent
+            // and shadow falling away from the light (StudReach).
             var raise = recipe.StudDiscRaisePixels / cell;
-            Assert.GreaterOrEqual(faceTop - (highest + raise + radius), margin, "face above the top studs");
-            Assert.GreaterOrEqual(lowest + raise - drop - radius - faceBottom, margin, "face below the bottom studs' crescents");
-            Assert.GreaterOrEqual(faceRight - (outermost + radius), margin, "face beside the outer studs");
+            var reach = StudReach.Of(recipe);
+            Assert.GreaterOrEqual(faceTop - (highest + raise + reach.Up), margin, "face above the top studs");
+            Assert.GreaterOrEqual(lowest + raise - reach.Down - faceBottom, margin, "face below the bottom studs, crescent and shadow");
+            Assert.GreaterOrEqual(faceRight - (outermost + reach.Right), margin, "face right of the outer studs");
+            Assert.GreaterOrEqual(innermost - reach.Left - (1f - faceRight), margin, "face left of the outer studs");
 
-            // A face's rounded corner only reaches a stud whose centre lies
-            // past the corner's centre on both axes; the outer studs' column
-            // must not, or the bottom corner, squashed by the lip, would need
-            // its own check.
-            var cornerCenter = 0.5f + (quarter - recipe.BlockGapPixels / 2f - recipe.CornerRadiusPixels) / cell;
-            Assert.LessOrEqual(outermost, cornerCenter, "the outer studs stay beside the face's rounded corners");
+            // The rounded corners, the bottom ones squashed by the lip: every
+            // stud's every circle stays inside each corner's arc.
+            var discs = new List<Vector2>();
+            for (var row = 0; row < perSide; row++)
+            {
+                for (var column = 0; column < perSide; column++)
+                {
+                    discs.Add(new Vector2((column + 0.5f) / perSide, (row + 0.5f) / perSide + rise + raise));
+                }
+            }
+
+            var corners = new List<(QuarterTile, Rect)>();
+            foreach (var tile in tiles)
+            {
+                corners.Add((tile, FaceShape.QuarterRect(tile, 0f, lip)));
+            }
+
+            AssertInsideRoundedCorners(recipe, corners, discs);
         }
 
         [TestCase(false, TestName = "LayeredInnerStuds_TwoByTwoAtTheCodeDefaults_AreThreeByThreeInsideTheInnerFace")]
@@ -133,8 +147,7 @@ namespace GateRush.Tests
             var quarter = cell / 2f;
             var faceShare = (quarter - recipe.BlockGapPixels / 2f - recipe.PieceOutlinePixels) / quarter;
             var arcShare = (quarter - recipe.BlockGapPixels / 2f - recipe.CornerRadiusPixels) / quarter;
-            var radius = recipe.StudDiameterPixels / 2f / cell;
-            var drop = recipe.StudFootDropPixels / cell;
+            var reach = StudReach.Of(recipe);
             var raise = recipe.StudDiscRaisePixels / cell;
             var margin = MinFacePixels / cell;
 
@@ -154,10 +167,10 @@ namespace GateRush.Tests
 
             foreach (var c in centers)
             {
-                Assert.GreaterOrEqual(c.x - radius - left, margin, $"face left of the stud at {c}");
-                Assert.GreaterOrEqual(right - (c.x + radius), margin, $"face right of the stud at {c}");
-                Assert.GreaterOrEqual(top - (c.y + raise + radius), margin, $"face above the stud at {c}");
-                Assert.GreaterOrEqual(c.y + raise - drop - radius - bottom, margin, $"face below the stud's crescent at {c}");
+                Assert.GreaterOrEqual(c.x - reach.Left - left, margin, $"face left of the stud at {c}");
+                Assert.GreaterOrEqual(right - (c.x + reach.Right), margin, $"face right of the stud at {c}");
+                Assert.GreaterOrEqual(top - (c.y + raise + reach.Up), margin, $"face above the stud at {c}");
+                Assert.GreaterOrEqual(c.y + raise - reach.Down - bottom, margin, $"face below the stud's crescent and shadow at {c}");
 
                 foreach (var (tile, rect) in corners)
                 {
@@ -166,6 +179,108 @@ namespace GateRush.Tests
                     var isPastCorner = tile.SignX * (c.x - arcX) > 0f && tile.SignY * (c.y + raise - arcY) > 0f;
                     Assert.IsFalse(isPastCorner, $"the stud at {c} lies past the {tile.Corner} corner's rounding");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Asserts that every circle of every stud whose disc is centred at
+        /// one of <paramref name="discs"/> — the disc, its crescent and its
+        /// shadow — keeps <see cref="MinFacePixels"/> inside the face's arc at
+        /// each of <paramref name="corners"/>, wherever it lies past that arc's
+        /// centre on both axes. A corner quarter is posed over its rectangle
+        /// from the cell's centre out, so its arc is an ellipse when the lip
+        /// squashes it. Each circle is sampled every degree.
+        /// </summary>
+        private static void AssertInsideRoundedCorners(
+            ArtRecipe recipe, IEnumerable<(QuarterTile Tile, Rect Rect)> corners, IReadOnlyList<Vector2> discs)
+        {
+            const int Samples = 360;
+            float cell = recipe.CellPixels;
+            var quarter = cell / 2f;
+            var arcFromInner = quarter - recipe.BlockGapPixels / 2f - recipe.CornerRadiusPixels;
+            var faceRadius = recipe.CornerRadiusPixels - recipe.PieceOutlinePixels;
+            var margin = MinFacePixels / cell;
+            var reach = StudReach.Of(recipe);
+            var checkedPoints = 0;
+
+            foreach (var (tile, rect) in corners)
+            {
+                if (tile.Piece != QuarterPiece.OuterCorner)
+                {
+                    continue;
+                }
+
+                // Board cells per sprite pixel, along each axis.
+                var perPixelX = rect.width / quarter;
+                var perPixelY = rect.height / quarter;
+                var arcX = (tile.SignX > 0 ? rect.xMin : rect.xMax) + tile.SignX * arcFromInner * perPixelX;
+                var arcY = (tile.SignY > 0 ? rect.yMin : rect.yMax) + tile.SignY * arcFromInner * perPixelY;
+                var radiusX = faceRadius * perPixelX - margin;
+                var radiusY = faceRadius * perPixelY - margin;
+
+                foreach (var disc in discs)
+                {
+                    foreach (var offset in reach.CircleOffsets)
+                    {
+                        for (var k = 0; k < Samples; k++)
+                        {
+                            var angle = 2.0 * System.Math.PI * k / Samples;
+                            var x = disc.x + offset.x + reach.Radius * (float)System.Math.Cos(angle);
+                            var y = disc.y + offset.y + reach.Radius * (float)System.Math.Sin(angle);
+                            if (tile.SignX * (x - arcX) <= 0f || tile.SignY * (y - arcY) <= 0f)
+                            {
+                                continue;
+                            }
+
+                            var dx = (x - arcX) / radiusX;
+                            var dy = (y - arcY) / radiusY;
+                            Assert.LessOrEqual(dx * dx + dy * dy, 1f, $"({x}, {y}), of the stud at {disc}, inside the {tile.Corner} corner's arc");
+                            checkedPoints++;
+                        }
+                    }
+                }
+            }
+
+            Assert.Greater(checkedPoints, 0, "some stud reaches past a corner's arc centre, so the arcs were checked");
+        }
+
+        /// <summary>
+        /// How far a stud reaches from its disc's centre, in cells: the disc's
+        /// radius, and beyond it on the side away from the light the crescent
+        /// and then the shadow, circles as large as the disc carried by the
+        /// crescent's depth and the shadow's offset. The shadow's softness
+        /// lies inside its outline and adds nothing.
+        /// </summary>
+        private readonly struct StudReach
+        {
+            private StudReach(float radius, Vector2 fall, Vector2[] circleOffsets)
+            {
+                Radius = radius;
+                Up = radius + System.Math.Max(0f, fall.y);
+                Down = radius + System.Math.Max(0f, -fall.y);
+                Right = radius + System.Math.Max(0f, fall.x);
+                Left = radius + System.Math.Max(0f, -fall.x);
+                CircleOffsets = circleOffsets;
+            }
+
+            public float Radius { get; }
+            public float Up { get; }
+            public float Down { get; }
+            public float Right { get; }
+            public float Left { get; }
+
+            /// <summary>The centres of the disc, the crescent and the shadow's two circles, from the disc's centre.</summary>
+            public IReadOnlyList<Vector2> CircleOffsets { get; }
+
+            public static StudReach Of(ArtRecipe recipe)
+            {
+                float cell = recipe.CellPixels;
+                var radians = recipe.LightAngleDegrees * System.Math.PI / 180.0;
+                var away = new Vector2((float)-System.Math.Cos(radians), (float)-System.Math.Sin(radians));
+                var drop = recipe.StudFootDropPixels / cell;
+                var shadow = recipe.StudShadowOffsetPixels / cell;
+                var offsets = new[] { Vector2.zero, away * drop, away * shadow, away * (drop + shadow) };
+                return new StudReach(recipe.StudDiameterPixels / 2f / cell, away * (drop + shadow), offsets);
             }
         }
 

@@ -135,9 +135,18 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite contourOuterSprite;
         [SerializeField] private Sprite contourEdgeSprite;
         [SerializeField] private Sprite contourConcaveSprite;
-        [SerializeField] private Sprite shineOuterSprite;
-        [SerializeField] private Sprite shineEdgeSprite;
-        [SerializeField] private Sprite shineConcaveSprite;
+        [SerializeField] private Sprite lightOuterTopLeftSprite;
+        [SerializeField] private Sprite lightOuterTopRightSprite;
+        [SerializeField] private Sprite lightOuterBottomLeftSprite;
+        [SerializeField] private Sprite lightOuterBottomRightSprite;
+        [SerializeField] private Sprite lightConcaveTopLeftSprite;
+        [SerializeField] private Sprite lightConcaveTopRightSprite;
+        [SerializeField] private Sprite lightConcaveBottomLeftSprite;
+        [SerializeField] private Sprite lightConcaveBottomRightSprite;
+        [SerializeField] private Sprite lightEdgeTopSprite;
+        [SerializeField] private Sprite lightEdgeBottomSprite;
+        [SerializeField] private Sprite lightEdgeLeftSprite;
+        [SerializeField] private Sprite lightEdgeRightSprite;
         [SerializeField] private Sprite studsSprite;
         [SerializeField] private Sprite studGlossSprite;
         [SerializeField] private Sprite singleStudSprite;
@@ -727,14 +736,11 @@ namespace GateRush.Runtime
         [Tooltip("The dark outline round every block, the frame, every gate and the gate arrow (D79). Never tinted by a block's colour. Opaque.")]
         [SerializeField] private Color contourColor = new Color32(0x1C, 0x0B, 0x3A, 0xFF);
 
-        [Tooltip("The highlight along a block's or a gate's top edges, just above its studs, untinted: white, its alpha the highlight's strength. Their bottom edges carry none.")]
-        [SerializeField] private Color blockShineTopColor = new Color(1f, 1f, 1f, 0.3f);
+        [Tooltip("The tint of a block's and a gate's light pieces (Module 46): white, so their lit bands stay white and their shaded ones black; its alpha scales both, as the art recipe paints them.")]
+        [SerializeField] private Color blockLightColor = Color.white;
 
-        [Tooltip("The frame's lighter rim along its top edges, untinted.")]
-        [SerializeField] private Color frameShineTopColor = new Color(1f, 1f, 1f, 0.2f);
-
-        [Tooltip("The frame's lighter rim along its bottom edges, untinted.")]
-        [SerializeField] private Color frameShineBottomColor = new Color(1f, 1f, 1f, 0.1f);
+        [Tooltip("The tint of the frame's light pieces: white, its alpha scaling the frame's lit and shaded edges against the blocks'.")]
+        [SerializeField] private Color frameLightColor = new Color(1f, 1f, 1f, 0.7f);
 
         [Tooltip("The highlight on each stud. Not tinted by the block's colour.")]
         [SerializeField] private Color glossColor = new Color(1f, 1f, 1f, 0.85f);
@@ -1403,14 +1409,11 @@ namespace GateRush.Runtime
         /// <summary>The outline round every block, the frame, every gate and the gate arrow; drawn untinted (D79).</summary>
         public Color ContourColor => contourColor;
 
-        /// <summary>The shine on a block's and a gate's top edges: white with the highlight's strength as alpha.</summary>
-        public Color BlockShineTopColor => blockShineTopColor;
+        /// <summary>The tint of a block's and a gate's light pieces: white, its alpha scaling the bands the sprites carry.</summary>
+        public Color BlockLightColor => blockLightColor;
 
-        /// <summary>The frame's rim on its top edges.</summary>
-        public Color FrameShineTopColor => frameShineTopColor;
-
-        /// <summary>The frame's rim on its bottom edges.</summary>
-        public Color FrameShineBottomColor => frameShineBottomColor;
+        /// <summary>The tint of the frame's light pieces.</summary>
+        public Color FrameLightColor => frameLightColor;
 
         /// <summary>Colour of the stud highlights.</summary>
         public Color GlossColor => glossColor;
@@ -1599,30 +1602,62 @@ namespace GateRush.Runtime
         public int GeneratorPreviewOrder => generatorPreviewOrder;
 
         /// <summary>
-        /// The generated sprite for one of the four quarter pieces in
-        /// <paramref name="layer"/>'s set. A fill has no contour or shine of
-        /// its own: its contour would be the opaque white face fill, which is
-        /// returned, and it carries no shine (<see cref="QuarterLayers"/>), so
-        /// null is.
+        /// The generated sprite <paramref name="tile"/> is drawn with in
+        /// <paramref name="layer"/>'s set. Face and contour pieces depend on
+        /// the piece alone; a fill's contour would be the opaque white face
+        /// fill, which is returned. A light piece depends on the quarter's
+        /// place too — its corner of the cell, or the side an edge faces — and
+        /// <see cref="QuarterLayer.ReversedLight"/> takes the opposite one; a
+        /// fill has no edge and carries no light (<see cref="QuarterLayers"/>),
+        /// so null is returned for it.
         /// </summary>
-        public Sprite QuarterSprite(QuarterLayer layer, QuarterSpriteKind kind)
+        public Sprite QuarterSprite(QuarterLayer layer, QuarterTile tile)
         {
-            switch (kind)
+            if (layer == QuarterLayer.Light || layer == QuarterLayer.ReversedLight)
+            {
+                var flip = layer == QuarterLayer.ReversedLight ? -1 : 1;
+                return LightSprite(tile.Piece, tile.SignX * flip, tile.SignY * flip);
+            }
+
+            switch (tile.SpriteKind)
             {
                 case QuarterSpriteKind.Outer:
-                    return layer == QuarterLayer.Contour ? contourOuterSprite
-                        : layer == QuarterLayer.Shine ? shineOuterSprite
-                        : quarterOuterSprite;
+                    return layer == QuarterLayer.Contour ? contourOuterSprite : quarterOuterSprite;
                 case QuarterSpriteKind.Edge:
-                    return layer == QuarterLayer.Contour ? contourEdgeSprite
-                        : layer == QuarterLayer.Shine ? shineEdgeSprite
-                        : quarterEdgeSprite;
+                    return layer == QuarterLayer.Contour ? contourEdgeSprite : quarterEdgeSprite;
                 case QuarterSpriteKind.Fill:
-                    return layer == QuarterLayer.Shine ? null : quarterFillSprite;
+                    return quarterFillSprite;
                 default:
-                    return layer == QuarterLayer.Contour ? contourConcaveSprite
-                        : layer == QuarterLayer.Shine ? shineConcaveSprite
-                        : quarterConcaveSprite;
+                    return layer == QuarterLayer.Contour ? contourConcaveSprite : quarterConcaveSprite;
+            }
+        }
+
+        /// <summary>
+        /// The light piece for <paramref name="piece"/> lit as if at corner
+        /// <c>(signX, signY)</c> of its cell: a corner piece's by that corner,
+        /// an edge along x's by the side it faces up or down, an edge along y's
+        /// by the side it faces left or right. Null for a fill.
+        /// </summary>
+        private Sprite LightSprite(QuarterPiece piece, int signX, int signY)
+        {
+            var isRight = signX > 0;
+            var isTop = signY > 0;
+            switch (piece)
+            {
+                case QuarterPiece.OuterCorner:
+                    return isTop
+                        ? isRight ? lightOuterTopRightSprite : lightOuterTopLeftSprite
+                        : isRight ? lightOuterBottomRightSprite : lightOuterBottomLeftSprite;
+                case QuarterPiece.ConcaveCorner:
+                    return isTop
+                        ? isRight ? lightConcaveTopRightSprite : lightConcaveTopLeftSprite
+                        : isRight ? lightConcaveBottomRightSprite : lightConcaveBottomLeftSprite;
+                case QuarterPiece.EdgeAlongX:
+                    return isTop ? lightEdgeTopSprite : lightEdgeBottomSprite;
+                case QuarterPiece.EdgeAlongY:
+                    return isRight ? lightEdgeRightSprite : lightEdgeLeftSprite;
+                default:
+                    return null;
             }
         }
 
@@ -1818,9 +1853,18 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, contourOuterSprite, "Contour Outer Sprite");
             AddIfUnassigned(problems, contourEdgeSprite, "Contour Edge Sprite");
             AddIfUnassigned(problems, contourConcaveSprite, "Contour Concave Sprite");
-            AddIfUnassigned(problems, shineOuterSprite, "Shine Outer Sprite");
-            AddIfUnassigned(problems, shineEdgeSprite, "Shine Edge Sprite");
-            AddIfUnassigned(problems, shineConcaveSprite, "Shine Concave Sprite");
+            AddIfUnassigned(problems, lightOuterTopLeftSprite, "Light Outer Top Left Sprite");
+            AddIfUnassigned(problems, lightOuterTopRightSprite, "Light Outer Top Right Sprite");
+            AddIfUnassigned(problems, lightOuterBottomLeftSprite, "Light Outer Bottom Left Sprite");
+            AddIfUnassigned(problems, lightOuterBottomRightSprite, "Light Outer Bottom Right Sprite");
+            AddIfUnassigned(problems, lightConcaveTopLeftSprite, "Light Concave Top Left Sprite");
+            AddIfUnassigned(problems, lightConcaveTopRightSprite, "Light Concave Top Right Sprite");
+            AddIfUnassigned(problems, lightConcaveBottomLeftSprite, "Light Concave Bottom Left Sprite");
+            AddIfUnassigned(problems, lightConcaveBottomRightSprite, "Light Concave Bottom Right Sprite");
+            AddIfUnassigned(problems, lightEdgeTopSprite, "Light Edge Top Sprite");
+            AddIfUnassigned(problems, lightEdgeBottomSprite, "Light Edge Bottom Sprite");
+            AddIfUnassigned(problems, lightEdgeLeftSprite, "Light Edge Left Sprite");
+            AddIfUnassigned(problems, lightEdgeRightSprite, "Light Edge Right Sprite");
             AddIfUnassigned(problems, studsSprite, "Studs Sprite");
             AddIfUnassigned(problems, studGlossSprite, "Stud Gloss Sprite");
             AddIfUnassigned(problems, singleStudSprite, "Single Stud Sprite");
@@ -2004,9 +2048,8 @@ namespace GateRush.Runtime
             AddIfNotOpaque(problems, backgroundTop, "Background Top");
             AddIfNotOpaque(problems, backgroundBottom, "Background Bottom");
 
-            AddIfAlphaOutOfRange(problems, blockShineTopColor, "Block Shine Top Color");
-            AddIfAlphaOutOfRange(problems, frameShineTopColor, "Frame Shine Top Color");
-            AddIfAlphaOutOfRange(problems, frameShineBottomColor, "Frame Shine Bottom Color");
+            AddIfAlphaOutOfRange(problems, blockLightColor, "Block Light Color");
+            AddIfAlphaOutOfRange(problems, frameLightColor, "Frame Light Color");
 
             if (!(frameContourOrder < frameLipOrder))
             {

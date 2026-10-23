@@ -22,9 +22,18 @@ MonoBehaviour:
   contourOuterSprite: {fileID: 21300000, guid: 01852c0078853d3468ad11dc31dc3eb1, type: 3}
   contourEdgeSprite: {fileID: 21300000, guid: 9687a1ceaa73867428e7598f4b646235, type: 3}
   contourConcaveSprite: {fileID: 21300000, guid: 25b0c3ac59f5b904dbba2176e1051244, type: 3}
-  shineOuterSprite: {fileID: 21300000, guid: ca4f4557e97e1da47bd330b6ce560805, type: 3}
-  shineEdgeSprite: {fileID: 21300000, guid: 40ccb9cc6e532ae46b8967d96f474a8d, type: 3}
-  shineConcaveSprite: {fileID: 21300000, guid: 1e54174799b765c4fabb82142ef17d41, type: 3}
+  lightOuterTopLeftSprite: {fileID: 21300000, guid: 46e11275ee3df4543b306a9f82eb591d, type: 3}
+  lightOuterTopRightSprite: {fileID: 21300000, guid: f3e8461c8d565e145b3f2c007d07866d, type: 3}
+  lightOuterBottomLeftSprite: {fileID: 21300000, guid: 0593c40c449a7e248b8ca4d3f092aa97, type: 3}
+  lightOuterBottomRightSprite: {fileID: 21300000, guid: 0ff4257dd38ffa447b3bc89e05f1dd52, type: 3}
+  lightConcaveTopLeftSprite: {fileID: 21300000, guid: 7d3d6c456025fd749abeff988bd2f587, type: 3}
+  lightConcaveTopRightSprite: {fileID: 21300000, guid: ae3598abf4fc72541a4a6f1b925b85a2, type: 3}
+  lightConcaveBottomLeftSprite: {fileID: 21300000, guid: a233bc925c7d146439acda5dae5adb46, type: 3}
+  lightConcaveBottomRightSprite: {fileID: 21300000, guid: 9a6489e342ff1094586830396eeaa8f4, type: 3}
+  lightEdgeTopSprite: {fileID: 21300000, guid: b3ef2bd36d4f8b346831c8dc1b6a5c58, type: 3}
+  lightEdgeBottomSprite: {fileID: 21300000, guid: edbe53fb027190c42b303e4bd37be759, type: 3}
+  lightEdgeLeftSprite: {fileID: 21300000, guid: aa8d4f3b40dacc8429b49e33b477f93a, type: 3}
+  lightEdgeRightSprite: {fileID: 21300000, guid: 709758bcad1a62243a120a9b08d32b61, type: 3}
   studsSprite: {fileID: 21300000, guid: 6e89ead6c0b9e044f9ee09ebc16889df, type: 3}
   studGlossSprite: {fileID: 21300000, guid: 3e8805fceec003c40b6c6681b6e2f108, type: 3}
   singleStudSprite: {fileID: 21300000, guid: 2a32eb33788a69343a80f4ec1f5fa168, type: 3}
@@ -288,9 +297,8 @@ MonoBehaviour:
   floorColor: {r: 0.19215687, g: 0.09411765, b: 0.37254903, a: 1}
   frameColor: {r: 0.28627452, g: 0.12941177, b: 0.5176471, a: 1}
   contourColor: {r: 0.10980392, g: 0.043137256, b: 0.22745098, a: 1}
-  blockShineTopColor: {r: 1, g: 1, b: 1, a: 0.3}
-  frameShineTopColor: {r: 1, g: 1, b: 1, a: 0.2}
-  frameShineBottomColor: {r: 1, g: 1, b: 1, a: 0.1}
+  blockLightColor: {r: 1, g: 1, b: 1, a: 1}
+  frameLightColor: {r: 1, g: 1, b: 1, a: 0.7}
   glossColor: {r: 1, g: 1, b: 1, a: 0.85}
   gateArrowColor: {r: 1, g: 1, b: 1, a: 1}
   axisArrowColor: {r: 1, g: 1, b: 1, a: 0.9}

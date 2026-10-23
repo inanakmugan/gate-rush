@@ -223,33 +223,64 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ShineQuarterRect_EdgeOnAStraightRun_KeepsToItsOwnQuarterAlongIt()
+        public void LightQuarterRect_EdgeOnAStraightRun_KeepsToItsOwnQuarterAlongIt()
         {
             // The left cell's top-right edge runs on into the right cell's
-            // top-left edge: the shine stops at the cells' boundary instead of
+            // top-left edge: the light stops at the cells' boundary instead of
             // overlapping its neighbour by the inset.
             var tiles = BlockTiling.Compute(Horizontal1x2);
             var tile = TileAt(Horizontal1x2, new Coord(0, 0), Quarter.TopRight);
             var face = FaceShape.QuarterRect(tile, Inset, Lip);
 
-            var shine = FaceShape.ShineQuarterRect(tile, tiles, Inset, Lip);
+            var light = FaceShape.LightQuarterRect(tile, tiles, Inset, Lip);
 
-            AssertRect(Rect.MinMaxRect(0.5f, face.yMin, 1f, face.yMax), shine);
+            AssertRect(Rect.MinMaxRect(0.5f, face.yMin, 1f, face.yMax), light);
             Assert.AreEqual(1f + Inset, face.xMax, Tolerance, "the face itself reaches on by the inset");
         }
 
         [Test]
-        public void ShineQuarterRect_EdgeBesideAConcaveCorner_KeepsTheFacesReach()
+        public void LightQuarterRect_EdgeBesideAConcaveCorner_KeepsTheFacesReach()
         {
             // The foot's top-left edge runs into the inside corner of the L,
             // which is pulled in: the reach covers the strip between them.
             var tiles = BlockTiling.Compute(LShape);
             var tile = TileAt(LShape, new Coord(1, 0), Quarter.TopLeft);
 
-            var shine = FaceShape.ShineQuarterRect(tile, tiles, Inset, Lip);
+            var light = FaceShape.LightQuarterRect(tile, tiles, Inset, Lip);
 
             Assert.AreEqual(QuarterPiece.EdgeAlongX, tile.Piece);
-            AssertRect(FaceShape.QuarterRect(tile, Inset, Lip), shine);
+            AssertRect(FaceShape.QuarterRect(tile, Inset, Lip), light);
+        }
+
+        [Test]
+        public void LightQuarterRect_SideOnAStraightRun_KeepsToItsOwnQuarterUpIt()
+        {
+            // The bottom cell's top-right side runs on into the top cell's
+            // bottom-right side: the face reaches up by the inset and the lip,
+            // the light stops at the cells' boundary.
+            var tiles = BlockTiling.Compute(Vertical1x2);
+            var tile = TileAt(Vertical1x2, new Coord(0, 0), Quarter.TopRight);
+            var face = FaceShape.QuarterRect(tile, Inset, Lip);
+
+            var light = FaceShape.LightQuarterRect(tile, tiles, Inset, Lip);
+
+            Assert.AreEqual(QuarterPiece.EdgeAlongY, tile.Piece);
+            AssertRect(Rect.MinMaxRect(face.xMin, 0.5f, face.xMax, 1f), light);
+            Assert.AreEqual(1f + Inset + Lip, face.yMax, Tolerance, "the face itself reaches on by the inset and the lip");
+        }
+
+        [Test]
+        public void LightQuarterRect_SideBelowAConcaveCorner_KeepsTheFacesReach()
+        {
+            // The bar's right side runs up into the bend that opens downward,
+            // whose corner rises by the lip: the reach covers the strip below it.
+            var tiles = BlockTiling.Compute(HangingL);
+            var tile = TileAt(HangingL, new Coord(0, 0), Quarter.TopRight);
+
+            var light = FaceShape.LightQuarterRect(tile, tiles, Inset, Lip);
+
+            Assert.AreEqual(QuarterPiece.EdgeAlongY, tile.Piece);
+            AssertRect(FaceShape.QuarterRect(tile, Inset, Lip), light);
         }
 
         private static List<Rect> Rects(IReadOnlyList<Coord> cells, float inset) =>

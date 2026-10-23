@@ -511,7 +511,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The frame ring and every wall cell: its outline, lip and face, and
-        /// a lighter rim along its top and bottom edges (Module 46). The lip
+        /// its light — lit along the edges facing the light, shaded along the
+        /// others (Module 46). The lip
         /// hangs below the outline: dark purple on dark, it reads as part of it.
         /// </summary>
         private void DrawFrame()
@@ -529,11 +530,8 @@ namespace GateRush.Runtime
 
             var shine = AddGroup(board, "Frame shine", Vector2.zero);
             AddQuarters(
-                shine, QuarterLayers.Shine(frameTiles, isTop: true), frameQuarterRect, QuarterLayer.Shine,
-                config.FrameShineTopColor, config.FrameShineOrder);
-            AddQuarters(
-                shine, QuarterLayers.Shine(frameTiles, isTop: false), frameQuarterRect, QuarterLayer.Shine,
-                config.FrameShineBottomColor, config.FrameShineOrder);
+                shine, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Light, config.FrameLightColor,
+                config.FrameShineOrder);
         }
 
         /// <summary>
@@ -667,24 +665,24 @@ namespace GateRush.Runtime
         {
             for (var i = 0; i < tiles.Count; i++)
             {
-                PoseQuarter(quarters[i], tiles[i], FaceQuarterRect(tiles[i], insetCells));
+                PoseQuarter(quarters[i], tiles[i], QuarterLayer.Face, FaceQuarterRect(tiles[i], insetCells));
             }
         }
 
         /// <summary>
-        /// Poses <paramref name="quarters"/> — a shape's shine, drawn from
-        /// <paramref name="shineTiles"/>, in their order — over a shape
-        /// <paramref name="insetCells"/> inside the face of the block whose
-        /// quarters are <paramref name="tiles"/>, each keeping to its own span
-        /// along the edge (<see cref="FaceShape.ShineQuarterRect"/>).
+        /// Poses <paramref name="quarters"/> — a layered block's window light,
+        /// drawn from <paramref name="lightTiles"/>, in their order — over a
+        /// shape <paramref name="insetCells"/> inside the face of the block
+        /// whose quarters are <paramref name="tiles"/>, each keeping to its own
+        /// span along the edge (<see cref="FaceShape.LightQuarterRect"/>).
         /// </summary>
         private void PoseShineInset(
-            List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> shineTiles, IReadOnlyList<QuarterTile> tiles, float insetCells)
+            List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> lightTiles, IReadOnlyList<QuarterTile> tiles, float insetCells)
         {
-            for (var i = 0; i < shineTiles.Count; i++)
+            for (var i = 0; i < lightTiles.Count; i++)
             {
-                var rect = FaceShape.ShineQuarterRect(shineTiles[i], tiles, insetCells, config.BlockLipCells);
-                PoseQuarter(quarters[i], shineTiles[i], CellRectToLocal(rect));
+                var rect = FaceShape.LightQuarterRect(lightTiles[i], tiles, insetCells, config.BlockLipCells);
+                PoseQuarter(quarters[i], lightTiles[i], QuarterLayer.ReversedLight, CellRectToLocal(rect));
             }
         }
 
@@ -918,11 +916,11 @@ namespace GateRush.Runtime
             {
                 var tile = tiles[i];
                 var renderer = AddRenderer(
-                    parent, tile.ToString(), config.QuarterSprite(layer, tile.SpriteKind), Vector2.zero, color, order,
+                    parent, tile.ToString(), config.QuarterSprite(layer, tile), Vector2.zero, color, order,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 renderer.flipX = tile.FlipX;
                 renderer.flipY = tile.FlipY;
-                PoseQuarter(renderer, tile, rectOf(tile));
+                PoseQuarter(renderer, tile, layer, rectOf(tile));
                 renderers.Add(renderer);
             }
 
@@ -930,15 +928,16 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Places a quarter renderer over <paramref name="rect"/>, enlarged by
-        /// the seam overlap while its colour is opaque and not at all while it
-        /// is translucent (<see cref="QuarterLayers.SeamOverlap"/>), so a
-        /// shine or a fading quarter is never blended twice at a
-        /// seam. A rotated sprite's own x runs along the board's y.
+        /// Places a quarter renderer of <paramref name="layer"/> over
+        /// <paramref name="rect"/>, enlarged by the seam overlap while it is
+        /// opaque and not at all while it is translucent
+        /// (<see cref="QuarterLayers.SeamOverlap"/>), so a light piece or a
+        /// fading quarter is never blended twice at a seam. A rotated
+        /// sprite's own x runs along the board's y.
         /// </summary>
-        private void PoseQuarter(SpriteRenderer renderer, QuarterTile tile, Rect rect)
+        private void PoseQuarter(SpriteRenderer renderer, QuarterTile tile, QuarterLayer layer, Rect rect)
         {
-            var overlap = CellsToWorld(QuarterLayers.SeamOverlap(renderer.color, config.SeamOverlapCells)) * 2f;
+            var overlap = CellsToWorld(QuarterLayers.SeamOverlap(layer, renderer.color, config.SeamOverlapCells)) * 2f;
             var size = rect.size + new Vector2(overlap, overlap);
             var frameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
             var bounds = renderer.sprite.bounds.size;
@@ -1167,7 +1166,7 @@ namespace GateRush.Runtime
             /// <summary>The face's quarter renderers, in the block's colour (darkened when layered), in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> FaceQuarters { get; set; }
 
-            /// <summary>The face's top shine renderers, in the order of <see cref="QuarterLayers.Shine"/>.</summary>
+            /// <summary>The face's light renderers, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
             public List<SpriteRenderer> ShineQuarters { get; set; }
 
             /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>

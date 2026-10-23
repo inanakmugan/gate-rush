@@ -25,9 +25,10 @@ namespace GateRush.Tests
     /// Joker Icons, an icon size that is not positive and a transparent icon
     /// colour are each reported by name. Module 46: the default palette and
     /// board colours are the measured ones; translucent faces and backdrops,
-    /// shine alphas past 1, outline and shine orders out of place, a negative
-    /// block lip and unassigned outline and shine sprites are each reported
-    /// by name; each quarter layer resolves to its own sprite.
+    /// light alphas past 1, outline and light orders out of place, a negative
+    /// block lip and unassigned outline and light sprites are each reported
+    /// by name; each quarter layer resolves to its own sprite, a light layer
+    /// by the quarter's place and the reversed one by the opposite place.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
@@ -902,10 +903,9 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("Block Palette entry 2 (Green) must be opaque"), string.Join(" | ", problems));
         }
 
-        [TestCase("blockShineTopColor", "Block Shine Top Color")]
-        [TestCase("frameShineTopColor", "Frame Shine Top Color")]
-        [TestCase("frameShineBottomColor", "Frame Shine Bottom Color")]
-        public void Problems_ShineAlphaAboveOne_IsReportedByName(string field, string shownName)
+        [TestCase("blockLightColor", "Block Light Color")]
+        [TestCase("frameLightColor", "Frame Light Color")]
+        public void Problems_LightAlphaAboveOne_IsReportedByName(string field, string shownName)
         {
             SetAlpha(new SerializedObject(config), field, 1.5f);
 
@@ -935,15 +935,18 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_UnassignedOutlineAndShineSprites_AreReportedByName()
+        public void Problems_UnassignedOutlineAndLightSprites_AreReportedByName()
         {
             var problems = config.Problems();
 
             foreach (var shownName in new[]
                      {
-                         "Contour Outer Sprite", "Contour Edge Sprite", "Contour Concave Sprite", "Shine Outer Sprite",
-                         "Shine Edge Sprite", "Shine Concave Sprite", "Gate Arrow Outline Sprite", "Single Stud Sprite",
-                         "Single Stud Gloss Sprite"
+                         "Contour Outer Sprite", "Contour Edge Sprite", "Contour Concave Sprite",
+                         "Light Outer Top Left Sprite", "Light Outer Top Right Sprite", "Light Outer Bottom Left Sprite",
+                         "Light Outer Bottom Right Sprite", "Light Concave Top Left Sprite", "Light Concave Top Right Sprite",
+                         "Light Concave Bottom Left Sprite", "Light Concave Bottom Right Sprite", "Light Edge Top Sprite",
+                         "Light Edge Bottom Sprite", "Light Edge Left Sprite", "Light Edge Right Sprite",
+                         "Gate Arrow Outline Sprite", "Single Stud Sprite", "Single Stud Gloss Sprite"
                      })
             {
                 Assert.That(problems, Has.Some.Contains(shownName), shownName);
@@ -951,7 +954,85 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void QuarterSprite_EachLayerAndKind_IsThatLayersSprite()
+        public void QuarterSprite_FaceAndContour_IsThatLayersSpriteForThePiece()
+        {
+            var sprites = AssignQuarterSprites();
+
+            try
+            {
+                Assert.AreSame(sprites["quarterOuterSprite"], config.QuarterSprite(QuarterLayer.Face, Tile(Quarter.BottomLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["quarterEdgeSprite"], config.QuarterSprite(QuarterLayer.Face, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Face, Tile(Quarter.TopRight, QuarterPiece.Fill)));
+                Assert.AreSame(sprites["quarterConcaveSprite"], config.QuarterSprite(QuarterLayer.Face, Tile(Quarter.TopLeft, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["contourOuterSprite"], config.QuarterSprite(QuarterLayer.Contour, Tile(Quarter.TopRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["contourEdgeSprite"], config.QuarterSprite(QuarterLayer.Contour, Tile(Quarter.BottomLeft, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Contour, Tile(Quarter.TopRight, QuarterPiece.Fill)), "a fill's contour is the face fill");
+                Assert.AreSame(sprites["contourConcaveSprite"], config.QuarterSprite(QuarterLayer.Contour, Tile(Quarter.BottomRight, QuarterPiece.ConcaveCorner)));
+            }
+            finally
+            {
+                DestroySprites(sprites);
+            }
+        }
+
+        [Test]
+        public void QuarterSprite_Light_IsTheSpriteForTheQuartersPlace()
+        {
+            var sprites = AssignQuarterSprites();
+
+            try
+            {
+                Assert.AreSame(sprites["lightOuterTopLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightOuterTopRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightOuterBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightOuterBottomRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightConcaveTopLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["lightConcaveTopRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["lightConcaveBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["lightConcaveBottomRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.ConcaveCorner)));
+
+                // An edge along x faces up or down whichever side of its cell
+                // it lies on along x; an edge along y faces left or right.
+                Assert.AreSame(sprites["lightEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["lightEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["lightEdgeBottomSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["lightEdgeLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["lightEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["lightEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongY)));
+
+                Assert.IsNull(config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.Fill)), "a fill carries no light");
+            }
+            finally
+            {
+                DestroySprites(sprites);
+            }
+        }
+
+        [Test]
+        public void QuarterSprite_ReversedLight_IsTheSpriteForTheOppositePlace()
+        {
+            var sprites = AssignQuarterSprites();
+
+            try
+            {
+                Assert.AreSame(sprites["lightOuterBottomRightSprite"], config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.TopLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightOuterTopLeftSprite"], config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.BottomRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["lightConcaveBottomLeftSprite"], config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.TopRight, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["lightEdgeBottomSprite"], config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.TopLeft, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["lightEdgeLeftSprite"], config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongY)));
+                Assert.IsNull(config.QuarterSprite(QuarterLayer.ReversedLight, Tile(Quarter.TopRight, QuarterPiece.Fill)), "a fill carries no light");
+            }
+            finally
+            {
+                DestroySprites(sprites);
+            }
+        }
+
+        /// <summary>A quarter of cell (0, 0); <see cref="RuntimeConfig.QuarterSprite"/> reads only its corner and piece.</summary>
+        private static QuarterTile Tile(Quarter corner, QuarterPiece piece) => new QuarterTile(new Coord(0, 0), corner, piece);
+
+        /// <summary>A distinct sprite on every quarter sprite field of the config, keyed by field, sharing one texture.</summary>
+        private Dictionary<string, Sprite> AssignQuarterSprites()
         {
             var texture = new Texture2D(4, 4);
             var sprites = new Dictionary<string, Sprite>();
@@ -960,39 +1041,33 @@ namespace GateRush.Tests
                      {
                          "quarterOuterSprite", "quarterEdgeSprite", "quarterFillSprite", "quarterConcaveSprite",
                          "contourOuterSprite", "contourEdgeSprite", "contourConcaveSprite",
-                         "shineOuterSprite", "shineEdgeSprite", "shineConcaveSprite"
+                         "lightOuterTopLeftSprite", "lightOuterTopRightSprite", "lightOuterBottomLeftSprite",
+                         "lightOuterBottomRightSprite", "lightConcaveTopLeftSprite", "lightConcaveTopRightSprite",
+                         "lightConcaveBottomLeftSprite", "lightConcaveBottomRightSprite", "lightEdgeTopSprite",
+                         "lightEdgeBottomSprite", "lightEdgeLeftSprite", "lightEdgeRightSprite"
                      })
             {
                 sprites[field] = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), Vector2.one * 0.5f);
-                serialized.FindProperty(field).objectReferenceValue = sprites[field];
+                var property = serialized.FindProperty(field);
+                Assert.IsNotNull(property, $"the config has a serialized field '{field}'");
+                property.objectReferenceValue = sprites[field];
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
+            return sprites;
+        }
 
-            try
+        /// <summary>Destroys the sprites of <see cref="AssignQuarterSprites"/> and their shared texture.</summary>
+        private static void DestroySprites(Dictionary<string, Sprite> sprites)
+        {
+            Texture2D texture = null;
+            foreach (var sprite in sprites.Values)
             {
-                Assert.AreSame(sprites["quarterOuterSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Outer));
-                Assert.AreSame(sprites["quarterEdgeSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Edge));
-                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Fill));
-                Assert.AreSame(sprites["quarterConcaveSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Concave));
-                Assert.AreSame(sprites["contourOuterSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Outer));
-                Assert.AreSame(sprites["contourEdgeSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Edge));
-                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Fill), "a fill's contour is the face fill");
-                Assert.AreSame(sprites["contourConcaveSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Concave));
-                Assert.AreSame(sprites["shineOuterSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Outer));
-                Assert.AreSame(sprites["shineEdgeSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Edge));
-                Assert.IsNull(config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Fill), "a fill carries no shine");
-                Assert.AreSame(sprites["shineConcaveSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Concave));
+                texture = sprite.texture;
+                Object.DestroyImmediate(sprite);
             }
-            finally
-            {
-                foreach (var sprite in sprites.Values)
-                {
-                    Object.DestroyImmediate(sprite);
-                }
 
-                Object.DestroyImmediate(texture);
-            }
+            Object.DestroyImmediate(texture);
         }
 
         private static void SetAlpha(SerializedObject serialized, string field, float alpha)

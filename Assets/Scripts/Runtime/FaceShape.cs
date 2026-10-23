@@ -83,44 +83,60 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The rectangle a shine quarter for <paramref name="tile"/> covers,
+        /// The rectangle a light quarter for <paramref name="tile"/> covers,
         /// in cell units in the frame of its cells: <see cref="QuarterRect"/>'s,
-        /// except that an edge along x keeps to its own quarter along its run
-        /// unless the next quarter along it is a concave corner. The reach
-        /// along a run covers the strip beside a pulled-in concave corner; on
-        /// a straight run it only overlaps the neighbouring edge, which an
-        /// opaque face hides but a translucent shine would blend twice, making
-        /// the band brighter wherever an inset shape's edges overlap
-        /// (Module 46).
+        /// except that an edge keeps to its own quarter along its run unless
+        /// the next quarter along it is a concave corner — an edge along x by
+        /// the inset, an edge along y by the inset and, at the top of its
+        /// cell, the lip. The reach along a run covers the strip beside a
+        /// pulled-in concave corner; on a straight run it only overlaps the
+        /// neighbouring edge, which an opaque face hides but a translucent
+        /// light piece would blend twice, making the band stronger wherever
+        /// two edges overlap (Module 46).
         /// </summary>
         /// <param name="tile">A quarter of the block's footprint.</param>
         /// <param name="tiles">Every quarter of that footprint (<see cref="BlockTiling"/>), to find the next quarter along the run.</param>
         /// <param name="insetCells">How far the shape sits inside the face, in cells.</param>
         /// <param name="lipCells">How much of the footprint's lower outline the lip takes, in cells.</param>
-        public static Rect ShineQuarterRect(QuarterTile tile, IReadOnlyList<QuarterTile> tiles, float insetCells, float lipCells)
+        public static Rect LightQuarterRect(QuarterTile tile, IReadOnlyList<QuarterTile> tiles, float insetCells, float lipCells)
         {
             var rect = QuarterRect(tile, insetCells, lipCells);
-            if (tile.Piece != QuarterPiece.EdgeAlongX || IsNextAlongRunConcave(tile, tiles))
+            switch (tile.Piece)
             {
-                return rect;
+                case QuarterPiece.EdgeAlongX:
+                    if (!IsNextAlongRunConcave(tile, tiles, new Coord(tile.SignX, 0)))
+                    {
+                        MoveOutwardX(ref rect, tile.SignX, -insetCells);
+                    }
+
+                    break;
+
+                case QuarterPiece.EdgeAlongY:
+                    if (!IsNextAlongRunConcave(tile, tiles, new Coord(0, tile.SignY)))
+                    {
+                        MoveOutwardY(ref rect, tile.SignY, -(insetCells + (tile.SignY < 0 ? 0f : lipCells)));
+                    }
+
+                    break;
             }
 
-            MoveOutwardX(ref rect, tile.SignX, -insetCells);
             return rect;
         }
 
         /// <summary>
-        /// True when the quarter beside <paramref name="tile"/> along x, across
-        /// its outward side — the mirrored corner of the next cell — is a
-        /// concave corner.
+        /// True when the quarter beside <paramref name="tile"/> across its
+        /// outward side along its run — in the cell <paramref name="step"/>
+        /// away, mirrored on that axis — is a concave corner.
         /// </summary>
-        private static bool IsNextAlongRunConcave(QuarterTile tile, IReadOnlyList<QuarterTile> tiles)
+        private static bool IsNextAlongRunConcave(QuarterTile tile, IReadOnlyList<QuarterTile> tiles, Coord step)
         {
-            var nextCell = tile.Cell + new Coord(tile.SignX, 0);
+            var nextCell = tile.Cell + step;
+            var signX = step.X != 0 ? -tile.SignX : tile.SignX;
+            var signY = step.Y != 0 ? -tile.SignY : tile.SignY;
             for (var i = 0; i < tiles.Count; i++)
             {
                 var other = tiles[i];
-                if (other.Cell == nextCell && other.SignX == -tile.SignX && other.SignY == tile.SignY)
+                if (other.Cell == nextCell && other.SignX == signX && other.SignY == signY)
                 {
                     return other.Piece == QuarterPiece.ConcaveCorner;
                 }

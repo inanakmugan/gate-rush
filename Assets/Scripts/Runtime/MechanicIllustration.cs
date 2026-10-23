@@ -375,7 +375,7 @@ namespace GateRush.Runtime
             RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color)
         {
             var images = new List<Image>(tiles.Count);
-            var overlap = QuarterLayers.SeamOverlap(color, config.SeamOverlapCells) * 2f;
+            var overlap = QuarterLayers.SeamOverlap(layer, color, config.SeamOverlapCells) * 2f;
             for (var i = 0; i < tiles.Count; i++)
             {
                 var tile = tiles[i];
@@ -383,7 +383,7 @@ namespace GateRush.Runtime
                 var size = rect.size + new Vector2(overlap, overlap);
                 var frameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
                 var image = AddSprite(
-                    parent, tile.ToString(), config.QuarterSprite(layer, tile.SpriteKind), rect.center, frameSize, color,
+                    parent, tile.ToString(), config.QuarterSprite(layer, tile), rect.center, frameSize, color,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 image.rectTransform.localScale = new Vector3(tile.FlipX ? -1f : 1f, tile.FlipY ? -1f : 1f, 1f);
                 images.Add(image);
