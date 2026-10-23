@@ -16,10 +16,9 @@ namespace GateRush.Tests
     /// </summary>
     public class LayerStudsTests
     {
-        // The config's defaults: the window 0.31 and its rim 0.02, the lip
-        // 0.1, the inner grid and the clearance.
+        // The config's defaults: the window 0.31 and its rim 0.02, the inner
+        // grid and the clearance.
         private const float InnerInset = 0.33f;
-        private const float Lip = 0.1f;
         private const float Spacing = 0.42f;
         private const float Clearance = 0.18f;
         private const float Tolerance = 1e-4f;
@@ -51,10 +50,10 @@ namespace GateRush.Tests
         {
             var centers = Centers(Square2);
 
-            // The inner block runs from the inset to 2 less the inset across,
-            // and from the inset plus the lip to 2 less the inset up.
+            // The inner block runs from the inset to 2 less the inset, both
+            // ways, so the grid is centred on the block's middle.
             var middleX = 1f;
-            var middleY = (InnerInset + Lip + 2f - InnerInset) * 0.5f;
+            var middleY = 1f;
 
             Assert.AreEqual(9, centers.Count);
             foreach (var row in new[] { -1, 0, 1 })
@@ -83,16 +82,16 @@ namespace GateRush.Tests
         [Test]
         public void Centers_NullCells_Throws()
         {
-            Assert.Throws<ArgumentNullException>(() => LayerStuds.Centers(null, InnerInset, Lip, Spacing, Clearance));
+            Assert.Throws<ArgumentNullException>(() => LayerStuds.Centers(null, InnerInset, Spacing, Clearance));
         }
 
         [Test]
         public void Centers_NonPositiveSpacing_Throws()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => LayerStuds.Centers(Square2, InnerInset, Lip, 0f, Clearance));
+            Assert.Throws<ArgumentOutOfRangeException>(() => LayerStuds.Centers(Square2, InnerInset, 0f, Clearance));
         }
 
         private static IReadOnlyList<Vector2> Centers(Coord[] cells) =>
-            LayerStuds.Centers(cells, InnerInset, Lip, Spacing, Clearance);
+            LayerStuds.Centers(cells, InnerInset, Spacing, Clearance);
     }
 }

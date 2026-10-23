@@ -14,26 +14,28 @@ MonoBehaviour:
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.RuntimeConfig
   cellSprite: {fileID: 7482667652216324306, guid: 11ae25fa028900843b7335ef0991e270, type: 3}
   spriteMaterial: {fileID: 2100000, guid: 9dfc825aed78fcd4ba02077103263b40, type: 2}
+  litMaterial: {fileID: 2100000, guid: 60c345dd28f04e9448a2f8b7c6a0809a, type: 2}
+  specularMaterial: {fileID: 2100000, guid: baa892730faf26740a5d304a4afacce0, type: 2}
+  uiLitMaterial: {fileID: 2100000, guid: 790861bbe77b135408a06c6fcfd4fa84, type: 2}
+  uiSpecularMaterial: {fileID: 2100000, guid: cd09af12390a2c34a8e16de8763f51bc, type: 2}
   labelFont: {fileID: 11400000, guid: 9bd0b4fb6c61e6c49aff7f5e7c6ef52e, type: 2}
   quarterOuterSprite: {fileID: 21300000, guid: b29f3da1aa4f7b44387f2f72cf96c017, type: 3}
   quarterEdgeSprite: {fileID: 21300000, guid: 97b3def5b3c7ae7458d9d385a69a40f4, type: 3}
   quarterFillSprite: {fileID: 21300000, guid: 7405c1a7af3ad7f46b0d2754c31ce09c, type: 3}
   quarterConcaveSprite: {fileID: 21300000, guid: 0e8673d3b50821a4cbc7512c4934b515, type: 3}
-  contourOuterSprite: {fileID: 21300000, guid: 01852c0078853d3468ad11dc31dc3eb1, type: 3}
-  contourEdgeSprite: {fileID: 21300000, guid: 9687a1ceaa73867428e7598f4b646235, type: 3}
-  contourConcaveSprite: {fileID: 21300000, guid: 25b0c3ac59f5b904dbba2176e1051244, type: 3}
-  lightOuterTopLeftSprite: {fileID: 21300000, guid: 46e11275ee3df4543b306a9f82eb591d, type: 3}
-  lightOuterTopRightSprite: {fileID: 21300000, guid: f3e8461c8d565e145b3f2c007d07866d, type: 3}
-  lightOuterBottomLeftSprite: {fileID: 21300000, guid: 0593c40c449a7e248b8ca4d3f092aa97, type: 3}
-  lightOuterBottomRightSprite: {fileID: 21300000, guid: 0ff4257dd38ffa447b3bc89e05f1dd52, type: 3}
-  lightConcaveTopLeftSprite: {fileID: 21300000, guid: 7d3d6c456025fd749abeff988bd2f587, type: 3}
-  lightConcaveTopRightSprite: {fileID: 21300000, guid: ae3598abf4fc72541a4a6f1b925b85a2, type: 3}
-  lightConcaveBottomLeftSprite: {fileID: 21300000, guid: a233bc925c7d146439acda5dae5adb46, type: 3}
-  lightConcaveBottomRightSprite: {fileID: 21300000, guid: 9a6489e342ff1094586830396eeaa8f4, type: 3}
-  lightEdgeTopSprite: {fileID: 21300000, guid: b3ef2bd36d4f8b346831c8dc1b6a5c58, type: 3}
-  lightEdgeBottomSprite: {fileID: 21300000, guid: edbe53fb027190c42b303e4bd37be759, type: 3}
-  lightEdgeLeftSprite: {fileID: 21300000, guid: aa8d4f3b40dacc8429b49e33b477f93a, type: 3}
-  lightEdgeRightSprite: {fileID: 21300000, guid: 709758bcad1a62243a120a9b08d32b61, type: 3}
+  faceOuterTopLeftSprite: {fileID: 21300000, guid: ea8e353c55a64214fbf63592cb5186c7, type: 3}
+  faceOuterTopRightSprite: {fileID: 21300000, guid: 422cae275ca022245b6c4d979bd89795, type: 3}
+  faceOuterBottomLeftSprite: {fileID: 21300000, guid: dd6f3ce900baa824a8a843ba9a802712, type: 3}
+  faceOuterBottomRightSprite: {fileID: 21300000, guid: b060b26db529f744a9033460ce8652a9, type: 3}
+  faceConcaveTopLeftSprite: {fileID: 21300000, guid: d10f9b0933b99534fa9b843f10896362, type: 3}
+  faceConcaveTopRightSprite: {fileID: 21300000, guid: 9e28151ed0757824eb27ac39c2693b01, type: 3}
+  faceConcaveBottomLeftSprite: {fileID: 21300000, guid: 4b5be74c91853524eb246c3fcd785a90, type: 3}
+  faceConcaveBottomRightSprite: {fileID: 21300000, guid: 7ea43e16e363562478b52c095298f8aa, type: 3}
+  faceEdgeTopSprite: {fileID: 21300000, guid: feebe99837e94834f845440bafbb08f3, type: 3}
+  faceEdgeBottomSprite: {fileID: 21300000, guid: a4e6d0a6870d30a459133a4758b70815, type: 3}
+  faceEdgeLeftSprite: {fileID: 21300000, guid: cc2077a4b9115944285426a832722dea, type: 3}
+  faceEdgeRightSprite: {fileID: 21300000, guid: 2f9b7d6b18cf8b6409cba68c3e3d8169, type: 3}
+  faceFillSprite: {fileID: 21300000, guid: 1decf0c969b2f34449f8df683aeca87c, type: 3}
   bodyOuterTopLeftSprite: {fileID: 21300000, guid: 21d18813a59f5274ca272232f1b71969, type: 3}
   bodyOuterTopRightSprite: {fileID: 21300000, guid: 5f01c7ea4a1d8f14784e5dff3b6151ff, type: 3}
   bodyOuterBottomLeftSprite: {fileID: 21300000, guid: 6dc63c403044d5e409f437f278ba62a3, type: 3}
@@ -46,6 +48,19 @@ MonoBehaviour:
   bodyEdgeBottomSprite: {fileID: 21300000, guid: fae92550220fc3b41bf25351cb727a53, type: 3}
   bodyEdgeLeftSprite: {fileID: 21300000, guid: 63f69733374eda949a87886cac626367, type: 3}
   bodyEdgeRightSprite: {fileID: 21300000, guid: 1b55a1e47e710f645ad05f4d269193b8, type: 3}
+  bodyFillSprite: {fileID: 21300000, guid: be62af0d22a170344b726b7111676a86, type: 3}
+  shadowOuterTopLeftSprite: {fileID: 21300000, guid: b26d069a708b8084f94439b1587f80ac, type: 3}
+  shadowOuterTopRightSprite: {fileID: 21300000, guid: 8c8bddffbe6909c46b35bf852d3cfa9d, type: 3}
+  shadowOuterBottomLeftSprite: {fileID: 21300000, guid: 261429501d3defe4f99bc5a81fc8b1dc, type: 3}
+  shadowOuterBottomRightSprite: {fileID: 21300000, guid: 93da1d4870a97b1459d552d667b9b730, type: 3}
+  shadowConcaveTopLeftSprite: {fileID: 21300000, guid: 18a3e257eec7a1c47b07a10fff9b2c46, type: 3}
+  shadowConcaveTopRightSprite: {fileID: 21300000, guid: aca8686838a90aa488a37ae2588500b3, type: 3}
+  shadowConcaveBottomLeftSprite: {fileID: 21300000, guid: 334dbe4311c24a845bbc4e3a4ed6b41e, type: 3}
+  shadowConcaveBottomRightSprite: {fileID: 21300000, guid: 94d146d76ab814341a8ac1f72504017b, type: 3}
+  shadowEdgeTopSprite: {fileID: 21300000, guid: 6f2468c81659bd14f84222242231088b, type: 3}
+  shadowEdgeBottomSprite: {fileID: 21300000, guid: aac13717bbf3e19458d32972fe711f3d, type: 3}
+  shadowEdgeLeftSprite: {fileID: 21300000, guid: 547943ba6e0684d4fa720269391591be, type: 3}
+  shadowEdgeRightSprite: {fileID: 21300000, guid: 5c5964856e638e244b74c2f32f937443, type: 3}
   studsSprite: {fileID: 21300000, guid: 6e89ead6c0b9e044f9ee09ebc16889df, type: 3}
   studGlossSprite: {fileID: 21300000, guid: 3e8805fceec003c40b6c6681b6e2f108, type: 3}
   singleStudSprite: {fileID: 21300000, guid: 2a32eb33788a69343a80f4ec1f5fa168, type: 3}
@@ -76,8 +91,7 @@ MonoBehaviour:
   bottomBandScreenFraction: 0.145
   frameThicknessCells: 0.45
   floorUnderlayCells: 0.2
-  lipOffsetCells: 0.1
-  blockLipCells: 0.1
+  lipOffsetCells: 0.09
   lipDarken: 0.5
   seamOverlapCells: 0.002
   gateArrowSizeCells: 0.3
@@ -311,7 +325,7 @@ MonoBehaviour:
   contourColor: {r: 0.10980392, g: 0.043137256, b: 0.22745098, a: 1}
   blockLightColor: {r: 1, g: 1, b: 1, a: 1}
   frameLightColor: {r: 1, g: 1, b: 1, a: 0.7}
-  glossColor: {r: 1, g: 1, b: 1, a: 0.85}
+  glossColor: {r: 1, g: 1, b: 1, a: 1}
   gateArrowColor: {r: 1, g: 1, b: 1, a: 1}
   axisArrowColor: {r: 1, g: 1, b: 1, a: 0.9}
   iceColor: {r: 0.72, g: 0.86, b: 0.95, a: 1}

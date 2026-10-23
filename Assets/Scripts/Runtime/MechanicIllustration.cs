@@ -175,9 +175,7 @@ namespace GateRush.Runtime
 
             DrawGate(root, ctx, isOpen: true);
 
-            // The gate's lip hangs below its face; the block's is inside its cell.
-            var lip = config.LipOffsetCells;
-            return Rect.MinMaxRect(0f, -lip, boardWidth + config.FrameThicknessCells, 1f);
+            return Rect.MinMaxRect(0f, 0f, boardWidth + config.FrameThicknessCells, 1f);
         }
 
         /// <summary>A closed gate (M2) on the top edge of a board as wide as the gate.</summary>
@@ -188,8 +186,7 @@ namespace GateRush.Runtime
 
             DrawGate(root, ctx, isOpen: false);
 
-            var span = GateSpan(ctx);
-            return Rect.MinMaxRect(span.xMin, span.yMin - config.LipOffsetCells, span.xMax, span.yMax);
+            return GateSpan(ctx);
         }
 
         /// <summary>A locked 1×2 block beside a 1×1 block carrying its key, whose gem is the lock's colour (D47).</summary>
@@ -333,6 +330,15 @@ namespace GateRush.Runtime
             float rotationDegrees) =>
             AddSprite(parent, name, sprite, center, size, color, rotationDegrees);
 
+        /// <summary>A stud, drawn with the lit material's UI twin, as on the board.</summary>
+        Image IRecipeSurface<RectTransform, Image>.LitSprite(
+            RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order)
+        {
+            var image = AddSprite(parent, name, sprite, center, size, color);
+            image.material = config.UiLitMaterial;
+            return image;
+        }
+
         Image IRecipeSurface<RectTransform, Image>.Sliced(
             RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order) =>
             AddSliced(parent, name, sprite, center, size, border, color);
@@ -364,18 +370,20 @@ namespace GateRush.Runtime
             AddLabel(parent, name, center, text, boardFontSize, color);
 
         /// <summary>
-        /// One image per quarter, in the tiles' order, each posed as its tile
-        /// says over its rectangle enlarged by the seam overlap; a rotated
-        /// sprite's own x runs along the scene's y. An <see cref="Image"/>
-        /// has no flip, so a mirrored quarter gets a negative scale, which —
-        /// like a <c>SpriteRenderer</c>'s flip on the board — acts in the
-        /// sprite's own frame, before the rotation.
+        /// One image per quarter, in the tiles' order, each with its layer's
+        /// UI material (<see cref="RuntimeConfig.QuarterUiMaterial"/>) and
+        /// posed as its tile says over its rectangle enlarged by the seam
+        /// overlap; a rotated sprite's own x runs along the scene's y. An
+        /// <see cref="Image"/> has no flip, so a mirrored quarter gets a
+        /// negative scale, which — like a <c>SpriteRenderer</c>'s flip on the
+        /// board — acts in the sprite's own frame, before the rotation.
         /// </summary>
         private List<Image> AddQuarters(
             RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color)
         {
             var images = new List<Image>(tiles.Count);
             var overlap = QuarterLayers.SeamOverlap(layer, color, config.SeamOverlapCells) * 2f;
+            var material = config.QuarterUiMaterial(layer);
             for (var i = 0; i < tiles.Count; i++)
             {
                 var tile = tiles[i];
@@ -386,6 +394,7 @@ namespace GateRush.Runtime
                     parent, tile.ToString(), config.QuarterSprite(layer, tile), rect.center, frameSize, color,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 image.rectTransform.localScale = new Vector3(tile.FlipX ? -1f : 1f, tile.FlipY ? -1f : 1f, 1f);
+                image.material = material;
                 images.Add(image);
             }
 

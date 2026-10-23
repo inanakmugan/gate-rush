@@ -434,11 +434,10 @@ namespace GateRush.Runtime
             if (block.Outline == null)
             {
                 block.Outline = AddGroup(block.Body, "Outline", Vector2.zero);
-                // The contour pieces are the block's whole silhouette, so the
-                // outline grows out from its outer edge, as it did before the
-                // outline was drawn (Module 46).
+                // The plain pieces are the block's whole silhouette, so the
+                // outline grows out from its edge (Module 46).
                 block.OutlineQuarters = AddQuarters(
-                    block.Outline, block.Tiles, blockQuarterRect, QuarterLayer.Contour, config.OutlineColor, config.OutlineOrder);
+                    block.Outline, block.Tiles, blockQuarterRect, QuarterLayer.Plain, config.OutlineColor, config.OutlineOrder);
                 ApplyLift(block, block.LiftAmount);
             }
 
@@ -490,7 +489,7 @@ namespace GateRush.Runtime
             for (var i = 0; i < block.Tiles.Count; i++)
             {
                 var tile = block.Tiles[i];
-                PoseQuarter(block.OutlineQuarters[i], tile, QuarterLayer.Contour, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
+                PoseQuarter(block.OutlineQuarters[i], tile, QuarterLayer.Plain, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
             }
         }
 
@@ -1383,13 +1382,12 @@ namespace GateRush.Runtime
         /// <summary>
         /// A surviving layered block peels its removed outer colour (Modules
         /// 20 and 46), on the renderers it was drawn with: the window grows
-        /// from its inset to the whole face (<see cref="FaceShape"/>) — its
-        /// rim fading as it goes, the inner block and its top
-        /// shine growing with it over the darker outer block and its studs —
-        /// while the lip turns from the outer colour's to
-        /// <paramref name="exposed"/>'s and the inner block's own studs fade
-        /// out as the per-cell studs of a plain block, in the exposed colour,
-        /// fade in. It ends as a plain block of the exposed colour, which is
+        /// from its inset to the whole body (<see cref="FaceShape"/>) — its
+        /// sunken rim fading as it goes, the inner block and its highlight
+        /// growing with it over the darker outer block and its studs — while
+        /// the inner block's own studs fade out as the per-cell studs of a
+        /// plain block, in <paramref name="exposed"/>'s colour, fade in. It
+        /// ends as a plain block of the exposed colour, which is
         /// what the redraw then shows — with a third colour in its window when
         /// the stack goes deeper.
         /// </summary>
@@ -1409,14 +1407,11 @@ namespace GateRush.Runtime
 
             var edgeInset = config.LayerInsetCells;
             var innerInset = config.LayerInnerInsetCells;
-            var lightTiles = QuarterLayers.Contour(block.Tiles);
 
             // A footprint has at least one cell, so each quarter list holds
             // at least four quarters, all drawn in one colour.
             var edgeColor = layer.Edge[0].color;
-            var lipFrom = block.LipQuarters[0].color;
             var exposedFill = config.BlockFill(exposed);
-            var lipTo = config.LipFill(exposedFill);
             var innerStudColors = new Color[layer.Studs.Count];
             for (var i = 0; i < innerStudColors.Length; i++)
             {
@@ -1436,11 +1431,10 @@ namespace GateRush.Runtime
                     // opacity (QuarterLayers.SeamOverlap).
                     SetColor(layer.Edge, WithOpacity(edgeColor, opacity));
 
-                    PoseInset(layer.Edge, block.Tiles, edgeInset * (1f - t));
-                    PoseInset(layer.Face, block.Tiles, innerInset * (1f - t));
-                    PoseShineInset(layer.Shine, lightTiles, block.Tiles, innerInset * (1f - t));
+                    PoseInset(layer.Edge, block.Tiles, QuarterLayer.ReversedLit, edgeInset * (1f - t));
+                    PoseInset(layer.Face, block.Tiles, QuarterLayer.Lit, innerInset * (1f - t));
+                    PoseShineInset(layer.Shine, block.Tiles, innerInset * (1f - t));
 
-                    SetColor(block.LipQuarters, Color.Lerp(lipFrom, lipTo, t));
                     for (var i = 0; i < layer.Studs.Count; i++)
                     {
                         layer.Studs[i].color = WithOpacity(innerStudColors[i], opacity);
@@ -1471,14 +1465,13 @@ namespace GateRush.Runtime
 
             IRecipeSurface<Transform, SpriteRenderer> surface = this;
             var mask = block.FaceQuarters[0].maskInteraction;
-            var rise = new Vector2(0f, FaceShape.ContentRise(config.BlockLipCells));
             for (var c = 0; c < block.Cells.Count; c++)
             {
                 var cell = block.Cells[c];
-                var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f) + rise;
-                var stud = surface.Sprite(
+                var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
+                var stud = surface.LitSprite(
                     block.Body, $"Peel studs {cell}", config.StudsSprite, center, Vector2.one, WithOpacity(exposedFill, 0f),
-                    config.LayerStudOrder, 0f);
+                    config.LayerStudOrder);
                 var gloss = surface.Sprite(
                     block.Body, $"Peel gloss {cell}", config.StudGlossSprite, center, Vector2.one,
                     WithOpacity(config.GlossColor, 0f), config.LayerGlossOrder, 0f);

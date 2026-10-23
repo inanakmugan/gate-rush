@@ -124,6 +124,19 @@ namespace GateRush.Runtime
         [Tooltip("Sprite-Unlit-Default. Under the 2D Renderer a lit sprite renders black with no Light 2D.")]
         [SerializeField] private Material spriteMaterial;
 
+        [Header("Lit body materials (Module 46; Gate Rush → Generate Art makes and assigns these)")]
+        [Tooltip("Gate Rush/Board Sprite multiplying the colour back by the art recipe's Shade Headroom: the lit faces and the studs.")]
+        [SerializeField] private Material litMaterial;
+
+        [Tooltip("Gate Rush/Board Sprite adding its colour: the white highlight over the lit faces.")]
+        [SerializeField] private Material specularMaterial;
+
+        [Tooltip("The lit material's twin on Gate Rush/Board UI Sprite, for the introduction cards' UI Images.")]
+        [SerializeField] private Material uiLitMaterial;
+
+        [Tooltip("The highlight material's twin on Gate Rush/Board UI Sprite, for the introduction cards' UI Images.")]
+        [SerializeField] private Material uiSpecularMaterial;
+
         [Tooltip("TextMeshPro font asset for the board's labels: its counts, and the counts and marks in the introduction cards' illustrations. Lilita One (D46), created from Assets/Art/Fonts. The cards' own texts use Intro Font.")]
         [SerializeField] private TMP_FontAsset labelFont;
 
@@ -132,21 +145,19 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite quarterEdgeSprite;
         [SerializeField] private Sprite quarterFillSprite;
         [SerializeField] private Sprite quarterConcaveSprite;
-        [SerializeField] private Sprite contourOuterSprite;
-        [SerializeField] private Sprite contourEdgeSprite;
-        [SerializeField] private Sprite contourConcaveSprite;
-        [SerializeField] private Sprite lightOuterTopLeftSprite;
-        [SerializeField] private Sprite lightOuterTopRightSprite;
-        [SerializeField] private Sprite lightOuterBottomLeftSprite;
-        [SerializeField] private Sprite lightOuterBottomRightSprite;
-        [SerializeField] private Sprite lightConcaveTopLeftSprite;
-        [SerializeField] private Sprite lightConcaveTopRightSprite;
-        [SerializeField] private Sprite lightConcaveBottomLeftSprite;
-        [SerializeField] private Sprite lightConcaveBottomRightSprite;
-        [SerializeField] private Sprite lightEdgeTopSprite;
-        [SerializeField] private Sprite lightEdgeBottomSprite;
-        [SerializeField] private Sprite lightEdgeLeftSprite;
-        [SerializeField] private Sprite lightEdgeRightSprite;
+        [SerializeField] private Sprite faceOuterTopLeftSprite;
+        [SerializeField] private Sprite faceOuterTopRightSprite;
+        [SerializeField] private Sprite faceOuterBottomLeftSprite;
+        [SerializeField] private Sprite faceOuterBottomRightSprite;
+        [SerializeField] private Sprite faceConcaveTopLeftSprite;
+        [SerializeField] private Sprite faceConcaveTopRightSprite;
+        [SerializeField] private Sprite faceConcaveBottomLeftSprite;
+        [SerializeField] private Sprite faceConcaveBottomRightSprite;
+        [SerializeField] private Sprite faceEdgeTopSprite;
+        [SerializeField] private Sprite faceEdgeBottomSprite;
+        [SerializeField] private Sprite faceEdgeLeftSprite;
+        [SerializeField] private Sprite faceEdgeRightSprite;
+        [SerializeField] private Sprite faceFillSprite;
         [SerializeField] private Sprite bodyOuterTopLeftSprite;
         [SerializeField] private Sprite bodyOuterTopRightSprite;
         [SerializeField] private Sprite bodyOuterBottomLeftSprite;
@@ -159,6 +170,19 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite bodyEdgeBottomSprite;
         [SerializeField] private Sprite bodyEdgeLeftSprite;
         [SerializeField] private Sprite bodyEdgeRightSprite;
+        [SerializeField] private Sprite bodyFillSprite;
+        [SerializeField] private Sprite shadowOuterTopLeftSprite;
+        [SerializeField] private Sprite shadowOuterTopRightSprite;
+        [SerializeField] private Sprite shadowOuterBottomLeftSprite;
+        [SerializeField] private Sprite shadowOuterBottomRightSprite;
+        [SerializeField] private Sprite shadowConcaveTopLeftSprite;
+        [SerializeField] private Sprite shadowConcaveTopRightSprite;
+        [SerializeField] private Sprite shadowConcaveBottomLeftSprite;
+        [SerializeField] private Sprite shadowConcaveBottomRightSprite;
+        [SerializeField] private Sprite shadowEdgeTopSprite;
+        [SerializeField] private Sprite shadowEdgeBottomSprite;
+        [SerializeField] private Sprite shadowEdgeLeftSprite;
+        [SerializeField] private Sprite shadowEdgeRightSprite;
         [SerializeField] private Sprite studsSprite;
         [SerializeField] private Sprite studGlossSprite;
         [SerializeField] private Sprite singleStudSprite;
@@ -203,13 +227,10 @@ namespace GateRush.Runtime
         [Tooltip("How far the floor's backing reaches past the grid under the frame, in cells, so no background shows between floor and frame. At most the frame thickness.")]
         [SerializeField] private float floorUnderlayCells = 0.2f;
 
-        [Tooltip("How far the frame's, a gate's and a machine's darker copy (the lip) hangs below its face, in cells. It reads as thickness. At least 0.")]
-        [SerializeField] private float lipOffsetCells = 0.1f;
+        [Tooltip("How far a machine's darker copy (the lip) hangs below its body, in cells. It reads as thickness. Blocks, gates and the frame are lit bodies and carry none (Module 46). At least 0.")]
+        [SerializeField] private float lipOffsetCells = 0.09f;
 
-        [Tooltip("How much of a block's footprint its lip takes along the bottom, in cells (Module 46). The lip stays inside the block's cells and the face is shortened by this from below; the studs rise with it, so StudFitTests bounds it. At least 0, and with Layer Inset Cells below 0.5.")]
-        [SerializeField] private float blockLipCells = 0.1f;
-
-        [Tooltip("The lip's colour is the face colour with RGB multiplied by this, from 0 (black) to 1 (no darkening).")]
+        [Tooltip("A machine's lip's colour, and a previewed cell's rim, is the colour with RGB multiplied by this, from 0 (black) to 1 (no darkening).")]
         [SerializeField] private float lipDarken = 0.5f;
 
         [Tooltip("How much each quarter tile is enlarged on every side, in cells, to hide sub-pixel cracks between tiles. 0 turns it off.")]
@@ -225,7 +246,7 @@ namespace GateRush.Runtime
         [SerializeField] private float axisArrowEndInsetCells = 0.14f;
 
         [Header("Layered blocks (M4)")]
-        [Tooltip("How far a layered block's window sits inside its footprint, in cells, on every side (Module 46): the darker outer block, with its studs, shows around it. Above 0; with Layer Edge Cells and Block Lip Cells below 0.5.")]
+        [Tooltip("How far a layered block's window sits inside its footprint, in cells, on every side (Module 46): the darker outer block, with its studs, shows around it. Above 0; with Layer Edge Cells below 0.5.")]
         [SerializeField] private float layerInsetCells = 0.31f;
 
         [Tooltip("Width of the window's dark rim, in cells, in the outer colour darkened by Layer Edge Darken. At least 0.")]
@@ -745,17 +766,17 @@ namespace GateRush.Runtime
         [Tooltip("The frame's face, white in its middle, so this is the colour shown there. Opaque.")]
         [SerializeField] private Color frameColor = new Color32(0x49, 0x21, 0x84, 0xFF);
 
-        [Tooltip("The dark outline round every block, the frame, every gate and the gate arrow (D79). Never tinted by a block's colour. Opaque.")]
+        [Tooltip("The dark outline round the gate arrow (D79). Blocks, gates and the frame are lit bodies without one (Module 46). Opaque.")]
         [SerializeField] private Color contourColor = new Color32(0x1C, 0x0B, 0x3A, 0xFF);
 
-        [Tooltip("The tint of a block's and a gate's body pieces, and of a layered block's window light (Module 46): white, so their light stays white and their shade black; its alpha scales both, as the art recipe paints them.")]
+        [Tooltip("The tint of a block's and a gate's highlight pieces (Module 46): white, so the highlight stays white; its alpha scales it, as the art recipe paints it.")]
         [SerializeField] private Color blockLightColor = Color.white;
 
-        [Tooltip("The tint of the frame's body pieces: white, its alpha scaling the frame's highlight and bevel against the blocks'.")]
+        [Tooltip("The tint of the frame's highlight pieces: white, its alpha scaling the frame's highlight against the blocks'.")]
         [SerializeField] private Color frameLightColor = new Color(1f, 1f, 1f, 0.7f);
 
-        [Tooltip("The highlight on each stud. Not tinted by the block's colour.")]
-        [SerializeField] private Color glossColor = new Color(1f, 1f, 1f, 0.85f);
+        [Tooltip("The tint of each stud's rim light. Not tinted by the block's colour: white and opaque draws it as the art recipe paints it (Module 46); a lower alpha weakens it.")]
+        [SerializeField] private Color glossColor = Color.white;
 
         [SerializeField] private Color gateArrowColor = new Color(1f, 1f, 1f, 1f);
         [SerializeField] private Color axisArrowColor = new Color(1f, 1f, 1f, 0.9f);
@@ -811,16 +832,16 @@ namespace GateRush.Runtime
         [SerializeField] private int miniatureLipOrder = DefaultMiniatureLipOrder;
         [SerializeField] private int miniatureOrder = DefaultMiniatureOrder;
 
-        [Tooltip("The frame's outline, and a gate's: below Frame Lip Order.")]
+        [Tooltip("The frame's floor shadow, and a gate's (Module 46; this slot held their outline): below Frame Lip Order.")]
         [SerializeField] private int frameContourOrder = DefaultFrameContourOrder;
 
-        [Tooltip("The frame's lip, and a gate's.")]
+        [Tooltip("Kept free between the frame's shadow and its body: the frame and gates no longer carry a lip (Module 46).")]
         [SerializeField] private int frameLipOrder = DefaultFrameLipOrder;
 
-        [Tooltip("The frame's face, and a gate's.")]
+        [Tooltip("The frame's lit body, and a gate's.")]
         [SerializeField] private int frameOrder = DefaultFrameOrder;
 
-        [Tooltip("The frame's lighter rim and a gate's gloss: above Frame Order, below Gate Arrow Outline Order.")]
+        [Tooltip("The frame's and a gate's white highlight: above Frame Order, below Gate Arrow Outline Order.")]
         [SerializeField] private int frameShineOrder = DefaultFrameShineOrder;
 
         [Tooltip("The dark outline under an open gate's arrow: below Gate Mark Order.")]
@@ -829,13 +850,16 @@ namespace GateRush.Runtime
         [Tooltip("An open gate's arrow and a closed gate's frost.")]
         [SerializeField] private int gateMarkOrder = DefaultGateMarkOrder;
 
-        [Tooltip("A block's outline: above Gate Mark Order, below Block Lip Order.")]
+        [Tooltip("A block's floor shadow (Module 46; this slot held its outline): above Gate Mark Order, below Block Lip Order, so it falls on the floor and the frame and under every block.")]
         [SerializeField] private int blockContourOrder = DefaultBlockContourOrder;
 
+        [Tooltip("Kept free between a block's shadow and its body: blocks no longer carry a lip (Module 46). A previewed cell stays below it.")]
         [SerializeField] private int blockLipOrder = DefaultBlockLipOrder;
+
+        [Tooltip("A block's lit body.")]
         [SerializeField] private int blockOrder = DefaultBlockOrder;
 
-        [Tooltip("A block's top highlight: above Block Order, below Stud Order.")]
+        [Tooltip("A block's white highlight: above Block Order, below Stud Order.")]
         [SerializeField] private int blockShineOrder = DefaultBlockShineOrder;
 
         [Tooltip("Studs, and a frozen block's frost, which has no studs.")]
@@ -897,8 +921,54 @@ namespace GateRush.Runtime
         /// <summary>The white square the floor's backing is drawn with, and the shape of a passing block's clip mask.</summary>
         public Sprite CellSprite => cellSprite;
 
-        /// <summary>The material every sprite uses: <c>Sprite-Unlit-Default</c>.</summary>
+        /// <summary>The material every sprite uses but the lit body's: <c>Sprite-Unlit-Default</c>.</summary>
         public Material SpriteMaterial => spriteMaterial;
+
+        /// <summary>The material of the lit faces and the studs, which multiplies them back by the art recipe's headroom.</summary>
+        public Material LitMaterial => litMaterial;
+
+        /// <summary>
+        /// The material a SpriteRenderer drawing <paramref name="layer"/>
+        /// uses: the lit one for faces, the highlight one for the body's
+        /// white, <see cref="SpriteMaterial"/> for the rest.
+        /// </summary>
+        public Material QuarterMaterial(QuarterLayer layer) => MaterialFor(layer, litMaterial, specularMaterial, spriteMaterial);
+
+        /// <summary>
+        /// The material a UI Image drawing <paramref name="layer"/> uses, for
+        /// the introduction cards: the UI twins of <see cref="QuarterMaterial"/>,
+        /// or null — Unity's UI default — for the rest.
+        /// </summary>
+        public Material QuarterUiMaterial(QuarterLayer layer) => MaterialFor(layer, uiLitMaterial, uiSpecularMaterial, null);
+
+        /// <summary>The material a UI Image drawing a stud uses: the lit UI twin.</summary>
+        public Material UiLitMaterial => uiLitMaterial;
+
+        private static Material MaterialFor(QuarterLayer layer, Material lit, Material specular, Material plain)
+        {
+            switch (layer)
+            {
+                case QuarterLayer.Lit:
+                case QuarterLayer.ReversedLit:
+                    return lit;
+                case QuarterLayer.Body:
+                    return specular;
+                default:
+                    return plain;
+            }
+        }
+
+        /// <summary>
+        /// How far a shadow piece's canvas reaches past its cell, in cells:
+        /// its sprite's width less a plain quarter's, as a share of a cell,
+        /// which a quarter is half of (<see cref="FaceShape.ShadowQuarterRect"/>).
+        /// Read from the sprites, so it always matches what the generator
+        /// painted; 0 while they are unassigned.
+        /// </summary>
+        public float ShadowMarginCells =>
+            shadowOuterTopLeftSprite != null && quarterFillSprite != null
+                ? (shadowOuterTopLeftSprite.rect.width - quarterFillSprite.rect.width) / (2f * quarterFillSprite.rect.width)
+                : 0f;
 
         /// <summary>The font of the board's labels and of the introduction cards' illustrations: Lilita One.</summary>
         public TMP_FontAsset LabelFont => labelFont;
@@ -998,14 +1068,6 @@ namespace GateRush.Runtime
         /// face, in cells.
         /// </summary>
         public float LipOffsetCells => lipOffsetCells;
-
-        /// <summary>
-        /// How much of a block's footprint its lip takes along the bottom, in
-        /// cells: the face is shortened by this from below
-        /// (<see cref="FaceShape"/>). Also a layered block's inner shape's and
-        /// a machine screen's miniature's.
-        /// </summary>
-        public float BlockLipCells => blockLipCells;
 
         /// <summary>How much each quarter tile is enlarged on every side, in cells.</summary>
         public float SeamOverlapCells => seamOverlapCells;
@@ -1418,13 +1480,13 @@ namespace GateRush.Runtime
         /// <summary>Tint of the frame and of walls, which are drawn as frame.</summary>
         public Color FrameColor => frameColor;
 
-        /// <summary>The outline round every block, the frame, every gate and the gate arrow; drawn untinted (D79).</summary>
+        /// <summary>The outline round the gate arrow; drawn untinted (D79).</summary>
         public Color ContourColor => contourColor;
 
-        /// <summary>The tint of a block's and a gate's light pieces: white, its alpha scaling the bands the sprites carry.</summary>
+        /// <summary>The tint of a block's and a gate's highlight pieces: white, its alpha scaling the highlight.</summary>
         public Color BlockLightColor => blockLightColor;
 
-        /// <summary>The tint of the frame's light pieces.</summary>
+        /// <summary>The tint of the frame's highlight pieces.</summary>
         public Color FrameLightColor => frameLightColor;
 
         /// <summary>Colour of the stud highlights.</summary>
@@ -1615,60 +1677,68 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The generated sprite <paramref name="tile"/> is drawn with in
-        /// <paramref name="layer"/>'s set. Face and contour pieces depend on
-        /// the piece alone; a fill's contour would be the opaque white face
-        /// fill, which is returned. A body or light piece depends on the
-        /// quarter's place too — its corner of the cell, or the side an edge
-        /// faces: <see cref="QuarterLayer.Body"/> takes the body piece of that
-        /// place, <see cref="QuarterLayer.ReversedLight"/> the light piece of
-        /// the opposite one. A fill has no edge and carries neither
-        /// (<see cref="QuarterLayers"/>), so null is returned for it.
+        /// <paramref name="layer"/>'s set. A plain piece depends on the piece
+        /// alone. A lit, highlight or shadow piece depends on the quarter's
+        /// place too — its corner of the cell, or the side an edge faces —
+        /// and <see cref="QuarterLayer.ReversedLit"/> takes the lit piece of
+        /// the opposite place. A fill has a lit and a highlight piece of its
+        /// own, the flat top's; it casts no shadow past the shape
+        /// (<see cref="QuarterLayers.Edged"/>), so null is returned for it.
         /// </summary>
         public Sprite QuarterSprite(QuarterLayer layer, QuarterTile tile)
         {
-            if (layer == QuarterLayer.Body)
+            switch (layer)
             {
-                return PlaceSprite(
-                    tile.Piece, tile.SignX, tile.SignY,
-                    bodyOuterTopLeftSprite, bodyOuterTopRightSprite, bodyOuterBottomLeftSprite, bodyOuterBottomRightSprite,
-                    bodyConcaveTopLeftSprite, bodyConcaveTopRightSprite, bodyConcaveBottomLeftSprite, bodyConcaveBottomRightSprite,
-                    bodyEdgeTopSprite, bodyEdgeBottomSprite, bodyEdgeLeftSprite, bodyEdgeRightSprite);
-            }
+                case QuarterLayer.Lit:
+                case QuarterLayer.ReversedLit:
+                {
+                    var flip = layer == QuarterLayer.ReversedLit ? -1 : 1;
+                    return PlaceSprite(
+                        tile.Piece, tile.SignX * flip, tile.SignY * flip,
+                        faceOuterTopLeftSprite, faceOuterTopRightSprite, faceOuterBottomLeftSprite, faceOuterBottomRightSprite,
+                        faceConcaveTopLeftSprite, faceConcaveTopRightSprite, faceConcaveBottomLeftSprite, faceConcaveBottomRightSprite,
+                        faceEdgeTopSprite, faceEdgeBottomSprite, faceEdgeLeftSprite, faceEdgeRightSprite, faceFillSprite);
+                }
 
-            if (layer == QuarterLayer.ReversedLight)
-            {
-                return PlaceSprite(
-                    tile.Piece, -tile.SignX, -tile.SignY,
-                    lightOuterTopLeftSprite, lightOuterTopRightSprite, lightOuterBottomLeftSprite, lightOuterBottomRightSprite,
-                    lightConcaveTopLeftSprite, lightConcaveTopRightSprite, lightConcaveBottomLeftSprite, lightConcaveBottomRightSprite,
-                    lightEdgeTopSprite, lightEdgeBottomSprite, lightEdgeLeftSprite, lightEdgeRightSprite);
+                case QuarterLayer.Body:
+                    return PlaceSprite(
+                        tile.Piece, tile.SignX, tile.SignY,
+                        bodyOuterTopLeftSprite, bodyOuterTopRightSprite, bodyOuterBottomLeftSprite, bodyOuterBottomRightSprite,
+                        bodyConcaveTopLeftSprite, bodyConcaveTopRightSprite, bodyConcaveBottomLeftSprite, bodyConcaveBottomRightSprite,
+                        bodyEdgeTopSprite, bodyEdgeBottomSprite, bodyEdgeLeftSprite, bodyEdgeRightSprite, bodyFillSprite);
+                case QuarterLayer.Shadow:
+                    return PlaceSprite(
+                        tile.Piece, tile.SignX, tile.SignY,
+                        shadowOuterTopLeftSprite, shadowOuterTopRightSprite, shadowOuterBottomLeftSprite, shadowOuterBottomRightSprite,
+                        shadowConcaveTopLeftSprite, shadowConcaveTopRightSprite, shadowConcaveBottomLeftSprite, shadowConcaveBottomRightSprite,
+                        shadowEdgeTopSprite, shadowEdgeBottomSprite, shadowEdgeLeftSprite, shadowEdgeRightSprite, null);
             }
 
             switch (tile.SpriteKind)
             {
                 case QuarterSpriteKind.Outer:
-                    return layer == QuarterLayer.Contour ? contourOuterSprite : quarterOuterSprite;
+                    return quarterOuterSprite;
                 case QuarterSpriteKind.Edge:
-                    return layer == QuarterLayer.Contour ? contourEdgeSprite : quarterEdgeSprite;
+                    return quarterEdgeSprite;
                 case QuarterSpriteKind.Fill:
                     return quarterFillSprite;
                 default:
-                    return layer == QuarterLayer.Contour ? contourConcaveSprite : quarterConcaveSprite;
+                    return quarterConcaveSprite;
             }
         }
 
         /// <summary>
-        /// Of one set of twelve place-dependent pieces, the one for
+        /// Of one set of place-dependent pieces, the one for
         /// <paramref name="piece"/> as if at corner <c>(signX, signY)</c> of
         /// its cell: a corner piece's by that corner, an edge along x's by the
         /// side it faces up or down, an edge along y's by the side it faces
-        /// left or right. Null for a fill.
+        /// left or right, and a fill's <paramref name="fill"/>.
         /// </summary>
         private static Sprite PlaceSprite(
             QuarterPiece piece, int signX, int signY,
             Sprite outerTopLeft, Sprite outerTopRight, Sprite outerBottomLeft, Sprite outerBottomRight,
             Sprite concaveTopLeft, Sprite concaveTopRight, Sprite concaveBottomLeft, Sprite concaveBottomRight,
-            Sprite edgeTop, Sprite edgeBottom, Sprite edgeLeft, Sprite edgeRight)
+            Sprite edgeTop, Sprite edgeBottom, Sprite edgeLeft, Sprite edgeRight, Sprite fill)
         {
             var isRight = signX > 0;
             var isTop = signY > 0;
@@ -1687,7 +1757,7 @@ namespace GateRush.Runtime
                 case QuarterPiece.EdgeAlongY:
                     return isRight ? edgeRight : edgeLeft;
                 default:
-                    return null;
+                    return fill;
             }
         }
 
@@ -1871,6 +1941,18 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Sprite Material is not assigned (use Sprite-Unlit-Default).");
             }
 
+            foreach (var (material, shownName) in new[]
+                     {
+                         (litMaterial, "Lit Material"), (specularMaterial, "Specular Material"),
+                         (uiLitMaterial, "Ui Lit Material"), (uiSpecularMaterial, "Ui Specular Material")
+                     })
+            {
+                if (material == null)
+                {
+                    problems.Add($"{name}: {shownName} is not assigned; run Gate Rush → Generate Art.");
+                }
+            }
+
             if (labelFont == null)
             {
                 problems.Add($"{name}: Label Font is not assigned; create the Lilita One font asset from Assets/Art/Fonts and assign it.");
@@ -1880,21 +1962,19 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, quarterEdgeSprite, "Quarter Edge Sprite");
             AddIfUnassigned(problems, quarterFillSprite, "Quarter Fill Sprite");
             AddIfUnassigned(problems, quarterConcaveSprite, "Quarter Concave Sprite");
-            AddIfUnassigned(problems, contourOuterSprite, "Contour Outer Sprite");
-            AddIfUnassigned(problems, contourEdgeSprite, "Contour Edge Sprite");
-            AddIfUnassigned(problems, contourConcaveSprite, "Contour Concave Sprite");
-            AddIfUnassigned(problems, lightOuterTopLeftSprite, "Light Outer Top Left Sprite");
-            AddIfUnassigned(problems, lightOuterTopRightSprite, "Light Outer Top Right Sprite");
-            AddIfUnassigned(problems, lightOuterBottomLeftSprite, "Light Outer Bottom Left Sprite");
-            AddIfUnassigned(problems, lightOuterBottomRightSprite, "Light Outer Bottom Right Sprite");
-            AddIfUnassigned(problems, lightConcaveTopLeftSprite, "Light Concave Top Left Sprite");
-            AddIfUnassigned(problems, lightConcaveTopRightSprite, "Light Concave Top Right Sprite");
-            AddIfUnassigned(problems, lightConcaveBottomLeftSprite, "Light Concave Bottom Left Sprite");
-            AddIfUnassigned(problems, lightConcaveBottomRightSprite, "Light Concave Bottom Right Sprite");
-            AddIfUnassigned(problems, lightEdgeTopSprite, "Light Edge Top Sprite");
-            AddIfUnassigned(problems, lightEdgeBottomSprite, "Light Edge Bottom Sprite");
-            AddIfUnassigned(problems, lightEdgeLeftSprite, "Light Edge Left Sprite");
-            AddIfUnassigned(problems, lightEdgeRightSprite, "Light Edge Right Sprite");
+            AddIfUnassigned(problems, faceOuterTopLeftSprite, "Face Outer Top Left Sprite");
+            AddIfUnassigned(problems, faceOuterTopRightSprite, "Face Outer Top Right Sprite");
+            AddIfUnassigned(problems, faceOuterBottomLeftSprite, "Face Outer Bottom Left Sprite");
+            AddIfUnassigned(problems, faceOuterBottomRightSprite, "Face Outer Bottom Right Sprite");
+            AddIfUnassigned(problems, faceConcaveTopLeftSprite, "Face Concave Top Left Sprite");
+            AddIfUnassigned(problems, faceConcaveTopRightSprite, "Face Concave Top Right Sprite");
+            AddIfUnassigned(problems, faceConcaveBottomLeftSprite, "Face Concave Bottom Left Sprite");
+            AddIfUnassigned(problems, faceConcaveBottomRightSprite, "Face Concave Bottom Right Sprite");
+            AddIfUnassigned(problems, faceEdgeTopSprite, "Face Edge Top Sprite");
+            AddIfUnassigned(problems, faceEdgeBottomSprite, "Face Edge Bottom Sprite");
+            AddIfUnassigned(problems, faceEdgeLeftSprite, "Face Edge Left Sprite");
+            AddIfUnassigned(problems, faceEdgeRightSprite, "Face Edge Right Sprite");
+            AddIfUnassigned(problems, faceFillSprite, "Face Fill Sprite");
             AddIfUnassigned(problems, bodyOuterTopLeftSprite, "Body Outer Top Left Sprite");
             AddIfUnassigned(problems, bodyOuterTopRightSprite, "Body Outer Top Right Sprite");
             AddIfUnassigned(problems, bodyOuterBottomLeftSprite, "Body Outer Bottom Left Sprite");
@@ -1907,6 +1987,19 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, bodyEdgeBottomSprite, "Body Edge Bottom Sprite");
             AddIfUnassigned(problems, bodyEdgeLeftSprite, "Body Edge Left Sprite");
             AddIfUnassigned(problems, bodyEdgeRightSprite, "Body Edge Right Sprite");
+            AddIfUnassigned(problems, bodyFillSprite, "Body Fill Sprite");
+            AddIfUnassigned(problems, shadowOuterTopLeftSprite, "Shadow Outer Top Left Sprite");
+            AddIfUnassigned(problems, shadowOuterTopRightSprite, "Shadow Outer Top Right Sprite");
+            AddIfUnassigned(problems, shadowOuterBottomLeftSprite, "Shadow Outer Bottom Left Sprite");
+            AddIfUnassigned(problems, shadowOuterBottomRightSprite, "Shadow Outer Bottom Right Sprite");
+            AddIfUnassigned(problems, shadowConcaveTopLeftSprite, "Shadow Concave Top Left Sprite");
+            AddIfUnassigned(problems, shadowConcaveTopRightSprite, "Shadow Concave Top Right Sprite");
+            AddIfUnassigned(problems, shadowConcaveBottomLeftSprite, "Shadow Concave Bottom Left Sprite");
+            AddIfUnassigned(problems, shadowConcaveBottomRightSprite, "Shadow Concave Bottom Right Sprite");
+            AddIfUnassigned(problems, shadowEdgeTopSprite, "Shadow Edge Top Sprite");
+            AddIfUnassigned(problems, shadowEdgeBottomSprite, "Shadow Edge Bottom Sprite");
+            AddIfUnassigned(problems, shadowEdgeLeftSprite, "Shadow Edge Left Sprite");
+            AddIfUnassigned(problems, shadowEdgeRightSprite, "Shadow Edge Right Sprite");
             AddIfUnassigned(problems, studsSprite, "Studs Sprite");
             AddIfUnassigned(problems, studGlossSprite, "Stud Gloss Sprite");
             AddIfUnassigned(problems, singleStudSprite, "Single Stud Sprite");
@@ -1951,16 +2044,6 @@ namespace GateRush.Runtime
             if (!(lipOffsetCells >= 0f))
             {
                 problems.Add($"{name}: Lip Offset Cells may not be negative.");
-            }
-
-            if (!(blockLipCells >= 0f))
-            {
-                problems.Add($"{name}: Block Lip Cells may not be negative.");
-            }
-
-            if (!(blockLipCells + layerInsetCells < 0.5f))
-            {
-                problems.Add($"{name}: Block Lip Cells plus Layer Inset Cells must be below 0.5, so the bottom of a block's face, and of a layered block's inner shape, keeps a height.");
             }
 
             if (!(lipDarken >= 0f && lipDarken <= 1f))
@@ -2095,7 +2178,7 @@ namespace GateRush.Runtime
 
             if (!(frameContourOrder < frameLipOrder))
             {
-                problems.Add($"{name}: Frame Contour Order must be below Frame Lip Order, so the outline sits under the frame and its gates.");
+                problems.Add($"{name}: Frame Contour Order must be below Frame Lip Order, so the shadow sits under the frame and its gates.");
             }
 
             if (!(frameOrder < frameShineOrder && frameShineOrder < gateArrowOutlineOrder && gateArrowOutlineOrder < gateMarkOrder))
@@ -2105,7 +2188,7 @@ namespace GateRush.Runtime
 
             if (!(gateMarkOrder < blockContourOrder && blockContourOrder < blockLipOrder))
             {
-                problems.Add($"{name}: Block Contour Order must be above Gate Mark Order and below Block Lip Order, so a block's outline sits under its lip and over the frame.");
+                problems.Add($"{name}: Block Contour Order must be above Gate Mark Order and below Block Lip Order, so a block's shadow sits under every block and over the frame.");
             }
         }
 
@@ -2145,9 +2228,9 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Layer Edge Cells may not be negative.");
             }
 
-            if (!(layerInsetCells + layerEdgeCells + blockLipCells < 0.5f))
+            if (!(layerInsetCells + layerEdgeCells < 0.5f))
             {
-                problems.Add($"{name}: Layer Inset Cells, Layer Edge Cells and Block Lip Cells together must be below 0.5, so a layered block's inner block keeps a height.");
+                problems.Add($"{name}: Layer Inset Cells and Layer Edge Cells together must be below 0.5, so a layered block's inner block keeps a height.");
             }
 
             if (!(layeredOuterDarken >= 0f && layeredOuterDarken <= 1f && layerEdgeDarken >= 0f && layerEdgeDarken <= 1f))

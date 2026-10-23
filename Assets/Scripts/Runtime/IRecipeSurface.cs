@@ -37,8 +37,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// One piece per quarter of <paramref name="tiles"/>, in their order,
-        /// drawn with <paramref name="layer"/>'s sprite for its piece and posed
-        /// as its tile says over the rectangle <paramref name="rectOf"/> gives it.
+        /// drawn with <paramref name="layer"/>'s sprite and material for its
+        /// piece and posed as its tile says over the rectangle
+        /// <paramref name="rectOf"/> gives it.
         /// </summary>
         List<TPiece> Quarters(
             TGroup parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
@@ -51,6 +52,13 @@ namespace GateRush.Runtime
         TPiece Sprite(
             TGroup parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
             float rotationDegrees);
+
+        /// <summary>
+        /// <paramref name="sprite"/> stretched over <paramref name="size"/>,
+        /// drawn with the lit material, which multiplies it back by the art
+        /// recipe's headroom: a stud, lit like the body under it (Module 46).
+        /// </summary>
+        TPiece LitSprite(TGroup parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order);
 
         /// <summary>
         /// A 9-sliced <paramref name="sprite"/> over <paramref name="size"/>

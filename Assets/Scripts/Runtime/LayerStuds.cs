@@ -17,10 +17,9 @@ namespace GateRush.Runtime
     /// evenly and centred on that box.</para>
     /// <para><b>The fit.</b> A point is kept when the square of the
     /// clearance around it lies inside the inner block, which is the footprint
-    /// shrunk by the inset on every outward side and by the lip too along the
-    /// bottom (<see cref="FaceShape"/>). That holds exactly when the square,
-    /// grown by the inset — and by the lip below — covers only the
-    /// footprint's own cells, which works for any shape. The rounding of the
+    /// shrunk by the inset on every outward side (<see cref="FaceShape"/>).
+    /// That holds exactly when the square, grown by the inset, covers only
+    /// the footprint's own cells, which works for any shape. The rounding of the
     /// inner block's corners is left to the clearance, which StudFitTests
     /// checks against the art recipe's stud.</para>
     /// </remarks>
@@ -32,13 +31,12 @@ namespace GateRush.Runtime
         /// </summary>
         /// <param name="cells">The block's footprint.</param>
         /// <param name="innerInsetCells">How far the inner block sits inside the footprint (<see cref="RuntimeConfig.LayerInnerInsetCells"/>).</param>
-        /// <param name="lipCells">How far the block's lip shortens its face from below (<see cref="RuntimeConfig.BlockLipCells"/>).</param>
         /// <param name="spacingCells">The inner grid's spacing (<see cref="RuntimeConfig.LayerStudSpacingCells"/>).</param>
         /// <param name="clearanceCells">How far a stud's centre stays from the inner block's edge (<see cref="RuntimeConfig.LayerStudClearanceCells"/>).</param>
         /// <exception cref="ArgumentNullException"><paramref name="cells"/> is null.</exception>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="spacingCells"/> is not positive.</exception>
         public static IReadOnlyList<Vector2> Centers(
-            IReadOnlyList<Coord> cells, float innerInsetCells, float lipCells, float spacingCells, float clearanceCells)
+            IReadOnlyList<Coord> cells, float innerInsetCells, float spacingCells, float clearanceCells)
         {
             if (cells == null)
             {
@@ -59,7 +57,7 @@ namespace GateRush.Runtime
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
             var left = minX + innerInsetCells;
             var right = maxX + 1 - innerInsetCells;
-            var bottom = minY + innerInsetCells + lipCells;
+            var bottom = minY + innerInsetCells;
             var top = maxY + 1 - innerInsetCells;
 
             var columns = CountAlong(right - left, spacingCells, clearanceCells);
@@ -73,7 +71,7 @@ namespace GateRush.Runtime
                 for (var column = 0; column < columns; column++)
                 {
                     var x = (left + right) * 0.5f + (column - (columns - 1) * 0.5f) * spacingCells;
-                    if (CoversOnlyMembers(members, x - reach, x + reach, y - reach - lipCells, y + reach))
+                    if (CoversOnlyMembers(members, x - reach, x + reach, y - reach, y + reach))
                     {
                         centers.Add(new Vector2(x, y));
                     }

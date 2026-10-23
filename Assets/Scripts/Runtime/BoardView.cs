@@ -510,28 +510,24 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The frame ring and every wall cell: its outline, lip and face, and
-        /// its body — the blocks' bevel ring and top band, faded by the frame's
-        /// tint (Module 46). The lip
-        /// hangs below the outline: dark purple on dark, it reads as part of it.
+        /// The frame ring and every wall cell, a raised wall lit like a block
+        /// (Module 46): its shadow on the floor, its lit body and its
+        /// highlight, faded by the frame's tint. The shadow keeps the
+        /// outline's group name, <c>Frame contour</c>.
         /// </summary>
         private void DrawFrame()
         {
             var contour = AddGroup(board, "Frame contour", Vector2.zero);
+            var margin = CellsToWorld(config.ShadowMarginCells);
             AddQuarters(
-                contour, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Contour, config.ContourColor,
-                config.FrameContourOrder);
-
-            var lip = AddGroup(board, "Frame lip", LipOffset());
-            AddQuarters(lip, frameTiles, frameQuarterRect, QuarterLayer.Face, config.LipFill(config.FrameColor), config.FrameLipOrder);
+                contour, QuarterLayers.Edged(frameTiles), tile => FaceShape.ShadowQuarterRect(frameQuarterRect(tile), tile, margin),
+                QuarterLayer.Shadow, Color.white, config.FrameContourOrder);
 
             var face = AddGroup(board, "Frame", Vector2.zero);
-            AddQuarters(face, frameTiles, frameQuarterRect, QuarterLayer.Face, config.FrameColor, config.FrameOrder);
+            AddQuarters(face, frameTiles, frameQuarterRect, QuarterLayer.Lit, config.FrameColor, config.FrameOrder);
 
             var shine = AddGroup(board, "Frame shine", Vector2.zero);
-            AddQuarters(
-                shine, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Body, config.FrameLightColor,
-                config.FrameShineOrder);
+            AddQuarters(shine, frameTiles, frameQuarterRect, QuarterLayer.Body, config.FrameLightColor, config.FrameShineOrder);
         }
 
         /// <summary>
@@ -625,14 +621,14 @@ namespace GateRush.Runtime
                 // M3: a frozen block is ice, never its colour.
                 var fill = visual.IsFrozen ? config.IceColor : config.BlockFill(visual.OuterColor.Value);
 
-                // The lip, the face over it and what the face carries are the
+                // The shadow, the lit body and what it carries are the
                 // shared recipe's (BoardRecipes.Block). M3: a frozen block
                 // shows no colour, so VisibilityLayer gives it none beneath
                 // either and it gets no inner shape.
                 var beneath = visual.BeneathColor.HasValue ? config.BlockFill(visual.BeneathColor.Value) : (Color?)null;
                 var parts = recipes.Block(body, cells, tiles, fill, beneath, visual.IsFrozen, spec.Axis);
 
-                var drawn = new DrawnBlock(root, body, FootprintCenterInBlock(cells), parts.Lip, cells, tiles, spec.Axis, visual.IsFrozen)
+                var drawn = new DrawnBlock(root, body, FootprintCenterInBlock(cells), cells, tiles, spec.Axis, visual.IsFrozen)
                 {
                     FaceQuarters = parts.Face,
                     ShineQuarters = parts.Shine,
@@ -647,42 +643,33 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Where a quarter of a block's face goes — at
-        /// <paramref name="insetCells"/> above 0, of a shape set that far into
-        /// the face — in its body's local world units: the footprint's
-        /// quarter, less the lip on its downward sides (<see cref="FaceShape"/>).
-        /// What a peel re-poses the drawn quarters with.
+        /// Poses <paramref name="quarters"/> of <paramref name="layer"/> —
+        /// drawn from <paramref name="tiles"/>, in their order — as a shape
+        /// <paramref name="insetCells"/> inside the block's body
+        /// (<see cref="FaceShape"/>); at 0 they are the body. What a peel
+        /// re-poses the window's rim and inner block with.
         /// </summary>
-        private Rect FaceQuarterRect(QuarterTile tile, float insetCells) =>
-            CellRectToLocal(FaceShape.QuarterRect(tile, insetCells, config.BlockLipCells));
-
-        /// <summary>
-        /// Poses <paramref name="quarters"/> — drawn from <paramref name="tiles"/>,
-        /// in their order — as a shape <paramref name="insetCells"/> inside
-        /// the block's face; at 0 they are the face.
-        /// </summary>
-        private void PoseInset(List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> tiles, float insetCells)
+        private void PoseInset(List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> tiles, QuarterLayer layer, float insetCells)
         {
             for (var i = 0; i < tiles.Count; i++)
             {
-                PoseQuarter(quarters[i], tiles[i], QuarterLayer.Face, FaceQuarterRect(tiles[i], insetCells));
+                PoseQuarter(quarters[i], tiles[i], layer, CellRectToLocal(FaceShape.QuarterRect(tiles[i], insetCells)));
             }
         }
 
         /// <summary>
-        /// Poses <paramref name="quarters"/> — a layered block's window light,
-        /// drawn from <paramref name="lightTiles"/>, in their order — over a
-        /// shape <paramref name="insetCells"/> inside the face of the block
-        /// whose quarters are <paramref name="tiles"/>, each keeping to its own
-        /// span along the edge (<see cref="FaceShape.LightQuarterRect"/>).
+        /// Poses <paramref name="quarters"/> — a layered block's inner
+        /// highlight, drawn from <paramref name="tiles"/>, in their order —
+        /// over a shape <paramref name="insetCells"/> inside the block's body,
+        /// each keeping to its own span along the edge
+        /// (<see cref="FaceShape.LightQuarterRect"/>).
         /// </summary>
-        private void PoseShineInset(
-            List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> lightTiles, IReadOnlyList<QuarterTile> tiles, float insetCells)
+        private void PoseShineInset(List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> tiles, float insetCells)
         {
-            for (var i = 0; i < lightTiles.Count; i++)
+            for (var i = 0; i < tiles.Count; i++)
             {
-                var rect = FaceShape.LightQuarterRect(lightTiles[i], tiles, insetCells, config.BlockLipCells);
-                PoseQuarter(quarters[i], lightTiles[i], QuarterLayer.ReversedLight, CellRectToLocal(rect));
+                var rect = FaceShape.LightQuarterRect(tiles[i], tiles, insetCells);
+                PoseQuarter(quarters[i], tiles[i], QuarterLayer.Body, CellRectToLocal(rect));
             }
         }
 
@@ -862,6 +849,10 @@ namespace GateRush.Runtime
             float rotationDegrees) =>
             AddSprite(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, color, order, rotationDegrees);
 
+        SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.LitSprite(
+            Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order) =>
+            AddLitSprite(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, color, order);
+
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Sliced(
             Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order) =>
             AddSliced(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, CellsToWorld(border), color, order);
@@ -899,10 +890,10 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Draws <paramref name="tiles"/> under <paramref name="parent"/>, one
-        /// renderer per quarter, each posed as its tile says
-        /// (<see cref="PoseQuarter"/>). The one path for block faces, lips,
-        /// outlines and shine, the frame's, gates', the next block on a
-        /// generator's screen, and a grabbed block's outline; only the
+        /// renderer per quarter, each with its layer's material and posed as
+        /// its tile says (<see cref="PoseQuarter"/>). The one path for block
+        /// bodies, highlights and shadows, the frame's, gates', the next block
+        /// on a generator's screen, and a grabbed block's outline; only the
         /// arguments differ.
         /// </summary>
         /// <param name="rectOf">Where a tile goes, in <paramref name="parent"/>'s local world units.</param>
@@ -918,6 +909,7 @@ namespace GateRush.Runtime
                 var renderer = AddRenderer(
                     parent, tile.ToString(), config.QuarterSprite(layer, tile), Vector2.zero, color, order,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
+                renderer.sharedMaterial = config.QuarterMaterial(layer);
                 renderer.flipX = tile.FlipX;
                 renderer.flipY = tile.FlipY;
                 PoseQuarter(renderer, tile, layer, rectOf(tile));
@@ -952,13 +944,6 @@ namespace GateRush.Runtime
             group.localPosition = localPosition;
             return group;
         }
-
-        /// <summary>
-        /// Where the lip group of the frame, a gate or a machine sits relative
-        /// to its face: straight down by the lip offset. A block's lip is not
-        /// offset (<see cref="FaceShape"/>).
-        /// </summary>
-        private Vector2 LipOffset() => new Vector2(0f, -CellsToWorld(config.LipOffsetCells));
 
         private Vector2 GridToLocal(Vector2 grid) => layout.GridToWorld(grid);
 
@@ -1032,6 +1017,19 @@ namespace GateRush.Runtime
             var renderer = AddRenderer(parent, name, sprite, localCenter, color, order, rotationDegrees);
             var bounds = sprite.bounds.size;
             renderer.transform.localScale = new Vector3(size.x / bounds.x, size.y / bounds.y, 1f);
+            return renderer;
+        }
+
+        /// <summary>
+        /// <see cref="AddSprite"/> drawn with the lit material, which
+        /// multiplies a stud's stored colour back by the art recipe's headroom
+        /// (Module 46).
+        /// </summary>
+        private SpriteRenderer AddLitSprite(
+            Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, Color color, int order)
+        {
+            var renderer = AddSprite(parent, name, sprite, localCenter, size, color, order);
+            renderer.sharedMaterial = config.LitMaterial;
             return renderer;
         }
 
@@ -1138,13 +1136,12 @@ namespace GateRush.Runtime
         private sealed class DrawnBlock
         {
             public DrawnBlock(
-                Transform root, Transform body, Vector2 footprintCenter, List<SpriteRenderer> lipQuarters,
+                Transform root, Transform body, Vector2 footprintCenter,
                 IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, MovementAxis axis, bool isIce)
             {
                 Root = root;
                 Body = body;
                 FootprintCenter = footprintCenter;
-                LipQuarters = lipQuarters;
                 Cells = cells;
                 Tiles = tiles;
                 Axis = axis;
@@ -1160,13 +1157,10 @@ namespace GateRush.Runtime
             /// <summary>The centre of the footprint's bounding box, relative to <see cref="Root"/> and <see cref="Body"/>.</summary>
             public Vector2 FootprintCenter { get; }
 
-            /// <summary>The lip's quarter renderers, filling the footprint under the face, in <see cref="Tiles"/> order.</summary>
-            public List<SpriteRenderer> LipQuarters { get; }
-
-            /// <summary>The face's quarter renderers, in the block's colour (darkened when layered), in <see cref="Tiles"/> order.</summary>
+            /// <summary>The lit body's quarter renderers, in the block's colour (darkened when layered), in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> FaceQuarters { get; set; }
 
-            /// <summary>The face's body renderers, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
+            /// <summary>The body's highlight renderers, in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> ShineQuarters { get; set; }
 
             /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>
@@ -1175,7 +1169,7 @@ namespace GateRush.Runtime
             /// <summary>The footprint, relative to the origin.</summary>
             public IReadOnlyList<Coord> Cells { get; }
 
-            /// <summary>The footprint's quarter tiles, shared by lip, face and outline.</summary>
+            /// <summary>The footprint's quarter tiles, shared by the shadow, the lit body, its highlight and the outline.</summary>
             public IReadOnlyList<QuarterTile> Tiles { get; }
 
             /// <summary>The block's movement axis: a restricted one shows an arrow instead of studs.</summary>
