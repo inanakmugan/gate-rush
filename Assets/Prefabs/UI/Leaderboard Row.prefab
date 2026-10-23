@@ -58,14 +58,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.961, g: 0.718, b: 0.039, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: eba0e1e6565e9464a9ba2a9589d3c6d5, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ba2a8eb055dd9584fa8877eb38f1a5aa, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -360,7 +360,6 @@ GameObject:
   - component: {fileID: 6907305520508147771}
   - component: {fileID: 2643117682079436142}
   - component: {fileID: 3013225124489285384}
-  - component: {fileID: 6980594974424752683}
   m_Layer: 5
   m_Name: Coin
   m_TagString: Untagged
@@ -408,7 +407,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.8, b: 0.2, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -425,20 +424,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &6980594974424752683
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4869768607545629599}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dfa135da2359b44ab5a27961030512e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.UiTint
-  role: 3
-  target: {fileID: 3013225124489285384}
 --- !u!1 &6594754626074270995
 GameObject:
   m_ObjectHideFlags: 0
@@ -641,7 +626,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: ca11c4973acef6d4d90b7eb6c2186967, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 277801d57b109cb408858b169d0e9bae, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -724,7 +709,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 28235a3ca5f4e9b4c9d3e2ff2f578d4b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: e3cc49508eeea074ebdfbdbaea10c7d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -769,6 +754,9 @@ MonoBehaviour:
   background: {fileID: 3672555025595917473}
   rankLabel: {fileID: 130082840686774777}
   medal: {fileID: 5516558182045315315}
+  goldMedal: {fileID: 21300000, guid: ba2a8eb055dd9584fa8877eb38f1a5aa, type: 3}
+  silverMedal: {fileID: 21300000, guid: c85edcd41e2379f4cbff7ea1c7cd51e5, type: 3}
+  bronzeMedal: {fileID: 21300000, guid: 1d209aebcfe173d45b09b59806650fea, type: 3}
   avatar: {fileID: 5603236227764619347}
   nameLabel: {fileID: 8713907614619482375}
   scoreLabel: {fileID: 7253288209384900402}

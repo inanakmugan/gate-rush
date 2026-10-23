@@ -18,6 +18,7 @@ MonoBehaviour:
   livesCountFormat: '{0}'
   livesFractionFormat: '{0}/{1}'
   livesFullLabel: Full
+  nextLifeLabel: Next life in
   waitFormat: '{0}:{1:00}'
   refillFormat: Refill ({0})
   levelNumberFormat: '{0}'
@@ -55,14 +56,81 @@ MonoBehaviour:
     play does not count.
   rewardHeadlineFormat: '{0} wins in a row!'
   prizeFormat: +{0} {1}
+  profileTitle: Profile
+  nameEditHint: Tap to edit
+  nameRefusedText: Use 1 to 16 letters, digits, spaces, - _ or .
+  levelsCompletedLabel: Levels Completed
+  campaignLevelLabel: Campaign Level
+  bestStreakLabel: Best Streak
+  lifetimeGoldLabel: Lifetime Gold
+  statisticFormat: '{0:N0}'
+  hapticsLabel: Haptics
+  leaderboardSimulatedNote: Demo players. The online leaderboard is not connected.
+  leaderboardLoadingText: "Loading\u2026"
+  leaderboardFailedText: Could not load the leaderboard.
+  leaderboardRetryLabel: Retry
+  leaderboardScoreFormat: '{0:N0}'
+  leaderboardRankFormat: '{0}'
+  freePlayLabel: Free Play
+  levelLabelFormat: Level {0}
+  timerFormat: '{0}:{1:00}'
+  timeBonusFormat: +{0}
+  jokerCountBadgeFormat: '{0}'
+  jokerPriceBadgeFormat: '{0}'
+  goldPacksTitle: Get Gold
+  levelCompleteTitle: Level Complete
+  timesUpTitle: Time's Up
+  nextButtonLabel: Next
+  restartButtonLabel: Restart
+  goldEarnedFormat: +{0}
+  closingMessage: Thanks for playing!
+  lifeLostLabel: '-1'
+  leaveLevelTitle: Leave level?
+  restartLevelTitle: Restart level?
+  loseLifeLine: You will lose a life.
+  loseLifeAndStreakFormat: You will lose a life and your {0}-win streak.
+  loseLifeLabel: Lose a life
+  keepPlayingLabel: Keep playing
+  overlayPopSeconds: 0.25
+  overlayPopEase: 27
+  overlayPopStartScale: 0.8
+  timerWarningSeconds: 10
+  timeBonusSeconds: 0.9
+  timeBonusRiseUnits: 60
+  timeBonusEase: 6
+  timerPulseScale: 1.15
+  timerPulseSeconds: 0.25
+  jokerLockedBadgeFormat: Lv {0}
+  unlocksAtFormat: Unlocks at Level {0}
+  lockedPrizeFormat: +{0} {1}, opens at Level {2}
+  lockedIconAlpha: 0.6
+  markedPulseSeconds: 0.9
+  markedPulseScale: 1.06
+  markedPulseEase: 4
+  markedGlowColor: {r: 1, g: 0.85, b: 0.3, a: 1}
+  markedGlowMinAlpha: 0.25
   clockName: Clock
   rocketName: Rocket
   broomName: Broom
   backgroundColor: {r: 0.36, g: 0.2, b: 0.62, a: 1}
   iconColor: {r: 1, g: 1, b: 1, a: 1}
   idleTabIconColor: {r: 1, g: 1, b: 1, a: 0.55}
-  coinColor: {r: 1, g: 0.8, b: 0.2, a: 1}
-  heartColor: {r: 0.95, g: 0.27, b: 0.36, a: 1}
   streakColor: {r: 1, g: 0.55, b: 0.12, a: 1}
+  jokerSelectedColor: {r: 1, g: 0.76, b: 0.2, a: 1}
+  scrimColor: {r: 0, g: 0, b: 0, a: 0.85}
+  backgrounds:
+  - startLevel: 1
+    painting: {fileID: 21300000, guid: 4c6f591c3fbd54a46a357d349fb67659, type: 3}
+  - startLevel: 11
+    painting: {fileID: 21300000, guid: 9bb5410bc4c6d0b41a136809029c0b2c, type: 3}
+  - startLevel: 21
+    painting: {fileID: 21300000, guid: ea965f3f5037c6a4fba167e27ff68bf2, type: 3}
   buttonLabelColor: {r: 1, g: 1, b: 1, a: 1}
   disabledButtonLabelColor: {r: 0.43, g: 0.44, b: 0.56, a: 1}
+  leaderboardHighlightColor: {r: 1, g: 0.914, b: 0.659, a: 1}
+  leaderboardRowColor: {r: 1, g: 1, b: 1, a: 1}
+  timerColor: {r: 1, g: 1, b: 1, a: 1}
+  timerWarningColor: {r: 1, g: 0.32, b: 0.32, a: 1}
+  timeBonusColor: {r: 0.45, g: 1, b: 0.45, a: 1}
+  jokerBadgeTextColor: {r: 1, g: 1, b: 1, a: 1}
+  shortPriceColor: {r: 1, g: 0.88, b: 0.4, a: 1}

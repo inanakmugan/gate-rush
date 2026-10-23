@@ -183,7 +183,6 @@ GameObject:
   - component: {fileID: 640422505947596547}
   - component: {fileID: 5105265488837789244}
   - component: {fileID: 6569036240205182942}
-  - component: {fileID: 8364500861148563631}
   m_Layer: 5
   m_Name: Fire
   m_TagString: Untagged
@@ -231,14 +230,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.55, b: 0.12, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: c5e2e5d35ab24cd4f83642b37120edf5, type: 3}
+  m_Sprite: {fileID: 21300000, guid: b55629e0c57713d409758ba18402e627, type: 3}
   m_Type: 0
   m_PreserveAspect: 1
   m_FillCenter: 1
@@ -248,20 +247,6 @@ MonoBehaviour:
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
   m_PixelsPerUnitMultiplier: 1
---- !u!114 &8364500861148563631
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4550775538713115682}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dfa135da2359b44ab5a27961030512e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.UiTint
-  role: 5
-  target: {fileID: 6569036240205182942}
 --- !u!1 &5417564154013735104
 GameObject:
   m_ObjectHideFlags: 0
@@ -322,14 +307,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0.18039216, g: 0.101960786, b: 0.32156864, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: fe758ebe0bc57834b82f2f01f4425b80, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 4bab7b1d6811e294b8e6c53426cf1039, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -338,7 +323,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
+  m_PixelsPerUnitMultiplier: 1.25
 --- !u!1 &5527404184265748638
 GameObject:
   m_ObjectHideFlags: 0
@@ -487,7 +472,6 @@ GameObject:
   - component: {fileID: 5325239890641804977}
   - component: {fileID: 1479782710616931740}
   - component: {fileID: 750723711110793366}
-  - component: {fileID: 43013750821287829}
   m_Layer: 5
   m_Name: Fill
   m_TagString: Untagged
@@ -535,14 +519,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 0.55, b: 0.12, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 0
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: fe758ebe0bc57834b82f2f01f4425b80, type: 3}
+  m_Sprite: {fileID: 21300000, guid: bad261ead4bd125489e497260a6768d6, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1
@@ -551,21 +535,7 @@ MonoBehaviour:
   m_FillClockwise: 1
   m_FillOrigin: 0
   m_UseSpriteMesh: 0
-  m_PixelsPerUnitMultiplier: 1
---- !u!114 &43013750821287829
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5873704132039917924}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 4dfa135da2359b44ab5a27961030512e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.UiTint
-  role: 5
-  target: {fileID: 750723711110793366}
+  m_PixelsPerUnitMultiplier: 1.25
 --- !u!1 &6024205824090032994
 GameObject:
   m_ObjectHideFlags: 0
@@ -637,7 +607,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_Sprite: {fileID: 21300000, guid: 28235a3ca5f4e9b4c9d3e2ff2f578d4b, type: 3}
+  m_Sprite: {fileID: 21300000, guid: e3cc49508eeea074ebdfbdbaea10c7d5, type: 3}
   m_Type: 1
   m_PreserveAspect: 0
   m_FillCenter: 1

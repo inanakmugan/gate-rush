@@ -91,7 +91,7 @@ PrefabInstance:
     - target: {fileID: 5431400088701312487, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_Sprite
       value: 
-      objectReference: {fileID: 21300000, guid: 7f25bae78d051054082f50ca6dfa57da, type: 3}
+      objectReference: {fileID: 21300000, guid: 58bb8a93b2068dc478579961a4663954, type: 3}
     - target: {fileID: 8138155750093085964, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_Name
       value: Button Secondary
@@ -99,11 +99,11 @@ PrefabInstance:
     - target: {fileID: 8959401123252289822, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_SpriteState.m_PressedSprite
       value: 
-      objectReference: {fileID: 21300000, guid: 4852bc9b033731d43a379cd00d4165d4, type: 3}
+      objectReference: {fileID: 0}
     - target: {fileID: 8959401123252289822, guid: 2db65fc7d9c1c8f40a4c039c8ba1b1e3, type: 3}
       propertyPath: m_SpriteState.m_DisabledSprite
       value: 
-      objectReference: {fileID: 21300000, guid: 7f25bae78d051054082f50ca6dfa57da, type: 3}
+      objectReference: {fileID: 21300000, guid: 6139bb7906f041147a64dbfa8231554b, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

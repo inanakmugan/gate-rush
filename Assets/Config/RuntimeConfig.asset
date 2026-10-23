@@ -42,8 +42,8 @@ MonoBehaviour:
   sparkleSprite: {fileID: 21300000, guid: 955b1f1454c91ff4685f474613823b93, type: 3}
   cellSize: 1
   sideMarginCells: 0.3
-  topBandScreenFraction: 0.14
-  bottomBandScreenFraction: 0.1
+  topBandScreenFraction: 0.16
+  bottomBandScreenFraction: 0.14
   frameThicknessCells: 0.45
   floorUnderlayCells: 0.2
   lipOffsetCells: 0.09
@@ -160,11 +160,11 @@ MonoBehaviour:
   generatorPreviewFadeOutSeconds: 0.12
   campaignDoneNotice: All levels played. Play any level from Settings.
   introFont: {fileID: 11400000, guid: 7e272475c6b4f394f96d8a8ed970fc53, type: 2}
-  introPanelSprite: {fileID: 8645894043717093507, guid: 3ad0f6aba8241994c89b92079e541106, type: 3}
+  introPanelSprite: {fileID: 21300000, guid: e3cc49508eeea074ebdfbdbaea10c7d5, type: 3}
   introPanelPaddingUnits: 40
-  introCloseSprite: {fileID: 21300000, guid: fa9ddd220aa4aa84198a4a8ed4d7230f, type: 3}
+  introCloseSprite: {fileID: 21300000, guid: 189b3d6c5121f0f40801401388d40a42, type: 3}
   introCloseCrossSprite: {fileID: 21300000, guid: 71fdee8eebf39b24a9361689ab6288e4, type: 3}
-  introBackdropColor: {r: 0, g: 0, b: 0, a: 0.6}
+  introBackdropColor: {r: 0, g: 0, b: 0, a: 0.85}
   introPopSeconds: 0.25
   introPopEase: 27
   introPopStartScale: 0.8
@@ -208,20 +208,18 @@ MonoBehaviour:
   introSubtitleFontSize: 56
   introSubtitleHeightUnits: 80
   introSubtitleColor: {r: 0.23137255, g: 0.14117648, b: 0.4, a: 1}
-  introIllustrationSizeUnits: {x: 640, y: 480}
-  introCellUnits: 170
+  introIllustrationSizeUnits: {x: 960, y: 720}
+  introCellUnits: 255
   introHowToPlayArrowCells: 0.6
   introBlockColor: 1
   introSecondColor: 3
   introCount: 3
   introBonusSeconds: 5
   introTextBoxSizeUnits: {x: 900, y: 260}
-  introTextBoxCornerUnits: 48
-  introTextBoxBorderUnits: 10
-  introTextBoxColor: {r: 1, g: 0.95, b: 0.82, a: 1}
+  introTextBoxSprite: {fileID: 21300000, guid: f486e9f5aeea96a45a51cf31f80b9b41, type: 3}
   introTextPaddingUnits: 40
   introTextFontSize: 52
-  introTextColor: {r: 0.2, g: 0.14, b: 0.3, a: 1}
+  introTextColor: {r: 1, g: 1, b: 1, a: 1}
   introSpacingUnits: 36
   introCloseSizeUnits: 110
   introCloseCrossSizeUnits: 66
@@ -239,8 +237,8 @@ MonoBehaviour:
     title: Broom!
     text: Tap the Broom, then a block, to clear that colour from every block.
   newJokerSubtitle: New Joker Unlocked!
-  newJokerIconSizeUnits: 360
-  newJokerIconColor: {r: 0.231, g: 0.141, b: 0.4, a: 1}
+  newJokerIconSizeUnits: 540
+  newJokerIconColor: {r: 1, g: 1, b: 1, a: 1}
   introSparkles:
   - position: {x: -0.52, y: 0.4}
     sizeUnits: 64
