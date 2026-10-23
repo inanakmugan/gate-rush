@@ -73,12 +73,15 @@ namespace GateRush.Tests
             var faceRight = topRight.xMin + faceShare * topRight.width;
             var faceBottom = bottomRight.yMax - faceShare * bottomRight.height;
 
+            // The grid is Stud Spacing Pixels apart, centred on the cell.
             var perSide = recipe.StudsPerCellSide;
+            var spacing = recipe.StudSpacingPixels / cell;
+            var first = 0.5f - (perSide - 1) * spacing / 2f;
             var rise = FaceShape.ContentRise(lip);
-            var lowest = 0.5f / perSide + rise;
-            var highest = (perSide - 0.5f) / perSide + rise;
-            var outermost = (perSide - 0.5f) / perSide;
-            var innermost = 0.5f / perSide;
+            var lowest = first + rise;
+            var highest = 1f - first + rise;
+            var outermost = 1f - first;
+            var innermost = first;
 
             // A stud is a disc raised off its grid point, with its crescent
             // and shadow falling away from the light (StudReach).
@@ -96,7 +99,7 @@ namespace GateRush.Tests
             {
                 for (var column = 0; column < perSide; column++)
                 {
-                    discs.Add(new Vector2((column + 0.5f) / perSide, (row + 0.5f) / perSide + rise + raise));
+                    discs.Add(new Vector2(first + column * spacing, first + row * spacing + rise + raise));
                 }
             }
 

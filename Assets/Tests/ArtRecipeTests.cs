@@ -53,7 +53,10 @@ namespace GateRush.Tests
         [TestCase("studDiameterPixels", 62f, "Stud Diameter Pixels")]
         [TestCase("studFootDropPixels", -1f, "Stud Foot Drop Pixels")]
         [TestCase("studFootDropPixels", 30f, "Stud Foot Drop Pixels")]
-        [TestCase("glossDiameterPixels", 50f, "Gloss Diameter Pixels")]
+        [TestCase("studSpacingPixels", 40f, "Stud Spacing Pixels")]
+        [TestCase("studSpacingPixels", 80f, "Stud Spacing Pixels")]
+        [TestCase("studRimLightWidthPixels", 0f, "Stud Rim Light Width Pixels")]
+        [TestCase("studRimLightWidthPixels", 20f, "Stud Rim Light Width Pixels")]
         [TestCase("gateArrowOutlinePixels", 0f, "Gate Arrow Outline Pixels")]
         [TestCase("gateArrowOutlinePixels", 6f, "Gate Arrow Outline Pixels")]
         [TestCase("axisArrowHeadLengthPixels", 96f, "Axis Arrow Head Length Pixels")]
@@ -162,18 +165,6 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains("Studs Per Cell Side"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Problems_GlossOffsetOutsideTheStud_IsReported()
-        {
-            var serialized = new SerializedObject(recipe);
-            serialized.FindProperty("glossOffsetPixels").vector2Value = new Vector2(-14f, 14f);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-
-            var problems = recipe.Problems();
-
-            Assert.That(problems, Has.Some.Contains("Gloss Offset Pixels"), string.Join(" | ", problems));
         }
 
         [Test]

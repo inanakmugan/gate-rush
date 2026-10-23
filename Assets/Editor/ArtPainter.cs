@@ -361,12 +361,13 @@ namespace GateRush.Editor
 
         /// <summary>
         /// A grid of <paramref name="perSide"/> by <paramref name="perSide"/>
-        /// studs on a cell, the cell divided evenly among them, each a short
-        /// cylinder lit from <see cref="ArtRecipe.LightAngleDegrees"/>: a disc
-        /// in the face's tone, darkening away from the light, with a thin dark
-        /// rim along its upper arc; a darker crescent — its side — falling
+        /// studs on a cell, <see cref="ArtRecipe.StudSpacingPixels"/> apart
+        /// and centred on it, each a short flat-topped cylinder lit from
+        /// <see cref="ArtRecipe.LightAngleDegrees"/>, matte: a flat top in the
+        /// face's tone, shifting only gently away from the light, inside a
+        /// crisp darker rim all round; a darker crescent — its side — falling
         /// away from the light; and under both the stud's soft shadow on the
-        /// face, falling further. The disc sits
+        /// face, falling further. The top sits
         /// <see cref="ArtRecipe.StudDiscRaisePixels"/> above its grid point.
         /// The shadow fades in from its outline, so it reaches no further than
         /// its offset. The recipe keeps the spacing above a stud's reach, so
@@ -395,12 +396,10 @@ namespace GateRush.Editor
                     Length(x - cx + toward.x * shadowFall, y - discY + toward.y * shadowFall)) - radius;
                 var shadowAlpha = Coverage(recipe, shadow) * (shadowSoftness > 0.0 ? Smooth(Clamp01(-shadow / shadowSoftness)) : 1.0);
 
-                // Away from the light the disc darkens; the rim runs along
-                // its upper arc only.
+                // Away from the light the flat top shifts gently; the rim
+                // runs all round it, crisp, with one pixel of antialiasing.
                 var away = Clamp01(-((x - cx) * toward.x + (y - discY) * toward.y) / radius);
-                var inRim = 1.0 - Clamp01(-top - recipe.StudRingWidthPixels + 0.5);
-                var upward = Clamp01((y - discY) / radius);
-                var tone = Lerp(Lerp(recipe.StudTone, recipe.StudShadeTone, Smooth(away)), recipe.StudRingTone, inRim * Smooth(upward));
+                var tone = Lerp(Lerp(recipe.StudTone, recipe.StudShadeTone, Smooth(away)), recipe.StudRingTone, InRing(top, recipe.StudRingWidthPixels));
 
                 var sideAndShadow = Over((recipe.StudFootTone, Coverage(recipe, side)), (recipe.StudShadowTone, shadowAlpha));
                 return Over((tone, Coverage(recipe, top)), sideAndShadow);
@@ -409,14 +408,12 @@ namespace GateRush.Editor
 
         /// <summary>
         /// What lies untinted over each stud of <see cref="PaintStuds"/>' grid:
-        /// a white light across its disc on the side toward the light, fading
-        /// out by its middle, so that side reads lighter than the face, and
-        /// over it the soft white highlight, offset from the disc's centre.
+        /// a faint thin white arc just inside the top's edge, as strong as
+        /// that edge faces the light, so it runs round the side toward the
+        /// light and is gone a quarter turn away. Matte: no glossy spot.
         /// </summary>
         private static ArtImage PaintGloss(ArtRecipe recipe, int perSide)
         {
-            var highlightRadius = recipe.GlossDiameterPixels / 2.0;
-            var softness = Math.Max(recipe.GlossSoftnessPixels, recipe.AntiAliasPixels);
             var radius = recipe.StudDiameterPixels / 2.0;
             double raise = recipe.StudDiscRaisePixels;
             var toward = TowardLight(recipe);
@@ -424,19 +421,25 @@ namespace GateRush.Editor
             {
                 var (cx, cy) = NearestStud(recipe, perSide, x, y);
                 var discY = cy + raise;
-                var disc = Coverage(recipe, Length(x - cx, y - discY) - radius);
-                var lit = Clamp01(((x - cx) * toward.x + (y - discY) * toward.y) / radius);
-                var light = recipe.StudTopLightAlpha * disc * lit;
-                var d = Length(x - cx - recipe.GlossOffsetPixels.x, y - discY - recipe.GlossOffsetPixels.y);
-                var highlight = recipe.GlossAlpha * Clamp01(0.5 + (highlightRadius - d) / softness);
-                return Over((1.0, highlight), (1.0, light));
+                var fromCentre = Length(x - cx, y - discY);
+                var top = fromCentre - radius;
+                var facing = fromCentre > 0.0 ? Clamp01(((x - cx) * toward.x + (y - discY) * toward.y) / fromCentre) : 0.0;
+                var arc = Coverage(recipe, top) * InRing(top, recipe.StudRimLightWidthPixels);
+                return (1.0, recipe.StudRimLightAlpha * arc * facing);
             });
         }
 
         /// <summary>
+        /// How much a pixel <c>−sd</c> inside a disc's edge belongs to a ring
+        /// <paramref name="width"/> wide along that edge: 1 within it, 0 deeper,
+        /// with one pixel of antialiasing between, so the ring stays crisp.
+        /// </summary>
+        private static double InRing(double sd, double width) => 1.0 - Clamp01(-sd - width + 0.5);
+
+        /// <summary>
         /// The centre of the stud nearest a cell-sprite pixel: one of
-        /// <paramref name="perSide"/> per axis, the cell divided evenly among
-        /// them, centred on the cell.
+        /// <paramref name="perSide"/> per axis,
+        /// <see cref="ArtRecipe.StudSpacingPixels"/> apart, centred on the cell.
         /// </summary>
         private static (double x, double y) NearestStud(ArtRecipe recipe, int perSide, double x, double y) =>
             (NearestStudAlong(recipe, perSide, x), NearestStudAlong(recipe, perSide, y));
@@ -444,7 +447,7 @@ namespace GateRush.Editor
         private static double NearestStudAlong(ArtRecipe recipe, int perSide, double position)
         {
             var count = perSide;
-            var spacing = (double)recipe.CellPixels / perSide;
+            double spacing = recipe.StudSpacingPixels;
             var center = recipe.CellPixels / 2.0;
             var first = center - (count - 1) * spacing / 2.0;
             var index = count > 1 ? Clamp(Math.Floor((position - first) / spacing + 0.5), 0.0, count - 1) : 0.0;

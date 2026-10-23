@@ -18,11 +18,12 @@ namespace GateRush.Tests
     /// at the same seams, the face sits inside them by the outline's width
     /// and is plain white, the light pieces are white bands along edges that
     /// face the light and black ones along edges that face away, meeting the
-    /// edge piece of their place at every seam, the studs are a grid of Studs
-    /// Per Cell Side discs a side, each darkening away from the light, with a
-    /// darker crescent and a soft shadow falling to the bottom right and its
-    /// own highlight, and the gate arrow's outline covers the arrow inside its
-    /// sprite.
+    /// edge piece of their place at every seam, faint enough to read matte;
+    /// the studs are a grid of Studs Per Cell Side a side, Stud Spacing
+    /// Pixels apart, each a flat top inside a crisp rim, with a darker
+    /// crescent and a soft shadow falling to the bottom right and a faint arc
+    /// of light on the rim toward the light, no glossy spot; and the gate
+    /// arrow's outline covers the arrow inside its sprite.
     /// </summary>
     /// <remarks>
     /// Seams are checked against one profile: the edge piece's left column,
@@ -36,10 +37,9 @@ namespace GateRush.Tests
     {
         private const int RoundingTolerance = 1;
 
-        // The default highlight's size and offset as shares of the default
-        // stud (6 and 7 of 31 pixels), so a smaller stud keeps its highlight inside.
-        private const float GlossShareOfStud = 6f / 31f;
-        private const float GlossOffsetShareOfStud = 7f / 31f;
+        // The matte finish's ceiling (Module 46): no white light on a block's
+        // edge or a stud's rim stronger than this alpha.
+        private const float MatteLightAlphaCeiling = 0.15f;
 
         private ArtRecipe recipe;
 
@@ -225,16 +225,17 @@ namespace GateRush.Tests
             Assert.LessOrEqual(halfWay.a, RoundingTolerance, "clear where the arc faces across the light");
         }
 
-        [TestCase(1, 31f)]
-        [TestCase(2, 31f)]
-        [TestCase(3, 14f)]
-        public void Paint_Studs_PaintsAGridOfCylindersPerCellSide(int perSide, float diameter)
+        [TestCase(1, 35f, 59f)]
+        [TestCase(2, 35f, 59f)]
+        [TestCase(3, 14f, 40f)]
+        public void Paint_Studs_PaintsAGridOfFlatToppedCylindersPerCellSide(int perSide, float diameter, float spacing)
         {
-            SetStudGrid(perSide, diameter);
+            SetStudGrid(perSide, diameter, spacing);
             var studs = ArtPainter.Paint(recipe, ArtSprite.Studs);
             var radius = recipe.StudDiameterPixels / 2.0;
             var raise = recipe.StudDiscRaisePixels;
             var drop = recipe.StudFootDropPixels;
+            var ring = recipe.StudRingWidthPixels;
             var centers = StudCenters(perSide);
             var diagonal = 1.0 / System.Math.Sqrt(2.0);
 
@@ -242,25 +243,37 @@ namespace GateRush.Tests
             {
                 foreach (var cx in centers)
                 {
-                    // The disc sits its raise above the grid point; the
-                    // crescent falls away from the light, to the bottom
-                    // right; the rim runs along the disc's top, and the disc
-                    // darkens toward the bottom right.
+                    // The top sits its raise above the grid point; the
+                    // crescent falls away from the light, to the bottom right.
                     var discY = cy + raise;
                     var middle = Pixel(studs, cx, discY);
                     var past = radius + drop / 2.0;
                     var crescent = Pixel(studs, cx + past * diagonal, discY - past * diagonal);
-                    var rim = Pixel(studs, cx, discY + radius - recipe.StudRingWidthPixels / 2.0 - 0.5);
-                    var inside = radius - recipe.StudRingWidthPixels - 1.0;
-                    var lowerLeft = Pixel(studs, cx - inside * diagonal, discY - inside * diagonal);
-                    var lowerRight = Pixel(studs, cx + inside * diagonal, discY - inside * diagonal);
 
-                    Assert.AreEqual(255, middle.a, $"the disc at ({cx}, {cy})");
+                    Assert.AreEqual(255, middle.a, $"the top at ({cx}, {cy})");
+                    Assert.AreEqual(recipe.StudTone * 255f, middle.r, RoundingTolerance, $"the top's tone at ({cx}, {cy})");
                     Assert.AreEqual(255, crescent.a, $"the crescent beside ({cx}, {cy})");
-                    Assert.Less(crescent.r, middle.r, $"the crescent beside ({cx}, {cy}) is darker");
-                    Assert.Less(rim.r, middle.r, $"the rim at the top of ({cx}, {cy}) is darker");
-                    Assert.AreEqual(middle.r, lowerLeft.r, RoundingTolerance, $"the rim has faded out and the disc is unshaded across the light at ({cx}, {cy})");
-                    Assert.Less(lowerRight.r, middle.r, $"the disc of ({cx}, {cy}) darkens away from the light");
+                    Assert.AreEqual(recipe.StudFootTone * 255f, crescent.r, RoundingTolerance, $"the crescent's tone beside ({cx}, {cy})");
+
+                    // The rim runs all round, crisp and in one tone, between
+                    // the top and the crescent's.
+                    foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    {
+                        var rim = SolidRimPixel(studs, cx, discY, dx, dy, radius, ring);
+                        Assert.AreEqual(255, rim.a, $"the rim of ({cx}, {cy}) toward ({dx}, {dy})");
+                        Assert.AreEqual(recipe.StudRingTone * 255f, rim.r, RoundingTolerance, $"the rim's tone on ({cx}, {cy}) toward ({dx}, {dy})");
+                        Assert.Less(crescent.r, rim.r, "the crescent darker than the rim");
+                        Assert.Less(rim.r, middle.r, "the rim darker than the top");
+                    }
+
+                    // Inside the rim the top is flat: toward the light it is
+                    // the top's own tone, away from it only gently darker.
+                    var inside = radius - ring - 2.0;
+                    var towardLight = Pixel(studs, cx - inside * diagonal, discY + inside * diagonal);
+                    var awayFromLight = Pixel(studs, cx + inside * diagonal, discY - inside * diagonal);
+                    Assert.AreEqual(middle.r, towardLight.r, RoundingTolerance, $"the top of ({cx}, {cy}) toward the light");
+                    Assert.Less(awayFromLight.r, middle.r, $"the top of ({cx}, {cy}) shifts away from the light");
+                    Assert.GreaterOrEqual(awayFromLight.r, recipe.StudShadeTone * 255f - RoundingTolerance, $"only gently, on ({cx}, {cy})");
                 }
             }
 
@@ -278,30 +291,51 @@ namespace GateRush.Tests
             Assert.AreEqual(perSide * perSide, CountStudCentres(studs), "one disc with its crescent per stud");
         }
 
-        [TestCase(1, 31f)]
-        [TestCase(2, 31f)]
-        [TestCase(3, 14f)]
-        public void Paint_StudGloss_IsAHighlightAndALightTowardTheLightPerStud(int perSide, float diameter)
+        [TestCase(1, 35f, 59f)]
+        [TestCase(2, 35f, 59f)]
+        [TestCase(3, 14f, 40f)]
+        public void Paint_StudGloss_IsAFaintArcOnTheRimTowardTheLightAndNoSpot(int perSide, float diameter, float spacing)
         {
-            SetStudGrid(perSide, diameter);
+            SetStudGrid(perSide, diameter, spacing);
             var gloss = ArtPainter.Paint(recipe, ArtSprite.StudGloss);
-            var offset = recipe.GlossOffsetPixels;
             var radius = recipe.StudDiameterPixels / 2.0;
+            var width = recipe.StudRimLightWidthPixels;
             var centers = StudCenters(perSide);
+            var diagonal = 1.0 / System.Math.Sqrt(2.0);
 
             foreach (var cy in centers)
             {
                 foreach (var cx in centers)
                 {
-                    // From the top left: the light lies across the disc's
-                    // left half, away from the highlight above it, and
-                    // nothing lies on its bottom right.
+                    // From the top left: an arc on the top-left rim, thin,
+                    // and nothing on the top itself or the bottom-right rim.
                     var discY = cy + recipe.StudDiscRaisePixels;
-                    Assert.Greater(Pixel(gloss, cx + offset.x, discY + offset.y).a, 0, $"the highlight on ({cx}, {cy})");
-                    Assert.Greater(Pixel(gloss, cx - radius / 2.0, discY).a, 0, $"the light on ({cx}, {cy})");
-                    Assert.AreEqual(0, Pixel(gloss, cx - offset.x, discY - offset.y).a, $"nothing on the bottom right of ({cx}, {cy})");
+                    var onArc = radius - width / 2.0;
+                    var deeper = radius - width - 2.0;
+                    Assert.Greater(Pixel(gloss, cx - onArc * diagonal, discY + onArc * diagonal).a, 0, $"the arc on ({cx}, {cy})");
+                    Assert.AreEqual(0, Pixel(gloss, cx - deeper * diagonal, discY + deeper * diagonal).a, $"thin, on ({cx}, {cy})");
+                    Assert.AreEqual(0, Pixel(gloss, cx, discY).a, $"no spot on ({cx}, {cy})");
+                    Assert.AreEqual(0, Pixel(gloss, cx + onArc * diagonal, discY - onArc * diagonal).a, $"nothing on the bottom right of ({cx}, {cy})");
                 }
             }
+
+            Assert.IsTrue(gloss.Pixels.All(p => p.r == 255), "white");
+            Assert.LessOrEqual(gloss.Pixels.Max(p => p.a), recipe.StudRimLightAlpha * 255f + RoundingTolerance, "no stronger than the rim light");
+        }
+
+        [Test]
+        public void Paint_DefaultRecipe_IsMatte()
+        {
+            // The lit edge and the studs' rim light stay faint, and the
+            // shaded edge is softer than black at 0.4.
+            var ceiling = MatteLightAlphaCeiling * 255f;
+            var litEdge = ArtPainter.Paint(recipe, ArtSprite.LightEdgeTop).Pixels.Max(p => p.a);
+            var shadedEdge = ArtPainter.Paint(recipe, ArtSprite.LightEdgeBottom).Pixels.Max(p => p.a);
+            var studLight = ArtPainter.Paint(recipe, ArtSprite.StudGloss).Pixels.Max(p => p.a);
+
+            Assert.That(litEdge, Is.GreaterThan(0).And.LessThanOrEqualTo(ceiling), "the lit edge");
+            Assert.That(studLight, Is.GreaterThan(0).And.LessThanOrEqualTo(ceiling), "the studs' rim light");
+            Assert.That(shadedEdge, Is.GreaterThan(0).And.LessThan(0.4f * 255f), "the shaded edge");
         }
 
         [Test]
@@ -627,29 +661,57 @@ namespace GateRush.Tests
         }
 
         /// <summary>
-        /// Sets the recipe's stud grid, with a highlight scaled to the stud so
-        /// it stays inside it, and checks the recipe still has no problems.
+        /// Sets the recipe's stud grid and checks the recipe still has no
+        /// problems.
         /// </summary>
-        private void SetStudGrid(int perSide, float diameter)
+        private void SetStudGrid(int perSide, float diameter, float spacing)
         {
             var serialized = new SerializedObject(recipe);
             serialized.FindProperty("studsPerCellSide").intValue = perSide;
             serialized.FindProperty("studDiameterPixels").floatValue = diameter;
-            serialized.FindProperty("glossDiameterPixels").floatValue = diameter * GlossShareOfStud;
-            serialized.FindProperty("glossOffsetPixels").vector2Value = new Vector2(-diameter, diameter) * GlossOffsetShareOfStud;
+            serialized.FindProperty("studSpacingPixels").floatValue = spacing;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             Assert.IsEmpty(recipe.Problems(), "the grid is a valid recipe");
         }
 
         /// <summary>
-        /// The centres of the studs along one axis of the cell sprite: the
-        /// cell divided evenly, (i + ½) of a share each, so neighbouring cells
-        /// continue the grid.
+        /// The pixel on the rim of the stud top centred at
+        /// <c>(cx, cy)</c>, out from it along axis <c>(dx, dy)</c>, whose own
+        /// centre lies wholly inside both the top and its rim: at least half a
+        /// pixel inside the top's edge, so antialiasing does not mix in what
+        /// lies beneath, and at least half a pixel short of the rim's inner
+        /// edge. Picked by the pixel's exact centre, since a point on a
+        /// pixel's corner can floor into one whose centre is on the edge.
+        /// </summary>
+        private static Color32 SolidRimPixel(ArtImage image, double cx, double cy, int dx, int dy, double radius, double ring)
+        {
+            // The row (or column) of pixels through the centre, and the
+            // pixels out along it.
+            var across = (dx != 0 ? System.Math.Floor(cy) : System.Math.Floor(cx)) + 0.5;
+            var along = dx != 0 ? cx : cy;
+            var offAxis = across - (dx != 0 ? cy : cx);
+            for (var step = 0; step <= radius + 1.0; step++)
+            {
+                var pixelCentre = System.Math.Floor(along) + 0.5 + (dx + dy) * step;
+                var sd = System.Math.Sqrt((pixelCentre - along) * (pixelCentre - along) + offAxis * offAxis) - radius;
+                if (sd <= -0.5 && sd >= -(ring - 0.5))
+                {
+                    return dx != 0 ? Pixel(image, pixelCentre, across) : Pixel(image, across, pixelCentre);
+                }
+            }
+
+            Assert.Fail($"no pixel lies wholly on the rim of the stud at ({cx}, {cy}) toward ({dx}, {dy})");
+            return default;
+        }
+
+        /// <summary>
+        /// The centres of the studs along one axis of the cell sprite:
+        /// Stud Spacing Pixels apart, centred on the cell.
         /// </summary>
         private List<double> StudCenters(int perSide)
         {
-            var spacing = recipe.CellPixels / (double)perSide;
+            double spacing = recipe.StudSpacingPixels;
             var center = recipe.CellPixels / 2.0;
             var first = center - (perSide - 1) * spacing / 2.0;
             return Enumerable.Range(0, perSide).Select(i => first + i * spacing).ToList();

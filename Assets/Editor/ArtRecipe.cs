@@ -56,16 +56,16 @@ namespace GateRush.Editor
         [SerializeField, Range(0f, 360f)] private float lightAngleDegrees = 135f;
 
         [Tooltip("Width of the lighter band along the edges that face the light, in pixels, fading smoothly to nothing; the board draws it untinted, white.")]
-        [SerializeField] private float lightBandPixels = 6f;
+        [SerializeField] private float lightBandPixels = 10f;
 
-        [Tooltip("Strength of the lit band at an edge facing the light squarely: its white's alpha.")]
-        [SerializeField, Range(0f, 1f)] private float lightAlpha = 0.3f;
+        [Tooltip("Strength of the lit band at an edge facing the light squarely: its white's alpha. Low, so it reads as light catching a matte edge rather than a gloss stripe.")]
+        [SerializeField, Range(0f, 1f)] private float lightAlpha = 0.12f;
 
         [Tooltip("Width of the darker band along the edges that face away from the light, in pixels, fading smoothly to nothing; untinted black, so it darkens the block's own colour.")]
         [SerializeField] private float shadeBandPixels = 8f;
 
-        [Tooltip("Strength of the shaded band at an edge facing away squarely: its black's alpha, 0.4 darkening the colour to 0.6 of itself.")]
-        [SerializeField, Range(0f, 1f)] private float shadeAlpha = 0.4f;
+        [Tooltip("Strength of the shaded band at an edge facing away squarely: its black's alpha, 0.3 darkening the colour to 0.7 of itself.")]
+        [SerializeField, Range(0f, 1f)] private float shadeAlpha = 0.3f;
 
         [Header("Bevel (rounded box, padlock, key)")]
         [Tooltip("Width of the darker line along the outline, in pixels.")]
@@ -82,21 +82,25 @@ namespace GateRush.Editor
         [SerializeField, Range(0f, 1f)] private float faceTone = 0.84f;
 
         [Header("Studs (a grid per cell, centred)")]
-        [Tooltip("How many studs a cell carries along each side: 2 gives a 2×2 grid. The cell is divided evenly among them, so neighbouring cells continue one grid across a block. At least 1.")]
+        [Tooltip("How many studs a cell carries along each side: 2 gives a 2×2 grid, centred on the cell. At least 1.")]
         [SerializeField] private int studsPerCellSide = 2;
 
-        [Tooltip("Diameter of a stud's top disc, in pixels. A block's face is also shortened by its lip (Runtime Config's Block Lip Cells), which this recipe cannot see: StudFitTests checks the grid fits a single cell with both.")]
-        [SerializeField] private float studDiameterPixels = 31f;
+        [Tooltip("Distance between neighbouring stud centres within a cell, in pixels. The grid is centred on its cell, so studs in neighbouring cells sit Cell Pixels less (Studs Per Cell Side − 1) × this apart: below Cell Pixels ÷ Studs Per Cell Side, the outer studs sit further in from a block's edge than an even grid would put them.")]
+        [SerializeField] private float studSpacingPixels = 59f;
 
+        [Tooltip("Diameter of a stud's top disc, in pixels. A block's face is also shortened by its lip (Runtime Config's Block Lip Cells), which this recipe cannot see: StudFitTests checks the grid fits a single cell with both.")]
+        [SerializeField] private float studDiameterPixels = 35f;
+
+        [Tooltip("Tone of a stud's flat top at its centre.")]
         [SerializeField, Range(0f, 1f)] private float studTone = 1f;
 
-        [Tooltip("Tone of a stud's disc at its edge away from the light, easing from Stud Tone at its centre, so the disc reads as lit from Light Angle Degrees.")]
-        [SerializeField, Range(0f, 1f)] private float studShadeTone = 0.85f;
+        [Tooltip("Tone of a stud's flat top at its edge away from the light, easing gently from Stud Tone: close to it, so the top reads flat and matte.")]
+        [SerializeField, Range(0f, 1f)] private float studShadeTone = 0.95f;
 
-        [Tooltip("Width of the thin dark rim along the top of each stud's disc, in pixels; it fades out by the disc's middle.")]
-        [SerializeField] private float studRingWidthPixels = 1.5f;
+        [Tooltip("Width of the crisp darker rim all round each stud's top, in pixels, so the flat top reads as a surface of its own. At most half of Stud Diameter Pixels.")]
+        [SerializeField] private float studRingWidthPixels = 2f;
 
-        [SerializeField, Range(0f, 1f)] private float studRingTone = 0.6f;
+        [SerializeField, Range(0f, 1f)] private float studRingTone = 0.8f;
 
         [Tooltip("How deep the darker crescent beside each stud's disc is, away from the light, in pixels: the stud's side, so it reads as a short cylinder. At least 0.")]
         [SerializeField] private float studFootDropPixels = 7f;
@@ -114,19 +118,12 @@ namespace GateRush.Editor
         [Tooltip("How far each stud's disc sits above its point on the grid, in pixels, at least 0. The crescent and the shadow fall away from the light from the disc; this balances the whole stud on a face the lip shortens.")]
         [SerializeField] private float studDiscRaisePixels = 3f;
 
-        [Header("Stud gloss (never tinted by the block)")]
-        [SerializeField] private float glossDiameterPixels = 6f;
+        [Header("Stud rim light (never tinted by the block)")]
+        [Tooltip("Strength of the faint white arc along the rim of each stud's top on the side toward the light, at its brightest point: matte, so low, and no glossy spot.")]
+        [SerializeField, Range(0f, 1f)] private float studRimLightAlpha = 0.15f;
 
-        [Tooltip("Where each highlight sits relative to its stud's disc's centre, in pixels.")]
-        [SerializeField] private Vector2 glossOffsetPixels = new Vector2(-7f, 7f);
-
-        [Tooltip("Strength of the white light across each stud's disc on the side toward the light, fading out by its middle, so that side reads lighter than the face.")]
-        [SerializeField, Range(0f, 1f)] private float studTopLightAlpha = 0.3f;
-
-        [Tooltip("How far the highlight's edge fades out, in pixels.")]
-        [SerializeField] private float glossSoftnessPixels = 3f;
-
-        [SerializeField, Range(0f, 1f)] private float glossAlpha = 0.85f;
+        [Tooltip("Width of that arc, in pixels, just inside the top's edge. Above 0 and at most half of Stud Diameter Pixels.")]
+        [SerializeField] private float studRimLightWidthPixels = 1.5f;
 
         [Header("Floor")]
         [SerializeField, Range(0f, 1f)] private float floorTone = 0.85f;
@@ -397,10 +394,7 @@ namespace GateRush.Editor
         /// <summary>How far a stud's disc sits above its grid point, in pixels.</summary>
         public float StudDiscRaisePixels => studDiscRaisePixels;
 
-        /// <summary>Strength of the white light across a stud's disc toward the light.</summary>
-        public float StudTopLightAlpha => studTopLightAlpha;
-
-        /// <summary>Tone of a stud's disc at its edge away from the light.</summary>
+        /// <summary>Tone of a stud's flat top at its edge away from the light.</summary>
         public float StudShadeTone => studShadeTone;
 
         /// <summary>How far a stud's shadow falls beyond its crescent, in pixels.</summary>
@@ -415,16 +409,16 @@ namespace GateRush.Editor
         /// <summary>How many studs a cell carries along each side.</summary>
         public int StudsPerCellSide => studsPerCellSide;
 
-        /// <summary>Distance between neighbouring stud centres, in pixels: the cell divided evenly, so the grid continues across cells.</summary>
-        public float StudSpacingPixels => studsPerCellSide > 0 ? (float)cellPixels / studsPerCellSide : 0f;
+        /// <summary>Distance between neighbouring stud centres within a cell, in pixels; the grid is centred on its cell.</summary>
+        public float StudSpacingPixels => studSpacingPixels;
 
-        /// <summary>Tone of a stud.</summary>
+        /// <summary>Tone of a stud's flat top at its centre.</summary>
         public float StudTone => studTone;
 
-        /// <summary>Width of the dark rim along the top of a stud's disc, in pixels.</summary>
+        /// <summary>Width of the darker rim all round a stud's top, in pixels.</summary>
         public float StudRingWidthPixels => studRingWidthPixels;
 
-        /// <summary>Tone of a stud's top rim.</summary>
+        /// <summary>Tone of a stud's rim.</summary>
         public float StudRingTone => studRingTone;
 
         /// <summary>Depth of the darker crescent below a stud's disc, in pixels.</summary>
@@ -433,17 +427,11 @@ namespace GateRush.Editor
         /// <summary>Tone of a stud's crescent.</summary>
         public float StudFootTone => studFootTone;
 
-        /// <summary>Diameter of a stud's highlight, in pixels.</summary>
-        public float GlossDiameterPixels => glossDiameterPixels;
+        /// <summary>Alpha of the white arc on a stud's rim toward the light, at its brightest.</summary>
+        public float StudRimLightAlpha => studRimLightAlpha;
 
-        /// <summary>Offset of the highlight from the stud's centre, in pixels.</summary>
-        public Vector2 GlossOffsetPixels => glossOffsetPixels;
-
-        /// <summary>How far a highlight's edge fades, in pixels.</summary>
-        public float GlossSoftnessPixels => glossSoftnessPixels;
-
-        /// <summary>Opacity of a highlight.</summary>
-        public float GlossAlpha => glossAlpha;
+        /// <summary>Width of that arc, in pixels.</summary>
+        public float StudRimLightWidthPixels => studRimLightWidthPixels;
 
         /// <summary>Tone of a floor tile.</summary>
         public float FloorTone => floorTone;
@@ -781,14 +769,9 @@ namespace GateRush.Editor
                 problems.Add($"{name}: Stud Ring Width Pixels must be at least 0 and at most half the stud's diameter.");
             }
 
-            if (!(glossDiameterPixels > 0f && glossSoftnessPixels >= 0f))
+            if (!(studRimLightWidthPixels > 0f && studRimLightWidthPixels * 2f <= studDiameterPixels))
             {
-                problems.Add($"{name}: Gloss Diameter Pixels must be positive and Gloss Softness Pixels at least 0.");
-            }
-
-            if (!(glossOffsetPixels.magnitude + glossDiameterPixels / 2f <= studDiameterPixels / 2f))
-            {
-                problems.Add($"{name}: Gloss Offset Pixels and Gloss Diameter Pixels must keep the highlight inside the stud.");
+                problems.Add($"{name}: Stud Rim Light Width Pixels must be above 0 and at most half the stud's diameter.");
             }
 
             if (!(gridLinePixels >= 0f && gridLinePixels <= quarter))
@@ -911,11 +894,12 @@ namespace GateRush.Editor
             }
 
             // Face shows between neighbours, and a foot stays nearer its own
-            // stud than the one below. Across cells the spacing is the same.
-            var spacing = StudSpacingPixels;
-            if (!(spacing > studDiameterPixels + studFootDropPixels))
+            // stud than its neighbour. Across cells each stud keeps inside its
+            // own cell, which the reach below checks.
+            var spacing = studSpacingPixels;
+            if (studsPerCellSide > 1 && !(spacing > studDiameterPixels + studFootDropPixels))
             {
-                problems.Add($"{name}: Stud Diameter Pixels plus Stud Foot Drop Pixels must be below the stud spacing, Cell Pixels divided by Studs Per Cell Side ({spacing}), so the face shows between the studs.");
+                problems.Add($"{name}: Stud Diameter Pixels plus Stud Foot Drop Pixels must be below Stud Spacing Pixels ({spacing}), so the face shows between the studs.");
             }
 
             if (!(studDiscRaisePixels >= 0f && studShadowOffsetPixels >= 0f && studShadowSoftnessPixels >= 0f))
@@ -936,7 +920,7 @@ namespace GateRush.Editor
             var reach = (studsPerCellSide - 1) * spacing / 2f + unitReach;
             if (!(reach <= studRoom))
             {
-                problems.Add($"{name}: Studs Per Cell Side, Stud Diameter Pixels, Stud Foot Drop Pixels, Stud Shadow Offset Pixels and Stud Disc Raise Pixels put the studs outside the face ({reach} of {studRoom} from the cell's centre).");
+                problems.Add($"{name}: Studs Per Cell Side, Stud Spacing Pixels, Stud Diameter Pixels, Stud Foot Drop Pixels, Stud Shadow Offset Pixels and Stud Disc Raise Pixels put the studs outside the face ({reach} of {studRoom} from the cell's centre).");
             }
         }
 

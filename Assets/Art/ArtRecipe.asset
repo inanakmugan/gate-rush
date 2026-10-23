@@ -19,32 +19,30 @@ MonoBehaviour:
   concaveRadiusPixels: 1
   pieceOutlinePixels: 5
   lightAngleDegrees: 135
-  lightBandPixels: 6
-  lightAlpha: 0.3
+  lightBandPixels: 10
+  lightAlpha: 0.12
   shadeBandPixels: 8
-  shadeAlpha: 0.4
+  shadeAlpha: 0.3
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10
   rimTone: 1
   faceTone: 0.84
   studsPerCellSide: 2
-  studDiameterPixels: 31
+  studSpacingPixels: 59
+  studDiameterPixels: 35
   studTone: 1
-  studShadeTone: 0.85
-  studRingWidthPixels: 1.5
-  studRingTone: 0.6
+  studShadeTone: 0.95
+  studRingWidthPixels: 2
+  studRingTone: 0.8
   studFootDropPixels: 7
   studFootTone: 0.6
   studShadowOffsetPixels: 3
   studShadowTone: 0.7
   studShadowSoftnessPixels: 2
   studDiscRaisePixels: 3
-  glossDiameterPixels: 6
-  glossOffsetPixels: {x: -7, y: 7}
-  studTopLightAlpha: 0.3
-  glossSoftnessPixels: 3
-  glossAlpha: 0.85
+  studRimLightAlpha: 0.15
+  studRimLightWidthPixels: 1.5
   floorTone: 0.85
   gridLineTone: 1
   gridLinePixels: 2
