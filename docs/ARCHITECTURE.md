@@ -137,7 +137,10 @@ The screens are uGUI prefabs under `Assets/Prefabs/UI`. The shared parts
 are laid out by hand; the pages, the overlays and the front end that
 holds them are written by an Editor builder in `GateRush.UI.Editor`
 (*Gate Rush → Build UI Prefabs*), which nests the hand-made prefabs and
-never writes them.
+never writes them. The values a module decides for the hand-made
+prefabs are set by a second command, `HandMadePrefabSettings` (*Gate
+Rush → Apply Hand-Made Prefab Settings*), which compares before it
+writes and is safe to run at any time (D78).
 
 The level's interface is prefabs too, reached through `ILevelUi` the same
 way: the HUD and the joker bar (Module 40), and the result panel and the

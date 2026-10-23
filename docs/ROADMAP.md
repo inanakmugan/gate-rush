@@ -355,19 +355,22 @@ above and below a short board stays: taller boards fill it. Done with the
 new art (7.4, D77).
 
 The new levels of 7.3 are designed with the solver in batches of five and
-can be built alongside the other modules. Sound balance comes last, once
-the effects and the new cards have added their sounds. Each spec is written when the
-module before it is merged.
+can be built alongside the other modules. The board kept its own art
+through 7.4 and gets the new style in a module of its own (7.5), since it
+is drawn by code from tiles rather than from generated sprites. Sound
+balance comes last, once the effects and the new cards have added their
+sounds. Each spec is written when the module before it is merged.
 
 | # | Module | Spec | Status |
 |---|---|---|---|
 | 7.1 | Sound and haptics (D52) | `Modules/25-sound-and-haptics.md` | Done |
 | 7.2 | Joker unlocks: the Clock, Rocket and Broom open at levels 5, 10 and 15 with a New Joker card; locked buttons and Store cards (D76) | `Modules/43-joker-unlocks.md` | Done |
 | 7.3 | A campaign of thirty levels: the existing fifteen re-ordered and fifteen new ones (D75) | `Modules/44-campaign-thirty.md` | Done |
-| 7.4 | Interface art: a style guide and generated sprites, the larger joker bar (D77) | `Modules/45-interface-art.md` | Planned |
-| 7.5 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes | `Modules/46-effects.md` | Planned |
-| 7.6 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/47-sound-balance.md` | Planned |
-| 7.7 | The rest: privacy text, the end-of-content screen, optimisation on a phone | to be decided | Planned |
+| 7.4 | Interface art: a style guide and generated sprites, thirty avatars, the town backgrounds, the larger joker bar (D77, D78) | `Modules/45-interface-art.md` | Done |
+| 7.5 | Board art: the blocks, gates, frame and mechanics brought to the new interface's style, matched to a target image (D46) | `Modules/46-board-art.md` | Planned |
+| 7.6 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes | `Modules/47-effects.md` | Planned |
+| 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
+| 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | to be decided | Planned |
 
 ---
 

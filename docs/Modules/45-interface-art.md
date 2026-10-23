@@ -231,3 +231,61 @@ and bronze.
 - Home shows the day town on a new save, sunset from level 11 and night
   from level 21; the painting covers a tall phone and the web build's
   window without stretching.
+
+---
+
+## Resolved during implementation
+
+- **The sprites.** Everything listed above was drawn except `tab_bar`.
+  The quota came back, so the cog, the lock and the three medals were
+  generated after all, and a gold selection ring (`ring_select`) was
+  added for the selected joker and the next streak milestone. The note
+  above about keeping the old cog, lock and medals no longer holds.
+- **Avatars.** Thirty 256 by 256 animal avatars were generated in the
+  same style and replace Animal Pack Redux in `AvatarCatalog`, although
+  the spec left the avatars out (D77 has the note).
+- **Import.** `InterfaceArtImportRules` holds every sprite's import
+  settings and 9-slice borders, and `InterfaceArtImporter` applies them
+  on import, so a re-cut sprite needs no Inspector work.
+- **Tints.** The pre-coloured sprites stop being tinted rather than being
+  tinted white: the `UiTint` roles Coin, Heart and JokerBadge are
+  removed, and the remaining roles keep their numbers. The Streak role
+  and its colour are unused since the streak markers became round, and
+  stay until a cleanup.
+- **The scrim.** Black at 0.85 alpha: the project renders in linear
+  colour space, where the planned lighter scrim looked washed out.
+- **The joker bar.** First 1.4 times larger as planned. After the
+  owner's review it was designed 20 percent larger again, with half a
+  button between buttons and the three grouped in the centre, a lock
+  half the button's size and locked icons at 0.7 alpha. The bottom band
+  grows from 0.14 to 0.145, the most the board-fit floor of 0.9 allows
+  (level 4 comes out at about 0.902, and `CampaignBoardFitTests` checks
+  every campaign board). What is drawn is held by the band: about 16
+  percent larger on a tall phone and 7 percent in the web window.
+- **Hand-made prefabs.** The owner's Inspector steps were replaced by
+  one permanent command, `HandMadePrefabSettings` (*Gate Rush → Apply
+  Hand-Made Prefab Settings*, D78). It sets Button Round's glyph box,
+  the Top Bar's plus icons, heart, lives count, avatar frame and avatar,
+  the Tab Bar's labels and the Home Page's Play button and notice.
+- **The owner's review.** Close buttons sit 40 in from every overlay's
+  corner, like the introduction cards. White text on the painting uses a
+  generated Fredoka material with a purple outline and a soft underlay,
+  kept within the font atlas's padding. Scrolling lists (Store,
+  Leaderboard, Levels, Profile) fade over 40 units at their edges, with
+  padding so nothing is faded at rest; the Win Streak ladder does not
+  scroll and keeps a hard edge. Smaller fixes: the Lives overlay's
+  stack, the Settings icons shifted by their measured drawn centres,
+  one tab label size that fits "Leaderboard", the Play button low above
+  the tab bar, the Store's text-only "Full" label centred on the button's
+  face, disabled labels in the theme's dark purple, and shorter or
+  corrected texts.
+- **Third-party art.** Still shown: Kenney's white Game Icons glyphs
+  (plus, cross, home, return, sound on and off, phone, checkmark) and the
+  UI Pack's green checkmark. Animal Pack Redux, Board Game Icons and the
+  game-icons.net icons are no longer shown; the game-icons.net cog is
+  only a hidden leftover override on the Top Bar's settings button. The
+  unused files stay in the project until the cleanup in 7.8, and README
+  credits only what is shown.
+- **Numbering.** The board's art becomes its own module, 7.5 (Module
+  46), so effects move to 7.6 and sound balance to 7.7.
+- **Tests.** 2,707 after the main implementation, 2,764 at the end.

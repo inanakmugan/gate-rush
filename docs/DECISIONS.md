@@ -2373,7 +2373,9 @@ images; they are cleaned, trimmed, given their 9-slice borders and sized
 before they enter the project, under `Assets/Art/`. The prompts never use
 another game's screenshots, names or characters. README credits the art
 as AI-assisted. Kenney's avatars and any sprite not redrawn stay as they
-are (D69).
+are (D69). (Module 45 redrew the avatars too: thirty animal avatars in
+the same style replace Animal Pack Redux. Kenney's white button glyphs
+stay.)
 
 **Why.** The mentor pointed out that the interface can reach the genre's
 level with generated art. The owner has no artist; CC0 packs look flat
@@ -2391,5 +2393,38 @@ consistent with each other.
 **Rejected.** Imitating a named game's screens: a clone in a portfolio and
 a copyright risk. Commissioned art: no budget. Keeping Kenney: the
 mentor's point.
+
+---
+
+## D78 — Hand-made prefab values are set by one editor command
+
+**Decision.** The values of the hand-made prefabs (Button Close, Button
+Primary, Button Round, Button Secondary, Level Button, Top Bar, Tab Bar,
+Home Page), which `UiPrefabBuilder` nests and never writes, are no longer
+changed by hand in the Inspector. One permanent editor command,
+`HandMadePrefabSettings` (*Gate Rush → Apply Hand-Made Prefab Settings*),
+holds them as named constants and sets them by Hierarchy path. It compares
+each value first and saves a prefab only when something differs, so it is
+safe to run at any time. A new hand-made change is added there as a
+constant and a step, not as a new one-shot script.
+
+**Why.** The owner's Editor steps for Module 45 were long lists of fields
+to find and type in, across nested prefabs with overrides; mistakes were
+easy and tiring to hunt. A command makes the change exact and repeatable,
+and keeps the values in code, where review and tests see them.
+
+**Consequences.**
+- The rule of D68 stands: the builder still never writes a hand-made
+  prefab. The command is a separate, idempotent step the owner runs
+  before *Build UI Prefabs*.
+- `HandMadePrefabSettingsTests` read the real prefabs and fail until the
+  command has run, so a forgotten step shows up in the test run.
+- The command lives in `GateRush.UI.Editor` and never ships in a build.
+
+**Rejected.** Inspector steps in each report: the problem. A one-shot
+script per change, deleted afterwards: the values and their tests would
+go with it. Letting the builder write the hand-made prefabs: they are
+hand-made so the owner can lay them out; the command only sets what a
+module decides.
 
 ---

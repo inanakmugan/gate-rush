@@ -28,8 +28,12 @@ a Store that sells gold packs through a simulated purchase service that
 charges nothing, a win streak bar that shows the rewards ahead, a
 Profile with the player's name and avatar, and a Leaderboard that ranks
 the player among labelled demo players; the level's HUD, joker bar and
-panels share the same theme, and gold can be bought inside a level. Sound
-effects and haptics came forward from Phase 7. The
+panels share the same theme, and gold can be bought inside a level.
+Phase 7, polish, is under way: the jokers unlock one at a time at levels
+5, 10 and 15 with their own introductions, and the interface is redrawn
+in a glossy style with AI-assisted art, thirty avatars and a town
+painting behind the menu that changes from day to night as the campaign
+goes on. Sound effects and haptics came forward from Phase 7. The
 itch.io build predates Phase 4. See
 [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
@@ -140,23 +144,25 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-2,689 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+2,764 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
 ## Credits
 
-- Interface art: [Kenney](https://kenney.nl) — UI Pack, Game Icons, Board
-  Game Icons and Animal Pack Redux, all CC0.
-- Joker and settings icons: [game-icons.net](https://game-icons.net) —
-  Hourglass, Rocket and Cog by Lorc, Magic broom by Delapouite, CC BY 3.0.
+- Interface art, avatars and the town paintings: drawn for this project
+  with AI assistance, generated from a written style guide and then cut,
+  cleaned and sized by hand.
+- Button glyphs: [Kenney](https://kenney.nl) — Game Icons, and one
+  checkmark from the UI Pack, CC0.
 - Fonts: [Fredoka](https://fonts.google.com/specimen/Fredoka), with
   [Nunito](https://fonts.google.com/specimen/Nunito) ExtraBold as the
-  fallback for Turkish letters, both SIL Open Font License 1.1.
-- The coin sprites and the avatar frame under `Assets/Art/Sprites/UI` are
-  drawn for this project.
+  fallback for Turkish letters, and
+  [Lilita One](https://fonts.google.com/specimen/Lilita+One) for the
+  board's labels, all SIL Open Font License 1.1.
 
-The licences are kept beside the files under `Assets/ThirdParty/`.
+Kenney's and the interface fonts' licences are kept beside the files
+under `Assets/ThirdParty/`.
 
 ## Note on the web build
 
