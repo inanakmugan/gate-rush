@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: ca4f4557e97e1da47bd330b6ce560805
+guid: a233bc925c7d146439acda5dae5adb46
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -369292488589188861
-    second: ShineOuter_0
+      213: -8504835771801811864
+    second: LightConcaveBottomLeft_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ShineOuter_0
+      name: LightConcaveBottomLeft_0
       rect:
         serializedVersion: 2
-        x: 0
-        y: 34
-        width: 57
-        height: 23
+        x: 51
+        y: 49
+        width: 13
+        height: 15
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 301eb6f207200eaf0800000000000000
-      internalID: -369292488589188861
+      spriteID: 864c7b41de0c8f980800000000000000
+      internalID: -8504835771801811864
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ShineOuter_0: -369292488589188861
+      LightConcaveBottomLeft_0: -8504835771801811864
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

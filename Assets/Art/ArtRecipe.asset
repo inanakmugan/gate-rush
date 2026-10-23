@@ -18,22 +18,27 @@ MonoBehaviour:
   cornerRadiusPixels: 26
   concaveRadiusPixels: 1
   pieceOutlinePixels: 5
-  faceEdgeBandPixels: 6
-  faceEdgeBandTone: 0.6
-  shineWidthPixels: 4
-  shineSoftnessPixels: 3
+  lightAngleDegrees: 135
+  lightBandPixels: 6
+  lightAlpha: 0.3
+  shadeBandPixels: 8
+  shadeAlpha: 0.4
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10
   rimTone: 1
   faceTone: 0.84
   studsPerCellSide: 2
-  studDiameterPixels: 32
+  studDiameterPixels: 31
   studTone: 1
+  studShadeTone: 0.85
   studRingWidthPixels: 1.5
   studRingTone: 0.6
   studFootDropPixels: 7
   studFootTone: 0.6
+  studShadowOffsetPixels: 3
+  studShadowTone: 0.7
+  studShadowSoftnessPixels: 2
   studDiscRaisePixels: 3
   glossDiameterPixels: 6
   glossOffsetPixels: {x: -7, y: 7}

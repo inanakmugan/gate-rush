@@ -40,13 +40,15 @@ namespace GateRush.Tests
         [TestCase("rimWidthPixels", 60f, "Rim Width Pixels")]
         [TestCase("pieceOutlinePixels", 0f, "Piece Outline Pixels")]
         [TestCase("pieceOutlinePixels", 30f, "Piece Outline Pixels")]
-        [TestCase("faceEdgeBandPixels", -1f, "Face Edge Band Pixels")]
-        [TestCase("faceEdgeBandPixels", 60f, "Face Edge Band Pixels")]
+        [TestCase("lightBandPixels", 0f, "Light Band Pixels")]
+        [TestCase("lightBandPixels", 22f, "Light Band Pixels")]
+        [TestCase("shadeBandPixels", 0f, "Shade Band Pixels")]
+        [TestCase("shadeBandPixels", 22f, "Shade Band Pixels")]
         [TestCase("studDiscRaisePixels", -1f, "Stud Disc Raise Pixels")]
-        [TestCase("studDiscRaisePixels", 8f, "Stud Disc Raise Pixels")]
-        [TestCase("shineWidthPixels", 0f, "Shine Width Pixels")]
-        [TestCase("shineWidthPixels", 20f, "Shine Width Pixels")]
-        [TestCase("shineSoftnessPixels", -1f, "Shine Softness Pixels")]
+        [TestCase("studDiscRaisePixels", 11f, "Stud Disc Raise Pixels")]
+        [TestCase("studShadowOffsetPixels", -1f, "Stud Shadow Offset Pixels")]
+        [TestCase("studShadowOffsetPixels", 20f, "Stud Shadow Offset Pixels")]
+        [TestCase("studShadowSoftnessPixels", -1f, "Stud Shadow Softness Pixels")]
         [TestCase("studDiameterPixels", 130f, "Stud Diameter Pixels")]
         [TestCase("studDiameterPixels", 62f, "Stud Diameter Pixels")]
         [TestCase("studFootDropPixels", -1f, "Stud Foot Drop Pixels")]
@@ -172,6 +174,19 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains("Gloss Offset Pixels"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LightFromBelow_PutsTheStudsOutsideTheFace()
+        {
+            // The crescent and shadow fall away from the light: from below,
+            // they fall up past the raised disc, where the default stud fits
+            // only from the top left.
+            SetFloat("lightAngleDegrees", 270f);
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("put the studs outside the face"), string.Join(" | ", problems));
         }
 
         private void SetFloat(string field, float value)

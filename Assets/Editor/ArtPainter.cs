@@ -15,9 +15,18 @@ namespace GateRush.Editor
         ContourOuter,
         ContourEdge,
         ContourConcave,
-        ShineOuter,
-        ShineEdge,
-        ShineConcave,
+        LightOuterTopLeft,
+        LightOuterTopRight,
+        LightOuterBottomLeft,
+        LightOuterBottomRight,
+        LightConcaveTopLeft,
+        LightConcaveTopRight,
+        LightConcaveBottomLeft,
+        LightConcaveBottomRight,
+        LightEdgeTop,
+        LightEdgeBottom,
+        LightEdgeLeft,
+        LightEdgeRight,
         Studs,
         StudGloss,
         SingleStud,
@@ -84,14 +93,13 @@ namespace GateRush.Editor
     /// <para><b>Shapes</b> are signed distance functions evaluated at pixel
     /// centres: coverage is <c>0.5 − d / antiAlias</c>, clamped, and tone is a
     /// function of the depth inside the shape. A face piece (Module 46) is
-    /// white with a slight darkening toward its edge; its outline is a
-    /// separate contour piece drawn untinted under it, and its gloss a
-    /// separate shine piece drawn untinted over it. Face and contour depend
-    /// only on the distance to the boundary, so mirroring or rotating them
-    /// never turns their lighting the wrong way; the shine also depends on
-    /// which way the edge faces, so the runtime puts it only on quarters whose
-    /// mirroring keeps that meaning — top quarters light the top, bottom ones
-    /// the bottom. Fully
+    /// plain white; its outline is a separate contour piece drawn untinted
+    /// under it, and its lit and shaded edges a separate light piece drawn
+    /// untinted over it. Face and contour depend only on the distance to the
+    /// boundary, so mirroring or rotating them never turns anything the wrong
+    /// way; a light piece also depends on which way its edge faces the light
+    /// once posed, so there is one per corner of a cell and one per side for
+    /// an edge, and the runtime picks the one for the quarter's place. Fully
     /// transparent pixels keep the edge's tone in RGB, so filtering never pulls
     /// a dark fringe into the edge.</para>
     /// <para><b>Quarter pieces</b> are drawn for the top-right quarter, in
@@ -103,8 +111,10 @@ namespace GateRush.Editor
     /// <c>Math.Sqrt</c>, <c>Abs</c>, <c>Floor</c>, <c>Min</c> and <c>Max</c> are
     /// used, all exactly rounded — no <c>Mathf</c>,
     /// <c>Pow</c> or <c>Exp</c>, no randomness, no clock — and each value is
-    /// rounded to a byte with an explicit midpoint rule. The same recipe
-    /// always paints the same bytes.</para>
+    /// rounded to a byte with an explicit midpoint rule. The one exception,
+    /// the light's direction, takes a cosine and a sine once and rounds them
+    /// to nine decimals (<see cref="TowardLight"/>). The same recipe always
+    /// paints the same bytes.</para>
     /// </remarks>
     public static class ArtPainter
     {
@@ -114,6 +124,12 @@ namespace GateRush.Editor
         /// without sampling a single column's edge.
         /// </summary>
         private const int RampWidthPixels = 2;
+
+        /// <summary>
+        /// The decimals the light's direction is rounded to (<see cref="TowardLight"/>).
+        /// Not a look parameter: it only keeps a platform's last bit out of the pixels.
+        /// </summary>
+        private const int LightDirectionDecimals = 9;
 
         /// <summary>The four shapes a quarter piece takes (Module 15), whatever layer it is painted for.</summary>
         private enum QuarterShape
@@ -147,10 +163,30 @@ namespace GateRush.Editor
                 case ArtSprite.ContourEdge:
                 case ArtSprite.ContourConcave:
                     return PaintContour(recipe, sprite);
-                case ArtSprite.ShineOuter:
-                case ArtSprite.ShineEdge:
-                case ArtSprite.ShineConcave:
-                    return PaintShine(recipe, sprite);
+                case ArtSprite.LightOuterTopLeft:
+                    return PaintLight(recipe, QuarterShape.Outer, -1, 1);
+                case ArtSprite.LightOuterTopRight:
+                    return PaintLight(recipe, QuarterShape.Outer, 1, 1);
+                case ArtSprite.LightOuterBottomLeft:
+                    return PaintLight(recipe, QuarterShape.Outer, -1, -1);
+                case ArtSprite.LightOuterBottomRight:
+                    return PaintLight(recipe, QuarterShape.Outer, 1, -1);
+                case ArtSprite.LightConcaveTopLeft:
+                    return PaintLight(recipe, QuarterShape.Concave, -1, 1);
+                case ArtSprite.LightConcaveTopRight:
+                    return PaintLight(recipe, QuarterShape.Concave, 1, 1);
+                case ArtSprite.LightConcaveBottomLeft:
+                    return PaintLight(recipe, QuarterShape.Concave, -1, -1);
+                case ArtSprite.LightConcaveBottomRight:
+                    return PaintLight(recipe, QuarterShape.Concave, 1, -1);
+                case ArtSprite.LightEdgeTop:
+                    return PaintLightEdge(recipe, 0, 1);
+                case ArtSprite.LightEdgeBottom:
+                    return PaintLightEdge(recipe, 0, -1);
+                case ArtSprite.LightEdgeLeft:
+                    return PaintLightEdge(recipe, -1, 0);
+                case ArtSprite.LightEdgeRight:
+                    return PaintLightEdge(recipe, 1, 0);
                 case ArtSprite.Studs:
                     return PaintStuds(recipe, recipe.StudsPerCellSide);
                 case ArtSprite.StudGloss:
@@ -225,18 +261,15 @@ namespace GateRush.Editor
         /// <summary>
         /// A face piece: the piece's silhouette pulled in by the outline, with
         /// its own corners sharing the silhouette's centres, so the contour
-        /// under it shows as a ring of even width. White deeper than the bevel,
-        /// so the tint shows exactly there, and darkening to the edge tone
-        /// toward its edge.
+        /// under it shows as a ring of even width. White throughout, so the
+        /// tint shows exactly; its lit and shaded edges are the light pieces'
+        /// (<see cref="PaintLight"/>), drawn over it.
         /// </summary>
         private static ArtImage PaintQuarter(ArtRecipe recipe, ArtSprite sprite)
         {
             var shape = ShapeOf(sprite);
             return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
-            {
-                var sd = FaceSd(recipe, shape, x, y);
-                return (BevelTone(recipe, -sd), Coverage(recipe, sd));
-            });
+                (1.0, Coverage(recipe, FaceSd(recipe, shape, x, y))));
         }
 
         /// <summary>
@@ -253,68 +286,132 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// A shine piece over a face piece of the same kind: white, a band of
-        /// full strength just inside the face's edge fading out past it, as
-        /// strong as the edge faces up. The quarter is drawn for the top-right
-        /// corner, so a boundary along the top is lit fully, one along a side
-        /// not at all, and a rounded corner in between — which is why the band
-        /// fades to nothing where a corner meets a side and needs no shine on
-        /// side edges to meet. Mirrored onto a bottom quarter, the same sprite
-        /// lights the bottom edge.
+        /// A light piece over a face piece of the same kind, for the quarter at
+        /// corner <c>(sx, sy)</c> of its cell (Module 46): white along the
+        /// edges that face the light, black along those that face away, each
+        /// band as strong as its edge faces that way and fading smoothly in
+        /// from the edge. The sprite is drawn for the top-right quarter and
+        /// mirrored onto its corner, so the edge's facing is worked out after
+        /// that mirroring: a top-left corner is lit along both its edges, a
+        /// bottom-right one shaded along both, and the other two turn from
+        /// one to the other round their arc.
         /// </summary>
-        private static ArtImage PaintShine(ArtRecipe recipe, ArtSprite sprite)
+        private static ArtImage PaintLight(ArtRecipe recipe, QuarterShape shape, int sx, int sy)
         {
-            var shape = ShapeOf(sprite);
-            double width = recipe.ShineWidthPixels;
-            double softness = recipe.ShineSoftnessPixels;
+            var toward = TowardLight(recipe);
             return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
             {
-                var sd = FaceSd(recipe, shape, x, y);
-                var depth = -sd;
-                var band = depth <= width ? 1.0 : softness > 0.0 ? 1.0 - Smooth(Clamp01((depth - width) / softness)) : 0.0;
-                var facing = Smooth(Clamp01(UpwardShare(recipe, shape, x, y)));
-                return (1.0, Coverage(recipe, sd) * band * facing);
+                var (nx, ny) = OutwardNormal(recipe, shape, x, y);
+                return LightPixel(recipe, FaceSd(recipe, shape, x, y), Facing(sx * nx, sy * ny, toward));
             });
+        }
+
+        /// <summary>
+        /// A light piece over an edge piece whose boundary faces
+        /// <c>(wx, wy)</c> once posed: the edge sprite's band, of one
+        /// strength along the whole edge.
+        /// </summary>
+        private static ArtImage PaintLightEdge(ArtRecipe recipe, int wx, int wy)
+        {
+            var facing = Facing(wx, wy, TowardLight(recipe));
+            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
+                LightPixel(recipe, FaceSd(recipe, QuarterShape.Edge, x, y), facing));
+        }
+
+        /// <summary>
+        /// One light-piece pixel <c>−sd</c> inside the face's edge: white for a
+        /// lit edge (<paramref name="facing"/> above 0), black for a shaded
+        /// one, its alpha the band's strength times how squarely the edge
+        /// faces, easing to nothing across the band's width.
+        /// </summary>
+        private static (double tone, double alpha) LightPixel(ArtRecipe recipe, double sd, double facing)
+        {
+            var depth = -sd;
+            var isLit = facing >= 0.0;
+            double band = isLit ? recipe.LightBandPixels : recipe.ShadeBandPixels;
+            double strength = isLit ? recipe.LightAlpha : recipe.ShadeAlpha;
+            var fade = 1.0 - Smooth(Clamp01(depth / band));
+            return (isLit ? 1.0 : 0.0, Coverage(recipe, sd) * strength * Math.Abs(facing) * fade);
+        }
+
+        /// <summary>
+        /// How squarely an edge with outward normal <c>(nx, ny)</c> faces the
+        /// light, from 1 (lit) to −1 (shaded): their dot product, scaled so
+        /// that the straight edges nearest the light — the top and the left,
+        /// from the top left — count fully.
+        /// </summary>
+        private static double Facing(double nx, double ny, (double x, double y) toward)
+        {
+            var nearest = Math.Max(Math.Abs(toward.x), Math.Abs(toward.y));
+            return Clamp((nx * toward.x + ny * toward.y) / nearest, -1.0, 1.0);
+        }
+
+        /// <summary>
+        /// The unit vector toward the light, from
+        /// <see cref="ArtRecipe.LightAngleDegrees"/>. Cosine and sine are not
+        /// exactly rounded, so the result is rounded to nine decimals: a
+        /// last-bit difference between platforms then never reaches a pixel.
+        /// </summary>
+        private static (double x, double y) TowardLight(ArtRecipe recipe)
+        {
+            var radians = recipe.LightAngleDegrees * Math.PI / 180.0;
+            return (Math.Round(Math.Cos(radians), LightDirectionDecimals, MidpointRounding.AwayFromZero),
+                Math.Round(Math.Sin(radians), LightDirectionDecimals, MidpointRounding.AwayFromZero));
         }
 
         /// <summary>
         /// A grid of <paramref name="perSide"/> by <paramref name="perSide"/>
         /// studs on a cell, the cell divided evenly among them, each a short
-        /// cylinder seen from above: a disc in the face's tone with a thin
-        /// dark rim along its upper arc, fading out by its middle, over a
-        /// darker crescent — its side — hanging below it. The disc sits
-        /// <see cref="ArtRecipe.StudDiscRaisePixels"/> above its grid point
-        /// and the crescent the rest of its depth below. The recipe keeps the
-        /// spacing above a disc and its crescent, so every pixel belongs to
-        /// its nearest stud. One per side is the lone stud a layered block's
-        /// inner block places on its own grid.
+        /// cylinder lit from <see cref="ArtRecipe.LightAngleDegrees"/>: a disc
+        /// in the face's tone, darkening away from the light, with a thin dark
+        /// rim along its upper arc; a darker crescent — its side — falling
+        /// away from the light; and under both the stud's soft shadow on the
+        /// face, falling further. The disc sits
+        /// <see cref="ArtRecipe.StudDiscRaisePixels"/> above its grid point.
+        /// The shadow fades in from its outline, so it reaches no further than
+        /// its offset. The recipe keeps the spacing above a stud's reach, so
+        /// every pixel belongs to its nearest stud. One per side is the lone
+        /// stud a layered block's inner block places on its own grid.
         /// </summary>
         private static ArtImage PaintStuds(ArtRecipe recipe, int perSide)
         {
             var radius = recipe.StudDiameterPixels / 2.0;
             double drop = recipe.StudFootDropPixels;
+            double shadowFall = drop + recipe.StudShadowOffsetPixels;
+            double shadowSoftness = recipe.StudShadowSoftnessPixels;
             double raise = recipe.StudDiscRaisePixels;
+            var toward = TowardLight(recipe);
             return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
             {
                 var (cx, cy) = NearestStud(recipe, perSide, x, y);
                 var discY = cy + raise;
                 var top = Length(x - cx, y - discY) - radius;
-                var side = Length(x - cx, y - (discY - drop)) - radius;
+                var side = Length(x - cx + toward.x * drop, y - discY + toward.y * drop) - radius;
 
-                // The rim: within its width of the disc's edge, as strong as
-                // the edge there faces up, so it runs along the upper arc only.
+                // The shadow is the stud's whole outline — disc and side —
+                // carried further away from the light.
+                var shadow = Math.Min(
+                    Length(x - cx + toward.x * recipe.StudShadowOffsetPixels, y - discY + toward.y * recipe.StudShadowOffsetPixels),
+                    Length(x - cx + toward.x * shadowFall, y - discY + toward.y * shadowFall)) - radius;
+                var shadowAlpha = Coverage(recipe, shadow) * (shadowSoftness > 0.0 ? Smooth(Clamp01(-shadow / shadowSoftness)) : 1.0);
+
+                // Away from the light the disc darkens; the rim runs along
+                // its upper arc only.
+                var away = Clamp01(-((x - cx) * toward.x + (y - discY) * toward.y) / radius);
                 var inRim = 1.0 - Clamp01(-top - recipe.StudRingWidthPixels + 0.5);
                 var upward = Clamp01((y - discY) / radius);
-                var tone = Lerp(recipe.StudTone, recipe.StudRingTone, inRim * Smooth(upward));
-                return Over((tone, Coverage(recipe, top)), (recipe.StudFootTone, Coverage(recipe, side)));
+                var tone = Lerp(Lerp(recipe.StudTone, recipe.StudShadeTone, Smooth(away)), recipe.StudRingTone, inRim * Smooth(upward));
+
+                var sideAndShadow = Over((recipe.StudFootTone, Coverage(recipe, side)), (recipe.StudShadowTone, shadowAlpha));
+                return Over((tone, Coverage(recipe, top)), sideAndShadow);
             });
         }
 
         /// <summary>
         /// What lies untinted over each stud of <see cref="PaintStuds"/>' grid:
-        /// a white light across the top of its disc, fading out by its middle,
-        /// so the top reads lighter than the face, and over it the soft white
-        /// highlight, offset from the disc's centre.
+        /// a white light across its disc on the side toward the light, fading
+        /// out by its middle, so that side reads lighter than the face, and
+        /// over it the soft white highlight, offset from the disc's centre.
         /// </summary>
         private static ArtImage PaintGloss(ArtRecipe recipe, int perSide)
         {
@@ -322,12 +419,14 @@ namespace GateRush.Editor
             var softness = Math.Max(recipe.GlossSoftnessPixels, recipe.AntiAliasPixels);
             var radius = recipe.StudDiameterPixels / 2.0;
             double raise = recipe.StudDiscRaisePixels;
+            var toward = TowardLight(recipe);
             return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
             {
                 var (cx, cy) = NearestStud(recipe, perSide, x, y);
                 var discY = cy + raise;
                 var disc = Coverage(recipe, Length(x - cx, y - discY) - radius);
-                var light = recipe.StudTopLightAlpha * disc * Clamp01((y - discY) / radius);
+                var lit = Clamp01(((x - cx) * toward.x + (y - discY) * toward.y) / radius);
+                var light = recipe.StudTopLightAlpha * disc * lit;
                 var d = Length(x - cx - recipe.GlossOffsetPixels.x, y - discY - recipe.GlossOffsetPixels.y);
                 var highlight = recipe.GlossAlpha * Clamp01(0.5 + (highlightRadius - d) / softness);
                 return Over((1.0, highlight), (1.0, light));
@@ -352,18 +451,16 @@ namespace GateRush.Editor
             return first + index * spacing;
         }
 
-        /// <summary>The quarter shape a face, contour or shine sprite is painted for.</summary>
+        /// <summary>The quarter shape a face or contour sprite is painted for.</summary>
         private static QuarterShape ShapeOf(ArtSprite sprite)
         {
             switch (sprite)
             {
                 case ArtSprite.QuarterOuter:
                 case ArtSprite.ContourOuter:
-                case ArtSprite.ShineOuter:
                     return QuarterShape.Outer;
                 case ArtSprite.QuarterEdge:
                 case ArtSprite.ContourEdge:
-                case ArtSprite.ShineEdge:
                     return QuarterShape.Edge;
                 case ArtSprite.QuarterFill:
                     return QuarterShape.Fill;
@@ -407,13 +504,13 @@ namespace GateRush.Editor
             SilhouetteSd(recipe, shape, x, y) + recipe.PieceOutlinePixels;
 
         /// <summary>
-        /// How much the boundary nearest <c>(x, y)</c> faces up, from 1 (a top
-        /// edge) to 0 (a side): the upward part of its outward normal. Exact
-        /// wherever the shine reaches, which <see cref="ArtRecipe.Problems"/>
-        /// keeps within a face corner's radius of the edge: there the normal
-        /// turns smoothly, never jumping across a corner's diagonal.
+        /// The outward normal of the boundary nearest <c>(x, y)</c>, in the
+        /// sprite's own frame (the top-right quarter). Exact wherever a light
+        /// band reaches, which <see cref="ArtRecipe.Problems"/> keeps within a
+        /// face corner's radius of the edge: there the normal turns smoothly,
+        /// never jumping across a corner's diagonal.
         /// </summary>
-        private static double UpwardShare(ArtRecipe recipe, QuarterShape shape, double x, double y)
+        private static (double x, double y) OutwardNormal(ArtRecipe recipe, QuarterShape shape, double x, double y)
         {
             double q = recipe.QuarterPixels;
             var e = q - recipe.BlockGapPixels / 2.0;
@@ -429,16 +526,16 @@ namespace GateRush.Editor
                     var dy = y - c;
                     if (dx > 0.0 && dy > 0.0)
                     {
-                        return dy / Length(dx, dy);
+                        var length = Length(dx, dy);
+                        return (dx / length, dy / length);
                     }
 
-                    return dy >= dx ? 1.0 : 0.0;
+                    return dy >= dx ? (0.0, 1.0) : (1.0, 0.0);
                 }
 
                 case QuarterShape.Edge:
-                    return 1.0;
                 case QuarterShape.Fill:
-                    return 0.0;
+                    return (0.0, 1.0);
                 default:
                 {
                     // The notch is the quadrant beyond (c, c), rounded: below
@@ -447,30 +544,18 @@ namespace GateRush.Editor
                     var c = e + recipe.ConcaveRadiusPixels;
                     if (x >= c && y < c)
                     {
-                        return 1.0;
+                        return (0.0, 1.0);
                     }
 
                     if (x < c && y < c)
                     {
-                        return (c - y) / Length(c - x, c - y);
+                        var length = Length(c - x, c - y);
+                        return ((c - x) / length, (c - y) / length);
                     }
 
-                    return 0.0;
+                    return (1.0, 0.0);
                 }
             }
-        }
-
-        /// <summary>
-        /// The tone of a face pixel <paramref name="depth"/> pixels inside its
-        /// edge: the edge band's tone at the edge, easing smoothly to white at
-        /// the band's width, with no step — a darker edge of the block's own
-        /// colour that studs can sit over.
-        /// </summary>
-        private static double BevelTone(ArtRecipe recipe, double depth)
-        {
-            double band = recipe.FaceEdgeBandPixels;
-            var intoFace = band > 0.0 ? Clamp01(depth / band) : 1.0;
-            return Lerp(recipe.FaceEdgeBandTone, 1.0, Smooth(intoFace));
         }
 
         /// <summary>An opaque tile with half the grid line along each of its edges.</summary>

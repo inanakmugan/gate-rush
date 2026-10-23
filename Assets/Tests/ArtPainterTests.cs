@@ -16,10 +16,13 @@ namespace GateRush.Tests
     /// (Module 17) are white, unsliced, and have their shapes where the recipe
     /// puts them. Module 46: the contour pieces are white silhouettes meeting
     /// at the same seams, the face sits inside them by the outline's width
-    /// and is white past its bevel, the shine is a band that meets at top
-    /// seams and is clear at side seams, the studs are a grid of Studs Per
-    /// Cell Side discs a side, each with a darker foot and its own highlight,
-    /// and the gate arrow's outline covers the arrow inside its sprite.
+    /// and is plain white, the light pieces are white bands along edges that
+    /// face the light and black ones along edges that face away, meeting the
+    /// edge piece of their place at every seam, the studs are a grid of Studs
+    /// Per Cell Side discs a side, each darkening away from the light, with a
+    /// darker crescent and a soft shadow falling to the bottom right and its
+    /// own highlight, and the gate arrow's outline covers the arrow inside its
+    /// sprite.
     /// </summary>
     /// <remarks>
     /// Seams are checked against one profile: the edge piece's left column,
@@ -34,9 +37,9 @@ namespace GateRush.Tests
         private const int RoundingTolerance = 1;
 
         // The default highlight's size and offset as shares of the default
-        // stud (6 and 7 of 32 pixels), so a smaller stud keeps its highlight inside.
-        private const float GlossShareOfStud = 6f / 32f;
-        private const float GlossOffsetShareOfStud = 7f / 32f;
+        // stud (6 and 7 of 31 pixels), so a smaller stud keeps its highlight inside.
+        private const float GlossShareOfStud = 6f / 31f;
+        private const float GlossOffsetShareOfStud = 7f / 31f;
 
         private ArtRecipe recipe;
 
@@ -67,7 +70,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(35, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(44, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -139,95 +142,92 @@ namespace GateRush.Tests
             Assert.AreEqual(recipe.PieceOutlinePixels, contourEdge - faceEdge, 1.0);
         }
 
-        [Test]
-        public void Paint_FaceDeeperThanItsBevel_IsWhiteSoTheTintShowsExactly()
+        [TestCase(ArtSprite.QuarterOuter)]
+        [TestCase(ArtSprite.QuarterEdge)]
+        [TestCase(ArtSprite.QuarterFill)]
+        [TestCase(ArtSprite.QuarterConcave)]
+        public void Paint_FacePiece_IsPlainWhiteSoTheTintShowsExactly(ArtSprite sprite)
         {
-            var fill = ArtPainter.Paint(recipe, ArtSprite.QuarterFill);
-            var edge = ArtPainter.Paint(recipe, ArtSprite.QuarterEdge);
+            var face = ArtPainter.Paint(recipe, sprite);
 
-            Assert.IsTrue(fill.Pixels.All(p => p.r == 255 && p.a == 255), "the fill");
-            Assert.IsTrue(Row(edge, 0).All(p => p.r == 255 && p.a == 255), "the edge's row toward the cell's centre");
+            Assert.IsTrue(face.Pixels.All(p => p.r == 255 && p.g == 255 && p.b == 255), "white everywhere, its edge too");
+            Assert.AreEqual(255, face.Pixels[0].a, "opaque at the cell's centre");
+        }
+
+        [TestCase(ArtSprite.LightEdgeTop, true)]
+        [TestCase(ArtSprite.LightEdgeLeft, true)]
+        [TestCase(ArtSprite.LightEdgeBottom, false)]
+        [TestCase(ArtSprite.LightEdgeRight, false)]
+        public void Paint_LightEdge_IsABandOfOneKindAlongTheEdgeClearTowardTheCellsCentre(ArtSprite sprite, bool isLit)
+        {
+            // From the top left, the top and left edges face the light
+            // squarely, the bottom and right ones face squarely away.
+            var light = ArtPainter.Paint(recipe, sprite);
+            var strongest = light.Pixels.Max(p => p.a);
+            var strength = (isLit ? recipe.LightAlpha : recipe.ShadeAlpha) * 255f;
+
+            Assert.IsTrue(Row(light, 0).All(p => p.a == 0), "the row toward the cell's centre is clear");
+            Assert.IsTrue(light.Pixels.All(p => p.r == (isLit ? 255 : 0)), isLit ? "white" : "black");
+            Assert.That(strongest, Is.GreaterThan(strength / 2f).And.LessThanOrEqualTo(strength + RoundingTolerance), "as strong as the band");
+            CollectionAssert.AreEqual(Column(light, 0), Column(light, light.Width - 1), "one strength along the edge");
+        }
+
+        [TestCase(ArtSprite.LightOuterTopLeft, ArtSprite.LightEdgeTop, ArtSprite.LightEdgeLeft)]
+        [TestCase(ArtSprite.LightOuterTopRight, ArtSprite.LightEdgeTop, ArtSprite.LightEdgeRight)]
+        [TestCase(ArtSprite.LightOuterBottomLeft, ArtSprite.LightEdgeBottom, ArtSprite.LightEdgeLeft)]
+        [TestCase(ArtSprite.LightOuterBottomRight, ArtSprite.LightEdgeBottom, ArtSprite.LightEdgeRight)]
+        public void Paint_LightOuter_MeetsTheEdgesOfItsPlaceAtItsSeams(ArtSprite corner, ArtSprite alongX, ArtSprite alongY)
+        {
+            // Drawn for the top-right quarter: the left column meets the edge
+            // along x that continues its top, the bottom row the edge along y
+            // that continues its side, both posed at the corner's place.
+            var outer = ArtPainter.Paint(recipe, corner);
+
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongX), 0), Column(outer, 0), "left column, beside the edge along x");
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongY), 0), Row(outer, 0), "bottom row, beside the edge along y");
+        }
+
+        [TestCase(ArtSprite.LightConcaveTopLeft, ArtSprite.LightEdgeTop, ArtSprite.LightEdgeLeft)]
+        [TestCase(ArtSprite.LightConcaveTopRight, ArtSprite.LightEdgeTop, ArtSprite.LightEdgeRight)]
+        [TestCase(ArtSprite.LightConcaveBottomLeft, ArtSprite.LightEdgeBottom, ArtSprite.LightEdgeLeft)]
+        [TestCase(ArtSprite.LightConcaveBottomRight, ArtSprite.LightEdgeBottom, ArtSprite.LightEdgeRight)]
+        public void Paint_LightConcave_MeetsTheEdgesOfItsPlaceAndIsClearInsideTheShape(ArtSprite corner, ArtSprite alongX, ArtSprite alongY)
+        {
+            // The notch's floor runs on as an edge along x, its side as an
+            // edge along y; the other two seams lie inside the shape.
+            var concave = ArtPainter.Paint(recipe, corner);
+
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongX), 0), Column(concave, concave.Width - 1), "right column, beside the edge along x");
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongY), 0), Row(concave, concave.Height - 1), "top row, beside the edge along y");
+            Assert.IsTrue(Column(concave, 0).All(p => p.a == 0), "left column, inside the shape");
+            Assert.IsTrue(Row(concave, 0).All(p => p.a == 0), "bottom row, inside the shape");
         }
 
         [Test]
-        public void Paint_FaceAtItsEdge_IsDarkerThanItsMiddle()
+        public void Paint_LightOuterTopRight_TurnsFromLitToShadedRoundItsArc()
         {
-            var column = Column(ArtPainter.Paint(recipe, ArtSprite.QuarterEdge), 0);
-            var lastOpaque = column.FindLastIndex(p => p.a == 255);
+            // Lit under the top edge, shaded beside the right one, and clear
+            // half way round, where the arc faces across the light.
+            var outer = ArtPainter.Paint(recipe, ArtSprite.LightOuterTopRight);
+            var e = recipe.QuarterPixels - recipe.BlockGapPixels / 2.0;
+            var depth = recipe.PieceOutlinePixels + 1.5;
+            var arcCentre = e - recipe.CornerRadiusPixels;
+            var radial = (recipe.CornerRadiusPixels - depth) / System.Math.Sqrt(2.0);
 
-            Assert.Less(column[lastOpaque].r, column[0].r);
+            var underTop = Pixel(outer, 0.5, e - depth);
+            var besideSide = Pixel(outer, e - depth, 0.5);
+            var halfWay = Pixel(outer, arcCentre + radial, arcCentre + radial);
+
+            Assert.AreEqual(255, underTop.r, "white under the top");
+            Assert.Greater(underTop.a, 0, "lit under the top");
+            Assert.AreEqual(0, besideSide.r, "black beside the side");
+            Assert.Greater(besideSide.a, 0, "shaded beside the side");
+            Assert.LessOrEqual(halfWay.a, RoundingTolerance, "clear where the arc faces across the light");
         }
 
-        [Test]
-        public void Paint_FaceEdgeBand_RampsSmoothlyFromItsToneToWhite()
-        {
-            // Down the edge piece's column from just inside the face's edge
-            // toward the cell's centre, row by row.
-            var column = Column(ArtPainter.Paint(recipe, ArtSprite.QuarterEdge), 0);
-            var edgeRow = column.FindLastIndex(p => p.a == 255);
-            var bandRange = 255 - recipe.FaceEdgeBandTone * 255f;
-            var whiteBy = edgeRow - (int)System.Math.Ceiling(recipe.FaceEdgeBandPixels) - 1;
-
-            for (var row = edgeRow; row > 0; row--)
-            {
-                var step = column[row - 1].r - column[row].r;
-                Assert.That(step, Is.GreaterThanOrEqualTo(0), $"row {row - 1} is no darker than the row outside it");
-                Assert.That(step, Is.LessThan(bandRange / 2f), $"no step between rows {row} and {row - 1}");
-            }
-
-            Assert.Less(column[edgeRow].r, 255, "darker at the edge");
-            Assert.AreEqual(255, column[whiteBy].r, "white past the band");
-        }
-
-        [Test]
-        public void Paint_ShineEdge_IsABandAlongTheEdgeClearTowardTheCellsCentre()
-        {
-            var shine = ArtPainter.Paint(recipe, ArtSprite.ShineEdge);
-            var column = Column(shine, 0);
-            var lastShown = column.FindLastIndex(p => p.a > 0);
-
-            Assert.IsTrue(Row(shine, 0).All(p => p.a == 0), "the row toward the cell's centre is clear");
-            Assert.Greater(lastShown, 0, "something is lit");
-            Assert.AreEqual(255, column[lastShown - (int)recipe.ShineWidthPixels / 2].a, "the band is at full strength just inside the edge");
-            Assert.IsTrue(shine.Pixels.All(p => p.r == 255), "white");
-        }
-
-        [Test]
-        public void Paint_ShinePieces_MeetTheEdgesBandAtTopSeamsAndNothingAtSideSeams()
-        {
-            var profile = Column(ArtPainter.Paint(recipe, ArtSprite.ShineEdge), 0);
-            var outer = ArtPainter.Paint(recipe, ArtSprite.ShineOuter);
-            var concave = ArtPainter.Paint(recipe, ArtSprite.ShineConcave);
-
-            AssertSameProfile(profile, Column(outer, 0), "outer corner, left column, beside a top edge");
-            Assert.IsTrue(Row(outer, 0).All(p => p.a == 0), "outer corner, bottom row, beside a side");
-            AssertSameProfile(profile, Column(concave, concave.Width - 1), "concave corner, right column, beside a top edge");
-            Assert.IsTrue(Row(concave, concave.Height - 1).All(p => p.a == 0), "concave corner, top row, beside a side");
-            Assert.IsTrue(Column(concave, 0).All(p => p.a == 0), "concave corner, left column, inside the shape");
-            Assert.IsTrue(Row(concave, 0).All(p => p.a == 0), "concave corner, bottom row, inside the shape");
-        }
-
-        [Test]
-        public void Paint_ShineOuter_FadesRoundTheCornerFromTopToSide()
-        {
-            // Along the corner's diagonal the edge faces half up: lit, but
-            // less than straight under the top edge.
-            var outer = ArtPainter.Paint(recipe, ArtSprite.ShineOuter);
-            var reachBeforeRounding = recipe.QuarterPixels - recipe.BlockGapPixels / 2.0 - recipe.CornerRadiusPixels;
-            var depth = recipe.PieceOutlinePixels + recipe.ShineWidthPixels / 2.0;
-            var underTop = Pixel(outer, 0.5, recipe.QuarterPixels - recipe.BlockGapPixels / 2.0 - depth);
-            var radial = recipe.CornerRadiusPixels - depth;
-            var onDiagonal = Pixel(
-                outer, reachBeforeRounding + radial / System.Math.Sqrt(2.0), reachBeforeRounding + radial / System.Math.Sqrt(2.0));
-
-            Assert.AreEqual(255, underTop.a, "under the top edge");
-            Assert.Greater(onDiagonal.a, 0, "round the corner");
-            Assert.Less(onDiagonal.a, underTop.a, "fading toward the side");
-        }
-
-        [TestCase(1, 32f)]
-        [TestCase(2, 32f)]
-        [TestCase(3, 20f)]
+        [TestCase(1, 31f)]
+        [TestCase(2, 31f)]
+        [TestCase(3, 14f)]
         public void Paint_Studs_PaintsAGridOfCylindersPerCellSide(int perSide, float diameter)
         {
             SetStudGrid(perSide, diameter);
@@ -236,24 +236,31 @@ namespace GateRush.Tests
             var raise = recipe.StudDiscRaisePixels;
             var drop = recipe.StudFootDropPixels;
             var centers = StudCenters(perSide);
+            var diagonal = 1.0 / System.Math.Sqrt(2.0);
 
             foreach (var cy in centers)
             {
                 foreach (var cx in centers)
                 {
                     // The disc sits its raise above the grid point; the
-                    // crescent hangs below it, the rim runs along its top.
+                    // crescent falls away from the light, to the bottom
+                    // right; the rim runs along the disc's top, and the disc
+                    // darkens toward the bottom right.
                     var discY = cy + raise;
                     var middle = Pixel(studs, cx, discY);
-                    var crescent = Pixel(studs, cx, discY - radius - drop / 2.0);
+                    var past = radius + drop / 2.0;
+                    var crescent = Pixel(studs, cx + past * diagonal, discY - past * diagonal);
                     var rim = Pixel(studs, cx, discY + radius - recipe.StudRingWidthPixels / 2.0 - 0.5);
-                    var lowerEdge = Pixel(studs, cx, discY - radius + recipe.StudRingWidthPixels / 2.0 + 0.5);
+                    var inside = radius - recipe.StudRingWidthPixels - 1.0;
+                    var lowerLeft = Pixel(studs, cx - inside * diagonal, discY - inside * diagonal);
+                    var lowerRight = Pixel(studs, cx + inside * diagonal, discY - inside * diagonal);
 
                     Assert.AreEqual(255, middle.a, $"the disc at ({cx}, {cy})");
-                    Assert.AreEqual(255, crescent.a, $"the crescent below ({cx}, {cy})");
-                    Assert.Less(crescent.r, middle.r, $"the crescent below ({cx}, {cy}) is darker");
+                    Assert.AreEqual(255, crescent.a, $"the crescent beside ({cx}, {cy})");
+                    Assert.Less(crescent.r, middle.r, $"the crescent beside ({cx}, {cy}) is darker");
                     Assert.Less(rim.r, middle.r, $"the rim at the top of ({cx}, {cy}) is darker");
-                    Assert.AreEqual(middle.r, lowerEdge.r, $"the rim has faded out by the bottom of ({cx}, {cy})");
+                    Assert.AreEqual(middle.r, lowerLeft.r, RoundingTolerance, $"the rim has faded out and the disc is unshaded across the light at ({cx}, {cy})");
+                    Assert.Less(lowerRight.r, middle.r, $"the disc of ({cx}, {cy}) darkens away from the light");
                 }
             }
 
@@ -271,10 +278,10 @@ namespace GateRush.Tests
             Assert.AreEqual(perSide * perSide, CountStudCentres(studs), "one disc with its crescent per stud");
         }
 
-        [TestCase(1, 32f)]
-        [TestCase(2, 32f)]
-        [TestCase(3, 20f)]
-        public void Paint_StudGloss_IsAHighlightAndATopLightPerStud(int perSide, float diameter)
+        [TestCase(1, 31f)]
+        [TestCase(2, 31f)]
+        [TestCase(3, 14f)]
+        public void Paint_StudGloss_IsAHighlightAndALightTowardTheLightPerStud(int perSide, float diameter)
         {
             SetStudGrid(perSide, diameter);
             var gloss = ArtPainter.Paint(recipe, ArtSprite.StudGloss);
@@ -286,12 +293,35 @@ namespace GateRush.Tests
             {
                 foreach (var cx in centers)
                 {
+                    // From the top left: the light lies across the disc's
+                    // left half, away from the highlight above it, and
+                    // nothing lies on its bottom right.
                     var discY = cy + recipe.StudDiscRaisePixels;
                     Assert.Greater(Pixel(gloss, cx + offset.x, discY + offset.y).a, 0, $"the highlight on ({cx}, {cy})");
-                    Assert.Greater(Pixel(gloss, cx - offset.x, discY + radius / 2.0).a, 0, $"the top light on ({cx}, {cy})");
-                    Assert.AreEqual(0, Pixel(gloss, cx - offset.x, discY - offset.y).a, $"nothing low on ({cx}, {cy})");
+                    Assert.Greater(Pixel(gloss, cx - radius / 2.0, discY).a, 0, $"the light on ({cx}, {cy})");
+                    Assert.AreEqual(0, Pixel(gloss, cx - offset.x, discY - offset.y).a, $"nothing on the bottom right of ({cx}, {cy})");
                 }
             }
+        }
+
+        [Test]
+        public void Paint_Studs_CastASoftShadowAwayFromTheLightBeyondTheCrescent()
+        {
+            // The default grid's bottom-left stud: half way across the strip
+            // the shadow shows past its crescent, to the bottom right, it is
+            // in its own tone; as far to the top left, the face is clear.
+            var studs = ArtPainter.Paint(recipe, ArtSprite.Studs);
+            var center = StudCenters(recipe.StudsPerCellSide)[0];
+            var discY = center + recipe.StudDiscRaisePixels;
+            var diagonal = 1.0 / System.Math.Sqrt(2.0);
+            var past = recipe.StudDiameterPixels / 2.0 + recipe.StudFootDropPixels + recipe.StudShadowOffsetPixels / 2.0;
+
+            var shadow = Pixel(studs, center + past * diagonal, discY - past * diagonal);
+            var towardLight = Pixel(studs, center - past * diagonal, discY + past * diagonal);
+
+            Assert.Greater(shadow.a, 128, "the shadow, past the crescent");
+            Assert.AreEqual(recipe.StudShadowTone * 255f, shadow.r, RoundingTolerance, "in the shadow's tone");
+            Assert.AreEqual(0, towardLight.a, "nothing toward the light");
         }
 
         [Test]
@@ -673,14 +703,34 @@ namespace GateRush.Tests
         private static List<Color32> Row(ArtImage image, int y) =>
             Enumerable.Range(0, image.Width).Select(x => image.Pixels[y * image.Width + x]).ToList();
 
+        /// <summary>
+        /// Asserts two seam profiles match: alpha everywhere, and tone wherever
+        /// it can show — at a pixel with some alpha on either side, or next to
+        /// one, where filtering blends it in. Deeper in a transparent run the
+        /// tone is never seen, and a light piece leaves it undefined where two
+        /// edges are equally near: on the diagonal at the cell's centre, or in
+        /// the corner of a notch, between a lit edge and a shaded one.
+        /// </summary>
         private static void AssertSameProfile(IReadOnlyList<Color32> expected, IReadOnlyList<Color32> actual, string label)
         {
             Assert.AreEqual(expected.Count, actual.Count, label);
+            var tonesCompared = 0;
             for (var i = 0; i < expected.Count; i++)
             {
-                Assert.LessOrEqual(Mathf.Abs(expected[i].r - actual[i].r), RoundingTolerance, $"{label}, pixel {i}: tone");
                 Assert.LessOrEqual(Mathf.Abs(expected[i].a - actual[i].a), RoundingTolerance, $"{label}, pixel {i}: alpha");
+
+                if (CanShow(expected, i) || CanShow(actual, i))
+                {
+                    Assert.LessOrEqual(Mathf.Abs(expected[i].r - actual[i].r), RoundingTolerance, $"{label}, pixel {i}: tone");
+                    tonesCompared++;
+                }
             }
+
+            Assert.Greater(tonesCompared, 0, $"{label}: some of the profile shows, so its tone was compared");
         }
+
+        /// <summary>True when pixel <paramref name="i"/> of <paramref name="profile"/> or a neighbour along it has any alpha.</summary>
+        private static bool CanShow(IReadOnlyList<Color32> profile, int i) =>
+            profile[i].a > 0 || (i > 0 && profile[i - 1].a > 0) || (i + 1 < profile.Count && profile[i + 1].a > 0);
     }
 }

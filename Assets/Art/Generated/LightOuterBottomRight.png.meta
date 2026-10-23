@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 40ccb9cc6e532ae46b8967d96f474a8d
+guid: 0ff4257dd38ffa447b3bc89e05f1dd52
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 71006371223725069
-    second: ShineEdge_0
+      213: -8496013399191563330
+    second: LightOuterBottomRight_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -126,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: ShineEdge_0
+      name: LightOuterBottomRight_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 34
-        width: 64
-        height: 23
+        y: 0
+        width: 59
+        height: 59
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -141,8 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: d04649d1be34cf000800000000000000
-      internalID: 71006371223725069
+      spriteID: eb35a36c3d8181a80800000000000000
+      internalID: -8496013399191563330
       vertices: []
       indices: 
       edges: []
@@ -161,7 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      ShineEdge_0: 71006371223725069
+      LightOuterBottomRight_0: -8496013399191563330
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

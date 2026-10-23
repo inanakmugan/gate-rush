@@ -51,17 +51,21 @@ namespace GateRush.Editor
         [Tooltip("Width of the dark outline round every block, the frame and every gate (D79), in pixels. The contour pieces draw the whole shape; the face pieces are the same shape pulled in by this, so the contour shows as a ring of this width. Above 0 and at most Corner Radius Pixels.")]
         [SerializeField] private float pieceOutlinePixels = 5f;
 
-        [Tooltip("Width of the darker band of the block's own colour along a face piece's edge, in pixels (Module 46): the tone eases smoothly from Face Edge Band Tone at the edge to white at this depth, with no step; deeper the face is white, so the tint shows exactly.")]
-        [SerializeField] private float faceEdgeBandPixels = 6f;
+        [Header("Light (one direction for every lit and shaded piece)")]
+        [Tooltip("Where the light comes from, in degrees counter-clockwise from the right: 135 is the top left. Every light piece and every stud reads it, so blocks, studs, the frame, gates and the layered window agree.")]
+        [SerializeField, Range(0f, 360f)] private float lightAngleDegrees = 135f;
 
-        [Tooltip("Tone of the face's edge band at the very edge: the block's colour darkened to this share.")]
-        [SerializeField, Range(0f, 1f)] private float faceEdgeBandTone = 0.6f;
+        [Tooltip("Width of the lighter band along the edges that face the light, in pixels, fading smoothly to nothing; the board draws it untinted, white.")]
+        [SerializeField] private float lightBandPixels = 6f;
 
-        [Tooltip("Width of the shine's full-strength band just inside a face's edge, in pixels. The board draws it untinted: a gloss band along the top, a thin light line above the lip.")]
-        [SerializeField] private float shineWidthPixels = 4f;
+        [Tooltip("Strength of the lit band at an edge facing the light squarely: its white's alpha.")]
+        [SerializeField, Range(0f, 1f)] private float lightAlpha = 0.3f;
 
-        [Tooltip("How far past its band the shine fades out, in pixels. Band and fade together stay within the face's corner radius (Corner Radius Pixels less Piece Outline Pixels), so the shine turns smoothly round a corner.")]
-        [SerializeField] private float shineSoftnessPixels = 3f;
+        [Tooltip("Width of the darker band along the edges that face away from the light, in pixels, fading smoothly to nothing; untinted black, so it darkens the block's own colour.")]
+        [SerializeField] private float shadeBandPixels = 8f;
+
+        [Tooltip("Strength of the shaded band at an edge facing away squarely: its black's alpha, 0.4 darkening the colour to 0.6 of itself.")]
+        [SerializeField, Range(0f, 1f)] private float shadeAlpha = 0.4f;
 
         [Header("Bevel (rounded box, padlock, key)")]
         [Tooltip("Width of the darker line along the outline, in pixels.")]
@@ -82,21 +86,32 @@ namespace GateRush.Editor
         [SerializeField] private int studsPerCellSide = 2;
 
         [Tooltip("Diameter of a stud's top disc, in pixels. A block's face is also shortened by its lip (Runtime Config's Block Lip Cells), which this recipe cannot see: StudFitTests checks the grid fits a single cell with both.")]
-        [SerializeField] private float studDiameterPixels = 32f;
+        [SerializeField] private float studDiameterPixels = 31f;
 
         [SerializeField, Range(0f, 1f)] private float studTone = 1f;
+
+        [Tooltip("Tone of a stud's disc at its edge away from the light, easing from Stud Tone at its centre, so the disc reads as lit from Light Angle Degrees.")]
+        [SerializeField, Range(0f, 1f)] private float studShadeTone = 0.85f;
 
         [Tooltip("Width of the thin dark rim along the top of each stud's disc, in pixels; it fades out by the disc's middle.")]
         [SerializeField] private float studRingWidthPixels = 1.5f;
 
         [SerializeField, Range(0f, 1f)] private float studRingTone = 0.6f;
 
-        [Tooltip("How deep the darker crescent below each stud's disc is, in pixels: the stud's side, so it reads as a short cylinder. At least 0.")]
+        [Tooltip("How deep the darker crescent beside each stud's disc is, away from the light, in pixels: the stud's side, so it reads as a short cylinder. At least 0.")]
         [SerializeField] private float studFootDropPixels = 7f;
 
         [SerializeField, Range(0f, 1f)] private float studFootTone = 0.6f;
 
-        [Tooltip("How far each stud's disc sits above its point on the grid, in pixels, from 0 to Stud Foot Drop Pixels; the crescent hangs the rest of its depth below the point. Half the crescent centres disc and crescent on the point; a little less sits them on a face the lip shortens.")]
+        [Tooltip("How far the stud's soft shadow on the face falls beyond its crescent, away from the light, in pixels. At least 0.")]
+        [SerializeField] private float studShadowOffsetPixels = 3f;
+
+        [SerializeField, Range(0f, 1f)] private float studShadowTone = 0.7f;
+
+        [Tooltip("How far in from its outline the stud's shadow fades from nothing to full, in pixels: soft inside its edge, so it reaches no further than the offset. At least 0.")]
+        [SerializeField] private float studShadowSoftnessPixels = 2f;
+
+        [Tooltip("How far each stud's disc sits above its point on the grid, in pixels, at least 0. The crescent and the shadow fall away from the light from the disc; this balances the whole stud on a face the lip shortens.")]
         [SerializeField] private float studDiscRaisePixels = 3f;
 
         [Header("Stud gloss (never tinted by the block)")]
@@ -105,7 +120,7 @@ namespace GateRush.Editor
         [Tooltip("Where each highlight sits relative to its stud's disc's centre, in pixels.")]
         [SerializeField] private Vector2 glossOffsetPixels = new Vector2(-7f, 7f);
 
-        [Tooltip("Strength of the white light across the top of each stud's disc, fading out by its middle, so the top reads lighter than the face.")]
+        [Tooltip("Strength of the white light across each stud's disc on the side toward the light, fading out by its middle, so that side reads lighter than the face.")]
         [SerializeField, Range(0f, 1f)] private float studTopLightAlpha = 0.3f;
 
         [Tooltip("How far the highlight's edge fades out, in pixels.")]
@@ -346,17 +361,20 @@ namespace GateRush.Editor
         /// <summary>Width of the dark outline round a block, the frame and a gate, in pixels: how far a face piece sits inside its contour piece.</summary>
         public float PieceOutlinePixels => pieceOutlinePixels;
 
-        /// <summary>Width of the darker own-colour band along a face piece's edge, in pixels.</summary>
-        public float FaceEdgeBandPixels => faceEdgeBandPixels;
+        /// <summary>Where the light comes from, in degrees counter-clockwise from the right.</summary>
+        public float LightAngleDegrees => lightAngleDegrees;
 
-        /// <summary>Tone of a face piece's edge band.</summary>
-        public float FaceEdgeBandTone => faceEdgeBandTone;
+        /// <summary>Width of the lit band along edges facing the light, in pixels.</summary>
+        public float LightBandPixels => lightBandPixels;
 
-        /// <summary>Width of the shine's full-strength band, in pixels.</summary>
-        public float ShineWidthPixels => shineWidthPixels;
+        /// <summary>Alpha of the lit band's white at an edge facing the light squarely.</summary>
+        public float LightAlpha => lightAlpha;
 
-        /// <summary>How far past its band the shine fades out, in pixels.</summary>
-        public float ShineSoftnessPixels => shineSoftnessPixels;
+        /// <summary>Width of the shaded band along edges facing away from the light, in pixels.</summary>
+        public float ShadeBandPixels => shadeBandPixels;
+
+        /// <summary>Alpha of the shaded band's black at an edge facing away squarely.</summary>
+        public float ShadeAlpha => shadeAlpha;
 
         /// <summary>Width of the rounded box's, padlock's and key's darker outline line, in pixels.</summary>
         public float OutlineWidthPixels => outlineWidthPixels;
@@ -379,8 +397,20 @@ namespace GateRush.Editor
         /// <summary>How far a stud's disc sits above its grid point, in pixels.</summary>
         public float StudDiscRaisePixels => studDiscRaisePixels;
 
-        /// <summary>Strength of the white light across the top of a stud's disc.</summary>
+        /// <summary>Strength of the white light across a stud's disc toward the light.</summary>
         public float StudTopLightAlpha => studTopLightAlpha;
+
+        /// <summary>Tone of a stud's disc at its edge away from the light.</summary>
+        public float StudShadeTone => studShadeTone;
+
+        /// <summary>How far a stud's shadow falls beyond its crescent, in pixels.</summary>
+        public float StudShadowOffsetPixels => studShadowOffsetPixels;
+
+        /// <summary>Tone of a stud's shadow on the face.</summary>
+        public float StudShadowTone => studShadowTone;
+
+        /// <summary>How far in from its outline a stud's shadow fades to full, in pixels.</summary>
+        public float StudShadowSoftnessPixels => studShadowSoftnessPixels;
 
         /// <summary>How many studs a cell carries along each side.</summary>
         public int StudsPerCellSide => studsPerCellSide;
@@ -835,16 +865,29 @@ namespace GateRush.Editor
                 problems.Add($"{name}: Piece Outline Pixels must be above 0 and at most Corner Radius Pixels, so the face inside the outline keeps a rounded corner.");
             }
 
-            if (!(faceEdgeBandPixels >= 0f && pieceOutlinePixels + faceEdgeBandPixels <= inside))
+            // A light piece's bands must end before the face's straight sides
+            // meet inside its corner, where the way an edge faces would jump.
+            var faceCorner = cornerRadiusPixels - pieceOutlinePixels;
+            if (!(lightBandPixels > 0f && shadeBandPixels > 0f && Math.Max(lightBandPixels, shadeBandPixels) <= faceCorner))
             {
-                problems.Add($"{name}: Face Edge Band Pixels must be at least 0, and with Piece Outline Pixels fit inside the face ({inside}).");
+                problems.Add($"{name}: Light Band Pixels and Shade Band Pixels must be above 0 and at most the face's corner radius, Corner Radius Pixels less Piece Outline Pixels ({faceCorner}).");
             }
 
-            var faceCorner = cornerRadiusPixels - pieceOutlinePixels;
-            if (!(shineWidthPixels > 0f && shineSoftnessPixels >= 0f && shineWidthPixels + shineSoftnessPixels <= faceCorner))
+            if (!(Math.Max(lightBandPixels, shadeBandPixels) + pieceOutlinePixels <= inside))
             {
-                problems.Add($"{name}: Shine Width Pixels must be above 0 and Shine Softness Pixels at least 0, and the two together at most the face's corner radius, Corner Radius Pixels less Piece Outline Pixels ({faceCorner}).");
+                problems.Add($"{name}: Light Band Pixels and Shade Band Pixels must fit inside the face with Piece Outline Pixels ({inside}).");
             }
+        }
+
+        /// <summary>
+        /// The offset <paramref name="distance"/> pixels away from the light,
+        /// for checks only: the painter works the direction out to its own,
+        /// exactly repeatable precision.
+        /// </summary>
+        private Vector2 AwayFromLight(float distance)
+        {
+            var radians = lightAngleDegrees * Math.PI / 180.0;
+            return new Vector2((float)(-Math.Cos(radians) * distance), (float)(-Math.Sin(radians) * distance));
         }
 
         /// <summary>
@@ -875,20 +918,25 @@ namespace GateRush.Editor
                 problems.Add($"{name}: Stud Diameter Pixels plus Stud Foot Drop Pixels must be below the stud spacing, Cell Pixels divided by Studs Per Cell Side ({spacing}), so the face shows between the studs.");
             }
 
-            if (!(studDiscRaisePixels >= 0f && studDiscRaisePixels <= studFootDropPixels))
+            if (!(studDiscRaisePixels >= 0f && studShadowOffsetPixels >= 0f && studShadowSoftnessPixels >= 0f))
             {
-                problems.Add($"{name}: Stud Disc Raise Pixels must be from 0 to Stud Foot Drop Pixels, so the disc and its crescent stay on their grid point.");
+                problems.Add($"{name}: Stud Disc Raise Pixels, Stud Shadow Offset Pixels and Stud Shadow Softness Pixels must be at least 0.");
             }
 
-            // From a grid point the disc reaches its raise and its radius up,
-            // the crescent the rest of its depth and the radius down.
+            // From a grid point the disc reaches its raise and its radius; the
+            // crescent and then the shadow fall away from the light from it,
+            // their circles as large as the disc. The shadow's softness lies
+            // inside its outline, so it adds no reach.
             var studRoom = faceExtent - pieceOutlinePixels;
             var radius = studDiameterPixels / 2f;
-            var unitReach = Math.Max(studDiscRaisePixels + radius, studFootDropPixels - studDiscRaisePixels + radius);
+            var fall = AwayFromLight(studFootDropPixels + studShadowOffsetPixels);
+            var unitReach = radius + Math.Max(
+                Math.Max(studDiscRaisePixels, Math.Abs(studDiscRaisePixels + fall.y)),
+                Math.Abs(fall.x));
             var reach = (studsPerCellSide - 1) * spacing / 2f + unitReach;
             if (!(reach <= studRoom))
             {
-                problems.Add($"{name}: Studs Per Cell Side, Stud Diameter Pixels, Stud Foot Drop Pixels and Stud Disc Raise Pixels put the studs outside the face ({reach} of {studRoom} from the cell's centre).");
+                problems.Add($"{name}: Studs Per Cell Side, Stud Diameter Pixels, Stud Foot Drop Pixels, Stud Shadow Offset Pixels and Stud Disc Raise Pixels put the studs outside the face ({reach} of {studRoom} from the cell's centre).");
             }
         }
 
