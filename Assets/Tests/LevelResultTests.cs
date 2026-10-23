@@ -10,7 +10,8 @@ namespace GateRush.Tests
     /// offers the closing message instead of Next; neither offers Restart
     /// (D58); a win that could not be reported shows no gold; a free-play win
     /// offers Restart and Next only when a level follows, with no gold and no
-    /// message; a loss offers Restart alone.
+    /// message; a loss offers Restart alone, and only a campaign loss costs
+    /// a life (the Module 45 follow-up).
     /// </summary>
     public class LevelResultTests
     {
@@ -24,6 +25,7 @@ namespace GateRush.Tests
             Assert.IsTrue(result.HasNext);
             Assert.IsFalse(result.HasRestart, "a won campaign level is never replayed");
             Assert.IsFalse(result.HasClosingMessage);
+            Assert.IsFalse(result.LostLife);
         }
 
         [Test]
@@ -64,18 +66,33 @@ namespace GateRush.Tests
             Assert.AreEqual(hasNext, result.HasNext);
             Assert.IsTrue(result.HasRestart);
             Assert.IsFalse(result.HasClosingMessage, "the closing message is the campaign's alone");
+            Assert.IsFalse(result.LostLife);
         }
 
         [Test]
-        public void Loss_OffersRestartAndNothingElse()
+        public void CampaignLoss_LosesALifeAndOffersRestart()
         {
-            var result = LevelResult.Loss();
+            var result = LevelResult.CampaignLoss();
 
             Assert.IsFalse(result.IsWin);
             Assert.IsNull(result.GoldEarned);
             Assert.IsFalse(result.HasNext);
             Assert.IsTrue(result.HasRestart);
             Assert.IsFalse(result.HasClosingMessage);
+            Assert.IsTrue(result.LostLife, "a campaign loss costs a life (D57)");
+        }
+
+        [Test]
+        public void FreePlayLoss_LosesNothingAndOffersRestart()
+        {
+            var result = LevelResult.FreePlayLoss();
+
+            Assert.IsFalse(result.IsWin);
+            Assert.IsNull(result.GoldEarned);
+            Assert.IsFalse(result.HasNext);
+            Assert.IsTrue(result.HasRestart);
+            Assert.IsFalse(result.HasClosingMessage);
+            Assert.IsFalse(result.LostLife, "free play costs no life (D58)");
         }
     }
 }

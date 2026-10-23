@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,7 +7,8 @@ namespace GateRush.UI
 {
     /// <summary>
     /// Gives one graphic its theme colour from <see cref="UiConfig"/> (D69):
-    /// the icons, the coin, the heart and the background. Put it beside the
+    /// the white icons, the background and the plain highlight and ring;
+    /// never a sprite drawn in its own colours (Module 45). Put it beside the
     /// Image it tints; <see cref="FrontEnd"/> applies every one under it when
     /// it opens, and the level grid applies those of the buttons it creates.
     /// </summary>
@@ -27,10 +29,18 @@ namespace GateRush.UI
             }
         }
 
-        /// <summary>Adds this tint's path to <paramref name="missing"/> when it has no target.</summary>
+        /// <summary>
+        /// Adds this tint's path to <paramref name="missing"/> when it has no
+        /// target, and when its role is no longer declared — a coin, heart or
+        /// badge tint left from before Module 45, which would throw on apply.
+        /// </summary>
         public void AddMissing(List<string> missing)
         {
             UiParts.AddIfMissing(missing, target, $"UiTint on '{name}'", nameof(target));
+            if (!Enum.IsDefined(typeof(UiColorRole), role))
+            {
+                missing.Add($"UiTint on '{name}' has the role {(int)role}, which is no longer a colour role; remove the tint");
+            }
         }
 
         /// <summary>Applies every tint under <paramref name="root"/>, inactive ones included.</summary>

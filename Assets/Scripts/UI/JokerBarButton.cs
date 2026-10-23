@@ -37,7 +37,7 @@ namespace GateRush.UI
         [Tooltip("The ring around the button, shown while the joker is selected.")]
         [SerializeField] private GameObject ring;
 
-        [Tooltip("The joker's icon: the Icon Color while pressable, the Disabled Button Label Color while greyed, at Locked Icon Alpha while locked.")]
+        [Tooltip("The joker's icon: the Icon Color while pressable, the Disabled Joker Icon Color while greyed, at Locked Icon Alpha while locked.")]
         [SerializeField] private Image icon;
 
         [Tooltip("The lock over the icon, shown while the joker is locked in the campaign (D76).")]
@@ -78,7 +78,7 @@ namespace GateRush.UI
             coin.SetActive(state.Badge == JokerBadge.Price);
             button.interactable = state.IsInteractable;
 
-            var iconColor = state.IsInteractable ? config.IconColor : config.DisabledButtonLabelColor;
+            var iconColor = state.IsInteractable ? config.IconColor : config.DisabledJokerIconColor;
             iconColor.a *= state.IsLocked ? config.LockedIconAlpha : OpaqueAlpha;
             icon.color = iconColor;
             lockIcon.SetActive(state.IsLocked);

@@ -13,8 +13,10 @@ namespace GateRush.UI
     /// campaign win paid beside the coin, the closing message after the last
     /// campaign level, and the buttons the <see cref="LevelResult"/> offers —
     /// Next (green), Restart (blue after a free-play win, green after a
-    /// loss) and Menu (round, home icon). It has no close button: the buttons
-    /// are the way out, and Back does nothing here.
+    /// loss) and Menu (round, home icon). After a loss the middle shows a
+    /// large hourglass and, when the loss cost a life, a heart with "-1"
+    /// under it (the Module 45 follow-up). It has no close button: the
+    /// buttons are the way out, and Back does nothing here.
     /// </summary>
     /// <remarks>
     /// <para>It holds no rules: which buttons show is the bootstrap's,
@@ -42,6 +44,15 @@ namespace GateRush.UI
 
         [Tooltip("The closing message: shown after the last campaign level.")]
         [SerializeField] private TMP_Text messageLabel;
+
+        [Tooltip("The large hourglass in the panel's middle: shown after a loss.")]
+        [SerializeField] private GameObject lossArt;
+
+        [Tooltip("The heart with '-1' under the hourglass: shown after a loss that cost a life, in the campaign (D57).")]
+        [SerializeField] private GameObject lifeLost;
+
+        [Tooltip("The '-1' beside the heart.")]
+        [SerializeField] private TMP_Text lifeLostLabel;
 
         [Tooltip("The green Button Primary: shown when a level follows.")]
         [SerializeField] private Button nextButton;
@@ -87,6 +98,10 @@ namespace GateRush.UI
             messageLabel.text = config.ClosingMessage;
             messageLabel.gameObject.SetActive(result.HasClosingMessage);
 
+            lossArt.SetActive(!result.IsWin);
+            lifeLostLabel.text = config.LifeLostLabel;
+            lifeLost.SetActive(result.LostLife);
+
             nextLabel.text = config.NextButtonLabel;
             winRestartLabel.text = config.RestartButtonLabel;
             lossRestartLabel.text = config.RestartButtonLabel;
@@ -114,6 +129,9 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, goldRow, nameof(ResultOverlay), nameof(goldRow));
             UiParts.AddIfMissing(missing, goldLabel, nameof(ResultOverlay), nameof(goldLabel));
             UiParts.AddIfMissing(missing, messageLabel, nameof(ResultOverlay), nameof(messageLabel));
+            UiParts.AddIfMissing(missing, lossArt, nameof(ResultOverlay), nameof(lossArt));
+            UiParts.AddIfMissing(missing, lifeLost, nameof(ResultOverlay), nameof(lifeLost));
+            UiParts.AddIfMissing(missing, lifeLostLabel, nameof(ResultOverlay), nameof(lifeLostLabel));
             UiParts.AddIfMissing(missing, nextButton, nameof(ResultOverlay), nameof(nextButton));
             UiParts.AddIfMissing(missing, nextLabel, nameof(ResultOverlay), nameof(nextLabel));
             UiParts.AddIfMissing(missing, winRestartButton, nameof(ResultOverlay), nameof(winRestartButton));

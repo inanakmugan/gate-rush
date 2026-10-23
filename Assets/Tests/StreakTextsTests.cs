@@ -99,7 +99,7 @@ namespace GateRush.Tests
         {
             var text = StreakTexts.CurrentStreak(4, config);
 
-            Assert.AreEqual("Streak 4", text);
+            Assert.AreEqual("Streak: 4", text);
         }
 
         [Test]
@@ -107,7 +107,7 @@ namespace GateRush.Tests
         {
             var text = StreakTexts.BestStreak(7, config);
 
-            Assert.AreEqual("Best 7", text);
+            Assert.AreEqual("Best: 7", text);
         }
 
         [Test]

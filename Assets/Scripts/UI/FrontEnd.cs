@@ -5,6 +5,7 @@ using GateRush.Platform;
 using GateRush.Runtime;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 namespace GateRush.UI
 {
@@ -44,6 +45,8 @@ namespace GateRush.UI
     /// result that arrives while another tab is selected is ignored.</para>
     /// <para><b>Back</b> is the Escape key, which is also Android's back
     /// button under the Input System.</para>
+    /// <para><b>The painting</b> behind everything (Module 45) follows the
+    /// campaign level of every state shown, by the UI Config's list.</para>
     /// <para>No animation yet: screen transitions are Phase 7.</para>
     /// </remarks>
     public sealed class FrontEnd : MonoBehaviour, IFrontEnd
@@ -87,6 +90,12 @@ namespace GateRush.UI
 
         [Tooltip("Assets/Config/AvatarCatalog.asset: the avatars the top bar and Profile draw, the same asset the bootstrap holds.")]
         [SerializeField] private AvatarCatalog avatarCatalog;
+
+        [Tooltip("The painting behind everything (Module 45): the UI Config's background for the campaign level.")]
+        [SerializeField] private Image painting;
+
+        [Tooltip("Envelops the screen with the painting, cropped and centred, never stretched; its ratio follows the painting's sprite.")]
+        [SerializeField] private AspectRatioFitter paintingFit;
 
         private readonly UiNavigation navigation = new UiNavigation();
 
@@ -161,6 +170,8 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, streakBar, nameof(FrontEnd), nameof(streakBar));
             UiParts.AddIfMissing(missing, jokerIcons, nameof(FrontEnd), nameof(jokerIcons));
             UiParts.AddIfMissing(missing, avatarCatalog, nameof(FrontEnd), nameof(avatarCatalog));
+            UiParts.AddIfMissing(missing, painting, nameof(FrontEnd), nameof(painting));
+            UiParts.AddIfMissing(missing, paintingFit, nameof(FrontEnd), nameof(paintingFit));
 
             if (store != null)
             {
@@ -291,6 +302,7 @@ namespace GateRush.UI
         {
             shownState = state;
             hasShownState = true;
+            ShowPainting(state.CampaignLevelNumber);
             topBar.Show(state, config, avatarCatalog);
             home.Show(state, config);
             store.Show(state, config);
@@ -425,6 +437,22 @@ namespace GateRush.UI
             if (keyboard != null && keyboard[BackKey].wasPressedThisFrame && navigation.Back())
             {
                 ButtonPressed?.Invoke();
+            }
+        }
+
+        /// <summary>
+        /// Shows the painting for <paramref name="campaignLevelNumber"/>, null
+        /// once the campaign is over, at its own aspect ratio. The UI Config's
+        /// problems, which <see cref="MissingSetup"/> reports, guarantee one.
+        /// </summary>
+        private void ShowPainting(int? campaignLevelNumber)
+        {
+            var sprite = config.BackgroundFor(campaignLevelNumber);
+            painting.sprite = sprite;
+            if (sprite != null)
+            {
+                var size = sprite.rect.size;
+                paintingFit.aspectRatio = size.x / size.y;
             }
         }
 

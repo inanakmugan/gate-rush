@@ -9,7 +9,8 @@ namespace GateRush.UI
 {
     /// <summary>
     /// The Lives overlay (Module 35, D62): the lives as "3/5", "Full" or the
-    /// time to the next life, and the refill button with its price, pressable
+    /// time to the next life under "Next life in" (the Module 45 follow-up),
+    /// and the refill button with its price, pressable
     /// whenever the lives are not full (<see cref="FrontEndState.IsLivesFull"/>),
     /// whatever the balance: too little gold opens the Not Enough Gold prompt
     /// (Module 36). It stays open as lives come back; the player closes it.
@@ -26,6 +27,9 @@ namespace GateRush.UI
 
         [Tooltip("The lives of the cap, as '3/5'.")]
         [SerializeField] private TMP_Text livesLabel;
+
+        [Tooltip("'Next life in', above the wait; hidden while the lives are full.")]
+        [SerializeField] private TMP_Text nextLifeLabel;
 
         [Tooltip("'Full', or the time to the next life.")]
         [SerializeField] private TMP_Text statusLabel;
@@ -46,6 +50,10 @@ namespace GateRush.UI
         {
             livesLabel.text = HomeTexts.LivesFraction(state.Lives, state.LifeCap, config);
             statusLabel.text = HomeTexts.LivesStatus(state.UntilNextLife, config);
+
+            // The same question the status asks: a wait shows exactly when there is one.
+            nextLifeLabel.text = config.NextLifeLabel;
+            nextLifeLabel.gameObject.SetActive(state.UntilNextLife.HasValue);
             refillLabel.text = HomeTexts.Refill(state.RefillPrice, config);
             var canPress = !state.IsLivesFull;
             refillButton.interactable = canPress;
@@ -57,6 +65,7 @@ namespace GateRush.UI
         {
             UiParts.AddIfMissing(missing, closeButton, nameof(LivesOverlay), nameof(closeButton));
             UiParts.AddIfMissing(missing, livesLabel, nameof(LivesOverlay), nameof(livesLabel));
+            UiParts.AddIfMissing(missing, nextLifeLabel, nameof(LivesOverlay), nameof(nextLifeLabel));
             UiParts.AddIfMissing(missing, statusLabel, nameof(LivesOverlay), nameof(statusLabel));
             UiParts.AddIfMissing(missing, refillButton, nameof(LivesOverlay), nameof(refillButton));
             UiParts.AddIfMissing(missing, refillLabel, nameof(LivesOverlay), nameof(refillLabel));

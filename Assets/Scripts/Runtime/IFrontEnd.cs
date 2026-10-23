@@ -93,7 +93,7 @@ namespace GateRush.Runtime
         void ShowLives();
 
         /// <summary>
-        /// Shows <paramref name="text"/> in the line under Home's play button,
+        /// Shows <paramref name="text"/> in the line above Home's play button,
         /// selecting Home first. It stays until the tab changes or the front
         /// end is shown again.
         /// </summary>

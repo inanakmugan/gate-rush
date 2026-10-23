@@ -75,7 +75,7 @@ namespace GateRush.Tests
             SetString("timesUpTitle", "Out of time");
 
             var win = LevelPanelTexts.ResultTitle(LevelResult.FreePlayWin(true), config);
-            var loss = LevelPanelTexts.ResultTitle(LevelResult.Loss(), config);
+            var loss = LevelPanelTexts.ResultTitle(LevelResult.CampaignLoss(), config);
 
             Assert.AreEqual("Cleared", win);
             Assert.AreEqual("Out of time", loss);

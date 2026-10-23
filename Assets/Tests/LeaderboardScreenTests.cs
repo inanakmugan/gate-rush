@@ -17,8 +17,8 @@ namespace GateRush.Tests
     /// them: Loading hides the list and Retry; a failed fetch shows its line
     /// and Retry; a simulated table shows the note and one row per entry,
     /// and one that is not simulated hides the note; only the player's row
-    /// is in the highlight colour; and the first three ranks carry their
-    /// medal colours while the others have none.
+    /// is in the highlight colour; and the first three ranks carry their own
+    /// medal sprite, untinted (Module 45), while the others have none.
     /// </summary>
     /// <remarks>
     /// The screen is built from code with the fields the builder wires, so
@@ -42,10 +42,18 @@ namespace GateRush.Tests
         private TMP_Text statusLabel;
         private Button retryButton;
         private RectTransform rows;
+        private Texture2D medalTexture;
+
+        // The gold, silver and bronze medals, by rank.
+        private Sprite[] medalSprites;
 
         [SetUp]
         public void SetUp()
         {
+            medalTexture = new Texture2D(1, 1);
+            medalSprites = Enumerable.Range(0, MedalRanks)
+                .Select(_ => Sprite.Create(medalTexture, new Rect(0f, 0f, 1f, 1f), Vector2.zero))
+                .ToArray();
             config = ScriptableObject.CreateInstance<UiConfig>();
             catalog = ScriptableObject.CreateInstance<AvatarCatalog>();
             service = new StubLeaderboardService();
@@ -83,6 +91,12 @@ namespace GateRush.Tests
             Object.DestroyImmediate(rowTemplate);
             Object.DestroyImmediate(config);
             Object.DestroyImmediate(catalog);
+            foreach (var sprite in medalSprites)
+            {
+                Object.DestroyImmediate(sprite);
+            }
+
+            Object.DestroyImmediate(medalTexture);
         }
 
         [Test]
@@ -152,7 +166,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Show_Table_TheFirstThreeRanksCarryTheirMedalColours()
+        public void Show_Table_TheFirstThreeRanksCarryTheirOwnMedalUntinted()
         {
             Request();
 
@@ -166,9 +180,9 @@ namespace GateRush.Tests
                 Assert.AreEqual(LeaderboardTexts.Rank(rank, config), Part<TMP_Text>(shown[i], "rankLabel").text);
                 if (rank <= MedalRanks)
                 {
-                    config.TryGetMedalColor(rank, out var expected);
                     Assert.IsTrue(medal.gameObject.activeSelf, $"rank {rank} has a medal");
-                    Assert.AreEqual(expected, medal.color, $"rank {rank}'s medal colour");
+                    Assert.AreEqual(medalSprites[i], medal.sprite, $"rank {rank}'s own medal");
+                    Assert.AreEqual(Color.white, medal.color, $"rank {rank}'s medal is drawn in its own colours");
                 }
                 else
                 {
@@ -208,6 +222,9 @@ namespace GateRush.Tests
                 ("background", background),
                 ("rankLabel", AddText(rowTemplate.transform, "Rank")),
                 ("medal", medal),
+                ("goldMedal", medalSprites[0]),
+                ("silverMedal", medalSprites[1]),
+                ("bronzeMedal", medalSprites[2]),
                 ("avatar", avatar),
                 ("nameLabel", AddText(rowTemplate.transform, "Name")),
                 ("scoreLabel", AddText(rowTemplate.transform, "Score")));

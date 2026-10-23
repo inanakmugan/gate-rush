@@ -14,62 +14,62 @@ MonoBehaviour:
   m_EditorClassIdentifier: GateRush.Runtime::GateRush.Runtime.AvatarCatalog
   avatars:
   - id: bear
-    sprite: {fileID: 21300000, guid: ca11c4973acef6d4d90b7eb6c2186967, type: 3}
+    sprite: {fileID: 21300000, guid: 277801d57b109cb408858b169d0e9bae, type: 3}
   - id: buffalo
-    sprite: {fileID: 21300000, guid: 1e2d16f83cb53e34a8d7de3b11c14852, type: 3}
+    sprite: {fileID: 21300000, guid: cc03efa513778d24c91ba72191a7fa2e, type: 3}
   - id: chick
-    sprite: {fileID: 21300000, guid: b8b0161eaacdc6a4f9fca0bd9bfc5503, type: 3}
+    sprite: {fileID: 21300000, guid: b703c4f910c0ba34794954c03abe089e, type: 3}
   - id: chicken
-    sprite: {fileID: 21300000, guid: 84499fc1ef4e8d844a6a65f00cc258f7, type: 3}
+    sprite: {fileID: 21300000, guid: 8efdaae45804db54994a33b79e043f45, type: 3}
   - id: cow
-    sprite: {fileID: 21300000, guid: 92e807f34c498824c898cb2f55f618cc, type: 3}
+    sprite: {fileID: 21300000, guid: 0cb09837212cc474ab295544bc3a9f78, type: 3}
   - id: crocodile
-    sprite: {fileID: 21300000, guid: 0a938259856e8584ba96c27752f0a68d, type: 3}
+    sprite: {fileID: 21300000, guid: 96e298f97f5fd56489a8fe12403befc1, type: 3}
   - id: dog
-    sprite: {fileID: 21300000, guid: cf74cfe3dfa4b1f4e9f65d6aef03de3a, type: 3}
+    sprite: {fileID: 21300000, guid: 950ea9a8320c20c448cc3ddf1d22dce5, type: 3}
   - id: duck
-    sprite: {fileID: 21300000, guid: 31636a8a36a6da043ada40250d144b7c, type: 3}
+    sprite: {fileID: 21300000, guid: 1034a7d7f855d5c469a70ba63ff88a36, type: 3}
   - id: elephant
-    sprite: {fileID: 21300000, guid: 02ea02f435d5b274e9bf25483e139575, type: 3}
+    sprite: {fileID: 21300000, guid: a813eaacb5afc9d4db1fab2e21d7ac72, type: 3}
   - id: frog
-    sprite: {fileID: 21300000, guid: 5312919a05676cf4b99e8e99b6d6435a, type: 3}
+    sprite: {fileID: 21300000, guid: 8f36aeed516e222418ca7be651f1f0eb, type: 3}
   - id: giraffe
-    sprite: {fileID: 21300000, guid: 7b9c0e570aeaf984a800c4296e82ff74, type: 3}
+    sprite: {fileID: 21300000, guid: 9d5d413f3f525b64f8f2212963b7e0c5, type: 3}
   - id: goat
-    sprite: {fileID: 21300000, guid: 0a1dd62305c9e164eab2e48debedefef, type: 3}
+    sprite: {fileID: 21300000, guid: 736de1bc0526e8246910706e8b9b9fcc, type: 3}
   - id: gorilla
-    sprite: {fileID: 21300000, guid: 4f5a457f2b871684781c7668ef781817, type: 3}
+    sprite: {fileID: 21300000, guid: 7e37859f28d8e16498f4e7986bc95c83, type: 3}
   - id: hippo
-    sprite: {fileID: 21300000, guid: 8308e841aac0e044eba8302dbcbaf793, type: 3}
+    sprite: {fileID: 21300000, guid: a695d7a6c299b3040a8b8a2c98c4139a, type: 3}
   - id: horse
-    sprite: {fileID: 21300000, guid: 7e50f1339d1e0ac4986f681e9ff9c497, type: 3}
+    sprite: {fileID: 21300000, guid: 653b4452cffb04743aa538ba2b77e490, type: 3}
   - id: monkey
-    sprite: {fileID: 21300000, guid: 7054588ef8da5ed4583d1a1f5c9fb497, type: 3}
+    sprite: {fileID: 21300000, guid: c64ce5e4fd018904ea1f98e090b16bd1, type: 3}
   - id: moose
-    sprite: {fileID: 21300000, guid: 304f48397527e204aa500e9608733f0e, type: 3}
+    sprite: {fileID: 21300000, guid: e9d66c3776d613e42bcbc8709de5ad25, type: 3}
   - id: narwhal
-    sprite: {fileID: 21300000, guid: a999535835992854984fb61fa86f5686, type: 3}
+    sprite: {fileID: 21300000, guid: d849e1bfe4b510741beb62a56805f1f7, type: 3}
   - id: owl
-    sprite: {fileID: 21300000, guid: ad18eff5178384e4d8c915cc44dafaeb, type: 3}
+    sprite: {fileID: 21300000, guid: a8e4bbaff67f87d42b34e27886d59a0a, type: 3}
   - id: panda
-    sprite: {fileID: 21300000, guid: 1c0293f650fbce14096c3cb73b65bb0e, type: 3}
+    sprite: {fileID: 21300000, guid: 1e0c27073c352c3429cd29d2e8bdbef2, type: 3}
   - id: parrot
-    sprite: {fileID: 21300000, guid: 7bae98dd634fddb42ac4d0cbd8c3d363, type: 3}
+    sprite: {fileID: 21300000, guid: 83d54610de329cd4795e06e12b4d33e7, type: 3}
   - id: penguin
-    sprite: {fileID: 21300000, guid: d466001ee250a9948a49cc9a7db0f7c7, type: 3}
+    sprite: {fileID: 21300000, guid: a166d5bd85aacb441a20af702e506f04, type: 3}
   - id: pig
-    sprite: {fileID: 21300000, guid: 3d0099e740d86bb4ab535d199c67e8c3, type: 3}
+    sprite: {fileID: 21300000, guid: 021ac3490908b8940a528f512e87a95c, type: 3}
   - id: rabbit
-    sprite: {fileID: 21300000, guid: ff4923fa02bf938489f6d177bd99a07e, type: 3}
+    sprite: {fileID: 21300000, guid: 0f6db59110d83bc45bd9b0a586c54790, type: 3}
   - id: rhino
-    sprite: {fileID: 21300000, guid: 4be81831f7eae1045a0b468809976688, type: 3}
+    sprite: {fileID: 21300000, guid: ffbed739f63dde44c9f6e87f25f0dca4, type: 3}
   - id: sloth
-    sprite: {fileID: 21300000, guid: 48b3b1b7358f2314a9fbe8ba9731f5f5, type: 3}
+    sprite: {fileID: 21300000, guid: 780b7dbb896a02045ab8e579bf705872, type: 3}
   - id: snake
-    sprite: {fileID: 21300000, guid: aece84f59896ee140952138275dbe7d5, type: 3}
+    sprite: {fileID: 21300000, guid: 120c4e5ceef81014f8428e2c7e2d0a11, type: 3}
   - id: walrus
-    sprite: {fileID: 21300000, guid: 31e0d7c1ccb8fe6458eb1741296f1748, type: 3}
+    sprite: {fileID: 21300000, guid: 88e4b1a21ffa75e4280567fe50c2d83f, type: 3}
   - id: whale
-    sprite: {fileID: 21300000, guid: e28944f509cf47e46806575ef6c122a7, type: 3}
+    sprite: {fileID: 21300000, guid: 22453aa73e87c594a99ca53bc11c0da9, type: 3}
   - id: zebra
-    sprite: {fileID: 21300000, guid: 3dc62776bcd209f449d4535424fa5bea, type: 3}
+    sprite: {fileID: 21300000, guid: 297caccc87d89164e97d4448878e9096, type: 3}
