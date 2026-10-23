@@ -573,6 +573,7 @@ namespace GateRush.Tests
 
         [TestCase("Intro Font")]
         [TestCase("Intro Panel Sprite")]
+        [TestCase("Intro Text Box Sprite")]
         [TestCase("Intro Close Sprite")]
         [TestCase("Intro Close Cross Sprite")]
         public void Problems_UnassignedIntroLookAsset_IsReportedByName(string shownName)
@@ -582,18 +583,19 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} is not assigned"), string.Join(" | ", problems));
         }
 
-        [Test]
-        public void Problems_IntroPanelSpriteWithoutBorder_IsReportedByName()
+        [TestCase("introPanelSprite", "Intro Panel Sprite")]
+        [TestCase("introTextBoxSprite", "Intro Text Box Sprite")]
+        public void Problems_SlicedIntroSpriteWithoutBorder_IsReportedByName(string field, string shownName)
         {
             var texture = new Texture2D(PanelTextureSize, PanelTextureSize);
             var sprite = Sprite.Create(texture, new Rect(0f, 0f, PanelTextureSize, PanelTextureSize), Vector2.zero);
             try
             {
-                SetObject("introPanelSprite", sprite);
+                SetObject(field, sprite);
 
                 var problems = config.Problems();
 
-                Assert.That(problems, Has.Some.Contains("Intro Panel Sprite is drawn 9-sliced"), string.Join(" | ", problems));
+                Assert.That(problems, Has.Some.Contains($"{shownName} is drawn 9-sliced"), string.Join(" | ", problems));
             }
             finally
             {
@@ -602,8 +604,9 @@ namespace GateRush.Tests
             }
         }
 
-        [Test]
-        public void Problems_IntroPanelSpriteWithBorder_ReportsNothingAboutIt()
+        [TestCase("introPanelSprite", "Intro Panel Sprite")]
+        [TestCase("introTextBoxSprite", "Intro Text Box Sprite")]
+        public void Problems_SlicedIntroSpriteWithBorder_ReportsNothingAboutIt(string field, string shownName)
         {
             var texture = new Texture2D(PanelTextureSize, PanelTextureSize);
             var sprite = Sprite.Create(
@@ -611,11 +614,11 @@ namespace GateRush.Tests
                 SpriteMeshType.FullRect, Vector4.one * PanelBorder);
             try
             {
-                SetObject("introPanelSprite", sprite);
+                SetObject(field, sprite);
 
                 var problems = config.Problems();
 
-                Assert.That(problems, Has.None.Contains("Intro Panel Sprite"), string.Join(" | ", problems));
+                Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
             }
             finally
             {

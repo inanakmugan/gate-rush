@@ -6,8 +6,9 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// The avatars a player can choose (Module 38, D71): ordered entries of an
-    /// id and a sprite, the thirty Animal Pack Redux sprites in alphabetical
-    /// order, each id the file name without its extension. The save keeps the
+    /// id and a sprite, the thirty avatar discs of Assets/Art/Sprites/Avatars
+    /// in alphabetical order, each id the file name without its extension —
+    /// the same ids the Animal Pack Redux avatars had. The save keeps the
     /// id, never the position, so reordering or adding entries changes no
     /// player's avatar.
     /// </summary>

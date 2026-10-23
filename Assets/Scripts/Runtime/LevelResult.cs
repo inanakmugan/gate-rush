@@ -5,9 +5,9 @@ namespace GateRush.Runtime
     /// <summary>
     /// What the result panel shows at the end of a level (Module 41): the
     /// outcome, the gold a campaign win paid, whether Next and Restart are
-    /// offered, and whether the closing message shows after the last
-    /// campaign level. Built by the bootstrap from what it decided; the panel
-    /// only draws it.
+    /// offered, whether the closing message shows after the last campaign
+    /// level, and whether the loss cost a life (the Module 45 follow-up).
+    /// Built by the bootstrap from what it decided; the panel only draws it.
     /// </summary>
     /// <remarks>
     /// <para>A campaign win offers no Restart: a won campaign level is never
@@ -15,16 +15,19 @@ namespace GateRush.Runtime
     /// offers Restart and nothing else; whether a campaign restart has a life
     /// for it is decided when it is pressed (D57). Menu is always
     /// offered.</para>
+    /// <para>A campaign loss costs a life (D57) and free play costs none
+    /// (D58), so only <see cref="CampaignLoss"/> has <see cref="LostLife"/>.</para>
     /// </remarks>
     public readonly struct LevelResult
     {
-        private LevelResult(bool isWin, int? goldEarned, bool hasNext, bool hasRestart, bool hasClosingMessage)
+        private LevelResult(bool isWin, int? goldEarned, bool hasNext, bool hasRestart, bool hasClosingMessage, bool lostLife)
         {
             IsWin = isWin;
             GoldEarned = goldEarned;
             HasNext = hasNext;
             HasRestart = hasRestart;
             HasClosingMessage = hasClosingMessage;
+            LostLife = lostLife;
         }
 
         /// <summary>True for a won level, false for a lost one.</summary>
@@ -42,6 +45,9 @@ namespace GateRush.Runtime
         /// <summary>True after the last campaign level: the closing message shows.</summary>
         public bool HasClosingMessage { get; }
 
+        /// <summary>True after a campaign loss, which cost a life: the panel shows the heart with "-1".</summary>
+        public bool LostLife { get; }
+
         /// <summary>
         /// A campaign win: <paramref name="goldEarned"/> beside the coin — null
         /// when the win could not be reported, which shows no gold line — Next
@@ -56,13 +62,16 @@ namespace GateRush.Runtime
                 throw new ArgumentOutOfRangeException(nameof(goldEarned), goldEarned, "A win cannot pay negative gold.");
             }
 
-            return new LevelResult(true, goldEarned, hasNext, false, !hasNext);
+            return new LevelResult(true, goldEarned, hasNext, false, !hasNext, false);
         }
 
         /// <summary>A free-play win: Next when <paramref name="hasNext"/>, Restart, no gold and no closing message (D58).</summary>
-        public static LevelResult FreePlayWin(bool hasNext) => new LevelResult(true, null, hasNext, true, false);
+        public static LevelResult FreePlayWin(bool hasNext) => new LevelResult(true, null, hasNext, true, false, false);
 
-        /// <summary>A loss: Restart, and no Next, gold or closing message.</summary>
-        public static LevelResult Loss() => new LevelResult(false, null, false, true, false);
+        /// <summary>A campaign loss: Restart, and no Next, gold or closing message; it cost a life (D57).</summary>
+        public static LevelResult CampaignLoss() => new LevelResult(false, null, false, true, false, true);
+
+        /// <summary>A free-play loss: Restart, and no Next, gold or closing message; it cost nothing (D58).</summary>
+        public static LevelResult FreePlayLoss() => new LevelResult(false, null, false, true, false, false);
     }
 }

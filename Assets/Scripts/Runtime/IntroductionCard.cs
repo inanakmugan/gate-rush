@@ -189,7 +189,7 @@ namespace GateRush.Runtime
             BuildSparkles();
             top += illustrationSize.y + spacing;
 
-            BuildTextBox(top, referencePixelsPerUnit);
+            BuildTextBox(top);
 
             fittedSafeSize = Vector2.negativeInfinity;
             root.gameObject.SetActive(false);
@@ -536,29 +536,22 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The text box at the card's foot: a rounded box in the frame's colour
-        /// with a smaller cream one on it, which leaves the frame's colour as a
-        /// border, and dark text in the card's font that wraps inside the
-        /// padding. Neither box takes a press, so a tap on the text closes the
-        /// card too.
+        /// The text box at the card's foot (the Module 45 follow-up): the
+        /// theme's dark pill, 9-sliced at its own scale in its own colours, and
+        /// white text in the card's font that wraps inside the padding. The box
+        /// takes no press, so a tap on the text closes the card too.
         /// </summary>
-        private void BuildTextBox(float top, float referencePixelsPerUnit)
+        private void BuildTextBox(float top)
         {
             var size = config.IntroTextBoxSizeUnits;
-            var border = config.IntroTextBoxBorderUnits;
-            var corner = config.IntroTextBoxCornerUnits;
 
             var box = UiBuilder.CreateRect("Text box", card);
             UiBuilder.Place(box, TopMiddle, new Vector2(0f, -top), size);
-            UiBuilder.AddRoundedBox(box, size, config.RoundedRectSprite, config.FrameColor, corner, referencePixelsPerUnit)
-                .raycastTarget = false;
-
-            var fill = UiBuilder.CreateRect("Fill", box);
-            var fillSize = size - 2f * border * Vector2.one;
-            UiBuilder.PlaceCentered(fill, fillSize);
-            UiBuilder.AddRoundedBox(
-                    fill, fillSize, config.RoundedRectSprite, config.IntroTextBoxColor, corner - border, referencePixelsPerUnit)
-                .raycastTarget = false;
+            var boxImage = box.gameObject.AddComponent<Image>();
+            boxImage.sprite = config.IntroTextBoxSprite;
+            boxImage.type = Image.Type.Sliced;
+            boxImage.color = Untinted;
+            boxImage.raycastTarget = false;
 
             var label = UiBuilder.CreateRect("Text", box);
             UiBuilder.Stretch(label);

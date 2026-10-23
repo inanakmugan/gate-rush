@@ -5,30 +5,31 @@ namespace GateRush.UI
     /// graphic: the theme's colours set from code (D69). Colours that never
     /// change and are not part of the theme stay on the prefabs.
     /// </summary>
+    /// <remarks>
+    /// The values are saved in prefabs, so each keeps its number. The coin,
+    /// heart and joker badge roles (3, 4 and 7) went with Module 45: those
+    /// sprites are drawn in their own colours and are not tinted. A tint
+    /// still holding one is reported by <see cref="UiTint.AddMissing"/>. The
+    /// scrim role takes 8, so no old badge tint can be read as a scrim.
+    /// </remarks>
     public enum UiColorRole
     {
         /// <summary>The flat colour behind every tab (<see cref="UiConfig.BackgroundColor"/>).</summary>
-        Background,
+        Background = 0,
 
         /// <summary>A white icon on a button or a selected tab (<see cref="UiConfig.IconColor"/>).</summary>
-        Icon,
+        Icon = 1,
 
         /// <summary>A tab's icon while another tab is selected (<see cref="UiConfig.IdleTabIconColor"/>).</summary>
-        IdleTabIcon,
+        IdleTabIcon = 2,
 
-        /// <summary>The gold's coin (<see cref="UiConfig.CoinColor"/>).</summary>
-        Coin,
-
-        /// <summary>The lives' heart (<see cref="UiConfig.HeartColor"/>).</summary>
-        Heart,
-
-        /// <summary>The win streak's fire, the bar's fill and the next reward's highlight (<see cref="UiConfig.StreakColor"/>).</summary>
-        Streak,
+        /// <summary>The highlight behind the next reward's marker on the streak bar (<see cref="UiConfig.StreakColor"/>).</summary>
+        Streak = 5,
 
         /// <summary>The ring around the selected joker's button in a level (<see cref="UiConfig.JokerSelectedColor"/>).</summary>
-        JokerSelected,
+        JokerSelected = 6,
 
-        /// <summary>The badge on a joker button's corner in a level (<see cref="UiConfig.JokerBadgeColor"/>).</summary>
-        JokerBadge
+        /// <summary>The dim behind every overlay's panel (<see cref="UiConfig.ScrimColor"/>).</summary>
+        Scrim = 8
     }
 }

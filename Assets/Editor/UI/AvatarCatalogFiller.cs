@@ -24,8 +24,12 @@ namespace GateRush.UI.Editor
     /// </remarks>
     public static class AvatarCatalogFiller
     {
-        /// <summary>The folder the avatars are read from.</summary>
-        public const string AvatarFolder = "Assets/ThirdParty/Kenney/AnimalPackRedux/Round";
+        /// <summary>
+        /// The folder the avatars are read from: the owner's generated discs
+        /// since the Module 45 follow-up, one per id the Animal Pack Redux
+        /// avatars had, so no save's id changes.
+        /// </summary>
+        public const string AvatarFolder = InterfaceArtImportRules.AvatarFolder;
 
         /// <summary>The catalog the menu fills.</summary>
         public const string CatalogPath = "Assets/Config/AvatarCatalog.asset";

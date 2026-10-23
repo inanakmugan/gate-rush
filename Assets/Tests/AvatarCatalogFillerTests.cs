@@ -11,7 +11,8 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers Module 38's <see cref="AvatarCatalogFiller"/> over the real
-    /// Animal Pack Redux folder: thirty avatars in ordinal order of file name,
+    /// avatar folder (the generated discs since the Module 45 follow-up, with
+    /// the Animal Pack Redux ids): thirty avatars in ordinal order of file name,
     /// the first the bear; each id is its file name and each sprite its file's
     /// one sprite; and the filled catalog reports no problem. Needs every
     /// file in the folder imported as one sprite (Sprite Mode: Single).
@@ -38,7 +39,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Fill_RoundFolder_ThirtyAvatarsInOrdinalOrderFromTheBear()
+        public void Fill_AvatarFolder_ThirtyAvatarsInOrdinalOrderFromTheBear()
         {
             var ids = new List<string>();
             for (var i = 0; i < catalog.Count; i++)
@@ -55,7 +56,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Fill_RoundFolder_EachSpriteIsItsIdsFile()
+        public void Fill_AvatarFolder_EachSpriteIsItsIdsFile()
         {
             var wrong = new List<string>();
 
@@ -73,7 +74,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Fill_RoundFolder_CatalogReportsNoProblem()
+        public void Fill_AvatarFolder_CatalogReportsNoProblem()
         {
             var problems = catalog.Problems();
 

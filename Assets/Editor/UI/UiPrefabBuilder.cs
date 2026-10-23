@@ -26,7 +26,13 @@ namespace GateRush.UI.Editor
     /// Level UI, and Module 41's Result Overlay and Confirm Overlay, nested in
     /// Level UI, with Module 42's square joker buttons and Module 43's locks
     /// and glow on the joker buttons and locks on the Store's cards — from
-    /// code, with every serialized field wired.
+    /// code, with every serialized field wired. Module 45 draws them all with
+    /// the generated interface art, the joker bar about 1.4 times larger and
+    /// the front end's painting behind everything. Its follow-up lays the
+    /// Level HUD out anew under a ribbon, tints every scrim from the UI
+    /// Config, shows a loss's hourglass and lost life on the result panel,
+    /// and redraws Profile's name field and chosen avatar, the Lives
+    /// overlay's wait and the Win Streak panel.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -44,7 +50,8 @@ namespace GateRush.UI.Editor
     /// instances included, gives its graphic its <see cref="UiConfig"/>
     /// colour, so the Editor shows them as the game does; on a nested
     /// instance the colour is that instance's override. <see cref="UiTint"/>
-    /// still applies the colour at runtime.</para>
+    /// still applies the colour at runtime. A sprite drawn in its own colours
+    /// (Module 45) carries no tint and is drawn white.</para>
     /// <para>Texts the game sets from the UI Config are written with the
     /// config's values, for the same reason; texts it sets from the state
     /// are written with placeholders.</para>
@@ -68,51 +75,48 @@ namespace GateRush.UI.Editor
 
         // Inputs.
         private const string UiConfigPath = "Assets/Config/UiConfig.asset";
-        private const string PanelSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_flat.png";
-        private const string RibbonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_flat.png";
-        private const string SoundOnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOn.png";
-        private const string SoundOffSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOff.png";
-        private const string HeartSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/suit_hearts.png";
-        // Module 42: the game's own coin and pile of coins, drawn in greys so
-        // the Coin tint colours them (the Top Bar's hand-made coin is the same).
+        private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
+        private const string AvatarCatalogPath = "Assets/Config/AvatarCatalog.asset";
+
+        // Module 45 (D77): the owner's generated interface art. Every sprite
+        // here is drawn in its own colours, so it is drawn white and never
+        // tinted; the sliced ones take their borders from
+        // InterfaceArtImportRules.
+        private const string PanelSpritePath = "Assets/Art/Sprites/UI/panel.png";
+        private const string PillSpritePath = "Assets/Art/Sprites/UI/pill.png";
+        private const string RibbonSpritePath = "Assets/Art/Sprites/UI/ribbon.png";
+        private const string BarTrackSpritePath = "Assets/Art/Sprites/UI/bar_track.png";
+        private const string BarFillSpritePath = "Assets/Art/Sprites/UI/bar_fill.png";
+        private const string BadgeSpritePath = "Assets/Art/Sprites/UI/badge.png";
+        private const string RedButtonSpritePath = "Assets/Art/Sprites/UI/button_rect_red.png";
+        private const string JokerButtonSpritePath = "Assets/Art/Sprites/UI/button_square_green.png";
+        private const string JokerButtonDisabledSpritePath = "Assets/Art/Sprites/UI/button_square_grey.png";
         private const string CoinSpritePath = "Assets/Art/Sprites/UI/coin.png";
         private const string CoinStackSpritePath = "Assets/Art/Sprites/UI/coins.png";
+        private const string HeartSpritePath = "Assets/Art/Sprites/UI/heart.png";
+        private const string FireSpritePath = "Assets/Art/Sprites/UI/fire.png";
+        private const string HourglassSpritePath = "Assets/Art/Sprites/UI/hourglass.png";
+        private const string LockSpritePath = "Assets/Art/Sprites/UI/lock.png";
+        private const string GoldMedalSpritePath = "Assets/Art/Sprites/UI/medal_gold.png";
+        private const string SilverMedalSpritePath = "Assets/Art/Sprites/UI/medal_silver.png";
+        private const string BronzeMedalSpritePath = "Assets/Art/Sprites/UI/medal_bronze.png";
+        private const string RingSelectSpritePath = "Assets/Art/Sprites/UI/ring_select.png";
 
-        private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
-        private const string FireSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/fire.png";
+        // The game's own white rounded rectangle (D46), sliced: the plain
+        // shape behind a tinted highlight, ring, glow or selection, which
+        // none of the outlined pieces can be.
+        private const string PlainSpritePath = "Assets/Art/Generated/RoundedRect.png";
+
+        // The white Kenney glyphs that stay on the new buttons (Module 45):
+        // the sound looks, the phone and its cross, the marker's check, and
+        // the HUD's and the result panel's Menu (home) and Restart (return).
+        private const string SoundOnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOn.png";
+        private const string SoundOffSpritePath = "Assets/ThirdParty/Kenney/GameIcons/audioOff.png";
         private const string CheckSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/icon_checkmark.png";
-
-        private const string AvatarCatalogPath = "Assets/Config/AvatarCatalog.asset";
         private const string PhoneSpritePath = "Assets/ThirdParty/Kenney/GameIcons/phone.png";
         private const string CrossSpritePath = "Assets/ThirdParty/Kenney/GameIcons/cross.png";
-
-        // The Leaderboard's rank mark: white, tinted gold, silver and bronze at runtime.
-        private const string MedalSpritePath = "Assets/ThirdParty/Kenney/GameIcons/medal1.png";
-
-        // The streak bar's track and fill: near-white, so a tint shows true.
-        // Sliced, so it must have a border.
-        private const string BarSpritePath = "Assets/ThirdParty/Kenney/UIPack/Extra/input_rectangle.png";
-
-        // Module 40: the HUD's Menu and Restart icons and the timer's hourglass.
         private const string HomeSpritePath = "Assets/ThirdParty/Kenney/GameIcons/home.png";
         private const string ReturnSpritePath = "Assets/ThirdParty/Kenney/GameIcons/return.png";
-        private const string HourglassSpritePath = "Assets/ThirdParty/Kenney/BoardGameIcons/hourglass.png";
-
-        // Module 41: the confirmation's red button, 9-sliced as Button
-        // Primary's green face is. Its pressed look is the red flat sprite the
-        // ribbon uses (RibbonSpritePath).
-        private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
-
-        // Module 42: the joker buttons' square looks, 9-sliced as Button
-        // Primary's three are — the face, the pressed look and the grey
-        // disabled look.
-        private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
-        private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
-        private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
-
-        // Module 43: the lock over a locked joker's icon, on its button and
-        // its Store card.
-        private const string LockSpritePath = "Assets/ThirdParty/Kenney/GameIcons/locked.png";
         private const string UiLayerName = "UI";
 
         // Hand-made prefabs.
@@ -173,6 +177,7 @@ namespace GateRush.UI.Editor
         private const string LivesLabelName = "Lives";
         private const string StatusLabelName = "Status";
         private const string BackgroundName = "Background";
+        private const string PaintingName = "Painting";
         private const string SafeName = "Safe";
         private const string PagesName = "Pages";
         private const string OverlaysName = "Overlays";
@@ -248,6 +253,11 @@ namespace GateRush.UI.Editor
         private const string GoldPillName = "Gold Pill";
         private const string GoldLabelName = "Gold";
         private const string LivesPillName = "Lives Pill";
+        private const string PillsName = "Pills";
+        private const string PillName = "Pill";
+        private const string LossArtName = "Loss Art";
+        private const string LifeLostName = "Life Lost";
+        private const string NextLifeName = "Next Life";
         private const string LiftName = "Lift";
         private const string GlowName = "Glow";
         private const string LockName = "Lock";
@@ -330,36 +340,89 @@ namespace GateRush.UI.Editor
         private const int GoldEarnedPlaceholder = 50;
         private const int StreakAtRiskPlaceholder = 4;
 
+        // Module 45: the campaign level whose painting the Front End is saved
+        // with — a new save's, the first.
+        private const int PaintingLevelPlaceholder = 1;
+
         // Colours.
         private const string PageTitleColorHex = "#FFFFFF";
         private const string OverlayTextColorHex = "#3B2466";
         private const string LivesLabelColorHex = "#FFFFFF";
         private const string IconColorHex = "#FFFFFF";
         private const string RibbonLabelColorHex = "#FFFFFF";
-        private const string ScrimColorHex = "#000000";
-        private const byte ScrimAlpha = 153;
         private const string ViewportColorHex = "#FFFFFF00";
         private const string PanelColorHex = "#FFFFFF";
-
-        // The streak bar's track: a dark tint of the theme's purple.
-        private const string StreakTrackColorHex = "#2E1A52";
 
         // The cross over the haptics phone: red, since a white cross would not
         // show on the white phone.
         private const string HapticsCrossColorHex = "#E8384F";
 
-        // The ring behind the chosen avatar in Profile's grid.
-        private const string SelectedAvatarColorHex = "#FFCC33";
+        // Under Profile's name field, on the light panel: the muted hint and
+        // the refusal line, dark enough to read there (the Module 45
+        // follow-up).
+        private const string NameHintColorHex = "#5B4A85";
+        private const string NameRefusalColorHex = "#C62838";
 
-        // Under Profile's name field: the muted hint, and the refusal line.
-        private const string NameHintColorHex = "#6E7090";
-        private const string NameRefusalColorHex = "#D93A4A";
+        // In Profile's name field, on the dark pill: the white name and
+        // caret, and the selection in the theme's blue, under which the
+        // white name still reads.
+        private const string NameTextColorHex = "#FFFFFF";
+        private const string NameCaretColorHex = "#FFFFFF";
+        private const string NameSelectionColorHex = "#36A3F099";
 
-        // The HUD's pills, the top bar's pill colour, and the HUD's white
-        // text. The joker badges are tinted red from the UI Config instead
-        // (Module 42).
-        private const string PillColorHex = "#2E1A52";
+        // The "-1" beside the heart on the result panel after a campaign loss.
+        private const string LifeLostColorHex = "#E8384F";
+
+        // The pill behind the Store's test store line: the dark pill at 70
+        // percent, so the painting shows through a little.
+        private const string TestStoreNotePillColorHex = "#FFFFFFB3";
+
+        // The HUD's white text, on the dark pills.
         private const string HudTextColorHex = "#FFFFFF";
+
+        // A sliced sprite drawn in its own colours (Module 45): white, so the
+        // image changes none of them.
+        private const string OwnColorsHex = "#FFFFFF";
+
+        // Module 45: each sliced image's Pixels Per Unit Multiplier, so the
+        // sprite's borders (InterfaceArtImportRules, at 100 pixels a unit)
+        // are drawn at a size that reads on the image and fits it: a
+        // border is its pixels divided by the multiplier, in canvas units,
+        // and a border pair must stay within the image's side.
+        // The overlay panels, 820 to 900 wide: corners about 68 units.
+        private const float OverlayPanelPixelsPerUnitMultiplier = 0.8f;
+
+        // The panel on cards and rows 120 to 200 units tall: 109 of border.
+        private const float CardPanelPixelsPerUnitMultiplier = 1f;
+
+        // The streak marker's 84-unit disc: 75 units of border.
+        private const float MarkerDiscPixelsPerUnitMultiplier = 1.5f;
+
+        // The timer pill, 106 tall, and the gold and lives pills, 66 tall:
+        // 102 and 61 units of border.
+        private const float TimerPillPixelsPerUnitMultiplier = 1.2f;
+        private const float HudPillPixelsPerUnitMultiplier = 2f;
+
+        // Profile's name field, the pill 120 tall: 111 units of border.
+        private const float NameFieldPixelsPerUnitMultiplier = 1.1f;
+
+        // The Store's 220 by 52 ribbon: borders of 41 by 21 units.
+        private const float RibbonPixelsPerUnitMultiplier = 2.5f;
+
+        // The HUD's 400 by 90 ribbon: borders of 146 by 76 units.
+        private const float HudRibbonPixelsPerUnitMultiplier = 1.4f;
+
+        // The streak bar's 36-unit track and its fill: 34 units of border.
+        private const float BarPixelsPerUnitMultiplier = 1.25f;
+
+        // The joker badge, 72 square: 58 units of border.
+        private const float BadgePixelsPerUnitMultiplier = 1.4f;
+
+        // The 196-unit square joker buttons: 118 units of border.
+        private const float JokerButtonPixelsPerUnitMultiplier = 1.3f;
+
+        // The plain rounded rectangle at its own scale: 13 units of border.
+        private const float PlainPixelsPerUnitMultiplier = 1f;
 
         // Anchor and pivot coordinates: a parent's low edge, middle and high edge.
         private const float AnchorLow = 0f;
@@ -369,6 +432,15 @@ namespace GateRush.UI.Editor
         // Every scroll view: Unity's default of 1 is far too slow for the
         // mouse wheel at the 1080x1920 reference resolution.
         private const float ScrollSensitivity = 20f;
+
+        // A scroll view whose list moves under its edges fades it out over
+        // this many units at the top and bottom (RectMask2D's softness), and
+        // its list keeps at least as much padding there, so nothing is faded
+        // at rest. The Win Streak ladder keeps a hard edge: it is sized to
+        // the shipped table and does not scroll.
+        private const int SoftScrollEdgeUnits = 40;
+        private static readonly Vector2Int SoftScrollEdge = new Vector2Int(0, SoftScrollEdgeUnits);
+        private static readonly Vector2Int HardScrollEdge = Vector2Int.zero;
 
         // Store and Leaderboard pages.
         private const float PageTitleFontSize = 90f;
@@ -383,6 +455,15 @@ namespace GateRush.UI.Editor
         private const float SectionHeaderFontSize = 60f;
         private const float TestStoreNoteHeight = 120f;
         private const float TestStoreNoteFontSize = 40f;
+
+        // The test store line on the dark pill, so it reads on the painting:
+        // the text's padding inside the pill, and the column it wraps in at
+        // the 1080-unit reference. The pill is sized to the config's text when
+        // the build runs; a changed Test Store Note needs a rebuild.
+        private const float ReferenceWidth = 1080f;
+        private const float StoreColumnWidth = ReferenceWidth - (StoreSideInset + StoreSideInset);
+        private const float TestStoreNotePaddingX = 24f;
+        private const float TestStoreNotePaddingY = 10f;
 
         // Every Store card. Its width is the layout's; this one is the Gold
         // Pack Card prefab's own, for the Editor.
@@ -433,7 +514,11 @@ namespace GateRush.UI.Editor
         // this one is the prefab's own, the same, for the Editor.
         private const float AvatarCellSize = 140f;
         private const float AvatarIconInset = 6f;
-        private const float AvatarSelectedOutset = 8f;
+
+        // The chosen avatar's ring over its disc (the Module 45 follow-up):
+        // 160 across, so its hole, two thirds of it, covers the disc's rim
+        // and the ring shows outside it, within the grid's 20-unit gaps.
+        private const float AvatarSelectedOutset = 10f;
 
         // Profile overlay.
         private const float ProfilePanelWidth = 900f;
@@ -465,13 +550,20 @@ namespace GateRush.UI.Editor
         private const float ScrollTop = 160f;
         private const int LevelGridColumns = 4;
 
-        // Lives overlay.
+        // Lives overlay. Every PosY is a top edge, down from the panel's top:
+        // the heart spans 160 to 280 (its width the sprite's own aspect, so
+        // Preserve Aspect leaves no room around it), "Next life in" 310 to
+        // 370 and the wait 390 to 480, all clear of the title above and of
+        // Refill at the foot, whose top is 580.
         private const float LivesPanelWidth = 820f;
         private const float LivesPanelHeight = 800f;
-        private const float HeartSize = 240f;
+        private const float HeartHeight = 120f;
         private const float HeartPosY = -160f;
-        private const float LivesFontSize = 72f;
-        private const float StatusPosY = -420f;
+        private const float LivesOverlayCountFontSize = 48f;
+        private const float NextLifePosY = -310f;
+        private const float NextLifeHeight = 60f;
+        private const float NextLifeFontSize = 44f;
+        private const float StatusPosY = -390f;
         private const float StatusHeight = 90f;
         private const float StatusFontSize = 56f;
 
@@ -550,18 +642,20 @@ namespace GateRush.UI.Editor
         private const float LadderFontSize = 48f;
         private const float LadderStateFontSize = 44f;
 
-        // Win Streak overlay.
+        // Win Streak overlay. The Module 45 follow-up sizes the panel to the
+        // default reward table, so the rule sits LadderRuleGap under the last
+        // ladder row; a longer table scrolls.
         private const float WinStreakPanelWidth = 900f;
-        private const float WinStreakPanelHeight = 1300f;
         private const float StreakLinePosY = -160f;
         private const float StreakLineHeight = 80f;
         private const float StreakLineFontSize = 56f;
         private const float LadderTop = 270f;
-        private const float LadderBottom = 300f;
         private const float LadderSpacing = 20f;
-        private const float RulePosY = 60f;
-        private const float RuleHeight = 220f;
+        private const float RulePosY = 50f;
+        private const float RuleHeight = 160f;
         private const float RuleFontSize = 40f;
+        private const float LadderRuleGap = 20f;
+        private const float LadderBottom = RulePosY + RuleHeight + LadderRuleGap;
 
         // Streak Prize. Its width is the column's; this one is the prefab's
         // own, for the Editor.
@@ -631,79 +725,104 @@ namespace GateRush.UI.Editor
         private const float GoldPacksNoteFontSize = 40f;
 
         // Module 40: the Level HUD's row, laid out at the 1080x1920
-        // reference and scaled down by BandFit when the top band (0.14 of
-        // the screen's height, 269 units there) is smaller. Menu and Restart
-        // keep Button Round's own size; the timer pill is as tall.
+        // reference and scaled down by BandFit when the top band is smaller.
+        //
+        // The Module 45 follow-up's layout, every top measured down from the
+        // row's top: Menu and Restart, the same large Button Rounds, mirrored
+        // at the sides; centred, the ribbon with the level label, the timer
+        // pill under it with the hourglass hanging off its left end, and the
+        // gold and lives pills under that, side by side about the centre,
+        // their icons larger than the pill and hanging off its left end. The
+        // hourglass reaches 99 to 215, the pill icons 218 to 304, inside the
+        // 306-unit row, which the top band (0.16 of the screen's height, 307
+        // units at the reference) holds unscaled. The lives heart's overhang,
+        // 34 units, stays inside the 90-unit gap between the pills.
         private const float HudRowWidth = 1080f;
-        private const float HudRowHeight = 250f;
+        private const float HudRowHeight = 306f;
         private const float HudSideInset = 40f;
-        private const float HudTopInset = 20f;
-        private const float HudButtonGap = 20f;
-        private const float TimerPillWidth = 300f;
-        private const float TimerPillHeight = 110f;
-        private const float HourglassSize = 70f;
-        private const float HourglassInset = 20f;
-        private const float TimerDigitsLeft = 100f;
-        private const float TimerDigitsRight = 20f;
+        private const float HudButtonTop = 16f;
+        private const float HudButtonSize = 160f;
+        private const float HudRibbonTop = 6f;
+        private const float HudRibbonWidth = 400f;
+        private const float HudRibbonHeight = 90f;
+
+        // The level label on the ribbon's face: in from the folded tails, and
+        // raised onto the face, which sits above the tails' tips.
+        private const float RibbonLabelInset = 50f;
+        private const float RibbonLabelRaise = 8f;
+        private const float LevelLabelFontSize = 48f;
+        private const float HudTimerTop = 106f;
+        private const float TimerPillWidth = 320f;
+        private const float TimerPillHeight = 106f;
         private const float TimerFontSize = 64f;
         private const float TimeBonusGap = 16f;
-        private const float TimeBonusWidth = 200f;
+        private const float TimeBonusWidth = 160f;
         private const float TimeBonusFontSize = 64f;
-        private const float LevelLabelWidth = 300f;
-        private const float LevelLabelFontSize = 60f;
-        private const float HudRowGap = 16f;
-        private const float HudPillRowTop = HudTopInset + TimerPillHeight + HudRowGap;
-        private const float HudPillWidth = 300f;
-        private const float HudPillHeight = 80f;
-        private const float HudPillGap = 24f;
-        private const float PillIconInset = 12f;
-        private const float PillCoinSize = 60f;
-        private const float PillLabelLeft = 84f;
-        private const float PillFontSize = 48f;
-        private const float PillHeartInset = 10f;
-        private const float PillHeartSize = 70f;
-        private const float PillLivesCountFontSize = 40f;
-        private const float PillStatusLeft = 90f;
+        private const float HudPillRowTop = 228f;
+        private const float HudPillWidth = 270f;
+        private const float HudPillHeight = 66f;
+        private const float HudPillGap = 90f;
+        private const float PillFontSize = 44f;
+        /// <summary>
+        /// The lives count inside the heart, on the Level HUD and — through
+        /// <see cref="HandMadePrefabSettings"/> — on the hand-made Top Bar.
+        /// </summary>
+        public const float LivesCountFontSize = 38f;
         private const float PillStatusFontSize = 40f;
 
-        // Module 40: the Joker Bar's row, laid out at the reference and
-        // scaled down by BandFit when the bottom band (0.10 of the screen's
-        // height, 192 units there) is smaller. Each slot sits a little low,
-        // so the selected button has room to rise with its ring.
-        //
-        // Module 42: each slot is a square button. The square sprites are 128
-        // pixels with an 8-pixel depth strip at the foot, drawn 9-sliced at
-        // one unit a pixel, so the strip is JokerFaceDepth units at any size
-        // and the icon is raised by half of it to sit centred on the face.
-        // The badge hangs BadgeOutset past the bottom-right corner; it is a
-        // BadgeSize square for a count and widens leftwards for a price. In
-        // the 190-unit row the raised ring's top reaches
-        // 70 - 10 + 20 + 8 = 88 and the badge's foot -70 - 10 - 12 = -92,
-        // both inside the row's 95.
-        private const float JokerRowWidth = 1080f;
-        private const float JokerRowHeight = 190f;
-        private const float JokerButtonSize = 140f;
-        private const float JokerSlotGap = 140f;
-        private const float JokerSlotDrop = 10f;
-        private const float JokerRaise = 20f;
-        private const float JokerRingOutset = 8f;
-        private const float JokerFaceDepth = 8f;
-        private const float JokerIconSize = 96f;
-        private const float BadgeSize = 52f;
-        private const float BadgeOutset = 12f;
-        private const int BadgePadding = 10;
-        private const float BadgeSpacing = 4f;
-        private const float BadgeCoinSize = 40f;
-        private const float BadgeFontSize = 40f;
+        // An icon hanging off a HUD pill's left end: its height as a share of
+        // the pill's — the hourglass a little taller than the timer, the coin
+        // and the heart about 1.3 times their pills — and the share of its
+        // width outside the pill. The pill's text is centred between the
+        // icon's right edge, PillTextGap further in, and PillTextInset from
+        // the pill's right end.
+        private const float HourglassHeightShare = 1.1f;
+        private const float PillIconHeightShare = 1.3f;
+        private const float PillIconOutsideShare = 0.35f;
+        private const float PillTextGap = 8f;
+        private const float PillTextInset = 16f;
 
-        // Module 43: a locked joker's lock, centred on its 96-unit icon, and
-        // a marked joker's glow behind the button. With a 12-unit outset a
-        // raised glow's top reaches 70 - 10 + 20 + 12 = 92, inside the row's
-        // 95; the pulse scales only the button, whose raised top at the
-        // UI Config's default 1.06 is 74.2 - 10 + 20 = 84.2. "Lv 15" widens
-        // the badge to about 120 units, within the 140-unit button.
-        private const float JokerLockSize = 56f;
-        private const float JokerGlowOutset = 12f;
+        // Module 40: the Joker Bar's row, laid out at the reference and
+        // scaled down by BandFit when the bottom band (0.14 of the screen's
+        // height since Module 45, 269 units at the 1920-unit reference) is
+        // smaller.
+        //
+        // Module 45 (the Samsung M33 note): the square buttons, the badge,
+        // the icon and the lock are about 1.4 times Module 42's, the gap
+        // between the buttons too. Each slot stands JokerBottomClearance
+        // above the row's foot under its badge, so the bar sits off the
+        // screen's bottom edge: its centre is -136 + 22 + 16 + 98 = 0. In
+        // the 272-unit row the raised glow's top reaches 98 + 20 + 16 = 134,
+        // the raised ring's 129, and a raised button at the UI Config's
+        // default pulse of 1.06 reaches 103.9 + 20 = 123.9, all inside the
+        // row's 136. The outer badge's right edge is at 392 + 98 + 16 = 506,
+        // inside the row's 540. "Lv 15" widens the badge to about 170 units,
+        // within the 196-unit button.
+        //
+        // The square sprite has 29 pixels of outline and lip at its foot and
+        // 15 of outline at its top; drawn at JokerButtonPixelsPerUnitMultiplier
+        // the face's middle sits (29 - 15) / 2 / 1.3, about 6 units, above
+        // the button's, so the icon is raised by JokerIconRaise.
+        private const float JokerRowWidth = 1080f;
+        private const float JokerRowHeight = 272f;
+        private const float JokerButtonSize = 196f;
+        private const float JokerSlotGap = 196f;
+        private const float JokerBottomClearance = 22f;
+        private const float JokerRaise = 20f;
+        private const float JokerRingOutset = 11f;
+        private const float JokerIconRaise = 6f;
+        private const float JokerIconSize = 134f;
+        private const float BadgeSize = 72f;
+        private const float BadgeOutset = 16f;
+        private const int BadgePadding = 14;
+        private const float BadgeSpacing = 6f;
+        private const float BadgeCoinSize = 56f;
+        private const float BadgeFontSize = 56f;
+
+        // Module 43: a locked joker's lock, centred on its icon, and a marked
+        // joker's glow behind the button (the extents above include it).
+        private const float JokerLockSize = 78f;
+        private const float JokerGlowOutset = 16f;
 
         // Module 43: a locked joker's lock on its Store card, centred on the
         // 140-unit card icon.
@@ -711,9 +830,7 @@ namespace GateRush.UI.Editor
 
         // Module 41: the result panel. Under the title, the gold row (coin and
         // amount, centred) and the closing message; at the foot, one centred
-        // row of Next, the two Restarts (one shows at a time) and Menu, which
-        // keeps Button Round's own size. The widest row, Next, Restart and
-        // Menu, is 320 + 320 + 110 + 2 x 30 = 810 units.
+        // row of Next, the two Restarts (one shows at a time) and Menu.
         private const float ResultPanelWidth = 900f;
         private const float ResultPanelHeight = 680f;
         private const float GoldRowPosY = -170f;
@@ -727,6 +844,18 @@ namespace GateRush.UI.Editor
         private const float ResultButtonWidth = 320f;
         private const float ResultButtonHeight = 140f;
         private const float ResultButtonGap = 30f;
+
+        // The Module 45 follow-up: Menu close to the rectangular buttons'
+        // height, so the widest row is 320 + 320 + 130 + 2 x 30 = 830 units;
+        // and after a loss, between the title and the buttons, the large
+        // hourglass and, under it, the heart with "-1".
+        private const float ResultMenuButtonSize = 130f;
+        private const float LossHourglassTop = 165f;
+        private const float LossHourglassSize = 180f;
+        private const float LifeLostRowTop = 355f;
+        private const float LifeLostRowHeight = 90f;
+        private const float LifeLostSpacing = 16f;
+        private const float LifeLostFontSize = 64f;
 
         // Module 41: the confirmation. The line under the title; Keep playing
         // at the foot and Lose a life above it, both at Button Primary's own
@@ -844,6 +973,11 @@ namespace GateRush.UI.Editor
         private const string ProfileField = "profile";
         private const string AvatarCatalogField = "avatarCatalog";
         private const string BackgroundField = "background";
+        private const string PaintingField = "painting";
+        private const string PaintingFitField = "paintingFit";
+        private const string GoldMedalField = "goldMedal";
+        private const string SilverMedalField = "silverMedal";
+        private const string BronzeMedalField = "bronzeMedal";
         private const string RankLabelField = "rankLabel";
         private const string MedalField = "medal";
         private const string AvatarField = "avatar";
@@ -878,6 +1012,10 @@ namespace GateRush.UI.Editor
         private const string PanelField = "panel";
         private const string GoldRowField = "goldRow";
         private const string MessageLabelField = "messageLabel";
+        private const string LossArtField = "lossArt";
+        private const string LifeLostField = "lifeLost";
+        private const string LifeLostLabelField = "lifeLostLabel";
+        private const string NextLifeLabelField = "nextLifeLabel";
         private const string NextButtonField = "nextButton";
         private const string NextLabelField = "nextLabel";
         private const string WinRestartButtonField = "winRestartButton";
@@ -1027,7 +1165,7 @@ namespace GateRush.UI.Editor
             UiBuilder.PlaceCentered(rect, new Vector2(CardPreviewWidth, CardHeight));
             AddCardFrame(rect, sources);
 
-            AddCardIcon(rect, sources.CoinStack, IconColorHex, UiColorRole.Coin);
+            AddCardIcon(rect, sources.CoinStack);
 
             var amountRect = UiBuilder.CreateRect(AmountName, rect);
             CardTextBand(amountRect, AnchorLow, AnchorHigh);
@@ -1036,10 +1174,7 @@ namespace GateRush.UI.Editor
 
             var ribbon = UiBuilder.CreateRect(RibbonName, rect);
             UiBuilder.Place(ribbon, new Vector2(AnchorLow, AnchorHigh), Vector2.zero, new Vector2(RibbonWidth, RibbonHeight));
-            var ribbonImage = ribbon.gameObject.AddComponent<Image>();
-            ribbonImage.sprite = sources.Ribbon;
-            ribbonImage.type = Image.Type.Sliced;
-            ribbonImage.raycastTarget = false;
+            AddSliced(ribbon, sources.Ribbon, OwnColorsHex, RibbonPixelsPerUnitMultiplier);
             var ribbonLabelRect = UiBuilder.CreateRect(RibbonLabelName, ribbon);
             UiBuilder.Stretch(ribbonLabelRect);
             var ribbonLabel = AddText(
@@ -1072,12 +1207,12 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(scroll);
             scroll.offsetMax = new Vector2(0f, PageTitlePosY - PageTitleHeight);
 
-            var viewport = AddViewport(scroll);
+            var viewport = AddViewport(scroll, SoftScrollEdge);
 
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, StoreSideInset, 0f, 0f);
             var layout = AddColumn(content);
-            layout.padding = new RectOffset(0, 0, 0, StoreBottomPadding);
+            layout.padding = new RectOffset(0, 0, SoftScrollEdgeUnits, StoreBottomPadding);
             var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -1095,10 +1230,10 @@ namespace GateRush.UI.Editor
 
             var livesHeader = AddSectionLine(content, sources, LivesHeaderName, config.LivesHeader, SectionHeaderHeight, SectionHeaderFontSize, false);
             var livesCard = BuildItemCard(
-                content, sources, LivesCardName, sources.Heart, IconColorHex, UiColorRole.Heart, RefillLivesText,
+                content, sources, LivesCardName, sources.Heart, RefillLivesText,
                 config.LivesFullLabel, config.LivesFullLabel);
 
-            var note = AddSectionLine(content, sources, TestStoreNoteName, config.TestStoreNote, TestStoreNoteHeight, TestStoreNoteFontSize, true);
+            var note = AddTestStoreNote(content, sources, config.TestStoreNote);
 
             var scrollRect = AddVerticalScroll(scroll, viewport, content);
 
@@ -1131,14 +1266,14 @@ namespace GateRush.UI.Editor
             var root = CreateRoot(LeaderboardRowName, scene, sources.Layer);
             var rect = (RectTransform)root.transform;
             UiBuilder.PlaceCentered(rect, new Vector2(LeaderboardRowPreviewWidth, LeaderboardRowHeight));
-            var background = AddSliced(rect, sources.Panel, PanelColorHex);
+            var background = AddSliced(rect, sources.Panel, PanelColorHex, CardPanelPixelsPerUnitMultiplier);
             background.color = config.LeaderboardRowColor;
             root.AddComponent<LayoutElement>().preferredHeight = LeaderboardRowHeight;
 
-            config.TryGetMedalColor(RankPlaceholder, out var medalColor);
+            // The placeholder is the first rank, so it shows the gold medal.
             var medal = UiBuilder.CreateRect(MedalName, rect);
             UiBuilder.Place(medal, new Vector2(AnchorLow, AnchorMid), new Vector2(RowMedalLeft, 0f), new Vector2(RowMedalSize, RowMedalSize));
-            var medalImage = UiBuilder.AddIcon(medal, sources.Medal, medalColor);
+            var medalImage = UiBuilder.AddIcon(medal, sources.GoldMedal, ParseColor(IconColorHex));
 
             var rank = UiBuilder.CreateRect(RankName, rect);
             UiBuilder.SetAnchors(rank, new Vector2(AnchorLow, AnchorLow), new Vector2(AnchorLow, AnchorHigh));
@@ -1155,8 +1290,7 @@ namespace GateRush.UI.Editor
 
             var coin = UiBuilder.CreateRect(CoinName, rect);
             UiBuilder.Place(coin, new Vector2(AnchorHigh, AnchorMid), new Vector2(-RowCoinRight, 0f), new Vector2(RowCoinSize, RowCoinSize));
-            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
 
             var score = UiBuilder.CreateRect(ScoreName, rect);
             UiBuilder.SetAnchors(score, new Vector2(AnchorHigh, AnchorLow), new Vector2(AnchorHigh, AnchorHigh));
@@ -1171,6 +1305,9 @@ namespace GateRush.UI.Editor
                 (BackgroundField, background),
                 (RankLabelField, rankLabel),
                 (MedalField, medalImage),
+                (GoldMedalField, sources.GoldMedal),
+                (SilverMedalField, sources.SilverMedal),
+                (BronzeMedalField, sources.BronzeMedal),
                 (AvatarField, avatarImage),
                 (NameLabelField, nameLabel),
                 (ScoreLabelField, scoreLabel));
@@ -1196,12 +1333,12 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(scroll);
             scroll.offsetMin = new Vector2(LeaderboardInset, LeaderboardInset);
             scroll.offsetMax = new Vector2(-LeaderboardInset, -LeaderboardListTop);
-            var viewport = AddViewport(scroll);
+            var viewport = AddViewport(scroll, SoftScrollEdge);
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
             var layout = AddColumn(content);
             layout.spacing = LeaderboardRowSpacing;
-            layout.padding = new RectOffset(0, 0, 0, LeaderboardListBottomPadding);
+            layout.padding = new RectOffset(0, 0, SoftScrollEdgeUnits, LeaderboardListBottomPadding);
             var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -1239,25 +1376,22 @@ namespace GateRush.UI.Editor
             RectTransform parent, Sources sources, string name, JokerKind kind, string subText, string priceText)
         {
             return BuildItemCard(
-                parent, sources, name, sources.JokerIcons.IconOf(kind), OverlayTextColorHex, null,
-                sources.Config.JokerName(kind), subText, priceText);
+                parent, sources, name, sources.JokerIcons.IconOf(kind), sources.Config.JokerName(kind), subText, priceText);
         }
 
         /// <summary>
-        /// A Store card bought for gold: the icon — tinted by
-        /// <paramref name="role"/> when it has one, else drawn in
-        /// <paramref name="iconColorHex"/> — with the lock over it, saved
-        /// hidden (Module 43; the lives card's is never shown), the name, the
-        /// line under it, and the buy button with the coin beside its label.
+        /// A Store card bought for gold: the icon, in its own colours, with
+        /// the lock over it, saved hidden (Module 43; the lives card's is
+        /// never shown), the name, the line under it, and the buy button with
+        /// the coin beside its label.
         /// </summary>
         private static StoreItemCard BuildItemCard(
-            RectTransform parent, Sources sources, string name, Sprite icon, string iconColorHex, UiColorRole? role,
-            string title, string subText, string priceText)
+            RectTransform parent, Sources sources, string name, Sprite icon, string title, string subText, string priceText)
         {
             var card = UiBuilder.CreateRect(name, parent);
             AddCardFrame(card, sources);
-            var iconImage = AddCardIcon(card, icon, iconColorHex, role);
-            var lockIcon = AddLock(iconImage.rectTransform, sources, CardLockSize, OverlayTextColorHex);
+            var iconImage = AddCardIcon(card, icon);
+            var lockIcon = AddLock(iconImage.rectTransform, sources, CardLockSize);
 
             var nameRect = UiBuilder.CreateRect(CardNameLabelName, card);
             CardTextBand(nameRect, AnchorMid, AnchorHigh);
@@ -1276,8 +1410,7 @@ namespace GateRush.UI.Editor
             // to make room for it.
             var coin = UiBuilder.CreateRect(CoinName, button);
             UiBuilder.Place(coin, new Vector2(AnchorLow, AnchorMid), new Vector2(ButtonCoinInset, 0f), new Vector2(ButtonCoinSize, ButtonCoinSize));
-            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
             var labelRect = priceLabel.rectTransform;
             labelRect.offsetMin += new Vector2(ButtonLabelCoinShift, 0f);
             Record(labelRect);
@@ -1376,7 +1509,7 @@ namespace GateRush.UI.Editor
             scroll.offsetMin = new Vector2(ScrollInset, ScrollInset);
             scroll.offsetMax = new Vector2(-ScrollInset, -ScrollTop);
 
-            var viewport = AddViewport(scroll);
+            var viewport = AddViewport(scroll, SoftScrollEdge);
 
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
@@ -1400,13 +1533,19 @@ namespace GateRush.UI.Editor
             var frame = BuildOverlayFrame(scene, sources, LivesOverlayName, LivesTitle, LivesPanelWidth, LivesPanelHeight, true);
 
             var heart = UiBuilder.CreateRect(HeartName, frame.Panel);
-            UiBuilder.Place(heart, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, HeartPosY), new Vector2(HeartSize, HeartSize));
-            var heartImage = UiBuilder.AddIcon(heart, sources.Heart, ParseColor(IconColorHex));
-            AddTint(heart.gameObject, heartImage, UiColorRole.Heart);
+            var heartWidth = HeartHeight * sources.Heart.rect.width / sources.Heart.rect.height;
+            UiBuilder.Place(heart, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, HeartPosY), new Vector2(heartWidth, HeartHeight));
+            UiBuilder.AddIcon(heart, sources.Heart, ParseColor(IconColorHex));
 
             var livesRect = UiBuilder.CreateRect(LivesLabelName, heart);
             UiBuilder.Stretch(livesRect);
-            var livesLabel = AddText(livesRect, sources, LivesPlaceholder, LivesFontSize, LivesLabelColorHex);
+            var livesLabel = AddText(livesRect, sources, LivesPlaceholder, LivesOverlayCountFontSize, LivesLabelColorHex);
+
+            // Saved hidden with the lives full, as the status placeholder shows.
+            var nextLifeRect = UiBuilder.CreateRect(NextLifeName, frame.Panel);
+            TopStretch(nextLifeRect, 0f, NextLifePosY, NextLifeHeight);
+            var nextLifeLabel = AddText(nextLifeRect, sources, sources.Config.NextLifeLabel, NextLifeFontSize, OverlayTextColorHex);
+            nextLifeRect.gameObject.SetActive(false);
 
             var statusRect = UiBuilder.CreateRect(StatusLabelName, frame.Panel);
             TopStretch(statusRect, 0f, StatusPosY, StatusHeight);
@@ -1421,6 +1560,7 @@ namespace GateRush.UI.Editor
                 overlay,
                 (CloseButtonField, frame.Close),
                 (LivesLabelField, livesLabel),
+                (NextLifeLabelField, nextLifeLabel),
                 (StatusLabelField, statusLabel),
                 (RefillButtonField, Single<Button>(refill.gameObject, ButtonPrimaryName)),
                 (RefillLabelField, refillLabel));
@@ -1434,8 +1574,7 @@ namespace GateRush.UI.Editor
 
             var stack = UiBuilder.CreateRect(CoinStackName, frame.Panel);
             UiBuilder.Place(stack, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, CoinStackPosY), new Vector2(CoinStackSize, CoinStackSize));
-            var stackImage = UiBuilder.AddIcon(stack, sources.CoinStack, ParseColor(IconColorHex));
-            AddTint(stack.gameObject, stackImage, UiColorRole.Coin);
+            UiBuilder.AddIcon(stack, sources.CoinStack, ParseColor(IconColorHex));
 
             var shortfallRect = UiBuilder.CreateRect(ShortfallName, frame.Panel);
             TopStretch(shortfallRect, OverlayTextInset, ShortfallPosY, ShortfallHeight);
@@ -1531,17 +1670,17 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(highlight);
             highlight.offsetMin = new Vector2(-MarkerHighlightOutset, -MarkerHighlightOutset);
             highlight.offsetMax = new Vector2(MarkerHighlightOutset, MarkerHighlightOutset);
-            var highlightImage = AddSliced(highlight, sources.Panel, PanelColorHex);
+            var highlightImage = AddSliced(highlight, sources.Plain, PanelColorHex, PlainPixelsPerUnitMultiplier);
             AddTint(highlight.gameObject, highlightImage, UiColorRole.Streak);
             highlight.gameObject.SetActive(false);
 
             var disc = UiBuilder.CreateRect(DiscName, rect);
             UiBuilder.Stretch(disc);
-            AddSliced(disc, sources.Panel, PanelColorHex);
+            AddSliced(disc, sources.Panel, PanelColorHex, MarkerDiscPixelsPerUnitMultiplier);
 
             var icon = UiBuilder.CreateRect(IconName, rect);
             UiBuilder.PlaceCentered(icon, new Vector2(MarkerIconSize, MarkerIconSize));
-            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(JokerKind.Rocket), ParseColor(OverlayTextColorHex));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(JokerKind.Rocket), ParseColor(IconColorHex));
 
             var count = UiBuilder.CreateRect(CountName, rect);
             UiBuilder.Place(count, new Vector2(AnchorHigh, AnchorLow), Vector2.zero, new Vector2(MarkerCountWidth, MarkerCountHeight));
@@ -1574,14 +1713,13 @@ namespace GateRush.UI.Editor
             var root = CreateRoot(StreakBarName, scene, sources.Layer);
             var rect = (RectTransform)root.transform;
             UiBuilder.PlaceCentered(rect, new Vector2(StreakBarPreviewWidth, StreakBarPreviewHeight));
-            var background = AddSliced(rect, sources.Panel, PanelColorHex);
+            var background = AddSliced(rect, sources.Panel, PanelColorHex, CardPanelPixelsPerUnitMultiplier);
             background.raycastTarget = true;
             var button = UiBuilder.AddButton(rect, background);
 
             var fire = UiBuilder.CreateRect(FireName, rect);
             UiBuilder.Place(fire, new Vector2(AnchorLow, AnchorMid), new Vector2(FireInset, 0f), new Vector2(FireSize, FireSize));
-            var fireImage = UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
-            AddTint(fire.gameObject, fireImage, UiColorRole.Streak);
+            UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
 
             var count = UiBuilder.CreateRect(CountName, rect);
             UiBuilder.Place(count, new Vector2(AnchorLow, AnchorMid), new Vector2(StreakCountLeft, 0f), new Vector2(StreakCountWidth, FireSize));
@@ -1595,12 +1733,11 @@ namespace GateRush.UI.Editor
             track.pivot = new Vector2(AnchorMid, AnchorMid);
             track.offsetMin = new Vector2(TrackLeft, TrackRaise - TrackHeight / 2f);
             track.offsetMax = new Vector2(-TrackRight, TrackRaise + TrackHeight / 2f);
-            AddSliced(track, sources.Bar, StreakTrackColorHex);
+            AddSliced(track, sources.BarTrack, OwnColorsHex, BarPixelsPerUnitMultiplier);
 
             var fill = UiBuilder.CreateRect(FillName, track);
             UiBuilder.SetAnchors(fill, new Vector2(AnchorLow, AnchorLow), new Vector2(placeholder.Fill, AnchorHigh));
-            var fillImage = AddSliced(fill, sources.Bar, PanelColorHex);
-            AddTint(fill.gameObject, fillImage, UiColorRole.Streak);
+            AddSliced(fill, sources.BarFill, OwnColorsHex, BarPixelsPerUnitMultiplier);
 
             var markers = UiBuilder.CreateRect(MarkersName, track);
             UiBuilder.Stretch(markers);
@@ -1632,7 +1769,7 @@ namespace GateRush.UI.Editor
             var root = CreateRoot(StreakLadderRowName, scene, sources.Layer);
             var rect = (RectTransform)root.transform;
             UiBuilder.PlaceCentered(rect, new Vector2(LadderRowPreviewWidth, LadderRowHeight));
-            AddSliced(rect, sources.Panel, PanelColorHex);
+            AddSliced(rect, sources.Panel, PanelColorHex, CardPanelPixelsPerUnitMultiplier);
             root.AddComponent<LayoutElement>().preferredHeight = LadderRowHeight;
 
             var wins = UiBuilder.CreateRect(WinsName, rect);
@@ -1644,7 +1781,7 @@ namespace GateRush.UI.Editor
 
             var icon = UiBuilder.CreateRect(IconName, rect);
             UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(LadderIconLeft, 0f), new Vector2(LadderIconSize, LadderIconSize));
-            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(reward.Joker), ParseColor(OverlayTextColorHex));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(reward.Joker), ParseColor(IconColorHex));
 
             var rewardLabel = AddBandText(
                 rect, sources, RewardName, LadderRewardLeft, LadderRewardRight, StreakTexts.LadderReward(reward, config), LadderFontSize);
@@ -1675,7 +1812,8 @@ namespace GateRush.UI.Editor
         private static GameObject BuildWinStreakOverlay(Scene scene, Sources sources, GameObject rowAsset)
         {
             var config = sources.Config;
-            var frame = BuildOverlayFrame(scene, sources, WinStreakOverlayName, WinStreakTitle, WinStreakPanelWidth, WinStreakPanelHeight, true);
+            var frame = BuildOverlayFrame(
+                scene, sources, WinStreakOverlayName, WinStreakTitle, WinStreakPanelWidth, WinStreakPanelHeight(), true);
 
             var streak = UiBuilder.CreateRect(StreakName, frame.Panel);
             TopStretch(streak, 0f, StreakLinePosY, StreakLineHeight);
@@ -1691,7 +1829,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(scroll);
             scroll.offsetMin = new Vector2(ScrollInset, LadderBottom);
             scroll.offsetMax = new Vector2(-ScrollInset, -LadderTop);
-            var viewport = AddViewport(scroll);
+            var viewport = AddViewport(scroll, HardScrollEdge);
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
             var layout = AddColumn(content);
@@ -1717,6 +1855,17 @@ namespace GateRush.UI.Editor
             return frame.Root;
         }
 
+        /// <summary>
+        /// The Win Streak panel's height (the Module 45 follow-up): the header,
+        /// the ladder of the default reward table (D61) and the rule under it,
+        /// so no gap is left between them; a longer table scrolls.
+        /// </summary>
+        private static float WinStreakPanelHeight()
+        {
+            var rows = PlaceholderStreakRewards().Length;
+            return LadderTop + rows * LadderRowHeight + (rows - 1) * LadderSpacing + LadderBottom;
+        }
+
         /// <summary>One line of the Streak Reward overlay: a joker's icon and "+1 Rocket".</summary>
         private static GameObject BuildStreakPrize(Scene scene, Sources sources)
         {
@@ -1728,7 +1877,7 @@ namespace GateRush.UI.Editor
 
             var icon = UiBuilder.CreateRect(IconName, rect);
             UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(PrizeIconLeft, 0f), new Vector2(PrizeIconSize, PrizeIconSize));
-            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(prize.Joker), ParseColor(OverlayTextColorHex));
+            var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(prize.Joker), ParseColor(IconColorHex));
 
             var label = AddBandText(
                 rect, sources, PrizeLabelName, PrizeLabelLeft, PrizeLabelRight, StreakTexts.Prize(prize, sources.Config), PrizeFontSize);
@@ -1750,8 +1899,7 @@ namespace GateRush.UI.Editor
 
             var fire = UiBuilder.CreateRect(FireName, frame.Panel);
             UiBuilder.Place(fire, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, RewardFirePosY), new Vector2(RewardFireSize, RewardFireSize));
-            var fireImage = UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
-            AddTint(fire.gameObject, fireImage, UiColorRole.Streak);
+            UiBuilder.AddIcon(fire, sources.Fire, ParseColor(IconColorHex));
 
             var headline = UiBuilder.CreateRect(HeadlineName, frame.Panel);
             TopStretch(headline, OverlayTextInset, HeadlinePosY, HeadlineHeight);
@@ -1781,21 +1929,15 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// One cell of Profile's avatar grid, the prefab Profile instantiates
-        /// per avatar: the ring behind (shown on the chosen one) and the
-        /// avatar, which takes the press for the button on the root.
+        /// per avatar: the avatar's disc, which takes the press for the button
+        /// on the root, and over it the gold ring (shown on the chosen one; the
+        /// Module 45 follow-up), drawn in its own colours and taking no press.
         /// </summary>
         private static GameObject BuildAvatarButton(Scene scene, Sources sources)
         {
             var root = CreateRoot(AvatarButtonName, scene, sources.Layer);
             var rect = (RectTransform)root.transform;
             UiBuilder.PlaceCentered(rect, new Vector2(AvatarCellSize, AvatarCellSize));
-
-            var selected = UiBuilder.CreateRect(SelectedName, rect);
-            UiBuilder.Stretch(selected);
-            selected.offsetMin = new Vector2(-AvatarSelectedOutset, -AvatarSelectedOutset);
-            selected.offsetMax = new Vector2(AvatarSelectedOutset, AvatarSelectedOutset);
-            AddSliced(selected, sources.Panel, SelectedAvatarColorHex);
-            selected.gameObject.SetActive(false);
 
             var icon = UiBuilder.CreateRect(IconName, rect);
             UiBuilder.Stretch(icon);
@@ -1804,6 +1946,14 @@ namespace GateRush.UI.Editor
             var iconImage = UiBuilder.AddIcon(icon, sources.AvatarCatalog.SpriteAt(0), ParseColor(IconColorHex));
             iconImage.raycastTarget = true;
             var button = UiBuilder.AddButton(rect, iconImage);
+
+            // After the icon, so it draws over the disc's rim.
+            var selected = UiBuilder.CreateRect(SelectedName, rect);
+            UiBuilder.Stretch(selected);
+            selected.offsetMin = new Vector2(-AvatarSelectedOutset, -AvatarSelectedOutset);
+            selected.offsetMax = new Vector2(AvatarSelectedOutset, AvatarSelectedOutset);
+            UiBuilder.AddIcon(selected, sources.RingSelect, ParseColor(OwnColorsHex));
+            selected.gameObject.SetActive(false);
 
             var cell = root.AddComponent<AvatarButton>();
             SetReferences(
@@ -1845,7 +1995,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(scroll);
             scroll.offsetMin = new Vector2(ScrollInset, ProfileGridBottom);
             scroll.offsetMax = new Vector2(-ScrollInset, -ProfileGridTop);
-            var viewport = AddViewport(scroll);
+            var viewport = AddViewport(scroll, SoftScrollEdge);
             var content = UiBuilder.CreateRect(ContentName, viewport);
             TopStretch(content, 0f, 0f, 0f);
             var avatarButton = Single<AvatarButton>(avatarButtonAsset, AvatarButtonName);
@@ -1892,18 +2042,20 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// Profile's name field: the input sprite as its box, a masked text
-        /// area holding the one-line text, and TextMeshPro's input field over
-        /// them — one line, no character limit, so a name too long can be
-        /// typed and refused, the text selected on focus and the old name
-        /// back on Escape. Its navigation is off, as every button's is.
+        /// Profile's name field: the dark pill as its box (the Module 45
+        /// follow-up), a masked text area holding the one-line white text, and
+        /// TextMeshPro's input field over them — one line, no character limit,
+        /// so a name too long can be typed and refused, the text selected on
+        /// focus and the old name back on Escape, with a white caret and a
+        /// blue selection the white text reads on. Its navigation is off, as
+        /// every button's is.
         /// </summary>
         private static TMP_InputField AddNameField(RectTransform panel, Sources sources)
         {
             var field = UiBuilder.CreateRect(NameFieldName, panel);
             UiBuilder.Place(
                 field, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, NameFieldPosY), new Vector2(NameFieldWidth, NameFieldHeight));
-            var box = AddSliced(field, sources.Bar, PanelColorHex);
+            var box = AddSliced(field, sources.Pill, OwnColorsHex, NameFieldPixelsPerUnitMultiplier);
             box.raycastTarget = true;
 
             var textArea = UiBuilder.CreateRect(TextAreaName, field);
@@ -1914,7 +2066,7 @@ namespace GateRush.UI.Editor
 
             var textRect = UiBuilder.CreateRect(TextName, textArea);
             UiBuilder.Stretch(textRect);
-            var text = AddText(textRect, sources, NamePlaceholder, NameFontSize, OverlayTextColorHex);
+            var text = AddText(textRect, sources, NamePlaceholder, NameFontSize, NameTextColorHex);
 
             var input = field.gameObject.AddComponent<TMP_InputField>();
             input.targetGraphic = box;
@@ -1925,6 +2077,9 @@ namespace GateRush.UI.Editor
             input.characterLimit = 0;
             input.onFocusSelectAll = true;
             input.restoreOriginalTextOnEscape = true;
+            input.customCaretColor = true;
+            input.caretColor = ParseColor(NameCaretColorHex);
+            input.selectionColor = ParseColor(NameSelectionColorHex);
             input.navigation = new Navigation { mode = Navigation.Mode.None };
             input.text = NamePlaceholder;
             return input;
@@ -1976,6 +2131,19 @@ namespace GateRush.UI.Editor
             var backgroundImage = background.gameObject.AddComponent<Image>();
             backgroundImage.raycastTarget = true;
             AddTint(background.gameObject, backgroundImage, UiColorRole.Background);
+
+            // Module 45: the painting over the flat colour, enveloping the
+            // screen at its own ratio — cropped and centred, never stretched.
+            // FrontEnd shows the campaign level's; the Editor shows level 1's.
+            var painting = UiBuilder.CreateRect(PaintingName, background);
+            UiBuilder.Stretch(painting);
+            var paintingSprite = sources.Config.BackgroundFor(PaintingLevelPlaceholder);
+            // The fitter keeps the ratio, so the image fills its rect.
+            var paintingImage = UiBuilder.AddIcon(painting, paintingSprite, ParseColor(IconColorHex));
+            paintingImage.preserveAspect = false;
+            var paintingFit = painting.gameObject.AddComponent<AspectRatioFitter>();
+            paintingFit.aspectMode = AspectRatioFitter.AspectMode.EnvelopeParent;
+            paintingFit.aspectRatio = paintingSprite.rect.width / paintingSprite.rect.height;
 
             var safe = UiBuilder.CreateRect(SafeName, root.transform);
             UiBuilder.Stretch(safe);
@@ -2046,7 +2214,9 @@ namespace GateRush.UI.Editor
                 (ProfileField, Single<ProfileOverlay>(profile.gameObject, ProfileOverlayName)),
                 (StreakBarField, Single<StreakBar>(streakBar.gameObject, StreakBarName)),
                 (JokerIconsField, sources.JokerIcons),
-                (AvatarCatalogField, sources.AvatarCatalog));
+                (AvatarCatalogField, sources.AvatarCatalog),
+                (PaintingField, paintingImage),
+                (PaintingFitField, paintingFit));
 
             root.SetActive(false);
             return root;
@@ -2085,13 +2255,17 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// The level's HUD (Module 40): a row, fitted to the top band, of Menu
-        /// and Restart at the left — Button Round instances whose own icon
-        /// shows home and return on the instance only — the timer pill with
-        /// the hourglass in the centre, the hidden time bonus beside it, the
-        /// level label at the right, and under them the gold and lives pills.
-        /// Texts the game sets are written with the config's values and
-        /// placeholders.
+        /// The level's HUD (Module 40), laid out anew by the Module 45
+        /// follow-up: a row, fitted to the top band, of Menu at the left and
+        /// Restart at the right — Button Round instances at one large size,
+        /// whose own icon shows home and return on the instance only — and,
+        /// centred, the ribbon with the level label, the timer pill under it
+        /// with the hourglass hanging off its left end and the hidden time
+        /// bonus beside it, and under that the gold and lives pills side by
+        /// side, each icon hanging off its pill's left end. The pills sit in a
+        /// centred row, so with the lives pill hidden in free play the gold
+        /// pill is centred. Texts the game sets are written with the config's
+        /// values and placeholders.
         /// </summary>
         private static GameObject BuildLevelHud(Scene scene, Sources sources)
         {
@@ -2099,19 +2273,26 @@ namespace GateRush.UI.Editor
             var root = CreateRoot(LevelHudName, scene, sources.Layer);
             var row = AddBandRow(root.transform, new Vector2(HudRowWidth, HudRowHeight));
 
-            var menu = AddHudButton(row, sources, MenuName, sources.Home, HudSideInset);
-            var restart = AddHudButton(row, sources, RestartName, sources.Return, HudSideInset + menu.sizeDelta.x + HudButtonGap);
+            var menu = AddHudButton(row, sources, MenuName, sources.Home, AnchorLow, HudSideInset);
+            var restart = AddHudButton(row, sources, RestartName, sources.Return, AnchorHigh, -HudSideInset);
+
+            var ribbon = UiBuilder.CreateRect(RibbonName, row);
+            PlaceBelowTop(ribbon, AnchorMid, 0f, HudRibbonTop, new Vector2(HudRibbonWidth, HudRibbonHeight));
+            AddSliced(ribbon, sources.Ribbon, OwnColorsHex, HudRibbonPixelsPerUnitMultiplier);
+            var level = UiBuilder.CreateRect(LevelLabelName, ribbon);
+            // Its foot raised twice as far as its middle, so it stays within
+            // the ribbon.
+            HorizontalBand(level, RibbonLabelInset, RibbonLabelInset);
+            level.offsetMin = new Vector2(level.offsetMin.x, RibbonLabelRaise + RibbonLabelRaise);
+            var levelLabel = AddText(
+                level, sources, LevelHudTexts.LevelLabel(false, LevelNumberPlaceholder, config), LevelLabelFontSize, HudTextColorHex);
 
             var timer = UiBuilder.CreateRect(TimerName, row);
-            PlaceBelowTop(timer, AnchorMid, 0f, HudTopInset, new Vector2(TimerPillWidth, TimerPillHeight));
-            AddSliced(timer, sources.Panel, PillColorHex);
-            var hourglass = UiBuilder.CreateRect(HourglassName, timer);
-            UiBuilder.Place(
-                hourglass, new Vector2(AnchorLow, AnchorMid), new Vector2(HourglassInset, 0f), new Vector2(HourglassSize, HourglassSize));
-            var hourglassImage = UiBuilder.AddIcon(hourglass, sources.Hourglass, ParseColor(IconColorHex));
-            AddTint(hourglass.gameObject, hourglassImage, UiColorRole.Icon);
+            PlaceBelowTop(timer, AnchorMid, 0f, HudTimerTop, new Vector2(TimerPillWidth, TimerPillHeight));
+            AddSliced(timer, sources.Pill, OwnColorsHex, TimerPillPixelsPerUnitMultiplier);
+            var hourglassRight = AddPillIcon(timer, HourglassName, sources.Hourglass, HourglassHeightShare);
             var digits = UiBuilder.CreateRect(DigitsName, timer);
-            HorizontalBand(digits, TimerDigitsLeft, TimerDigitsRight);
+            HorizontalBand(digits, hourglassRight + PillTextGap, PillTextInset);
             var timerLabel = AddText(digits, sources, LevelHudTexts.Timer(TimerPlaceholderSeconds, config), TimerFontSize, HudTextColorHex);
             timerLabel.color = config.TimerColor;
 
@@ -2120,50 +2301,50 @@ namespace GateRush.UI.Editor
             bonus.anchorMin = new Vector2(AnchorMid, AnchorHigh);
             bonus.anchorMax = new Vector2(AnchorMid, AnchorHigh);
             bonus.pivot = new Vector2(AnchorLow, AnchorMid);
-            bonus.anchoredPosition = new Vector2(TimerPillWidth / 2f + TimeBonusGap, -(HudTopInset + TimerPillHeight / 2f));
+            bonus.anchoredPosition = new Vector2(TimerPillWidth / 2f + TimeBonusGap, -(HudTimerTop + TimerPillHeight / 2f));
             bonus.sizeDelta = new Vector2(TimeBonusWidth, TimerPillHeight);
             var bonusLabel = AddText(bonus, sources, LevelHudTexts.TimeBonus(TimeBonusPlaceholder, config), TimeBonusFontSize, HudTextColorHex);
             bonusLabel.color = config.TimeBonusColor;
             bonusLabel.alignment = TextAlignmentOptions.MidlineLeft;
             bonus.gameObject.SetActive(false);
 
-            var level = UiBuilder.CreateRect(LevelLabelName, row);
-            UiBuilder.Place(
-                level, new Vector2(AnchorHigh, AnchorHigh), new Vector2(-HudSideInset, -HudTopInset), new Vector2(LevelLabelWidth, TimerPillHeight));
-            var levelLabel = AddText(
-                level, sources, LevelHudTexts.LevelLabel(false, LevelNumberPlaceholder, config), LevelLabelFontSize, HudTextColorHex);
-            levelLabel.alignment = TextAlignmentOptions.MidlineRight;
+            // A centred row: a hidden pill takes no room, so the gold pill
+            // alone is centred.
+            var pills = UiBuilder.CreateRect(PillsName, row);
+            TopStretch(pills, 0f, -HudPillRowTop, HudPillHeight);
+            var pillsLayout = pills.gameObject.AddComponent<HorizontalLayoutGroup>();
+            pillsLayout.spacing = HudPillGap;
+            pillsLayout.childAlignment = TextAnchor.MiddleCenter;
+            pillsLayout.childControlWidth = false;
+            pillsLayout.childControlHeight = false;
+            pillsLayout.childForceExpandWidth = false;
+            pillsLayout.childForceExpandHeight = false;
 
-            var pillOffset = (HudPillWidth + HudPillGap) / 2f;
             var pillSize = new Vector2(HudPillWidth, HudPillHeight);
-            var goldPill = UiBuilder.CreateRect(GoldPillName, row);
-            PlaceBelowTop(goldPill, AnchorMid, -pillOffset, HudPillRowTop, pillSize);
-            AddSliced(goldPill, sources.Panel, PillColorHex);
-            var coin = UiBuilder.CreateRect(CoinName, goldPill);
-            UiBuilder.Place(coin, new Vector2(AnchorLow, AnchorMid), new Vector2(PillIconInset, 0f), new Vector2(PillCoinSize, PillCoinSize));
-            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            var goldPill = UiBuilder.CreateRect(GoldPillName, pills);
+            goldPill.sizeDelta = pillSize;
+            AddSliced(goldPill, sources.Pill, OwnColorsHex, HudPillPixelsPerUnitMultiplier);
+            var coinRight = AddPillIcon(goldPill, CoinName, sources.Coin, PillIconHeightShare);
             var gold = UiBuilder.CreateRect(GoldLabelName, goldPill);
-            HorizontalBand(gold, PillLabelLeft, PillIconInset);
+            HorizontalBand(gold, coinRight + PillTextGap, PillTextInset);
             var goldLabel = AddText(gold, sources, HomeTexts.Gold(GoldPlaceholder, config), PillFontSize, HudTextColorHex);
-            goldLabel.alignment = TextAlignmentOptions.MidlineLeft;
 
-            var livesPill = UiBuilder.CreateRect(LivesPillName, row);
-            PlaceBelowTop(livesPill, AnchorMid, pillOffset, HudPillRowTop, pillSize);
-            AddSliced(livesPill, sources.Panel, PillColorHex);
-            var heart = UiBuilder.CreateRect(HeartName, livesPill);
-            UiBuilder.Place(
-                heart, new Vector2(AnchorLow, AnchorMid), new Vector2(PillHeartInset, 0f), new Vector2(PillHeartSize, PillHeartSize));
-            var heartImage = UiBuilder.AddIcon(heart, sources.Heart, ParseColor(IconColorHex));
-            AddTint(heart.gameObject, heartImage, UiColorRole.Heart);
+            var livesPill = UiBuilder.CreateRect(LivesPillName, pills);
+            livesPill.sizeDelta = pillSize;
+            AddSliced(livesPill, sources.Pill, OwnColorsHex, HudPillPixelsPerUnitMultiplier);
+            var heartRight = AddPillIcon(livesPill, HeartName, sources.Heart, PillIconHeightShare);
+            var heart = (RectTransform)livesPill.Find(HeartName);
             var count = UiBuilder.CreateRect(CountName, heart);
             UiBuilder.Stretch(count);
             var countLabel = AddText(
-                count, sources, HomeTexts.LivesCount(LivesCountPlaceholder, config), PillLivesCountFontSize, LivesLabelColorHex);
+                count, sources, HomeTexts.LivesCount(LivesCountPlaceholder, config), LivesCountFontSize, LivesLabelColorHex);
             var status = UiBuilder.CreateRect(StatusName, livesPill);
-            HorizontalBand(status, PillStatusLeft, PillIconInset);
+            HorizontalBand(status, heartRight + PillTextGap, PillTextInset);
             var statusLabel = AddText(status, sources, config.LivesFullLabel, PillStatusFontSize, HudTextColorHex);
-            statusLabel.alignment = TextAlignmentOptions.MidlineLeft;
+
+            // So the saved prefab, and the Editor, show the pills where the
+            // layout puts them.
+            LayoutRebuilder.ForceRebuildLayoutImmediate(pills);
 
             var hud = root.AddComponent<LevelHud>();
             SetReferences(
@@ -2183,20 +2364,41 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// A Button Round at the HUD row's top left, <paramref name="left"/>
-        /// in, named <paramref name="name"/>, its own icon showing
-        /// <paramref name="icon"/> — an override of this instance only, so
-        /// Button Round's file stays unwritten.
+        /// A Button Round at the HUD's large size in a top corner of the row —
+        /// the left one at <paramref name="anchorX"/> 0, the right at 1 —
+        /// <paramref name="x"/> across from it, named <paramref name="name"/>,
+        /// its own icon showing <paramref name="icon"/>: overrides of this
+        /// instance only, so Button Round's file stays unwritten. Its icon
+        /// keeps Button Round's share of the button.
         /// </summary>
-        private static RectTransform AddHudButton(RectTransform row, Sources sources, string name, Sprite icon, float left)
+        private static RectTransform AddHudButton(RectTransform row, Sources sources, string name, Sprite icon, float anchorX, float x)
         {
             var button = Nest(sources.ButtonRound, row);
             button.name = name;
-            UiBuilder.Place(button, new Vector2(AnchorLow, AnchorHigh), new Vector2(left, -HudTopInset), button.sizeDelta);
+            UiBuilder.Place(button, new Vector2(anchorX, AnchorHigh), new Vector2(x, -HudButtonTop), new Vector2(HudButtonSize, HudButtonSize));
             Record(button);
             Record(button.gameObject);
             SetRoundIcon(button, icon);
             return button;
+        }
+
+        /// <summary>
+        /// An icon named <paramref name="name"/> hanging off
+        /// <paramref name="pill"/>'s left end: <paramref name="heightShare"/>
+        /// of the pill's height at the sprite's own aspect, centred on the
+        /// pill's height, <see cref="PillIconOutsideShare"/> of its width
+        /// outside the pill, drawn in its own colours. Returns how far the
+        /// icon's right edge is in from the pill's left end, where the pill's
+        /// text may start.
+        /// </summary>
+        private static float AddPillIcon(RectTransform pill, string name, Sprite sprite, float heightShare)
+        {
+            var height = pill.sizeDelta.y * heightShare;
+            var width = height * sprite.rect.width / sprite.rect.height;
+            var icon = UiBuilder.CreateRect(name, pill);
+            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(-width * PillIconOutsideShare, 0f), new Vector2(width, height));
+            UiBuilder.AddIcon(icon, sprite, ParseColor(IconColorHex));
+            return width * (1f - PillIconOutsideShare);
         }
 
         /// <summary>
@@ -2223,7 +2425,9 @@ namespace GateRush.UI.Editor
         /// with the coin, the closing message, and the row of Next (Button
         /// Primary), Restart after a free-play win (Button Secondary), Restart
         /// after a loss (Button Primary, saved hidden) and Menu (Button Round
-        /// with the home icon). Written as a campaign win with gold and the
+        /// with the home icon, close to their height), and, saved hidden for
+        /// a loss, the large hourglass and the heart with "-1" (the Module 45
+        /// follow-up). Written as a campaign win with gold and the
         /// closing message, the texts from the UI Config; the overlay sets
         /// them all again when it opens. A CanvasGroup on the root carries the
         /// pop's fade.
@@ -2254,8 +2458,7 @@ namespace GateRush.UI.Editor
             var coinElement = coin.gameObject.AddComponent<LayoutElement>();
             coinElement.preferredWidth = GoldCoinSize;
             coinElement.preferredHeight = GoldCoinSize;
-            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
 
             var amount = UiBuilder.CreateRect(AmountName, gold);
             var goldLabel = AddText(amount, sources, LevelPanelTexts.GoldEarned(GoldEarnedPlaceholder, config), GoldFontSize, OverlayTextColorHex);
@@ -2263,6 +2466,37 @@ namespace GateRush.UI.Editor
             var messageRect = UiBuilder.CreateRect(MessageName, frame.Panel);
             TopStretch(messageRect, OverlayTextInset, ClosingMessagePosY, ClosingMessageHeight);
             var messageLabel = AddWrappingText(messageRect, sources, config.ClosingMessage, ClosingMessageFontSize, OverlayTextColorHex);
+
+            // After a loss, the middle the gold row and the message leave
+            // empty: the large hourglass and, under it in the campaign, the
+            // heart with "-1". Both saved hidden, as for the win written here.
+            var lossArt = UiBuilder.CreateRect(LossArtName, frame.Panel);
+            PlaceBelowTop(lossArt, AnchorMid, 0f, LossHourglassTop, new Vector2(LossHourglassSize, LossHourglassSize));
+            UiBuilder.AddIcon(lossArt, sources.Hourglass, ParseColor(IconColorHex));
+            lossArt.gameObject.SetActive(false);
+
+            var lifeLost = UiBuilder.CreateRect(LifeLostName, frame.Panel);
+            UiBuilder.Place(lifeLost, new Vector2(AnchorMid, AnchorHigh), new Vector2(0f, -LifeLostRowTop), new Vector2(0f, LifeLostRowHeight));
+            var lifeLostLayout = lifeLost.gameObject.AddComponent<HorizontalLayoutGroup>();
+            lifeLostLayout.spacing = LifeLostSpacing;
+            lifeLostLayout.childAlignment = TextAnchor.MiddleCenter;
+            lifeLostLayout.childControlWidth = true;
+            lifeLostLayout.childControlHeight = true;
+            lifeLostLayout.childForceExpandWidth = false;
+            lifeLostLayout.childForceExpandHeight = false;
+            var lifeLostFitter = lifeLost.gameObject.AddComponent<ContentSizeFitter>();
+            lifeLostFitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            lifeLostFitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+
+            var lostHeart = UiBuilder.CreateRect(HeartName, lifeLost);
+            var lostHeartElement = lostHeart.gameObject.AddComponent<LayoutElement>();
+            lostHeartElement.preferredHeight = LifeLostRowHeight;
+            lostHeartElement.preferredWidth = LifeLostRowHeight * sources.Heart.rect.width / sources.Heart.rect.height;
+            UiBuilder.AddIcon(lostHeart, sources.Heart, ParseColor(IconColorHex));
+
+            var lostAmount = UiBuilder.CreateRect(AmountName, lifeLost);
+            var lifeLostLabel = AddText(lostAmount, sources, config.LifeLostLabel, LifeLostFontSize, LifeLostColorHex);
+            lifeLost.gameObject.SetActive(false);
 
             // The row centres the buttons that show: hidden ones take no room.
             var row = UiBuilder.CreateRect(ButtonsName, frame.Panel);
@@ -2286,6 +2520,8 @@ namespace GateRush.UI.Editor
 
             var menu = Nest(sources.ButtonRound, row);
             menu.name = MenuName;
+            menu.sizeDelta = new Vector2(ResultMenuButtonSize, ResultMenuButtonSize);
+            Record(menu);
             Record(menu.gameObject);
             SetRoundIcon(menu, sources.Home);
 
@@ -2298,6 +2534,9 @@ namespace GateRush.UI.Editor
                 (GoldRowField, gold.gameObject),
                 (GoldLabelField, goldLabel),
                 (MessageLabelField, messageLabel),
+                (LossArtField, lossArt.gameObject),
+                (LifeLostField, lifeLost.gameObject),
+                (LifeLostLabelField, lifeLostLabel),
                 (NextButtonField, Single<Button>(next.gameObject, ButtonPrimaryName)),
                 (NextLabelField, nextLabel),
                 (WinRestartButtonField, Single<Button>(winRestart.gameObject, ButtonSecondaryName)),
@@ -2323,7 +2562,7 @@ namespace GateRush.UI.Editor
         /// The confirmation before a lost life (Module 41): the frame with no
         /// close button, the title, the line, Keep playing at the foot (Button
         /// Primary, green) and Lose a life above it — a Button Primary whose
-        /// face and pressed look are red on this instance only. Written as
+        /// face is red on this instance only. Written as
         /// Leave level with a streak at risk, the texts from the UI Config; the
         /// overlay sets them all again when it opens. A CanvasGroup on the
         /// root carries the pop's fade.
@@ -2357,8 +2596,10 @@ namespace GateRush.UI.Editor
             var loseFace = FaceOf(loseButton, "the red face");
             loseFace.sprite = sources.RedButton;
             Record(loseFace);
+
+            // No pressed look until Module 46's press effect, as on Button Primary.
             var sprites = loseButton.spriteState;
-            sprites.pressedSprite = sources.RedButtonPressed;
+            sprites.pressedSprite = null;
             loseButton.spriteState = sprites;
             Record(loseButton);
 
@@ -2396,23 +2637,25 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// One joker's slot, <paramref name="x"/> from the row's centre and a
-        /// little low: the lift, raised while selected, holding the glow
-        /// (hidden; shown while marked, Module 43) and the ring (hidden)
-        /// behind a Button Primary instance made square on this
-        /// instance — the green square face, its flat pressed look and its
-        /// grey disabled look — with its own label switched off; on the
-        /// button, the joker's icon from the Joker Icons asset centred on the
-        /// face above the depth strip with the lock (hidden; Module 43)
-        /// centred on it, and the red badge on the bottom-right
-        /// corner with the coin (hidden) and the count (Module 42).
+        /// One joker's slot, <paramref name="x"/> from the row's centre and
+        /// raised off the row's foot by the bottom clearance under its badge:
+        /// the lift, raised while selected, holding the glow (hidden; shown
+        /// while marked, Module 43) and the ring (hidden) behind a Button
+        /// Primary instance made square on this instance — the green square
+        /// face and its grey disabled look, with no pressed look until Module
+        /// 46 — with its own label switched off; on the button, the joker's
+        /// icon from the Joker Icons asset centred on the face above its lip
+        /// with the lock (hidden; Module 43) centred on it, and the red badge
+        /// on the bottom-right corner with the coin (hidden) and the count
+        /// (Module 42).
         /// </summary>
         private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
         {
             var config = sources.Config;
             var slot = UiBuilder.CreateRect(kind.ToString(), row);
             UiBuilder.PlaceCentered(slot, new Vector2(JokerButtonSize, JokerButtonSize));
-            slot.anchoredPosition = new Vector2(x, -JokerSlotDrop);
+            var slotY = -JokerRowHeight / 2f + JokerBottomClearance + BadgeOutset + JokerButtonSize / 2f;
+            slot.anchoredPosition = new Vector2(x, slotY);
 
             var lift = UiBuilder.CreateRect(LiftName, slot);
             UiBuilder.Stretch(lift);
@@ -2423,7 +2666,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(glow);
             glow.offsetMin = new Vector2(-JokerGlowOutset, -JokerGlowOutset);
             glow.offsetMax = new Vector2(JokerGlowOutset, JokerGlowOutset);
-            var glowImage = AddSliced(glow, sources.Panel, PanelColorHex);
+            var glowImage = AddSliced(glow, sources.Plain, PanelColorHex, PlainPixelsPerUnitMultiplier);
             glowImage.color = config.MarkedGlowColor;
             glow.gameObject.SetActive(false);
 
@@ -2431,7 +2674,7 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(ring);
             ring.offsetMin = new Vector2(-JokerRingOutset, -JokerRingOutset);
             ring.offsetMax = new Vector2(JokerRingOutset, JokerRingOutset);
-            var ringImage = AddSliced(ring, sources.Panel, PanelColorHex);
+            var ringImage = AddSliced(ring, sources.Plain, PanelColorHex, PlainPixelsPerUnitMultiplier);
             AddTint(ring.gameObject, ringImage, UiColorRole.JokerSelected);
             ring.gameObject.SetActive(false);
 
@@ -2443,9 +2686,10 @@ namespace GateRush.UI.Editor
             var buttonComponent = Single<Button>(button.gameObject, ButtonPrimaryName);
             var face = FaceOf(buttonComponent, "the joker button's square face");
             face.sprite = sources.JokerFace;
+            face.pixelsPerUnitMultiplier = JokerButtonPixelsPerUnitMultiplier;
             Record(face);
             var looks = buttonComponent.spriteState;
-            looks.pressedSprite = sources.JokerFacePressed;
+            looks.pressedSprite = null;
             looks.disabledSprite = sources.JokerFaceDisabled;
             buttonComponent.spriteState = looks;
             Record(buttonComponent);
@@ -2455,17 +2699,16 @@ namespace GateRush.UI.Editor
 
             var icon = UiBuilder.CreateRect(IconName, button);
             UiBuilder.Place(
-                icon, new Vector2(AnchorMid, AnchorMid), new Vector2(0f, JokerFaceDepth / 2f), new Vector2(JokerIconSize, JokerIconSize));
+                icon, new Vector2(AnchorMid, AnchorMid), new Vector2(0f, JokerIconRaise), new Vector2(JokerIconSize, JokerIconSize));
             var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(kind), config.IconColor);
-            var lockIcon = AddLock(icon, sources, JokerLockSize, IconColorHex);
+            var lockIcon = AddLock(icon, sources, JokerLockSize);
 
             // Pivoted on the button's bottom-right corner, so the fitter widens
             // it leftwards across the face and it never leaves the corner.
             var badge = UiBuilder.CreateRect(BadgeName, button);
             UiBuilder.Place(
                 badge, new Vector2(AnchorHigh, AnchorLow), new Vector2(BadgeOutset, -BadgeOutset), new Vector2(BadgeSize, BadgeSize));
-            var badgeImage = AddSliced(badge, sources.Panel, PanelColorHex);
-            AddTint(badge.gameObject, badgeImage, UiColorRole.JokerBadge);
+            AddSliced(badge, sources.Badge, OwnColorsHex, BadgePixelsPerUnitMultiplier);
             var badgeElement = badge.gameObject.AddComponent<LayoutElement>();
             badgeElement.minWidth = BadgeSize;
             var fitter = badge.gameObject.AddComponent<ContentSizeFitter>();
@@ -2484,8 +2727,7 @@ namespace GateRush.UI.Editor
             var coinElement = coin.gameObject.AddComponent<LayoutElement>();
             coinElement.preferredWidth = BadgeCoinSize;
             coinElement.preferredHeight = BadgeCoinSize;
-            var coinImage = UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            AddTint(coin.gameObject, coinImage, UiColorRole.Coin);
+            UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
             coin.gameObject.SetActive(false);
 
             var label = UiBuilder.CreateRect(BadgeLabelName, badge);
@@ -2613,17 +2855,18 @@ namespace GateRush.UI.Editor
 
             var scrim = UiBuilder.CreateRect(ScrimName, root.transform);
             UiBuilder.Stretch(scrim);
+            // The theme's dim (the Module 45 follow-up): its colour is the UI
+            // Config's, written at save and applied again when the screens open.
             var scrimImage = scrim.gameObject.AddComponent<Image>();
-            Color32 scrimColor = ParseColor(ScrimColorHex);
-            scrimColor.a = ScrimAlpha;
-            scrimImage.color = scrimColor;
             scrimImage.raycastTarget = true;
+            AddTint(scrim.gameObject, scrimImage, UiColorRole.Scrim);
 
             var panel = UiBuilder.CreateRect(PanelName, root.transform);
             UiBuilder.PlaceCentered(panel, new Vector2(width, height));
-            var panelImage = panel.gameObject.AddComponent<Image>();
-            panelImage.sprite = sources.Panel;
-            panelImage.type = Image.Type.Sliced;
+            var panelImage = AddSliced(panel, sources.Panel, PanelColorHex, OverlayPanelPixelsPerUnitMultiplier);
+
+            // A raycast target, as the panel always was: taps on it stop there.
+            panelImage.raycastTarget = true;
 
             var titleRect = UiBuilder.CreateRect(TitleName, panel);
             TopStretch(titleRect, 0f, OverlayTitlePosY, OverlayTitleHeight);
@@ -2743,38 +2986,29 @@ namespace GateRush.UI.Editor
         /// <summary>The panel sprite behind a Store card, and its height in the Store's column.</summary>
         private static void AddCardFrame(RectTransform card, Sources sources)
         {
-            var image = card.gameObject.AddComponent<Image>();
-            image.sprite = sources.Panel;
-            image.type = Image.Type.Sliced;
-            image.raycastTarget = false;
+            AddSliced(card, sources.Panel, PanelColorHex, CardPanelPixelsPerUnitMultiplier);
             var element = card.gameObject.AddComponent<LayoutElement>();
             element.preferredHeight = CardHeight;
         }
 
-        /// <summary>A Store card's icon at its left; tinted by <paramref name="role"/> when it has one.</summary>
-        private static Image AddCardIcon(RectTransform card, Sprite sprite, string colorHex, UiColorRole? role)
+        /// <summary>A Store card's icon at its left, drawn in its own colours.</summary>
+        private static Image AddCardIcon(RectTransform card, Sprite sprite)
         {
             var icon = UiBuilder.CreateRect(IconName, card);
             UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(CardIconInset, 0f), new Vector2(CardIconSize, CardIconSize));
-            var image = UiBuilder.AddIcon(icon, sprite, ParseColor(colorHex));
-            if (role.HasValue)
-            {
-                AddTint(icon.gameObject, image, role.Value);
-            }
-
-            return image;
+            return UiBuilder.AddIcon(icon, sprite, ParseColor(IconColorHex));
         }
 
         /// <summary>
         /// The lock (Module 43): a <paramref name="size"/> square centred on
         /// <paramref name="icon"/>, its own child so dimming the icon leaves it
-        /// whole, drawn in <paramref name="colorHex"/> and saved hidden.
+        /// whole, drawn in its own colours and saved hidden.
         /// </summary>
-        private static GameObject AddLock(RectTransform icon, Sources sources, float size, string colorHex)
+        private static GameObject AddLock(RectTransform icon, Sources sources, float size)
         {
             var lockRect = UiBuilder.CreateRect(LockName, icon);
             UiBuilder.PlaceCentered(lockRect, new Vector2(size, size));
-            UiBuilder.AddIcon(lockRect, sources.Lock, ParseColor(colorHex));
+            UiBuilder.AddIcon(lockRect, sources.Lock, ParseColor(IconColorHex));
             lockRect.gameObject.SetActive(false);
             return lockRect.gameObject;
         }
@@ -2799,14 +3033,16 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// A scroll view's viewport, filling <paramref name="scroll"/>:
-        /// RectMask2D clips, and the clear image catches drags that start
-        /// between the items, so the whole viewport scrolls.
+        /// RectMask2D clips, fading the list out over
+        /// <paramref name="softness"/> at its edges, and the clear image
+        /// catches drags that start between the items, so the whole viewport
+        /// scrolls.
         /// </summary>
-        private static RectTransform AddViewport(RectTransform scroll)
+        private static RectTransform AddViewport(RectTransform scroll, Vector2Int softness)
         {
             var viewport = UiBuilder.CreateRect(ViewportName, scroll);
             UiBuilder.Stretch(viewport);
-            viewport.gameObject.AddComponent<RectMask2D>();
+            viewport.gameObject.AddComponent<RectMask2D>().softness = softness;
             var viewportImage = viewport.gameObject.AddComponent<Image>();
             viewportImage.color = ParseColor(ViewportColorHex);
             viewportImage.raycastTarget = true;
@@ -2825,12 +3061,17 @@ namespace GateRush.UI.Editor
             return scrollRect;
         }
 
-        /// <summary>A 9-sliced <paramref name="sprite"/> on <paramref name="rect"/> in <paramref name="colorHex"/>; not a raycast target.</summary>
-        private static Image AddSliced(RectTransform rect, Sprite sprite, string colorHex)
+        /// <summary>
+        /// A 9-sliced <paramref name="sprite"/> on <paramref name="rect"/> in
+        /// <paramref name="colorHex"/>, its borders drawn at
+        /// <paramref name="pixelsPerUnitMultiplier"/>; not a raycast target.
+        /// </summary>
+        private static Image AddSliced(RectTransform rect, Sprite sprite, string colorHex, float pixelsPerUnitMultiplier)
         {
             var image = rect.gameObject.AddComponent<Image>();
             image.sprite = sprite;
             image.type = Image.Type.Sliced;
+            image.pixelsPerUnitMultiplier = pixelsPerUnitMultiplier;
             image.color = ParseColor(colorHex);
             image.raycastTarget = false;
             return image;
@@ -2874,7 +3115,9 @@ namespace GateRush.UI.Editor
         /// size on <paramref name="content"/>, with one gap between the columns
         /// and at both sides, all equal, so the grid is centred in a viewport
         /// <paramref name="viewportWidth"/> wide with the cells at their own
-        /// size; the content grows with its rows.
+        /// size; the content grows with its rows. Its top and bottom padding
+        /// are at least <see cref="SoftScrollEdgeUnits"/>, so the viewport's
+        /// soft edge fades no cell at rest.
         /// </summary>
         private static void AddCenteredGrid(RectTransform content, Vector2 cell, int columns, float viewportWidth, string cellName)
         {
@@ -2886,13 +3129,14 @@ namespace GateRush.UI.Editor
             }
 
             var padding = Mathf.FloorToInt(gap);
+            var edgePadding = Mathf.Max(padding, SoftScrollEdgeUnits);
             var grid = content.gameObject.AddComponent<GridLayoutGroup>();
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = columns;
             grid.cellSize = cell;
             grid.spacing = new Vector2(gap, gap);
             grid.childAlignment = TextAnchor.UpperCenter;
-            grid.padding = new RectOffset(padding, padding, padding, padding);
+            grid.padding = new RectOffset(padding, padding, edgePadding, edgePadding);
             var fitter = content.gameObject.AddComponent<ContentSizeFitter>();
             fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
@@ -2921,6 +3165,36 @@ namespace GateRush.UI.Editor
             var label = UiBuilder.AddLabel(rect, sources.Font, fontSize, ParseColor(PageTitleColorHex), isCentred);
             label.text = text;
             label.alignment = isCentred ? TextAlignmentOptions.Center : TextAlignmentOptions.MidlineLeft;
+            return label;
+        }
+
+        /// <summary>
+        /// The Store's test store line: its slot in the column, and in it,
+        /// centred, the dark pill sized to <paramref name="text"/> wrapped
+        /// within the column, with the white text inside its padding. The
+        /// pill's slice borders are scaled to its height, so its ends stay
+        /// round whatever the number of lines.
+        /// </summary>
+        private static TMP_Text AddTestStoreNote(RectTransform column, Sources sources, string text)
+        {
+            var line = UiBuilder.CreateRect(TestStoreNoteName, column);
+            line.gameObject.AddComponent<LayoutElement>().preferredHeight = TestStoreNoteHeight;
+
+            var pill = UiBuilder.CreateRect(PillName, line);
+            var labelRect = UiBuilder.CreateRect(TextName, pill);
+            UiBuilder.Stretch(labelRect);
+            labelRect.offsetMin = new Vector2(TestStoreNotePaddingX, TestStoreNotePaddingY);
+            labelRect.offsetMax = new Vector2(-TestStoreNotePaddingX, -TestStoreNotePaddingY);
+            var label = AddWrappingText(labelRect, sources, text, TestStoreNoteFontSize, PageTitleColorHex);
+
+            var maxTextWidth = StoreColumnWidth - (TestStoreNotePaddingX + TestStoreNotePaddingX);
+            var textSize = label.GetPreferredValues(text, maxTextWidth, TestStoreNoteHeight);
+            var pillSize = new Vector2(
+                Mathf.Min(textSize.x, maxTextWidth) + TestStoreNotePaddingX + TestStoreNotePaddingX,
+                textSize.y + TestStoreNotePaddingY + TestStoreNotePaddingY);
+            UiBuilder.PlaceCentered(pill, pillSize);
+            var border = sources.Pill.border;
+            AddSliced(pill, sources.Pill, TestStoreNotePillColorHex, (border.y + border.w) / pillSize.y);
             return label;
         }
 
@@ -3262,8 +3536,22 @@ namespace GateRush.UI.Editor
             public int Layer { get; private set; }
             public TMP_FontAsset Font { get; private set; }
             public UiConfig Config { get; private set; }
+            /// <summary>The light pop-up panel, 9-sliced: overlays, cards, rows, the streak bar and its marker discs.</summary>
             public Sprite Panel { get; private set; }
+
+            /// <summary>The dark counter, 9-sliced: the HUD's timer, gold and lives.</summary>
+            public Sprite Pill { get; private set; }
+
+            /// <summary>The game's own white rounded rectangle, 9-sliced: every tinted plain shape.</summary>
+            public Sprite Plain { get; private set; }
+
             public Sprite Ribbon { get; private set; }
+            public Sprite BarTrack { get; private set; }
+            public Sprite BarFill { get; private set; }
+
+            /// <summary>The joker button's red corner badge, 9-sliced.</summary>
+            public Sprite Badge { get; private set; }
+
             public Sprite SoundOn { get; private set; }
             public Sprite SoundOff { get; private set; }
             public Sprite Heart { get; private set; }
@@ -3271,10 +3559,15 @@ namespace GateRush.UI.Editor
             public Sprite CoinStack { get; private set; }
             public Sprite Fire { get; private set; }
             public Sprite Check { get; private set; }
-            public Sprite Bar { get; private set; }
             public Sprite Phone { get; private set; }
             public Sprite Cross { get; private set; }
-            public Sprite Medal { get; private set; }
+            public Sprite GoldMedal { get; private set; }
+            public Sprite SilverMedal { get; private set; }
+            public Sprite BronzeMedal { get; private set; }
+
+            /// <summary>The gold ring over the chosen avatar's disc, drawn in its own colours.</summary>
+            public Sprite RingSelect { get; private set; }
+
             public Sprite Home { get; private set; }
             public Sprite Return { get; private set; }
             public Sprite Hourglass { get; private set; }
@@ -3282,14 +3575,8 @@ namespace GateRush.UI.Editor
             /// <summary>The red face of the confirmation's Lose a life, 9-sliced.</summary>
             public Sprite RedButton { get; private set; }
 
-            /// <summary>Lose a life's pressed look: the red flat sprite, the ribbon's.</summary>
-            public Sprite RedButtonPressed { get; private set; }
-
-            /// <summary>A joker button's square green face, 9-sliced, its depth strip at the foot.</summary>
+            /// <summary>A joker button's square green face, 9-sliced, its lip at the foot.</summary>
             public Sprite JokerFace { get; private set; }
-
-            /// <summary>A joker button's pressed look: the square green flat sprite.</summary>
-            public Sprite JokerFacePressed { get; private set; }
 
             /// <summary>A joker button's look while it cannot be pressed: the square grey face.</summary>
             public Sprite JokerFaceDisabled { get; private set; }
@@ -3337,13 +3624,18 @@ namespace GateRush.UI.Editor
                     throw new InvalidOperationException($"{UiConfigPath} has problems: {string.Join(" ", problems)} Nothing was written.");
                 }
 
-                return new Sources
+                var sources = new Sources
                 {
                     Layer = layer,
                     Font = font,
                     Config = config,
-                    Panel = LoadSprite(PanelSpritePath),
-                    Ribbon = LoadSprite(RibbonSpritePath),
+                    Panel = LoadSlicedSprite(PanelSpritePath),
+                    Pill = LoadSlicedSprite(PillSpritePath),
+                    Plain = LoadSlicedSprite(PlainSpritePath),
+                    Ribbon = LoadSlicedSprite(RibbonSpritePath),
+                    BarTrack = LoadSlicedSprite(BarTrackSpritePath),
+                    BarFill = LoadSlicedSprite(BarFillSpritePath),
+                    Badge = LoadSlicedSprite(BadgeSpritePath),
                     SoundOn = LoadSprite(SoundOnSpritePath),
                     SoundOff = LoadSprite(SoundOffSpritePath),
                     Heart = LoadSprite(HeartSpritePath),
@@ -3351,17 +3643,17 @@ namespace GateRush.UI.Editor
                     CoinStack = LoadSprite(CoinStackSpritePath),
                     Fire = LoadSprite(FireSpritePath),
                     Check = LoadSprite(CheckSpritePath),
-                    Bar = LoadSlicedSprite(BarSpritePath),
                     Phone = LoadSprite(PhoneSpritePath),
                     Cross = LoadSprite(CrossSpritePath),
-                    Medal = LoadSprite(MedalSpritePath),
+                    GoldMedal = LoadSprite(GoldMedalSpritePath),
+                    SilverMedal = LoadSprite(SilverMedalSpritePath),
+                    BronzeMedal = LoadSprite(BronzeMedalSpritePath),
+                    RingSelect = LoadSprite(RingSelectSpritePath),
                     Home = LoadSprite(HomeSpritePath),
                     Return = LoadSprite(ReturnSpritePath),
                     Hourglass = LoadSprite(HourglassSpritePath),
                     RedButton = LoadSlicedSprite(RedButtonSpritePath),
-                    RedButtonPressed = LoadSlicedSprite(RibbonSpritePath),
                     JokerFace = LoadSlicedSprite(JokerButtonSpritePath),
-                    JokerFacePressed = LoadSlicedSprite(JokerButtonPressedSpritePath),
                     JokerFaceDisabled = LoadSlicedSprite(JokerButtonDisabledSpritePath),
                     Lock = LoadSprite(LockSpritePath),
                     JokerIcons = LoadJokerIcons(),
@@ -3375,6 +3667,34 @@ namespace GateRush.UI.Editor
                     TopBar = LoadHandMade(TopBarName),
                     LevelButton = Single<LevelButton>(LoadHandMade(LevelButtonName), LevelButtonName)
                 };
+
+                RequireUsableTints(
+                    sources.ButtonClose, sources.ButtonPrimary, sources.ButtonRound, sources.ButtonSecondary, sources.HomePage,
+                    sources.TabBar, sources.TopBar, sources.LevelButton.gameObject);
+                return sources;
+            }
+
+            /// <summary>
+            /// Refuses a hand-made prefab holding a tint the build could not
+            /// apply — one with no target, or a role removed by Module 45,
+            /// such as a coin or heart tint the Top Bar still carries.
+            /// </summary>
+            private static void RequireUsableTints(params GameObject[] prefabs)
+            {
+                var missing = new List<string>();
+                foreach (var prefab in prefabs)
+                {
+                    foreach (var tint in prefab.GetComponentsInChildren<UiTint>(true))
+                    {
+                        tint.AddMissing(missing);
+                    }
+                }
+
+                if (missing.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"The hand-made prefabs hold tints the build cannot apply: {string.Join("; ", missing)}. Nothing was written.");
+                }
             }
         }
     }

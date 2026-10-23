@@ -153,11 +153,11 @@ namespace GateRush.Runtime
         [Tooltip("Empty space kept on each side of the framed board, and of any generator machine, when fitting the camera, in cells.")]
         [SerializeField] private float sideMarginCells = 0.3f;
 
-        [Tooltip("Part of the screen's height kept free above the board for the HUD, from 0 to 1. Top and bottom together must stay below 1.")]
-        [SerializeField] private float topBandScreenFraction = 0.14f;
+        [Tooltip("Part of the screen's height kept free above the board for the HUD, from 0 to 1. Top and bottom together must stay below 1. 0.16 holds the 306-unit HUD of the Module 45 follow-up — ribbon, timer, pills — at the 1920-unit reference height.")]
+        [SerializeField] private float topBandScreenFraction = 0.16f;
 
-        [Tooltip("Part of the screen's height kept free below the board for the HUD, from 0 to 1. Top and bottom together must stay below 1.")]
-        [SerializeField] private float bottomBandScreenFraction = 0.10f;
+        [Tooltip("Part of the screen's height kept free below the board for the joker bar, from 0 to 1. Top and bottom together must stay below 1. 0.14 holds the 272-unit bar of Module 45 at the 1920-unit reference height.")]
+        [SerializeField] private float bottomBandScreenFraction = 0.14f;
 
         [Tooltip("Thickness of the frame around the grid, in cells: above 0, at most 1. Closed gates are drawn at this thickness too.")]
         [SerializeField] private float frameThicknessCells = 0.45f;
@@ -521,9 +521,9 @@ namespace GateRush.Runtime
         [Tooltip("The cross on the close button, drawn in its own colours: Assets/ThirdParty/Kenney/GameIcons/cross.png, as Button Close's.")]
         [SerializeField] private Sprite introCloseCrossSprite;
 
-        [Tooltip("The full-screen dim behind the card; it covers the board and the HUD and swallows presses on them.")]
+        [Tooltip("The full-screen dim behind the card; it covers the board and the HUD and swallows presses on them. The UI Config's Scrim Color, as every overlay's: the project blends in linear light, so 0.85 dims as 0.6 would in gamma.")]
         [FormerlySerializedAs("resultBackdropColor")]
-        [SerializeField] private Color introBackdropColor = new Color(0f, 0f, 0f, 0.6f);
+        [SerializeField] private Color introBackdropColor = new Color(0f, 0f, 0f, 0.85f);
 
         [Tooltip("Seconds the card's opening pop takes: it fades in and grows from Intro Pop Start Scale. Runs on unscaled time.")]
         [FormerlySerializedAs("resultPopSeconds")]
@@ -574,10 +574,10 @@ namespace GateRush.Runtime
         [SerializeField] private Color introSubtitleColor = new Color(0.231f, 0.141f, 0.400f);
 
         [Tooltip("The area the illustration is centred in, and scaled down to when it is larger.")]
-        [SerializeField] private Vector2 introIllustrationSizeUnits = new Vector2(640f, 480f);
+        [SerializeField] private Vector2 introIllustrationSizeUnits = new Vector2(960f, 720f);
 
         [Tooltip("Canvas units one board cell is drawn at in an illustration. Every other size in it is the board's own, in cells.")]
-        [SerializeField] private float introCellUnits = 170f;
+        [SerializeField] private float introCellUnits = 255f;
 
         [Tooltip("Size of the arrow between the block and its gate on the How to Play card, in cells.")]
         [SerializeField] private float introHowToPlayArrowCells = 0.6f;
@@ -595,18 +595,16 @@ namespace GateRush.Runtime
         [SerializeField] private int introBonusSeconds = 5;
 
         [SerializeField] private Vector2 introTextBoxSizeUnits = new Vector2(900f, 260f);
-        [SerializeField] private float introTextBoxCornerUnits = 48f;
 
-        [Tooltip("Thickness of the text box's border, which is the frame's colour. Below the corner and below half the box's height.")]
-        [SerializeField] private float introTextBoxBorderUnits = 10f;
-
-        [SerializeField] private Color introTextBoxColor = new Color(1.00f, 0.95f, 0.82f);
+        [Tooltip("The text box behind the card's sentence, drawn 9-sliced at its own scale in its own colours, so it needs a border: the theme's dark pill, Assets/Art/Sprites/UI/pill.png.")]
+        [SerializeField] private Sprite introTextBoxSprite;
 
         [Tooltip("Space between the text box's edges and its text.")]
         [SerializeField] private float introTextPaddingUnits = 40f;
 
         [SerializeField] private float introTextFontSize = 52f;
-        [SerializeField] private Color introTextColor = new Color(0.20f, 0.14f, 0.30f);
+        [Tooltip("The sentence's colour: white, on the dark pill.")]
+        [SerializeField] private Color introTextColor = Color.white;
 
         [Tooltip("Space between the card's rows: close button, title, subtitle, illustration, text box.")]
         [SerializeField] private float introSpacingUnits = 36f;
@@ -638,10 +636,10 @@ namespace GateRush.Runtime
         [SerializeField] private string newJokerSubtitle = "New Joker Unlocked!";
 
         [Tooltip("The joker icon's size, centred in the illustration area with the sparkles around it.")]
-        [SerializeField] private float newJokerIconSizeUnits = 360f;
+        [SerializeField] private float newJokerIconSizeUnits = 540f;
 
-        [Tooltip("The joker icon's colour, its white sprite tinted: the theme's purple, #3B2466, readable on the grey panel.")]
-        [SerializeField] private Color newJokerIconColor = new Color(0.231f, 0.141f, 0.400f);
+        [Tooltip("The joker icon's colour: white, since the Joker Icons are drawn in their own colours (Module 45).")]
+        [SerializeField] private Color newJokerIconColor = Color.white;
 
         [Header("Sparkles (around a card's illustration)")]
         [Tooltip("One entry per sparkle: where it sits, from the illustration area's centre, as a fraction of the area's size; its size in canvas units; and where in the twinkle it starts, from 0 to below 1.")]
@@ -1234,14 +1232,8 @@ namespace GateRush.Runtime
         /// <summary>Size of an introduction card's text box, in canvas units.</summary>
         public Vector2 IntroTextBoxSizeUnits => introTextBoxSizeUnits;
 
-        /// <summary>Corner radius of the text box, in canvas units.</summary>
-        public float IntroTextBoxCornerUnits => introTextBoxCornerUnits;
-
-        /// <summary>Thickness of the text box's border, in canvas units.</summary>
-        public float IntroTextBoxBorderUnits => introTextBoxBorderUnits;
-
-        /// <summary>Fill of the text box.</summary>
-        public Color IntroTextBoxColor => introTextBoxColor;
+        /// <summary>The text box, drawn 9-sliced in its own colours.</summary>
+        public Sprite IntroTextBoxSprite => introTextBoxSprite;
 
         /// <summary>Space between the text box's edges and its text, in canvas units.</summary>
         public float IntroTextPaddingUnits => introTextPaddingUnits;
@@ -1985,15 +1977,9 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Intro Count and Intro Bonus Seconds must be at least 1.");
             }
 
-            if (!(introTextBoxSizeUnits.x > 0f && introTextBoxSizeUnits.y > 0f && introTextBoxCornerUnits > 0f))
+            if (!(introTextBoxSizeUnits.x > 0f && introTextBoxSizeUnits.y > 0f))
             {
-                problems.Add($"{name}: Intro Text Box Size Units and Intro Text Box Corner Units must be positive.");
-            }
-
-            if (!(introTextBoxBorderUnits > 0f && introTextBoxBorderUnits < introTextBoxCornerUnits
-                  && introTextBoxBorderUnits < introTextBoxSizeUnits.y * 0.5f))
-            {
-                problems.Add($"{name}: Intro Text Box Border Units must be positive, below Intro Text Box Corner Units and below half the box's height.");
+                problems.Add($"{name}: Intro Text Box Size Units must be positive.");
             }
 
             if (!(introTextPaddingUnits >= 0f && 2f * introTextPaddingUnits < introTextBoxSizeUnits.x
@@ -2103,8 +2089,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The constraints on the introduction card's theme (Module 41), each
-        /// message naming its field: the font and the three sprites are
-        /// assigned, the panel sprite has a border to be drawn 9-sliced, the
+        /// message naming its field: the font and the four sprites are
+        /// assigned, the panel and text box sprites have a border to be drawn
+        /// 9-sliced, the
         /// padding is not negative, and the pop takes a positive time from a
         /// positive scale.
         /// </summary>
@@ -2115,14 +2102,8 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Intro Font is not assigned; assign Assets/ThirdParty/Fonts/Fredoka/Fredoka-Bold SDF.asset.");
             }
 
-            if (introPanelSprite == null)
-            {
-                problems.Add($"{name}: Intro Panel Sprite is not assigned; assign Assets/ThirdParty/Kenney/UIPack/Grey/button_square_flat.png.");
-            }
-            else if (introPanelSprite.border == Vector4.zero)
-            {
-                problems.Add($"{name}: Intro Panel Sprite is drawn 9-sliced, so it needs a border (Sprite Editor: Border); it has none.");
-            }
+            AddIfUnslicedIntroSprite(problems, introPanelSprite, "Intro Panel Sprite", "Assets/Art/Sprites/UI/panel.png");
+            AddIfUnslicedIntroSprite(problems, introTextBoxSprite, "Intro Text Box Sprite", "Assets/Art/Sprites/UI/pill.png");
 
             if (introCloseSprite == null)
             {
@@ -2368,6 +2349,23 @@ namespace GateRush.Runtime
             if (!(value > 0f) || float.IsInfinity(value))
             {
                 problems.Add($"{name}: {field} must be positive and finite.");
+            }
+        }
+
+        /// <summary>
+        /// An introduction card sprite drawn 9-sliced: reported when it is
+        /// not assigned, naming <paramref name="expectedPath"/>, or when it
+        /// has no border to slice by.
+        /// </summary>
+        private void AddIfUnslicedIntroSprite(List<string> problems, Sprite sprite, string field, string expectedPath)
+        {
+            if (sprite == null)
+            {
+                problems.Add($"{name}: {field} is not assigned; assign {expectedPath}.");
+            }
+            else if (sprite.border == Vector4.zero)
+            {
+                problems.Add($"{name}: {field} is drawn 9-sliced, so it needs a border (Sprite Editor: Border); it has none.");
             }
         }
 

@@ -18,8 +18,11 @@ namespace GateRush.Tests
     /// Module 37's win streak texts and Streak colour are checked the same
     /// way, and each joker kind reads its own name. Module 38's Profile and
     /// Haptics texts are checked the same way. Module 39's Leaderboard texts
-    /// and colours are checked the same way, and the first three ranks read
-    /// their own medal colour while every other rank has none. Module 40's
+    /// and colours are checked the same way. Module 45: the defaults lack
+    /// only the three paintings; an empty list, a missing painting, a first
+    /// start other than 1 and starts not rising are reported; and each
+    /// campaign level, and a finished campaign, show the right painting.
+    /// Module 40's
     /// level HUD texts, formats and colours are checked the same way, an
     /// unusable timing is reported, the defaults read as specified, and the
     /// selected joker's ring reads its own colour. Module 41's level panel
@@ -28,26 +31,121 @@ namespace GateRush.Tests
     /// </summary>
     public class UiConfigTests
     {
+        // The spec's paintings: day from level 1, sunset from 11, night from 21.
+        private const int DayStart = 1;
+        private const int SunsetStart = 11;
+        private const int NightStart = 21;
+        private const int BackgroundCount = 3;
+
         private UiConfig config;
+        private Texture2D texture;
+        private Sprite day;
+        private Sprite sunset;
+        private Sprite night;
 
         [SetUp]
         public void SetUp()
         {
             config = ScriptableObject.CreateInstance<UiConfig>();
+            texture = new Texture2D(2, 3);
+            day = Painting("day");
+            sunset = Painting("sunset");
+            night = Painting("night");
         }
 
         [TearDown]
         public void TearDown()
         {
             Object.DestroyImmediate(config);
+            Object.DestroyImmediate(day);
+            Object.DestroyImmediate(sunset);
+            Object.DestroyImmediate(night);
+            Object.DestroyImmediate(texture);
         }
 
         [Test]
-        public void Problems_Defaults_ReportNothing()
+        public void Problems_Defaults_ReportOnlyTheThreeUnassignedPaintings()
         {
             var problems = config.Problems();
 
+            Assert.AreEqual(BackgroundCount, problems.Count, string.Join(" | ", problems));
+            Assert.That(problems, Has.All.Contains("Painting is not assigned"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DefaultsWithPaintings_ReportNothing()
+        {
+            SetBackgrounds((DayStart, day), (SunsetStart, sunset), (NightStart, night));
+
+            var problems = config.Problems();
+
             Assert.IsEmpty(problems, string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NoBackgrounds_IsReported()
+        {
+            SetBackgrounds();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Backgrounds is empty"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_BackgroundWithoutPainting_IsReportedByElement()
+        {
+            SetBackgrounds((DayStart, day), (SunsetStart, null), (NightStart, night));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Backgrounds element 1: Painting is not assigned"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_FirstBackgroundNotAtLevelOne_IsReported()
+        {
+            SetBackgrounds((DayStart + 1, day), (SunsetStart, sunset));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Backgrounds element 0: Start Level must be 1"), string.Join(" | ", problems));
+        }
+
+        [TestCase(DayStart, TestName = "Problems_BackgroundStartingWithThePrevious_IsReported")]
+        [TestCase(DayStart - 1, TestName = "Problems_BackgroundStartingBelowThePrevious_IsReported")]
+        public void Problems_BackgroundStartNotRising_IsReported(int secondStart)
+        {
+            SetBackgrounds((DayStart, day), (secondStart, sunset));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Backgrounds element 1: Start Level must be above element 0's"), string.Join(" | ", problems));
+        }
+
+        [TestCase(1, "day")]
+        [TestCase(10, "day")]
+        [TestCase(11, "sunset")]
+        [TestCase(20, "sunset")]
+        [TestCase(21, "night")]
+        [TestCase(30, "night")]
+        public void BackgroundFor_CampaignLevel_IsTheLastPaintingReached(int level, string expected)
+        {
+            SetBackgrounds((DayStart, day), (SunsetStart, sunset), (NightStart, night));
+
+            var painting = config.BackgroundFor(level);
+
+            Assert.AreEqual(expected, painting.name);
+        }
+
+        [Test]
+        public void BackgroundFor_FinishedCampaign_IsTheLastPainting()
+        {
+            SetBackgrounds((DayStart, day), (SunsetStart, sunset), (NightStart, night));
+
+            var painting = config.BackgroundFor(null);
+
+            Assert.AreEqual(night, painting);
         }
 
         [TestCase("playLevelFormat", "Play Level Format")]
@@ -56,6 +154,7 @@ namespace GateRush.Tests
         [TestCase("livesCountFormat", "Lives Count Format")]
         [TestCase("livesFractionFormat", "Lives Fraction Format")]
         [TestCase("livesFullLabel", "Lives Full Label")]
+        [TestCase("nextLifeLabel", "Next Life Label")]
         [TestCase("waitFormat", "Wait Format")]
         [TestCase("refillFormat", "Refill Format")]
         [TestCase("levelNumberFormat", "Level Number Format")]
@@ -118,6 +217,7 @@ namespace GateRush.Tests
         [TestCase("restartButtonLabel", "Restart Button Label")]
         [TestCase("goldEarnedFormat", "Gold Earned Format")]
         [TestCase("closingMessage", "Closing Message")]
+        [TestCase("lifeLostLabel", "Life Lost Label")]
         [TestCase("leaveLevelTitle", "Leave Level Title")]
         [TestCase("restartLevelTitle", "Restart Level Title")]
         [TestCase("loseLifeLine", "Lose Life Line")]
@@ -185,18 +285,13 @@ namespace GateRush.Tests
         [TestCase("backgroundColor", "Background Color")]
         [TestCase("iconColor", "Icon Color")]
         [TestCase("idleTabIconColor", "Idle Tab Icon Color")]
-        [TestCase("coinColor", "Coin Color")]
-        [TestCase("heartColor", "Heart Color")]
         [TestCase("streakColor", "Streak Color")]
         [TestCase("buttonLabelColor", "Button Label Color")]
         [TestCase("disabledButtonLabelColor", "Disabled Button Label Color")]
-        [TestCase("goldMedalColor", "Gold Medal Color")]
-        [TestCase("silverMedalColor", "Silver Medal Color")]
-        [TestCase("bronzeMedalColor", "Bronze Medal Color")]
         [TestCase("leaderboardHighlightColor", "Leaderboard Highlight Color")]
         [TestCase("leaderboardRowColor", "Leaderboard Row Color")]
         [TestCase("jokerSelectedColor", "Joker Selected Color")]
-        [TestCase("jokerBadgeColor", "Joker Badge Color")]
+        [TestCase("scrimColor", "Scrim Color")]
         [TestCase("timerColor", "Timer Color")]
         [TestCase("timerWarningColor", "Timer Warning Color")]
         [TestCase("timeBonusColor", "Time Bonus Color")]
@@ -215,11 +310,9 @@ namespace GateRush.Tests
         [TestCase(UiColorRole.Background, "backgroundColor")]
         [TestCase(UiColorRole.Icon, "iconColor")]
         [TestCase(UiColorRole.IdleTabIcon, "idleTabIconColor")]
-        [TestCase(UiColorRole.Coin, "coinColor")]
-        [TestCase(UiColorRole.Heart, "heartColor")]
         [TestCase(UiColorRole.Streak, "streakColor")]
         [TestCase(UiColorRole.JokerSelected, "jokerSelectedColor")]
-        [TestCase(UiColorRole.JokerBadge, "jokerBadgeColor")]
+        [TestCase(UiColorRole.Scrim, "scrimColor")]
         public void ColorOf_Role_IsItsOwnField(UiColorRole role, string field)
         {
             // A colour no default has, so a role reading another field fails.
@@ -339,29 +432,6 @@ namespace GateRush.Tests
             Assert.AreEqual("Marker", name);
         }
 
-        [TestCase(1, "goldMedalColor")]
-        [TestCase(2, "silverMedalColor")]
-        [TestCase(3, "bronzeMedalColor")]
-        public void TryGetMedalColor_FirstThreeRanks_IsTheirOwnField(int rank, string field)
-        {
-            var marker = new Color(0.12f, 0.34f, 0.56f, 0.78f);
-            SetColor(field, marker);
-
-            var hasMedal = config.TryGetMedalColor(rank, out var color);
-
-            Assert.IsTrue(hasMedal);
-            Assert.AreEqual(marker, color);
-        }
-
-        [TestCase(0)]
-        [TestCase(4)]
-        public void TryGetMedalColor_OtherRank_HasNoMedal(int rank)
-        {
-            var hasMedal = config.TryGetMedalColor(rank, out _);
-
-            Assert.IsFalse(hasMedal);
-        }
-
         [Test]
         public void JokerName_UndeclaredKind_Throws()
         {
@@ -407,6 +477,30 @@ namespace GateRush.Tests
             }
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        /// <summary>Replaces the backgrounds with <paramref name="entries"/>, in order; a null painting stays unassigned.</summary>
+        private void SetBackgrounds(params (int startLevel, Sprite painting)[] entries)
+        {
+            var serialized = new SerializedObject(config);
+            var list = serialized.FindProperty("backgrounds");
+            Assert.IsNotNull(list, "UiConfig has no serialized field 'backgrounds'.");
+            list.arraySize = entries.Length;
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var entry = list.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("startLevel").intValue = entries[i].startLevel;
+                entry.FindPropertyRelative("painting").objectReferenceValue = entries[i].painting;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private Sprite Painting(string spriteName)
+        {
+            var sprite = Sprite.Create(texture, new Rect(0f, 0f, texture.width, texture.height), Vector2.zero);
+            sprite.name = spriteName;
+            return sprite;
         }
 
         private void SetString(string field, string value)

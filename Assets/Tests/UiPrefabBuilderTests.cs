@@ -43,14 +43,29 @@ namespace GateRush.Tests
     /// buttons are the theme's prefabs, Lose a life a red Button Primary and
     /// Menu a Button Round with the home icon, neither has a close button,
     /// and their texts come from the UI Config. Module 42's joker buttons are
-    /// square Button Primaries with the square face, pressed and grey
-    /// disabled looks, the icon centred above the depth strip and the red
-    /// badge hanging off the bottom-right corner, widening leftwards; every
-    /// coin-tinted graphic draws the owner's coin or pile of coins. Module
-    /// 43: the joker buttons and the Store's cards have the lock wired,
-    /// centred on their icons and saved hidden; the joker buttons' glow is
-    /// saved hidden behind the ring and the button; a Store card shown locked
-    /// hides the count and the buy button, and shown again restores them.
+    /// square Button Primaries with the square face and grey disabled look,
+    /// the icon centred above the lip and the red badge hanging off the
+    /// bottom-right corner, widening leftwards; every coin draws the owner's
+    /// coin or pile of coins. Module 43: the joker buttons and the Store's
+    /// cards have the lock wired, centred on their icons and saved hidden;
+    /// the joker buttons' glow is saved hidden behind the ring and the
+    /// button; a Store card shown locked hides the count and the buy button,
+    /// and shown again restores them. Module 45: the build draws the new
+    /// interface art, never tinted and never a replaced piece; there is no
+    /// pressed look until Module 46; the joker buttons, badge and gap are
+    /// about 1.4 times Module 42's and stay inside the row clear of its foot;
+    /// the Front End's painting envelops the screen behind everything; and
+    /// the Leaderboard Row holds the three medals. Its follow-up: the HUD's
+    /// Menu and Restart are one large size, mirrored; the level label sits on
+    /// the ribbon above the timer; the icons hang off their pills' left ends;
+    /// the pills are symmetric and the gold pill centres alone; every part
+    /// stays inside the row, which the top band holds unscaled; the white
+    /// glyphs are 55 to 60 percent of their round buttons; every scrim is the
+    /// UI Config's; the result panel shows a loss's hourglass and lost life
+    /// and its Menu is close to the other buttons' height; Profile's name
+    /// field is the pill with white text and the chosen avatar wears the gold
+    /// ring; "Next life in" sits above the wait; and the Win Streak rule sits
+    /// right under the shipped ladder.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -77,6 +92,7 @@ namespace GateRush.Tests
         private const string TintRoleField = "role";
         private const string TintTargetField = "target";
         private const float ExpectedScrollSensitivity = 20f;
+        private const float Tolerance = 1e-4f;
 
         private const string LevelUiName = "Level UI";
         private const string LevelHudName = "Level HUD";
@@ -88,16 +104,96 @@ namespace GateRush.Tests
 
         private const string ResultOverlayName = "Result Overlay";
         private const string ConfirmOverlayName = "Confirm Overlay";
-        private const string RedButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_depth_gradient.png";
-        private const string RedButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Red/button_rectangle_flat.png";
+        private const string RedButtonSpritePath = "Assets/Art/Sprites/UI/button_rect_red.png";
 
         private const string CoinSpritePath = "Assets/Art/Sprites/UI/coin.png";
         private const string CoinsSpritePath = "Assets/Art/Sprites/UI/coins.png";
 
-        private const string JokerButtonSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_depth_gradient.png";
-        private const string JokerButtonPressedSpritePath = "Assets/ThirdParty/Kenney/UIPack/Green/button_square_flat.png";
-        private const string JokerButtonDisabledSpritePath = "Assets/ThirdParty/Kenney/UIPack/Grey/button_square_depth_gradient.png";
-        private const string LockSpritePath = "Assets/ThirdParty/Kenney/GameIcons/locked.png";
+        private const string JokerButtonSpritePath = "Assets/Art/Sprites/UI/button_square_green.png";
+        private const string JokerButtonDisabledSpritePath = "Assets/Art/Sprites/UI/button_square_grey.png";
+        private const string LockSpritePath = "Assets/Art/Sprites/UI/lock.png";
+
+        // Module 45: the owner's interface art, drawn in its own colours.
+        private const string InterfaceArtFolder = "Assets/Art/Sprites/UI/";
+        private const string BadgeSpritePath = "Assets/Art/Sprites/UI/badge.png";
+        private const string GoldMedalSpritePath = "Assets/Art/Sprites/UI/medal_gold.png";
+        private const string SilverMedalSpritePath = "Assets/Art/Sprites/UI/medal_silver.png";
+        private const string BronzeMedalSpritePath = "Assets/Art/Sprites/UI/medal_bronze.png";
+
+        // Everything an image the builder itself draws may show since Module
+        // 45: the game's own art — the generated avatars among it since the
+        // follow-up — and the white Kenney glyphs kept on the new buttons.
+        // Anything else is a replaced piece.
+        private const string OwnArtFolder = "Assets/Art/";
+
+        private static string[] KeptKenneyGlyphs => new[]
+        {
+            "Assets/ThirdParty/Kenney/GameIcons/audioOn.png", "Assets/ThirdParty/Kenney/GameIcons/audioOff.png",
+            "Assets/ThirdParty/Kenney/GameIcons/phone.png", "Assets/ThirdParty/Kenney/GameIcons/cross.png",
+            "Assets/ThirdParty/Kenney/GameIcons/home.png", "Assets/ThirdParty/Kenney/GameIcons/return.png",
+            "Assets/ThirdParty/Kenney/UIPack/Green/icon_checkmark.png"
+        };
+
+        // The Module 45 follow-up.
+        private const string RuntimeConfigPath = "Assets/Config/RuntimeConfig.asset";
+        private const string MetaConfigPath = "Assets/Config/MetaConfig.asset";
+        private const string RibbonSpritePath = "Assets/Art/Sprites/UI/ribbon.png";
+        private const string PillSpritePath = "Assets/Art/Sprites/UI/pill.png";
+        private const string HourglassSpritePath = "Assets/Art/Sprites/UI/hourglass.png";
+        private const string HeartSpritePath = "Assets/Art/Sprites/UI/heart.png";
+        private const string RingSelectSpritePath = "Assets/Art/Sprites/UI/ring_select.png";
+
+        // The Level scene's Canvas Scaler reference height, which the HUD's
+        // row is laid out at.
+        private const float ReferenceHeight = 1920f;
+
+        // A pill icon is about 1.3 times its pill's height.
+        private const float PillIconMinShare = 1.25f;
+        private const float PillIconMaxShare = 1.35f;
+
+        // A white glyph on a round button is 45 to 50 percent of it, since the
+        // Round Glyph And Top Bar Fix. A Kenney glyph's drawing fills about 64
+        // percent of its square (measured on home, return, audioOn, audioOff,
+        // phone and plus).
+        private const float GlyphMinShare = 0.45f;
+        private const float GlyphMaxShare = 0.50f;
+        private const float KenneyGlyphFill = 0.64f;
+
+        // The result panel's Menu is close to the rectangular buttons' height.
+        private const float MenuMinHeightShare = 0.9f;
+
+        // The rule sits right under the ladder: at most this far below it.
+        private const float RuleMaxGap = 24f;
+
+        // The Lives overlay's heart, about 120 tall, and where every panel's
+        // foot button sits.
+        private const float LivesHeartHeight = 120f;
+        private const float PanelButtonPosY = 70f;
+
+        // A scrolling list's soft edge: 40 units at the top and bottom.
+        private const int SoftEdgeUnits = 40;
+
+        // The Store's test store line: its padding inside the pill, the
+        // pill's opacity, and the column it must fit (1080 less 40 a side).
+        private const float NotePaddingX = 24f;
+        private const float NotePaddingY = 10f;
+        private const float NotePillAlpha = 0.7f;
+        private const float ColourTolerance = 0.01f;
+        private const float StoreColumnWidth = 1000f;
+
+        // Every overlay the build draws over a scrim.
+        private static string[] ScrimmedOverlayNames => new[]
+        {
+            "Settings Overlay", "Levels Overlay", "Lives Overlay", "Not Enough Gold Overlay", "Message Overlay",
+            "Test Purchase Overlay", "Win Streak Overlay", "Streak Reward Overlay", ProfileOverlayName, GoldPacksOverlayName,
+            ResultOverlayName, ConfirmOverlayName
+        };
+
+        // Module 42's joker bar, which Module 45 makes about 1.4 times larger.
+        private const float Module42JokerButtonSize = 140f;
+        private const float Module42BadgeSize = 52f;
+        private const float Module42JokerSlotPitch = 280f;
+        private const float AboutOnePointFourTimes = 1.35f;
 
         private static string[] OutputNames => new[]
         {
@@ -201,7 +297,7 @@ namespace GateRush.Tests
 
         [TestCase(typeof(SettingsOverlay), 9)]
         [TestCase(typeof(LevelsOverlay), 3)]
-        [TestCase(typeof(LivesOverlay), 5)]
+        [TestCase(typeof(LivesOverlay), 6)]
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
         [TestCase(typeof(MessageOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
@@ -211,7 +307,7 @@ namespace GateRush.Tests
         [TestCase(typeof(StreakBar), 6)]
         [TestCase(typeof(ProfileOverlay), 16)]
         [TestCase(typeof(LeaderboardScreen), 7)]
-        [TestCase(typeof(FrontEnd), 18)]
+        [TestCase(typeof(FrontEnd), 20)]
         public void Build_View_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(FrontEndName).GetComponentInChildren(viewType, true);
@@ -315,7 +411,21 @@ namespace GateRush.Tests
             var row = LoadBuilt(LeaderboardRowName).GetComponent<LeaderboardRow>();
             Assert.IsNotNull(row, nameof(LeaderboardRow));
 
-            AssertEveryReferenceAssigned(row, 6);
+            AssertEveryReferenceAssigned(row, 9);
+        }
+
+        [Test]
+        public void Build_LeaderboardRow_MedalsAreTheThreeMedalSpritesInRankOrder()
+        {
+            var row = LoadBuilt(LeaderboardRowName).GetComponent<LeaderboardRow>();
+            Assert.IsNotNull(row, nameof(LeaderboardRow));
+
+            using (var serialized = new SerializedObject(row))
+            {
+                Assert.AreEqual(GoldMedalSpritePath, AssetDatabase.GetAssetPath(Reference<Sprite>(serialized, "goldMedal")));
+                Assert.AreEqual(SilverMedalSpritePath, AssetDatabase.GetAssetPath(Reference<Sprite>(serialized, "silverMedal")));
+                Assert.AreEqual(BronzeMedalSpritePath, AssetDatabase.GetAssetPath(Reference<Sprite>(serialized, "bronzeMedal")));
+            }
         }
 
         [Test]
@@ -410,37 +520,57 @@ namespace GateRush.Tests
                 }
             }
 
-            Assert.That(tints.Count, Is.GreaterThan(OverlayTypes.Length), "the coins, hearts, icons and background are tinted");
+            Assert.That(tints.Count, Is.GreaterThan(OverlayTypes.Length), "the white glyphs, the plain shapes and the background are tinted");
             CollectionAssert.IsEmpty(wrong, "tinted graphics without their UI Config colour");
         }
 
         [Test]
-        public void Build_CoinGraphics_AreTheOwnersCoinSprites()
+        public void Build_CoinGraphics_AreTheOwnersCoinSpritesDrawnWhite()
         {
-            var coinTints = OutputNames
-                .SelectMany(name => LoadBuilt(name).GetComponentsInChildren<UiTint>(true))
-                .Where(tint => RoleOf(tint) == UiColorRole.Coin)
+            var coins = BuilderDrawnImages()
+                .Where(image => image.name == "Coin" || image.name == "Coin Stack")
                 .ToList();
-            var paths = new List<string>();
-            var wrong = new List<string>();
-
-            foreach (var tint in coinTints)
-            {
-                using (var serialized = new SerializedObject(tint))
-                {
-                    var target = serialized.FindProperty(TintTargetField).objectReferenceValue as Image;
-                    var path = target == null ? null : AssetDatabase.GetAssetPath(target.sprite);
-                    paths.Add(path);
-                    if (path != CoinSpritePath && path != CoinsSpritePath)
-                    {
-                        wrong.Add($"{tint.name}: {path ?? "no image"}");
-                    }
-                }
-            }
+            var paths = coins.Select(image => AssetDatabase.GetAssetPath(image.sprite)).ToList();
+            var wrong = coins
+                .Where(image => (AssetDatabase.GetAssetPath(image.sprite) != CoinSpritePath && AssetDatabase.GetAssetPath(image.sprite) != CoinsSpritePath)
+                    || image.color != Color.white)
+                .Select(image => $"{image.name}: {AssetDatabase.GetAssetPath(image.sprite)} in {image.color}")
+                .ToList();
 
             CollectionAssert.Contains(paths, CoinSpritePath, "the single coin is drawn somewhere");
             CollectionAssert.Contains(paths, CoinsSpritePath, "the pile of coins is drawn somewhere");
-            CollectionAssert.IsEmpty(wrong, "coin-tinted graphics drawing another sprite");
+            CollectionAssert.IsEmpty(wrong, "coins drawing another sprite, or not in their own colours");
+        }
+
+        [Test]
+        public void Build_InterfaceArtTheBuildDraws_IsNeverTinted()
+        {
+            // The build's own tints only: the Tab Bar keeps its icons' tints,
+            // which dim the idle tabs' full-colour icons by design.
+            var tinted = OutputNames
+                .SelectMany(name => LoadBuilt(name).GetComponentsInChildren<UiTint>(true))
+                .Where(tint => PrefabUtility.GetCorrespondingObjectFromSource(tint) == null)
+                .Select(tint => (tint, image: TargetOf(tint) as Image))
+                .Where(pair => pair.image != null && AssetDatabase.GetAssetPath(pair.image.sprite).StartsWith(InterfaceArtFolder))
+                .Select(pair => $"{pair.tint.name} ({RoleOf(pair.tint)})")
+                .ToList();
+
+            CollectionAssert.IsEmpty(tinted, "tints on sprites drawn in their own colours");
+        }
+
+        [Test]
+        public void Build_BuilderDrawnImages_UseNoReplacedSprite()
+        {
+            var kept = KeptKenneyGlyphs;
+            var replaced = BuilderDrawnImages()
+                .Where(image => image.sprite != null)
+                .Select(image => (image, path: AssetDatabase.GetAssetPath(image.sprite)))
+                .Where(pair => !pair.path.StartsWith(OwnArtFolder) && !kept.Contains(pair.path))
+                .Select(pair => $"{pair.image.name}: {pair.path}")
+                .Distinct()
+                .ToList();
+
+            CollectionAssert.IsEmpty(replaced, "images still drawing a piece Module 45 replaced");
         }
 
         [Test]
@@ -522,7 +652,7 @@ namespace GateRush.Tests
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(MessageOverlay), 3)]
-        [TestCase(typeof(ResultOverlay), 13)]
+        [TestCase(typeof(ResultOverlay), 16)]
         [TestCase(typeof(ConfirmOverlay), 8)]
         public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
@@ -581,8 +711,7 @@ namespace GateRush.Tests
                     Assert.That(size.x, Is.GreaterThan(0f), $"{view.name} has a size");
                     Assert.AreEqual(size.x, size.y, $"{view.name} is square");
                     Assert.AreEqual(JokerButtonSpritePath, AssetDatabase.GetAssetPath(button.image.sprite), $"{view.name}'s face");
-                    Assert.AreEqual(
-                        JokerButtonPressedSpritePath, AssetDatabase.GetAssetPath(button.spriteState.pressedSprite), $"{view.name}'s pressed look");
+                    Assert.IsNull(button.spriteState.pressedSprite, $"{view.name} has no pressed look until Module 46");
                     Assert.AreEqual(
                         JokerButtonDisabledSpritePath, AssetDatabase.GetAssetPath(button.spriteState.disabledSprite), $"{view.name} is grey disabled");
                 }
@@ -666,9 +795,9 @@ namespace GateRush.Tests
                     var coin = Reference<GameObject>(serialized, "coin");
                     var corner = new Vector2(1f, 0f);
                     var fitter = badge.GetComponent<ContentSizeFitter>();
-                    var tint = badge.GetComponent<UiTint>();
+                    var badgeImage = badge.GetComponent<Image>();
                     Assert.IsNotNull(fitter, $"{view.name}'s badge has a ContentSizeFitter");
-                    Assert.IsNotNull(tint, $"{view.name}'s badge has a UiTint");
+                    Assert.IsNotNull(badgeImage, $"{view.name}'s badge has an Image");
 
                     Assert.AreEqual(button.transform, badge.parent, $"{view.name}'s badge is on the button");
                     Assert.AreEqual(badge, coin.transform.parent, $"{view.name}'s coin is in the badge");
@@ -678,13 +807,95 @@ namespace GateRush.Tests
                     Assert.That(badge.anchoredPosition.x, Is.GreaterThan(0f), $"{view.name}'s badge overlaps the right edge");
                     Assert.That(badge.anchoredPosition.y, Is.LessThan(0f), $"{view.name}'s badge overlaps the bottom edge");
                     Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.horizontalFit, $"{view.name}'s badge widens for a price");
-                    using (var tintSerialized = new SerializedObject(tint))
-                    {
-                        Assert.AreEqual(
-                            UiColorRole.JokerBadge, (UiColorRole)tintSerialized.FindProperty(TintRoleField).intValue, $"{view.name}'s badge is red");
-                    }
+                    Assert.AreEqual(BadgeSpritePath, AssetDatabase.GetAssetPath(badgeImage.sprite), $"{view.name}'s badge is the red badge");
+                    Assert.IsNull(badge.GetComponent<UiTint>(), $"{view.name}'s badge is drawn in its own colours");
                 }
             }
+        }
+
+        [Test]
+        public void Build_JokerBar_ButtonsBadgeAndGapAreAboutOnePointFourTimesModule42s()
+        {
+            var bar = LoadBuilt(JokerBarName).GetComponent<JokerBarView>();
+            Assert.IsNotNull(bar, nameof(JokerBarView));
+
+            using (var serialized = new SerializedObject(bar))
+            {
+                var clock = (RectTransform)Reference<JokerBarButton>(serialized, "clock").transform;
+                var rocket = (RectTransform)Reference<JokerBarButton>(serialized, "rocket").transform;
+                var broom = (RectTransform)Reference<JokerBarButton>(serialized, "broom").transform;
+                RectTransform badge;
+                using (var rocketSerialized = new SerializedObject(rocket.GetComponent<JokerBarButton>()))
+                {
+                    badge = (RectTransform)Label(rocketSerialized, "badgeLabel").transform.parent;
+                }
+
+                var pitch = rocket.anchoredPosition.x - clock.anchoredPosition.x;
+
+                Assert.That(rocket.sizeDelta.x, Is.GreaterThanOrEqualTo(Module42JokerButtonSize * AboutOnePointFourTimes), "the buttons");
+                Assert.That(badge.sizeDelta.y, Is.GreaterThanOrEqualTo(Module42BadgeSize * AboutOnePointFourTimes), "the badge");
+                Assert.That(badge.GetComponent<LayoutElement>().minWidth, Is.GreaterThanOrEqualTo(Module42BadgeSize * AboutOnePointFourTimes), "the badge's width");
+                Assert.That(pitch - rocket.sizeDelta.x, Is.GreaterThan(Module42JokerSlotPitch - Module42JokerButtonSize), "more room between them");
+                Assert.AreEqual(pitch, broom.anchoredPosition.x - rocket.anchoredPosition.x, Tolerance, "evenly spaced");
+            }
+        }
+
+        [Test]
+        public void Build_JokerBar_RaisedButtonsAndBadgesStayInsideTheRowClearOfItsFoot()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            var fit = LoadBuilt(JokerBarName).GetComponentInChildren<BandFit>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+            Assert.IsNotNull(fit, nameof(BandFit));
+            Vector2 design;
+            using (var serialized = new SerializedObject(fit))
+            {
+                design = serialized.FindProperty("designSize").vector2Value;
+            }
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var slot = (RectTransform)view.transform;
+                    var glow = Reference<Image>(serialized, "glow").rectTransform;
+                    var badge = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
+                    var raise = serialized.FindProperty("selectedRaise").floatValue;
+                    var half = slot.sizeDelta.y / 2f;
+
+                    var raisedGlowTop = slot.anchoredPosition.y + half + raise + glow.offsetMax.y;
+                    var badgeFoot = slot.anchoredPosition.y - half + badge.anchoredPosition.y;
+                    var rightEdge = slot.anchoredPosition.x + half + badge.anchoredPosition.x;
+
+                    Assert.That(raisedGlowTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised glow stays in the row");
+                    Assert.That(badgeFoot, Is.GreaterThan(-design.y / 2f), $"{view.name}'s badge stands off the row's foot");
+                    Assert.That(Mathf.Abs(rightEdge), Is.LessThanOrEqualTo(design.x / 2f), $"{view.name}'s badge stays in the row");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_FrontEnd_PaintingEnvelopesTheScreenBehindEverything()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var frontEnd = LoadBuilt(FrontEndName).GetComponent<FrontEnd>();
+            var painting = frontEnd.transform.Find("Background/Painting");
+            Assert.IsNotNull(painting, "Background/Painting");
+            var image = painting.GetComponent<Image>();
+            var fit = painting.GetComponent<AspectRatioFitter>();
+
+            using (var serialized = new SerializedObject(frontEnd))
+            {
+                Assert.AreEqual(image, Reference<Image>(serialized, "painting"));
+                Assert.AreEqual(fit, Reference<AspectRatioFitter>(serialized, "paintingFit"));
+            }
+
+            Assert.AreEqual(0, painting.parent.GetSiblingIndex(), "the Background, and so the painting, draws first");
+            Assert.AreEqual(config.BackgroundFor(1), image.sprite, "level 1's painting, as a new save shows");
+            Assert.IsFalse(image.raycastTarget);
+            Assert.AreEqual(AspectRatioFitter.AspectMode.EnvelopeParent, fit.aspectMode, "covers the screen, cropped, never stretched");
+            Assert.AreEqual(image.sprite.rect.width / image.sprite.rect.height, fit.aspectRatio, Tolerance, "at the painting's own ratio");
         }
 
         [Test]
@@ -796,7 +1007,7 @@ namespace GateRush.Tests
                 Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(lose));
                 Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(keep));
                 Assert.AreEqual(RedButtonSpritePath, AssetDatabase.GetAssetPath(lose.image.sprite), "Lose a life's face is red");
-                Assert.AreEqual(RedButtonPressedSpritePath, AssetDatabase.GetAssetPath(lose.spriteState.pressedSprite), "and so is its pressed look");
+                Assert.IsNull(lose.spriteState.pressedSprite, "no pressed look until Module 46");
                 Assert.AreEqual(primary.image.sprite, keep.image.sprite, "Keep playing keeps Button Primary's green");
             }
         }
@@ -815,6 +1026,7 @@ namespace GateRush.Tests
             {
                 Assert.AreEqual(config.LevelCompleteTitle, Label(serialized, "titleLabel").text);
                 Assert.AreEqual(config.ClosingMessage, Label(serialized, "messageLabel").text);
+                Assert.AreEqual(config.LifeLostLabel, Label(serialized, "lifeLostLabel").text);
                 Assert.AreEqual(config.NextButtonLabel, Label(serialized, "nextLabel").text);
                 Assert.AreEqual(config.RestartButtonLabel, Label(serialized, "winRestartLabel").text);
                 Assert.AreEqual(config.RestartButtonLabel, Label(serialized, "lossRestartLabel").text);
@@ -839,6 +1051,480 @@ namespace GateRush.Tests
 
             Assert.That(buttons.Count, Is.EqualTo(6), "Next, two Restarts and Menu; Lose a life and Keep playing");
             CollectionAssert.IsEmpty(closes, "the buttons are the way out");
+        }
+
+        [Test]
+        public void Build_LevelHud_MenuAndRestartAreTheSameLargeRoundButtonsMirroredAtTheSides()
+        {
+            var hud = LoadBuilt(LevelHudName).GetComponent<LevelHud>();
+            Assert.IsNotNull(hud, nameof(LevelHud));
+            var roundSize = ((RectTransform)AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePath("Button Round")).transform).sizeDelta;
+
+            using (var serialized = new SerializedObject(hud))
+            {
+                var menu = (RectTransform)Reference<Button>(serialized, "menuButton").transform;
+                var restart = (RectTransform)Reference<Button>(serialized, "restartButton").transform;
+
+                Assert.AreEqual(menu.sizeDelta, restart.sizeDelta, "the same size");
+                Assert.That(menu.sizeDelta.x, Is.GreaterThan(roundSize.x), "larger than Button Round's own");
+                Assert.AreEqual(new Vector2(0f, 1f), menu.anchorMin, "Menu at the top left");
+                Assert.AreEqual(new Vector2(1f, 1f), restart.anchorMin, "Restart at the top right");
+                Assert.AreEqual(-menu.anchoredPosition.x, restart.anchoredPosition.x, Tolerance, "mirrored across the row");
+                Assert.AreEqual(menu.anchoredPosition.y, restart.anchoredPosition.y, Tolerance, "at one height");
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_LevelLabelSitsOnTheRibbonAboveTheTimer()
+        {
+            var hud = LoadBuilt(LevelHudName).GetComponent<LevelHud>();
+            Assert.IsNotNull(hud, nameof(LevelHud));
+
+            using (var serialized = new SerializedObject(hud))
+            {
+                var label = Label(serialized, "levelLabel");
+                var timer = Reference<RectTransform>(serialized, "timer");
+                var ribbon = (RectTransform)label.transform.parent;
+
+                Assert.AreEqual(RibbonSpritePath, AssetDatabase.GetAssetPath(ribbon.GetComponent<Image>().sprite), "the label is on the ribbon");
+                Assert.AreEqual(timer.parent, ribbon.parent, "the ribbon and the timer share the row");
+                Assert.AreEqual(0f, ribbon.anchoredPosition.x, Tolerance, "the ribbon is centred");
+                Assert.AreEqual(0f, timer.anchoredPosition.x, Tolerance, "the timer is centred");
+                Assert.That(ExtentBelowTop(ribbon).bottom, Is.LessThanOrEqualTo(ExtentBelowTop(timer).top + Tolerance), "the timer is under the ribbon");
+                Assert.AreEqual(PillSpritePath, AssetDatabase.GetAssetPath(timer.GetComponent<Image>().sprite), "the timer is the pill");
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_IconsHangOffTheirPillsLeftEnds()
+        {
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{LevelHudName}.prefab");
+            try
+            {
+                var cases = new[]
+                {
+                    (pill: "Gold Pill", icon: "Coin", sprite: CoinSpritePath, isLarge: true),
+                    (pill: "Lives Pill", icon: "Heart", sprite: HeartSpritePath, isLarge: true),
+                    (pill: "Timer", icon: "Hourglass", sprite: HourglassSpritePath, isLarge: false)
+                };
+
+                foreach (var (pillName, iconName, sprite, isLarge) in cases)
+                {
+                    var pill = Named(contents, pillName);
+                    var icon = Named(contents, iconName);
+                    var share = icon.sizeDelta.y / pill.sizeDelta.y;
+
+                    Assert.AreEqual(pill, icon.parent, $"{iconName} is on {pillName}");
+                    Assert.AreEqual(sprite, AssetDatabase.GetAssetPath(icon.GetComponent<Image>().sprite), iconName);
+                    Assert.AreEqual(new Vector2(0f, 0.5f), icon.anchorMin, $"{iconName} is placed from {pillName}'s left end");
+                    Assert.That(icon.anchoredPosition.x, Is.LessThan(0f), $"{iconName} hangs off {pillName}'s left end");
+                    Assert.That(icon.anchoredPosition.x + icon.sizeDelta.x, Is.GreaterThan(0f), $"{iconName} still overlaps {pillName}");
+                    if (isLarge)
+                    {
+                        Assert.That(share, Is.InRange(PillIconMinShare, PillIconMaxShare), $"{iconName} is about 1.3 times {pillName}'s height");
+                    }
+                    else
+                    {
+                        Assert.That(share, Is.GreaterThan(1f), $"{iconName} is taller than {pillName}");
+                    }
+                }
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_PillsAreSymmetricAndTheGoldPillCentresAlone()
+        {
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{LevelHudName}.prefab");
+            try
+            {
+                var pills = Named(contents, "Pills");
+                var gold = Named(contents, "Gold Pill");
+                var lives = Named(contents, "Lives Pill");
+
+                LayoutRebuilder.ForceRebuildLayoutImmediate(pills);
+                var goldX = gold.localPosition.x;
+                var livesX = lives.localPosition.x;
+                lives.gameObject.SetActive(false);
+                LayoutRebuilder.ForceRebuildLayoutImmediate(pills);
+                var aloneX = gold.localPosition.x;
+
+                Assert.AreEqual(gold.sizeDelta, lives.sizeDelta, "the pills are the same size");
+                Assert.That(livesX, Is.GreaterThan(goldX), "gold at the left, lives at the right");
+                Assert.AreEqual(-goldX, livesX, Tolerance, "symmetric about the centre");
+                Assert.AreEqual(0f, aloneX, Tolerance, "in free play the gold pill is centred");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_EveryPartStaysInsideTheRow()
+        {
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{LevelHudName}.prefab");
+            try
+            {
+                var row = (RectTransform)contents.GetComponentInChildren<BandFit>(true).transform;
+                LayoutRebuilder.ForceRebuildLayoutImmediate(Named(contents, "Pills"));
+                var bounds = row.rect;
+                var corners = new Vector3[4];
+                var outside = new List<string>();
+
+                foreach (var part in row.GetComponentsInChildren<RectTransform>(true).Where(part => part != row))
+                {
+                    part.GetWorldCorners(corners);
+                    foreach (var corner in corners)
+                    {
+                        var local = row.InverseTransformPoint(corner);
+                        if (local.x < bounds.xMin - Tolerance || local.x > bounds.xMax + Tolerance
+                            || local.y < bounds.yMin - Tolerance || local.y > bounds.yMax + Tolerance)
+                        {
+                            outside.Add($"{part.name} at {local}");
+                            break;
+                        }
+                    }
+                }
+
+                CollectionAssert.IsEmpty(outside, $"parts outside the {bounds.size} row");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        [Test]
+        public void Build_LevelHud_RowFitsTheTopBandAtTheReferenceUnscaled()
+        {
+            var runtimeConfig = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(RuntimeConfigPath);
+            Assert.IsNotNull(runtimeConfig, RuntimeConfigPath);
+            var fit = LoadBuilt(LevelHudName).GetComponentInChildren<BandFit>(true);
+            Assert.IsNotNull(fit, nameof(BandFit));
+
+            Vector2 designSize;
+            using (var serialized = new SerializedObject(fit))
+            {
+                designSize = serialized.FindProperty("designSize").vector2Value;
+            }
+
+            Assert.AreEqual(designSize, ((RectTransform)fit.transform).sizeDelta, "the row is laid out at its design size");
+            Assert.That(
+                designSize.y, Is.LessThanOrEqualTo(runtimeConfig.TopBandScreenFraction * ReferenceHeight),
+                "the top band holds the row without scaling it at the reference");
+        }
+
+        [Test]
+        public void Build_RoundButtons_WhiteGlyphsAreFortyFiveToFiftyPercentOfTheButton()
+        {
+            var shares = new List<(string what, float share)>();
+
+            ForEachLoaded(LevelHudName, contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<LevelHud>()))
+                {
+                    shares.Add(("HUD Menu", GlyphShare(Reference<Button>(serialized, "menuButton"))));
+                    shares.Add(("HUD Restart", GlyphShare(Reference<Button>(serialized, "restartButton"))));
+                }
+            });
+            ForEachLoaded(ResultOverlayName, contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<ResultOverlay>()))
+                {
+                    shares.Add(("result Menu", GlyphShare(Reference<Button>(serialized, "menuButton"))));
+                }
+            });
+            ForEachLoaded("Settings Overlay", contents =>
+            {
+                foreach (var look in new[] { "Sound On Look", "Sound Off Look", "Haptics On Look", "Haptics Off Look" })
+                {
+                    var rect = Named(contents, look);
+                    shares.Add((look, GlyphShareOf(rect, (RectTransform)rect.parent)));
+                }
+            });
+
+            var wrong = shares
+                .Where(pair => pair.share < GlyphMinShare || pair.share > GlyphMaxShare)
+                .Select(pair => $"{pair.what}: {pair.share:P0}")
+                .ToList();
+
+            Assert.AreEqual(7, shares.Count, "the HUD's two, the result panel's Menu and the four Settings looks");
+            CollectionAssert.IsEmpty(
+                wrong, "glyphs outside 45 to 50 percent of their button; run Gate Rush > Apply Hand-Made Prefab Settings, then rebuild");
+        }
+
+        [Test]
+        public void Build_RoundButtons_IconsKeepButtonRoundsGlyphAnchors()
+        {
+            var icons = new List<RectTransform>();
+
+            ForEachLoaded(LevelHudName, contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<LevelHud>()))
+                {
+                    icons.Add((RectTransform)Reference<Button>(serialized, "menuButton").transform.Find("Icon"));
+                    icons.Add((RectTransform)Reference<Button>(serialized, "restartButton").transform.Find("Icon"));
+                }
+
+                AssertGlyphBoxes(icons);
+            });
+            ForEachLoaded(ResultOverlayName, contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<ResultOverlay>()))
+                {
+                    AssertGlyphBoxes(new[] { (RectTransform)Reference<Button>(serialized, "menuButton").transform.Find("Icon") });
+                }
+            });
+            ForEachLoaded("Settings Overlay", contents =>
+            {
+                AssertGlyphBoxes(
+                    new[] { "Sound On Look", "Sound Off Look", "Haptics On Look", "Haptics Off Look" }.Select(look => Named(contents, look)));
+            });
+        }
+
+        [Test]
+        public void Build_Overlays_ScrimIsTintedWithTheScrimRole()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var wrong = new List<string>();
+
+            foreach (var name in ScrimmedOverlayNames)
+            {
+                var scrim = LoadBuilt(name).transform.Find("Scrim");
+                var image = scrim == null ? null : scrim.GetComponent<Image>();
+                var tint = scrim == null ? null : scrim.GetComponent<UiTint>();
+                if (image == null || tint == null || RoleOf(tint) != UiColorRole.Scrim || TargetOf(tint) != image
+                    || image.color != config.ScrimColor || !image.raycastTarget)
+                {
+                    wrong.Add(name);
+                }
+            }
+
+            CollectionAssert.IsEmpty(wrong, "overlays whose scrim is not the UI Config's, tinted by the Scrim role, catching presses");
+        }
+
+        [Test]
+        public void Build_ResultOverlay_LossArtIsTheHourglassAndTheLifeLostHeartSavedHidden()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var lossArt = (RectTransform)Reference<GameObject>(serialized, "lossArt").transform;
+                var lifeLost = (RectTransform)Reference<GameObject>(serialized, "lifeLost").transform;
+                var label = Label(serialized, "lifeLostLabel");
+                var panel = Reference<RectTransform>(serialized, "panel");
+                var buttons = (RectTransform)Reference<Button>(serialized, "nextButton").transform.parent;
+                var heart = lifeLost.GetComponentsInChildren<Image>(true).Single();
+                var buttonsTop = panel.sizeDelta.y - (buttons.anchoredPosition.y + buttons.sizeDelta.y);
+
+                Assert.AreEqual(HourglassSpritePath, AssetDatabase.GetAssetPath(lossArt.GetComponent<Image>().sprite));
+                Assert.AreEqual(HeartSpritePath, AssetDatabase.GetAssetPath(heart.sprite));
+                Assert.AreEqual(lifeLost, label.transform.parent, "the '-1' is beside the heart");
+                Assert.IsFalse(lossArt.gameObject.activeSelf, "saved hidden: the panel is written as a win");
+                Assert.IsFalse(lifeLost.gameObject.activeSelf, "saved hidden");
+                Assert.That(ExtentBelowTop(lossArt).bottom, Is.LessThanOrEqualTo(ExtentBelowTop(lifeLost).top + Tolerance), "the heart is under the hourglass");
+                Assert.That(ExtentBelowTop(lifeLost).bottom, Is.LessThanOrEqualTo(buttonsTop + Tolerance), "both clear of the buttons");
+            }
+        }
+
+        [Test]
+        public void Build_ResultOverlay_MenuIsCloseToTheRectangleButtonsHeight()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var menu = (RectTransform)Reference<Button>(serialized, "menuButton").transform;
+                var next = (RectTransform)Reference<Button>(serialized, "nextButton").transform;
+
+                Assert.That(menu.sizeDelta.y, Is.InRange(MenuMinHeightShare * next.sizeDelta.y, next.sizeDelta.y));
+                Assert.AreEqual(menu.sizeDelta.x, menu.sizeDelta.y, Tolerance, "still round");
+            }
+        }
+
+        [Test]
+        public void Build_ProfileOverlay_NameFieldIsThePillWithWhiteText()
+        {
+            var profile = LoadBuilt(ProfileOverlayName).GetComponent<ProfileOverlay>();
+            Assert.IsNotNull(profile, nameof(ProfileOverlay));
+
+            using (var serialized = new SerializedObject(profile))
+            {
+                var field = Reference<TMP_InputField>(serialized, "nameField");
+                var box = (Image)field.targetGraphic;
+
+                Assert.AreEqual(PillSpritePath, AssetDatabase.GetAssetPath(box.sprite), "the dark pill");
+                Assert.AreEqual(Color.white, box.color, "drawn in its own colours");
+                Assert.AreEqual(Color.white, field.textComponent.color, "white text");
+                Assert.IsTrue(field.customCaretColor);
+                Assert.AreEqual(Color.white, field.caretColor, "a white caret");
+            }
+        }
+
+        [Test]
+        public void Build_AvatarButton_SelectedMarkIsTheGoldRingOverTheDisc()
+        {
+            var cell = LoadBuilt(AvatarButtonName).GetComponent<AvatarButton>();
+            Assert.IsNotNull(cell, nameof(AvatarButton));
+
+            using (var serialized = new SerializedObject(cell))
+            {
+                var mark = (RectTransform)Reference<GameObject>(serialized, "selectedMark").transform;
+                var icon = Reference<Image>(serialized, "icon");
+                var ring = mark.GetComponent<Image>();
+
+                Assert.AreEqual(RingSelectSpritePath, AssetDatabase.GetAssetPath(ring.sprite), "the gold ring");
+                Assert.AreEqual(Color.white, ring.color, "drawn in its own colours");
+                Assert.IsNull(mark.GetComponent<UiTint>(), "never tinted");
+                Assert.IsFalse(ring.raycastTarget, "the disc takes the press");
+                Assert.IsFalse(mark.gameObject.activeSelf, "saved hidden");
+                Assert.AreEqual(icon.transform.parent, mark.parent);
+                Assert.That(mark.GetSiblingIndex(), Is.GreaterThan(icon.transform.GetSiblingIndex()), "drawn over the disc");
+                Assert.That(mark.offsetMin.x, Is.LessThan(0f), "around the disc, outside the cell");
+            }
+        }
+
+        [Test]
+        public void Build_LivesOverlay_NextLifeLabelSitsAboveTheWaitFromTheConfig()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var overlay = LoadBuilt("Lives Overlay").GetComponent<LivesOverlay>();
+            Assert.IsNotNull(overlay, nameof(LivesOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var nextLife = Label(serialized, "nextLifeLabel");
+                var status = Label(serialized, "statusLabel");
+
+                Assert.AreEqual(config.NextLifeLabel, nextLife.text);
+                Assert.IsFalse(nextLife.gameObject.activeSelf, "saved hidden, with the lives full");
+                Assert.AreEqual(nextLife.transform.parent, status.transform.parent);
+                Assert.That(
+                    ExtentBelowTop((RectTransform)nextLife.transform).bottom,
+                    Is.LessThanOrEqualTo(ExtentBelowTop((RectTransform)status.transform).top + Tolerance), "above the wait");
+            }
+        }
+
+        [Test]
+        public void Build_LivesOverlay_HeartNextLifeAndWaitStackWithoutOverlap()
+        {
+            var overlay = LoadBuilt("Lives Overlay").GetComponent<LivesOverlay>();
+            Assert.IsNotNull(overlay, nameof(LivesOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var count = (RectTransform)Label(serialized, "livesLabel").transform;
+                var heart = (RectTransform)count.parent;
+                var nextLife = (RectTransform)Label(serialized, "nextLifeLabel").transform;
+                var status = (RectTransform)Label(serialized, "statusLabel").transform;
+                var refill = (RectTransform)Reference<Button>(serialized, "refillButton").transform;
+                var panel = (RectTransform)heart.parent;
+                var sprite = heart.GetComponent<Image>().sprite;
+                var refillTop = panel.sizeDelta.y - (refill.anchoredPosition.y + refill.sizeDelta.y);
+                var title = ExtentBelowTop((RectTransform)panel.Find("Title"));
+
+                Assert.AreEqual(HeartSpritePath, AssetDatabase.GetAssetPath(sprite));
+                Assert.AreEqual(LivesHeartHeight, heart.sizeDelta.y, Tolerance, "about 120 tall");
+                Assert.AreEqual(sprite.rect.width / sprite.rect.height, heart.sizeDelta.x / heart.sizeDelta.y, Tolerance, "at its sprite's own aspect");
+                Assert.AreEqual(Vector2.zero, count.anchorMin, "the count is stretched in the heart, so centred");
+                Assert.AreEqual(Vector2.one, count.anchorMax, "the count is stretched in the heart, so centred");
+                Assert.That(ExtentBelowTop(heart).top, Is.GreaterThan(title.bottom), "the heart is under the title");
+                Assert.That(ExtentBelowTop(nextLife).top, Is.GreaterThan(ExtentBelowTop(heart).bottom), "'Next life in' is under the heart");
+                Assert.That(ExtentBelowTop(status).top, Is.GreaterThan(ExtentBelowTop(nextLife).bottom), "the wait is under 'Next life in'");
+                Assert.That(refillTop, Is.GreaterThan(ExtentBelowTop(status).bottom), "Refill is under the wait");
+                Assert.AreEqual(new Vector2(0.5f, 0f), refill.anchorMin, "Refill stays at the panel's foot");
+                Assert.AreEqual(PanelButtonPosY, refill.anchoredPosition.y, Tolerance, "Refill stays where it was");
+            }
+        }
+
+        [TestCase("Store Page")]
+        [TestCase(LeaderboardPageName)]
+        [TestCase("Levels Overlay")]
+        [TestCase(ProfileOverlayName)]
+        public void Build_ScrollViews_FadeAtTheirTopAndBottomEdges(string prefabName)
+        {
+            var scrollRect = LoadBuilt(prefabName).GetComponentsInChildren<ScrollRect>(true).Single();
+            var viewport = scrollRect.viewport;
+            var mask = viewport.GetComponent<RectMask2D>();
+            var layout = scrollRect.content.GetComponent<LayoutGroup>();
+
+            Assert.IsNotNull(mask, $"{prefabName}'s viewport clips with RectMask2D");
+            Assert.IsNull(viewport.GetComponent<Mask>(), $"{prefabName}'s viewport has no Mask");
+            Assert.AreEqual(new Vector2Int(0, SoftEdgeUnits), mask.softness, $"{prefabName}: soft at the top and bottom only");
+            Assert.IsNotNull(layout, $"{prefabName}'s list layout");
+            Assert.That(layout.padding.top, Is.GreaterThanOrEqualTo(SoftEdgeUnits), $"{prefabName}: nothing is faded at rest at the top");
+            Assert.That(layout.padding.bottom, Is.GreaterThanOrEqualTo(SoftEdgeUnits), $"{prefabName}: nothing is faded at rest at the bottom");
+        }
+
+        [Test]
+        public void Build_WinStreakOverlay_LadderKeepsAHardEdge()
+        {
+            var scrollRect = LoadBuilt("Win Streak Overlay").GetComponentsInChildren<ScrollRect>(true).Single();
+            var mask = scrollRect.viewport.GetComponent<RectMask2D>();
+
+            Assert.IsNotNull(mask);
+            Assert.AreEqual(Vector2Int.zero, mask.softness, "the ladder fits the shipped table and does not scroll, so no row fades");
+        }
+
+        [Test]
+        public void Build_StorePage_TestStoreNoteSitsOnTheDarkPill()
+        {
+            var screen = LoadBuilt("Store Page").GetComponent<StoreScreen>();
+            Assert.IsNotNull(screen, nameof(StoreScreen));
+
+            using (var serialized = new SerializedObject(screen))
+            {
+                var label = Label(serialized, "testStoreNote");
+                var text = (RectTransform)label.transform;
+                var pill = (RectTransform)text.parent;
+                var image = pill.GetComponent<Image>();
+
+                Assert.AreEqual(PillSpritePath, AssetDatabase.GetAssetPath(image.sprite), "the dark pill");
+                Assert.AreEqual(Image.Type.Sliced, image.type, "9-sliced");
+                Assert.AreEqual(NotePillAlpha, image.color.a, ColourTolerance, "about 70 percent opaque");
+                Assert.AreEqual(Color.white, new Color(image.color.r, image.color.g, image.color.b), "in its own colours");
+                Assert.AreEqual(Color.white, label.color, "the text stays white");
+                Assert.AreEqual(new Vector2(NotePaddingX, NotePaddingY), text.offsetMin, "padding inside the pill");
+                Assert.AreEqual(new Vector2(-NotePaddingX, -NotePaddingY), text.offsetMax, "padding inside the pill");
+                Assert.AreEqual(new Vector2(0.5f, 0.5f), pill.anchorMin, "centred in its slot");
+                Assert.AreEqual(Vector2.zero, pill.anchoredPosition, "centred in its slot");
+                Assert.That(pill.sizeDelta.x, Is.InRange(NotePaddingX + NotePaddingX, StoreColumnWidth), "sized to the text, within the column");
+                Assert.That(pill.sizeDelta.y, Is.GreaterThan(NotePaddingY + NotePaddingY), "sized to the text");
+            }
+        }
+
+        [Test]
+        public void Build_WinStreakOverlay_RuleSitsRightUnderTheShippedLadder()
+        {
+            var metaConfig = AssetDatabase.LoadAssetAtPath<MetaConfig>(MetaConfigPath);
+            Assert.IsNotNull(metaConfig, MetaConfigPath);
+            var rewards = metaConfig.ToRules().StreakRewards.Count;
+            var overlay = LoadBuilt("Win Streak Overlay").GetComponent<WinStreakOverlay>();
+            Assert.IsNotNull(overlay, nameof(WinStreakOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var rows = Reference<RectTransform>(serialized, "rows");
+                var rowHeight = Reference<StreakLadderRow>(serialized, "rowPrefab").GetComponent<LayoutElement>().preferredHeight;
+                var rule = (RectTransform)Label(serialized, "ruleLabel").transform;
+                var scroll = (RectTransform)rows.parent.parent;
+                var panel = (RectTransform)scroll.parent;
+                var spacing = rows.GetComponent<VerticalLayoutGroup>().spacing;
+                var ladder = panel.sizeDelta.y + scroll.offsetMax.y - scroll.offsetMin.y;
+                var gap = scroll.offsetMin.y - (rule.anchoredPosition.y + rule.sizeDelta.y);
+
+                Assert.AreEqual(rewards * rowHeight + (rewards - 1) * spacing, ladder, Tolerance, "the ladder shows the shipped table's rows, no more");
+                Assert.That(gap, Is.InRange(0f, RuleMaxGap), "the rule right under the ladder");
+            }
         }
 
         private static T Reference<T>(SerializedObject serialized, string field) where T : Object
@@ -866,6 +1552,84 @@ namespace GateRush.Tests
         }
 
         private static string HandMadePath(string name) => $"{HandMadeFolder}/{name}.prefab";
+
+        /// <summary>
+        /// Where <paramref name="rect"/> reaches, measured down from its
+        /// parent's top edge, for a rect anchored to that edge.
+        /// </summary>
+        private static (float top, float bottom) ExtentBelowTop(RectTransform rect)
+        {
+            Assert.AreEqual(1f, rect.anchorMin.y, $"{rect.name} is anchored to its parent's top");
+            Assert.AreEqual(1f, rect.anchorMax.y, $"{rect.name} is anchored to its parent's top");
+            var top = -(rect.anchoredPosition.y + (1f - rect.pivot.y) * rect.sizeDelta.y);
+            return (top, top + rect.sizeDelta.y);
+        }
+
+        /// <summary>The one RectTransform named <paramref name="name"/> under <paramref name="root"/>.</summary>
+        private static RectTransform Named(GameObject root, string name)
+        {
+            var found = root.GetComponentsInChildren<RectTransform>(true).Where(rect => rect.name == name).ToList();
+            Assert.AreEqual(1, found.Count, $"exactly one '{name}' under {root.name}");
+            return found[0];
+        }
+
+        /// <summary>Runs <paramref name="check"/> on the loaded contents of the built <paramref name="name"/>, so its rects are laid out.</summary>
+        private void ForEachLoaded(string name, Action<GameObject> check)
+        {
+            var contents = PrefabUtility.LoadPrefabContents($"{folder}/{name}.prefab");
+            try
+            {
+                check(contents);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        /// <summary>Each icon is anchored to Button Round's glyph box with no offsets, so it scales with its button.</summary>
+        private static void AssertGlyphBoxes(IEnumerable<RectTransform> icons)
+        {
+            foreach (var icon in icons)
+            {
+                Assert.IsNotNull(icon, "a round button's icon");
+                Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMin, icon.anchorMin, $"{icon.name} on {icon.parent.name}");
+                Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMax, icon.anchorMax, $"{icon.name} on {icon.parent.name}");
+                Assert.AreEqual(Vector2.zero, icon.anchoredPosition, $"{icon.name} on {icon.parent.name}: no offset");
+                Assert.AreEqual(Vector2.zero, icon.sizeDelta, $"{icon.name} on {icon.parent.name}: no offset");
+            }
+        }
+
+        /// <summary>How much of a round button its own icon's glyph covers.</summary>
+        private static float GlyphShare(Button button)
+        {
+            var icon = button.transform.Find("Icon") as RectTransform;
+            Assert.IsNotNull(icon, $"{button.name}'s Icon");
+            return GlyphShareOf(icon, (RectTransform)button.transform);
+        }
+
+        /// <summary>How much of <paramref name="button"/>'s width the Kenney glyph drawn in <paramref name="icon"/> covers.</summary>
+        private static float GlyphShareOf(RectTransform icon, RectTransform button) =>
+            Mathf.Min(icon.rect.width, icon.rect.height) / button.rect.width * KenneyGlyphFill;
+
+        private static Graphic TargetOf(UiTint tint)
+        {
+            using (var serialized = new SerializedObject(tint))
+            {
+                return serialized.FindProperty(TintTargetField).objectReferenceValue as Graphic;
+            }
+        }
+
+        /// <summary>
+        /// Every image the build itself draws in every built prefab: the
+        /// prefab's own objects, those it added to nested instances included,
+        /// but not the objects nested prefabs bring, which their own prefab
+        /// draws.
+        /// </summary>
+        private IEnumerable<Image> BuilderDrawnImages() =>
+            OutputNames
+                .SelectMany(name => LoadBuilt(name).GetComponentsInChildren<Image>(true))
+                .Where(image => PrefabUtility.GetCorrespondingObjectFromSource(image) == null);
 
         private static UiColorRole RoleOf(UiTint tint)
         {

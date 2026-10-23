@@ -13,24 +13,25 @@ namespace GateRush.UI
     /// D74): the texts that carry a number or change with the state, the
     /// level panels' titles, lines and labels, the joker names, the theme's
     /// colours, the colours that change at runtime, and the level HUD's and
-    /// panels' timing. Fixed English titles, layout and colours
+    /// panels' timing, and the front end's paintings by campaign level
+    /// (Module 45). Fixed English titles, layout and colours
     /// that never change live on the prefabs.
     /// </summary>
     /// <remarks>
     /// Formats are read with the invariant culture (<see cref="HomeTexts"/>).
     /// <see cref="Problems"/> reports a blank text, a format with a
     /// placeholder beyond the numbers it is given, a fully transparent
-    /// colour and an unusable timing, each by its field's name; the front end
+    /// colour, an unusable timing and an unusable list of paintings, each by
+    /// its field's name; the front end
     /// and the level's interface refuse to open with one
     /// (<see cref="FrontEnd.MissingSetup"/>, <see cref="LevelUi.MissingSetup"/>).
     /// </remarks>
     [CreateAssetMenu(fileName = "UiConfig", menuName = "Gate Rush/UI Config")]
     public sealed class UiConfig : ScriptableObject
     {
-        // The ranks that carry a medal (Module 39): fixed by the spec, not tuned.
-        private const int GoldRank = 1;
-        private const int SilverRank = 2;
-        private const int BronzeRank = 3;
+        // The campaign's first level, counted from 1: where the first
+        // painting must start. Fixed by the numbering, not tuned.
+        private const int FirstCampaignLevel = 1;
 
         [Header("Texts (formats use the invariant culture)")]
         [Tooltip("Home's play button while the campaign has a level; {0} is its number.")]
@@ -50,6 +51,9 @@ namespace GateRush.UI
 
         [Tooltip("Beside the lives while they are full, in the top bar and the Lives overlay.")]
         [SerializeField] private string livesFullLabel = "Full";
+
+        [Tooltip("Above the wait in the Lives overlay while a life is coming back; hidden while the lives are full.")]
+        [SerializeField] private string nextLifeLabel = "Next life in";
 
         [Tooltip("The time to the next life; {0} is the minutes and {1} the seconds, rounded up as the countdown is.")]
         [SerializeField] private string waitFormat = "{0}:{1:00}";
@@ -241,6 +245,9 @@ namespace GateRush.UI
         [Tooltip("The line under the title after the last campaign level.")]
         [SerializeField] private string closingMessage = "Thanks for playing!";
 
+        [Tooltip("Beside the heart under the hourglass on the result panel after a campaign loss: the life it cost (D57).")]
+        [SerializeField] private string lifeLostLabel = "-1";
+
         [Tooltip("The confirmation's title before Menu leaves a campaign level being played.")]
         [SerializeField] private string leaveLevelTitle = "Leave level?";
 
@@ -297,7 +304,7 @@ namespace GateRush.UI
         [SerializeField] private string lockedPrizeFormat = "+{0} {1}, opens at Level {2}";
 
         [Tooltip("The opacity a locked joker's icon is drawn at, on its button and on its Store card: above 0, at most 1.")]
-        [SerializeField] private float lockedIconAlpha = 0.4f;
+        [SerializeField] private float lockedIconAlpha = 0.6f;
 
         [Tooltip("Seconds one pulse of a marked joker button takes, from rest to its largest; it then eases back. Unscaled time. Positive.")]
         [SerializeField] private float markedPulseSeconds = 0.9f;
@@ -328,17 +335,23 @@ namespace GateRush.UI
         [Tooltip("A tab's icon while another tab is selected.")]
         [SerializeField] private Color idleTabIconColor = new Color(1f, 1f, 1f, 0.55f);
 
-        [SerializeField] private Color coinColor = new Color(1f, 0.80f, 0.20f);
-        [SerializeField] private Color heartColor = new Color(0.95f, 0.27f, 0.36f);
-
-        [Tooltip("The win streak's fire, the bar's fill and the next reward's highlight.")]
+        [Tooltip("The highlight behind the next reward's marker on the streak bar.")]
         [SerializeField] private Color streakColor = new Color(1f, 0.55f, 0.12f);
 
         [Tooltip("The ring around the selected Rocket or Broom in a level (D67).")]
         [SerializeField] private Color jokerSelectedColor = new Color(1f, 0.76f, 0.2f);
 
-        [Tooltip("The badge on a joker button's corner in a level, behind its count or price: the UI Pack's red.")]
-        [SerializeField] private Color jokerBadgeColor = new Color(0.93f, 0.15f, 0.28f);
+        [Tooltip("The dim behind every overlay's panel. The project blends in linear light, so 0.85 dims as 0.6 would in gamma.")]
+        [SerializeField] private Color scrimColor = new Color(0f, 0f, 0f, 0.85f);
+
+        [Header("Front end backgrounds (Module 45)")]
+        [Tooltip("The paintings behind the front end, each with the campaign level it starts at: the first at 1, the starts rising. The last one reached shows, and the last of all once the campaign is over.")]
+        [SerializeField] private BackgroundEntry[] backgrounds =
+        {
+            new BackgroundEntry(1),
+            new BackgroundEntry(11),
+            new BackgroundEntry(21),
+        };
 
         [Header("Colours that change")]
         [Tooltip("A button's label while it can be pressed.")]
@@ -346,15 +359,6 @@ namespace GateRush.UI
 
         [Tooltip("A button's label while it cannot be pressed, readable on the grey sprite.")]
         [SerializeField] private Color disabledButtonLabelColor = new Color(0.43f, 0.44f, 0.56f);
-
-        [Tooltip("The medal on the Leaderboard's first rank.")]
-        [SerializeField] private Color goldMedalColor = new Color(0.961f, 0.718f, 0.039f);
-
-        [Tooltip("The medal on the Leaderboard's second rank.")]
-        [SerializeField] private Color silverMedalColor = new Color(0.722f, 0.761f, 0.800f);
-
-        [Tooltip("The medal on the Leaderboard's third rank.")]
-        [SerializeField] private Color bronzeMedalColor = new Color(0.804f, 0.498f, 0.196f);
 
         [Tooltip("The player's own row on the Leaderboard.")]
         [SerializeField] private Color leaderboardHighlightColor = new Color(1f, 0.914f, 0.659f);
@@ -394,6 +398,9 @@ namespace GateRush.UI
 
         /// <summary>Shown beside the lives while they are full.</summary>
         public string LivesFullLabel => livesFullLabel;
+
+        /// <summary>Above the wait in the Lives overlay while a life is coming back.</summary>
+        public string NextLifeLabel => nextLifeLabel;
 
         /// <summary>The time to the next life; {0} the minutes, {1} the seconds.</summary>
         public string WaitFormat => waitFormat;
@@ -572,6 +579,9 @@ namespace GateRush.UI
         /// <summary>The line after the last campaign level.</summary>
         public string ClosingMessage => closingMessage;
 
+        /// <summary>Beside the heart on the result panel after a campaign loss.</summary>
+        public string LifeLostLabel => lifeLostLabel;
+
         /// <summary>The confirmation's title before leaving.</summary>
         public string LeaveLevelTitle => leaveLevelTitle;
 
@@ -647,9 +657,6 @@ namespace GateRush.UI
         /// <summary>The ring around the selected joker's button.</summary>
         public Color JokerSelectedColor => jokerSelectedColor;
 
-        /// <summary>The badge on a joker button's corner.</summary>
-        public Color JokerBadgeColor => jokerBadgeColor;
-
         /// <summary>The timer's digits.</summary>
         public Color TimerColor => timerColor;
 
@@ -674,14 +681,11 @@ namespace GateRush.UI
         /// <summary>A tab's icon while another tab is selected.</summary>
         public Color IdleTabIconColor => idleTabIconColor;
 
-        /// <summary>The gold's coin.</summary>
-        public Color CoinColor => coinColor;
-
-        /// <summary>The lives' heart.</summary>
-        public Color HeartColor => heartColor;
-
-        /// <summary>The win streak's fire, the bar's fill and the next reward's highlight.</summary>
+        /// <summary>The highlight behind the next reward's marker on the streak bar.</summary>
         public Color StreakColor => streakColor;
+
+        /// <summary>The dim behind every overlay's panel.</summary>
+        public Color ScrimColor => scrimColor;
 
         /// <summary>A button's label while it can be pressed.</summary>
         public Color ButtonLabelColor => buttonLabelColor;
@@ -695,37 +699,33 @@ namespace GateRush.UI
         /// <summary>Every other row on the Leaderboard.</summary>
         public Color LeaderboardRowColor => leaderboardRowColor;
 
-        /// <summary>The first rank's medal.</summary>
-        public Color GoldMedalColor => goldMedalColor;
-
-        /// <summary>The second rank's medal.</summary>
-        public Color SilverMedalColor => silverMedalColor;
-
-        /// <summary>The third rank's medal.</summary>
-        public Color BronzeMedalColor => bronzeMedalColor;
-
         /// <summary>
-        /// The medal colour of <paramref name="rank"/>: gold, silver and bronze
-        /// for the first three ranks. False, with <paramref name="color"/>
-        /// clear, for every other rank, which has no medal.
+        /// The painting behind the front end at <paramref name="campaignLevelNumber"/>
+        /// (Module 45): the last one whose start level the player has reached,
+        /// the first below every start, and the last of all when the number is
+        /// null — the campaign is over, or there is no level order. Null only
+        /// when the list is empty, which <see cref="Problems"/> reports.
         /// </summary>
-        public bool TryGetMedalColor(int rank, out Color color)
+        public Sprite BackgroundFor(int? campaignLevelNumber)
         {
-            switch (rank)
+            var entries = backgrounds ?? Array.Empty<BackgroundEntry>();
+            Sprite chosen = null;
+            var hasChosen = false;
+            for (var i = 0; i < entries.Length; i++)
             {
-                case GoldRank:
-                    color = goldMedalColor;
-                    return true;
-                case SilverRank:
-                    color = silverMedalColor;
-                    return true;
-                case BronzeRank:
-                    color = bronzeMedalColor;
-                    return true;
-                default:
-                    color = Color.clear;
-                    return false;
+                if (entries[i] == null)
+                {
+                    continue;
+                }
+
+                if (!hasChosen || !campaignLevelNumber.HasValue || entries[i].StartLevel <= campaignLevelNumber.Value)
+                {
+                    chosen = entries[i].Painting;
+                    hasChosen = true;
+                }
             }
+
+            return chosen;
         }
 
         /// <summary>The colour <paramref name="role"/> stands for.</summary>
@@ -740,16 +740,12 @@ namespace GateRush.UI
                     return iconColor;
                 case UiColorRole.IdleTabIcon:
                     return idleTabIconColor;
-                case UiColorRole.Coin:
-                    return coinColor;
-                case UiColorRole.Heart:
-                    return heartColor;
                 case UiColorRole.Streak:
                     return streakColor;
                 case UiColorRole.JokerSelected:
                     return jokerSelectedColor;
-                case UiColorRole.JokerBadge:
-                    return jokerBadgeColor;
+                case UiColorRole.Scrim:
+                    return scrimColor;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(role), role, "Not a colour role.");
             }
@@ -806,6 +802,7 @@ namespace GateRush.UI
             AddIfUnusableFormat(problems, livesCountFormat, 1, "Lives Count Format", "{0} for the lives");
             AddIfUnusableFormat(problems, livesFractionFormat, 2, "Lives Fraction Format", "{0} for the lives and {1} for the cap");
             AddIfBlank(problems, livesFullLabel, "Lives Full Label");
+            AddIfBlank(problems, nextLifeLabel, "Next Life Label");
             AddIfUnusableFormat(problems, waitFormat, 2, "Wait Format", "{0} for the minutes and {1} for the seconds");
             AddIfUnusableFormat(problems, refillFormat, 1, "Refill Format", "{0} for the price");
             AddIfUnusableFormat(problems, levelNumberFormat, 1, "Level Number Format", "{0} for the number");
@@ -870,6 +867,7 @@ namespace GateRush.UI
             AddIfBlank(problems, restartButtonLabel, "Restart Button Label");
             AddIfUnusableFormat(problems, goldEarnedFormat, 1, "Gold Earned Format", "{0} for the gold");
             AddIfBlank(problems, closingMessage, "Closing Message");
+            AddIfBlank(problems, lifeLostLabel, "Life Lost Label");
             AddIfBlank(problems, leaveLevelTitle, "Leave Level Title");
             AddIfBlank(problems, restartLevelTitle, "Restart Level Title");
             AddIfBlank(problems, loseLifeLine, "Lose Life Line");
@@ -890,25 +888,55 @@ namespace GateRush.UI
             AddIfTransparent(problems, backgroundColor, "Background Color");
             AddIfTransparent(problems, iconColor, "Icon Color");
             AddIfTransparent(problems, idleTabIconColor, "Idle Tab Icon Color");
-            AddIfTransparent(problems, coinColor, "Coin Color");
-            AddIfTransparent(problems, heartColor, "Heart Color");
             AddIfTransparent(problems, streakColor, "Streak Color");
             AddIfTransparent(problems, buttonLabelColor, "Button Label Color");
             AddIfTransparent(problems, disabledButtonLabelColor, "Disabled Button Label Color");
-            AddIfTransparent(problems, goldMedalColor, "Gold Medal Color");
-            AddIfTransparent(problems, silverMedalColor, "Silver Medal Color");
-            AddIfTransparent(problems, bronzeMedalColor, "Bronze Medal Color");
             AddIfTransparent(problems, leaderboardHighlightColor, "Leaderboard Highlight Color");
             AddIfTransparent(problems, leaderboardRowColor, "Leaderboard Row Color");
             AddIfTransparent(problems, jokerSelectedColor, "Joker Selected Color");
-            AddIfTransparent(problems, jokerBadgeColor, "Joker Badge Color");
+            AddIfTransparent(problems, scrimColor, "Scrim Color");
             AddIfTransparent(problems, timerColor, "Timer Color");
             AddIfTransparent(problems, timerWarningColor, "Timer Warning Color");
             AddIfTransparent(problems, timeBonusColor, "Time Bonus Color");
             AddIfTransparent(problems, jokerBadgeTextColor, "Joker Badge Text Color");
             AddIfTransparent(problems, shortPriceColor, "Short Price Color");
+            AddBackgroundProblems(problems);
 
             return problems;
+        }
+
+        /// <summary>
+        /// The front end's paintings (Module 45): at least one, each with a
+        /// painting, the first starting at level 1 so every level has one,
+        /// and each later start above the one before.
+        /// </summary>
+        private void AddBackgroundProblems(List<string> problems)
+        {
+            var entries = backgrounds ?? Array.Empty<BackgroundEntry>();
+            if (entries.Length == 0)
+            {
+                problems.Add($"{name}: Backgrounds is empty; the front end needs at least one painting.");
+                return;
+            }
+
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                if (entry == null || entry.Painting == null)
+                {
+                    problems.Add($"{name}: Backgrounds element {i}: Painting is not assigned.");
+                }
+
+                var start = entry?.StartLevel ?? 0;
+                if (i == 0 && start != FirstCampaignLevel)
+                {
+                    problems.Add($"{name}: Backgrounds element 0: Start Level must be {FirstCampaignLevel}, so every level has a painting.");
+                }
+                else if (i > 0 && start <= (entries[i - 1]?.StartLevel ?? 0))
+                {
+                    problems.Add($"{name}: Backgrounds element {i}: Start Level must be above element {i - 1}'s.");
+                }
+            }
         }
 
         /// <summary>
@@ -1057,6 +1085,23 @@ namespace GateRush.UI
             public string ProductId => productId;
 
             public string Text => text;
+        }
+
+        /// <summary>One painting behind the front end and the campaign level it starts at, as the Inspector edits it.</summary>
+        [Serializable]
+        private sealed class BackgroundEntry
+        {
+            [SerializeField] private int startLevel;
+            [SerializeField] private Sprite painting;
+
+            public BackgroundEntry(int startLevel)
+            {
+                this.startLevel = startLevel;
+            }
+
+            public int StartLevel => startLevel;
+
+            public Sprite Painting => painting;
         }
     }
 }

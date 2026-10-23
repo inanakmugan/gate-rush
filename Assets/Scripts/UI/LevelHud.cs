@@ -9,10 +9,12 @@ using UnityEngine.UI;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The level's HUD in the top band (Module 40): Menu and Restart at the
-    /// left, the timer with the hourglass in the centre, "Level N" or "Free
-    /// Play" at the right, and under them the gold pill and, in the campaign,
-    /// the lives pill (D58). Shows the <see cref="LevelUiState"/> and the
+    /// The level's HUD in the top band (Module 40, laid out anew by the Module
+    /// 45 follow-up): Menu at the left and Restart at the right; centred, a
+    /// ribbon with "Level N" or "Free Play", the timer with the hourglass
+    /// under it, and under that the gold pill and, in the campaign, the lives
+    /// pill (D58) — with the lives pill hidden, the gold pill centres in its
+    /// row. Shows the <see cref="LevelUiState"/> and the
     /// time it is given and raises an event for each button; it holds no
     /// rules, and neither pill can be pressed.
     /// </summary>

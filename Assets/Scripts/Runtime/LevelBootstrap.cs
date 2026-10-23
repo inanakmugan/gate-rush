@@ -1393,12 +1393,14 @@ namespace GateRush.Runtime
                 inputController.CancelDrag();
                 ClearJokerSelection();
                 jokerMarks.Clear();
-                if (mode == PlayMode.Campaign)
+                // One decision: a campaign loss is reported and shows the life it cost.
+                var isCampaign = mode == PlayMode.Campaign;
+                if (isCampaign)
                 {
                     ReportCampaignLoss();
                 }
 
-                levelUiView.ShowLoss(LevelResult.Loss());
+                levelUiView.ShowLoss(isCampaign ? LevelResult.CampaignLoss() : LevelResult.FreePlayLoss());
                 PlayCue(SoundCue.Loss);
                 Pulse(HapticMoment.Loss);
             }
