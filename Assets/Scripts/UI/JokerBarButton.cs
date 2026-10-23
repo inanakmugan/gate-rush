@@ -9,9 +9,9 @@ using UnityEngine.UI;
 namespace GateRush.UI
 {
     /// <summary>
-    /// One joker's button on the level's joker bar (Modules 40 and 43): its
-    /// icon, a badge with the count, the price beside the coin, or the level
-    /// a locked joker opens at; greyed while it cannot be pressed, its icon
+    /// One joker's button on the level's joker bar (Modules 40, 43 and 46): its
+    /// icon, a pill under it with the count, the price beside the coin, or the
+    /// level a locked joker opens at; greyed while it cannot be pressed, its icon
     /// dimmed under a lock while locked; drawn raised with a ring around it
     /// while its joker is selected (D67); and pulsing with a glow behind it
     /// while marked (D76). Shows the <see cref="JokerButton"/>
@@ -46,13 +46,20 @@ namespace GateRush.UI
         [Tooltip("The glow behind the button, shown and pulsing while the joker is marked (D76).")]
         [SerializeField] private Image glow;
 
-        [Tooltip("The coin beside a price; hidden for a count and an unlock level.")]
+        [Tooltip("The coin hanging off the pill's left end beside a price; hidden for a count and an unlock level.")]
         [SerializeField] private GameObject coin;
 
+        [Tooltip("The pill's text: the count, the price or the unlock level.")]
         [SerializeField] private TMP_Text badgeLabel;
 
         [Tooltip("How far the button rises while selected, in canvas units; written by the UI builder.")]
         [SerializeField] private float selectedRaise;
+
+        [Tooltip("How far the pill's text keeps from both of its ends, centring it, in canvas units; written by the UI builder.")]
+        [SerializeField] private float labelInset;
+
+        [Tooltip("Where the pill's text starts beside the coin when it shows a price, in from the pill's left end, in canvas units; written by the UI builder.")]
+        [SerializeField] private float priceLabelLeft;
 
         // The mark last shown and the config it was shown with: the pulse
         // reads them while it runs, and OnEnable restarts it from them.
@@ -64,18 +71,21 @@ namespace GateRush.UI
         public event Action Pressed;
 
         /// <summary>
-        /// Shows <paramref name="state"/>: the badge's text, the coin for a
-        /// price, the price in <see cref="UiConfig.ShortPriceColor"/> while the
-        /// balance is short of it, the button greyed while it cannot be
-        /// pressed, the icon dimmed under the lock while locked, raised with
-        /// its ring while <paramref name="isSelected"/>, and pulsing while
-        /// marked.
+        /// Shows <paramref name="state"/>: the pill's text — centred, or beside
+        /// the coin for a price — the price in
+        /// <see cref="UiConfig.ShortPriceColor"/> while the balance is short of
+        /// it, the button greyed while it cannot be pressed, the icon dimmed
+        /// under the lock while locked, raised with its ring while
+        /// <paramref name="isSelected"/>, and pulsing while marked.
         /// </summary>
         public void Show(JokerButton state, bool isSelected, UiConfig config)
         {
+            var isPrice = state.Badge == JokerBadge.Price;
             badgeLabel.text = LevelHudTexts.JokerBadge(state, config);
             badgeLabel.color = state.IsShortOfGold ? config.ShortPriceColor : config.JokerBadgeTextColor;
-            coin.SetActive(state.Badge == JokerBadge.Price);
+            coin.SetActive(isPrice);
+            var text = badgeLabel.rectTransform;
+            text.offsetMin = new Vector2(isPrice ? priceLabelLeft : labelInset, text.offsetMin.y);
             button.interactable = state.IsInteractable;
 
             var iconColor = state.IsInteractable ? config.IconColor : config.DisabledJokerIconColor;

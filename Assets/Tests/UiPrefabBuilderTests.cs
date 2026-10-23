@@ -115,7 +115,6 @@ namespace GateRush.Tests
 
         // Module 45: the owner's interface art, drawn in its own colours.
         private const string InterfaceArtFolder = "Assets/Art/Sprites/UI/";
-        private const string BadgeSpritePath = "Assets/Art/Sprites/UI/badge.png";
         private const string GoldMedalSpritePath = "Assets/Art/Sprites/UI/medal_gold.png";
         private const string SilverMedalSpritePath = "Assets/Art/Sprites/UI/medal_silver.png";
         private const string BronzeMedalSpritePath = "Assets/Art/Sprites/UI/medal_bronze.png";
@@ -250,9 +249,14 @@ namespace GateRush.Tests
         // times larger, with half a button between the buttons; and its
         // lock, about half the button.
         private const float Module45JokerButtonSize = 196f;
-        private const float Module45BadgeToButton = 72f / 196f;
         private const float AboutOnePointTwoTimes = 1.18f;
-        private const float HalfAButton = 0.5f;
+
+        // Module 46's joker bar: a quarter of a button between the buttons, a
+        // pill nearly as wide as the button, and an icon larger than Module
+        // 45's 161 units, standing past the button's top.
+        private const float QuarterAButton = 0.25f;
+        private const float PillMinShareOfButton = 0.85f;
+        private const float Module45JokerIconSize = 161f;
         private const float ShareTolerance = 0.02f;
         private const float LockMinShare = 0.45f;
         private const float LockMaxShare = 0.55f;
@@ -887,7 +891,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_JokerBarButtons_BadgeHangsOffTheBottomRightCornerAndGrowsLeft()
+        public void Build_JokerBarButtons_IconIsLargerAndStandsPastTheButtonsTop()
         {
             var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
             Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
@@ -896,31 +900,59 @@ namespace GateRush.Tests
             {
                 using (var serialized = new SerializedObject(view))
                 {
-                    var button = Reference<Button>(serialized, "button");
-                    var badge = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
-                    var coin = Reference<GameObject>(serialized, "coin");
-                    var corner = new Vector2(1f, 0f);
-                    var fitter = badge.GetComponent<ContentSizeFitter>();
-                    var badgeImage = badge.GetComponent<Image>();
-                    Assert.IsNotNull(fitter, $"{view.name}'s badge has a ContentSizeFitter");
-                    Assert.IsNotNull(badgeImage, $"{view.name}'s badge has an Image");
+                    var button = (RectTransform)Reference<Button>(serialized, "button").transform;
+                    var icon = Reference<Image>(serialized, "icon").rectTransform;
+                    var iconTop = icon.anchoredPosition.y + icon.sizeDelta.y / 2f;
 
-                    Assert.AreEqual(button.transform, badge.parent, $"{view.name}'s badge is on the button");
-                    Assert.AreEqual(badge, coin.transform.parent, $"{view.name}'s coin is in the badge");
-                    Assert.AreEqual(corner, badge.anchorMin, $"{view.name}'s badge is anchored at the bottom-right corner");
-                    Assert.AreEqual(corner, badge.anchorMax, $"{view.name}'s badge is anchored at the bottom-right corner");
-                    Assert.AreEqual(corner, badge.pivot, $"{view.name}'s badge grows leftwards from the corner");
-                    Assert.That(badge.anchoredPosition.x, Is.GreaterThan(0f), $"{view.name}'s badge overlaps the right edge");
-                    Assert.That(badge.anchoredPosition.y, Is.LessThan(0f), $"{view.name}'s badge overlaps the bottom edge");
-                    Assert.AreEqual(ContentSizeFitter.FitMode.PreferredSize, fitter.horizontalFit, $"{view.name}'s badge widens for a price");
-                    Assert.AreEqual(BadgeSpritePath, AssetDatabase.GetAssetPath(badgeImage.sprite), $"{view.name}'s badge is the red badge");
-                    Assert.IsNull(badge.GetComponent<UiTint>(), $"{view.name}'s badge is drawn in its own colours");
+                    Assert.That(icon.sizeDelta.y, Is.GreaterThan(Module45JokerIconSize), $"{view.name}'s icon is larger");
+                    Assert.That(iconTop, Is.GreaterThan(button.rect.height / 2f), $"{view.name}'s icon stands past the button's top");
                 }
             }
         }
 
         [Test]
-        public void Build_JokerBar_ButtonsAreAboutOnePointTwoTimesLargerWithHalfAButtonBetweenThemInTheCentre()
+        public void Build_JokerBarButtons_PillIsCentredUnderTheButtonOverItsFoot()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var button = (RectTransform)Reference<Button>(serialized, "button").transform;
+                    var label = Label(serialized, "badgeLabel");
+                    var pill = (RectTransform)label.transform.parent;
+                    var coin = (RectTransform)Reference<GameObject>(serialized, "coin").transform;
+                    var pillImage = pill.GetComponent<Image>();
+                    var foot = new Vector2(0.5f, 0f);
+                    Assert.IsNotNull(pillImage, $"{view.name}'s pill has an Image");
+
+                    Assert.AreEqual(button, pill.parent, $"{view.name}'s pill is on the button, so it pulses and rises with it");
+                    Assert.AreEqual(foot, pill.anchorMin, $"{view.name}'s pill is anchored at the button's foot");
+                    Assert.AreEqual(foot, pill.anchorMax, $"{view.name}'s pill is anchored at the button's foot");
+                    Assert.AreEqual(new Vector2(0.5f, 0.5f), pill.pivot, $"{view.name}'s pill is centred on the foot, half below it");
+                    Assert.AreEqual(Vector2.zero, pill.anchoredPosition, $"{view.name}'s pill is centred under the button");
+                    Assert.That(pill.sizeDelta.x, Is.GreaterThanOrEqualTo(button.rect.width * PillMinShareOfButton), $"{view.name}'s pill is nearly as wide as the button");
+                    Assert.That(pill.sizeDelta.x, Is.LessThanOrEqualTo(button.rect.width), $"{view.name}'s pill is no wider than the button");
+                    Assert.AreEqual(PillSpritePath, AssetDatabase.GetAssetPath(pillImage.sprite), $"{view.name}'s pill is the dark pill");
+                    Assert.AreEqual(Image.Type.Sliced, pillImage.type, $"{view.name}'s pill is 9-sliced");
+                    Assert.IsNull(pill.GetComponent<UiTint>(), $"{view.name}'s pill is drawn in its own colours");
+
+                    Assert.AreEqual(pill, coin.parent, $"{view.name}'s coin is on the pill");
+                    Assert.AreEqual(0f, coin.anchorMin.x, $"{view.name}'s coin is at the pill's left end");
+                    Assert.That(coin.anchoredPosition.x, Is.LessThan(0f), $"{view.name}'s coin overlaps the pill's left end");
+                    Assert.IsFalse(coin.gameObject.activeSelf, $"{view.name}'s coin is saved hidden, for a price");
+                    Assert.AreEqual(FontStyles.Bold, label.fontStyle & FontStyles.Bold, $"{view.name}'s text is bold");
+                    Assert.That(
+                        serialized.FindProperty("priceLabelLeft").floatValue, Is.GreaterThan(serialized.FindProperty("labelInset").floatValue),
+                        $"{view.name}'s price starts beside the coin");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBar_ButtonsAreGroupedAQuarterOfAButtonApartInTheCentre()
         {
             var bar = LoadBuilt(JokerBarName).GetComponent<JokerBarView>();
             Assert.IsNotNull(bar, nameof(JokerBarView));
@@ -930,27 +962,19 @@ namespace GateRush.Tests
                 var clock = (RectTransform)Reference<JokerBarButton>(serialized, "clock").transform;
                 var rocket = (RectTransform)Reference<JokerBarButton>(serialized, "rocket").transform;
                 var broom = (RectTransform)Reference<JokerBarButton>(serialized, "broom").transform;
-                RectTransform badge;
-                using (var rocketSerialized = new SerializedObject(rocket.GetComponent<JokerBarButton>()))
-                {
-                    badge = (RectTransform)Label(rocketSerialized, "badgeLabel").transform.parent;
-                }
 
                 var pitch = rocket.anchoredPosition.x - clock.anchoredPosition.x;
-
                 var size = rocket.sizeDelta.x;
 
-                Assert.That(size, Is.GreaterThanOrEqualTo(Module45JokerButtonSize * AboutOnePointTwoTimes), "the buttons");
-                Assert.AreEqual(Module45BadgeToButton, badge.sizeDelta.y / size, ShareTolerance, "the badge scales with the button");
-                Assert.AreEqual(Module45BadgeToButton, badge.GetComponent<LayoutElement>().minWidth / size, ShareTolerance, "the badge's width too");
-                Assert.AreEqual(HalfAButton, (pitch - size) / size, ShareTolerance, "half a button between them");
+                Assert.That(size, Is.GreaterThanOrEqualTo(Module45JokerButtonSize * AboutOnePointTwoTimes), "the buttons keep their design size");
+                Assert.AreEqual(QuarterAButton, (pitch - size) / size, ShareTolerance, "a quarter of a button between them");
                 Assert.AreEqual(pitch, broom.anchoredPosition.x - rocket.anchoredPosition.x, Tolerance, "evenly spaced");
                 Assert.AreEqual(0f, rocket.anchoredPosition.x, Tolerance, "grouped in the centre");
             }
         }
 
         [Test]
-        public void Build_JokerBar_RaisedButtonsAndBadgesStayInsideTheRowClearOfItsFoot()
+        public void Build_JokerBar_RaisedButtonsAndPillsStayInsideTheRowClearOfItsFoot()
         {
             var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
             var fit = LoadBuilt(JokerBarName).GetComponentInChildren<BandFit>(true);
@@ -968,17 +992,24 @@ namespace GateRush.Tests
                 {
                     var slot = (RectTransform)view.transform;
                     var glow = Reference<Image>(serialized, "glow").rectTransform;
-                    var badge = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
+                    var icon = Reference<Image>(serialized, "icon").rectTransform;
+                    var pill = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
+                    var coin = (RectTransform)Reference<GameObject>(serialized, "coin").transform;
                     var raise = serialized.FindProperty("selectedRaise").floatValue;
                     var half = slot.sizeDelta.y / 2f;
 
                     var raisedGlowTop = slot.anchoredPosition.y + half + raise + glow.offsetMax.y;
-                    var badgeFoot = slot.anchoredPosition.y - half + badge.anchoredPosition.y;
-                    var rightEdge = slot.anchoredPosition.x + half + badge.anchoredPosition.x;
+                    var raisedIconTop = slot.anchoredPosition.y + raise + icon.anchoredPosition.y + icon.sizeDelta.y / 2f;
+                    var pillFoot = slot.anchoredPosition.y - half - pill.sizeDelta.y / 2f;
+                    // The coin is pivoted on its left edge at the pill's left end.
+                    var coinLeft = slot.anchoredPosition.x - pill.sizeDelta.x / 2f + coin.anchoredPosition.x;
+                    var pillRight = slot.anchoredPosition.x + pill.sizeDelta.x / 2f;
 
                     Assert.That(raisedGlowTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised glow stays in the row");
-                    Assert.That(badgeFoot, Is.GreaterThan(-design.y / 2f), $"{view.name}'s badge stands off the row's foot");
-                    Assert.That(Mathf.Abs(rightEdge), Is.LessThanOrEqualTo(design.x / 2f), $"{view.name}'s badge stays in the row");
+                    Assert.That(raisedIconTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised icon stays in the row");
+                    Assert.That(pillFoot, Is.GreaterThan(-design.y / 2f), $"{view.name}'s pill stands off the row's foot");
+                    Assert.That(coinLeft, Is.GreaterThanOrEqualTo(-design.x / 2f), $"{view.name}'s coin stays in the row");
+                    Assert.That(pillRight, Is.LessThanOrEqualTo(design.x / 2f), $"{view.name}'s pill stays in the row");
                 }
             }
         }
