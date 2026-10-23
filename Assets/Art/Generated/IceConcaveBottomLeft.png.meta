@@ -1,16 +1,10 @@
 fileFormatVersion: 2
-guid: 11ac25c8b75b80543960f733f09c9cca
+guid: c85e3b919db49584d8e5d3c243a7949e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8842744376882955741
-    second: Frost_0
-  - first:
-      213: 3412983059266073333
-    second: Frost_1
-  - first:
-      213: 1757828072892571670
-    second: Frost_2
+      213: -1450892838411574435
+    second: IceConcaveBottomLeft_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -103,6 +97,19 @@ TextureImporter:
     androidETC2FallbackOverride: 0
     forceMaximumCompressionQuality_BC6H_BC7: 0
   - serializedVersion: 4
+    buildTarget: Android
+    maxTextureSize: 2048
+    resizeAlgorithm: 0
+    textureFormat: -1
+    textureCompression: 1
+    compressionQuality: 50
+    crunchedCompression: 0
+    allowsAlphaSplitting: 0
+    overridden: 0
+    ignorePlatformSupport: 0
+    androidETC2FallbackOverride: 0
+    forceMaximumCompressionQuality_BC6H_BC7: 0
+  - serializedVersion: 4
     buildTarget: WebGL
     maxTextureSize: 2048
     resizeAlgorithm: 0
@@ -119,13 +126,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Frost_0
+      name: IceConcaveBottomLeft_0
       rect:
         serializedVersion: 2
-        x: 21
-        y: 54
-        width: 53
-        height: 53
+        x: 0
+        y: 0
+        width: 64
+        height: 64
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -134,52 +141,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: dd501bfe82db7ba70800000000000000
-      internalID: 8842744376882955741
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Frost_1
-      rect:
-        serializedVersion: 2
-        x: 35
-        y: 35
-        width: 58
-        height: 58
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 5f2faf7720a5d5f20800000000000000
-      internalID: 3412983059266073333
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: Frost_2
-      rect:
-        serializedVersion: 2
-        x: 54
-        y: 21
-        width: 53
-        height: 53
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 610a8f4a15f056810800000000000000
-      internalID: 1757828072892571670
+      spriteID: d53e15f86a46ddbe0800000000000000
+      internalID: -1450892838411574435
       vertices: []
       indices: 
       edges: []
@@ -198,9 +161,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Frost_0: 8842744376882955741
-      Frost_1: 3412983059266073333
-      Frost_2: 1757828072892571670
+      IceConcaveBottomLeft_0: -1450892838411574435
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 

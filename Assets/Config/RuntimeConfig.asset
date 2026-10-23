@@ -19,6 +19,7 @@ MonoBehaviour:
   uiLitMaterial: {fileID: 2100000, guid: 790861bbe77b135408a06c6fcfd4fa84, type: 2}
   uiSpecularMaterial: {fileID: 2100000, guid: cd09af12390a2c34a8e16de8763f51bc, type: 2}
   labelFont: {fileID: 11400000, guid: 9bd0b4fb6c61e6c49aff7f5e7c6ef52e, type: 2}
+  labelShadowMaterial: {fileID: 2100000, guid: a45714258d519314fae322bde2f26248, type: 2}
   quarterOuterSprite: {fileID: 21300000, guid: b29f3da1aa4f7b44387f2f72cf96c017, type: 3}
   quarterEdgeSprite: {fileID: 21300000, guid: 97b3def5b3c7ae7458d9d385a69a40f4, type: 3}
   quarterFillSprite: {fileID: 21300000, guid: 7405c1a7af3ad7f46b0d2754c31ce09c, type: 3}
@@ -71,27 +72,77 @@ MonoBehaviour:
   axisArrowSprite: {fileID: 21300000, guid: a3b998a840230234998d0d2bf0af528e, type: 3}
   backgroundRampSprite: {fileID: 21300000, guid: 3cc213a1173216d489edbeda5e8ccfd0, type: 3}
   vignetteSprite: {fileID: 21300000, guid: 48d7720f252d65444b9aa161843ef1d8, type: 3}
-  frostSprite: {fileID: 21300000, guid: 11ac25c8b75b80543960f733f09c9cca, type: 3}
   roundedRectSprite: {fileID: 21300000, guid: 352b0b51373934b4cb2108c1e5c87879, type: 3}
-  ringSprite: {fileID: 21300000, guid: c3d0154e087cff54f8f43fee4d4aa0b0, type: 3}
   chainSprite: {fileID: 21300000, guid: 9c243f91b12a1fd4ead0a5829eeedc8f, type: 3}
   padlockSprite: {fileID: 21300000, guid: 94f76d6ca442b1d47bbf1c3125d693f6, type: 3}
   keyBodySprite: {fileID: 21300000, guid: d791657bfbb562849b4b8aabb5c74333, type: 3}
   keyGemSprite: {fileID: 21300000, guid: c30ffc22fc1e5dc439123155839799d3, type: 3}
   shutterSlatsSprite: {fileID: 21300000, guid: 18041f29213268c43a9bf2f689c5a938, type: 3}
-  doorPanelSprite: {fileID: 21300000, guid: 40868de770378ac49b71f39dcc429d56, type: 3}
   clockSprite: {fileID: 21300000, guid: dd8716c6174b2bc4d981bce0856be4fc, type: 3}
   cubeSprite: {fileID: 21300000, guid: 37dd6b6b58c871e4b9a8596eb9eb91ab, type: 3}
   shardSprite: {fileID: 21300000, guid: f9efff3a6a10d7e4d8e4c4e166140569, type: 3}
   gateGlowSprite: {fileID: 21300000, guid: 5c6de48fd20565048a09c934e317d494, type: 3}
   sparkleSprite: {fileID: 21300000, guid: 955b1f1454c91ff4685f474613823b93, type: 3}
+  iceOuterTopLeftSprite: {fileID: 21300000, guid: 1ba5e6d163d699a4dae8c15ebe868939, type: 3}
+  iceOuterTopRightSprite: {fileID: 21300000, guid: 6c5edbe163a6ac64f82241c7488e97bf, type: 3}
+  iceOuterBottomLeftSprite: {fileID: 21300000, guid: 1aa3fd6773ad18f45a2c1a3516621f17, type: 3}
+  iceOuterBottomRightSprite: {fileID: 21300000, guid: a1fa0b03bbdf60b4d8a32986aa6486ab, type: 3}
+  iceConcaveTopLeftSprite: {fileID: 21300000, guid: a8c7c9d160547364796ef08c92135d1b, type: 3}
+  iceConcaveTopRightSprite: {fileID: 21300000, guid: 33c97a31ae599cf49b551fde5162185a, type: 3}
+  iceConcaveBottomLeftSprite: {fileID: 21300000, guid: c85e3b919db49584d8e5d3c243a7949e, type: 3}
+  iceConcaveBottomRightSprite: {fileID: 21300000, guid: e43314b8aafae7842a4d68750f5b567c, type: 3}
+  iceEdgeTopSprite: {fileID: 21300000, guid: bd9f3546396ad4d4cae3a3ceac972d7c, type: 3}
+  iceEdgeBottomSprite: {fileID: 21300000, guid: 73608df57e96aa34baef52815dd8564f, type: 3}
+  iceEdgeLeftSprite: {fileID: 21300000, guid: e43ddfd339d53bd4ca695837376a0c5a, type: 3}
+  iceEdgeRightSprite: {fileID: 21300000, guid: 644e5f634575a3045ab346c7b30f3f47, type: 3}
+  iceFillSprite: {fileID: 21300000, guid: c9b2c16e22a0f24468e8cf90449ff8e2, type: 3}
+  iceStreaksSprite: {fileID: 21300000, guid: 441d49f4a5226584eb55d81f4b49a4c8, type: 3}
+  iceStreaksWideSprite: {fileID: 21300000, guid: 2d225bd4b7c95184b98943edcc118063, type: 3}
+  badgeRimSprite: {fileID: 21300000, guid: 55a0431a4cc56aa4f8003b5d69ab78cc, type: 3}
+  badgeFaceSprite: {fileID: 21300000, guid: e22d5dd211ee88949ad24903b0a87bae, type: 3}
+  badgeHighlightSprite: {fileID: 21300000, guid: 4c3dac1ed412cf940bd72914241fa647, type: 3}
+  lockSprite: {fileID: 21300000, guid: c92e1c74b011fe34780253e8755c3822, type: 3}
+  goldKeySprite: {fileID: 21300000, guid: 9c50c91e63b6be147b55becd3a1d44ee, type: 3}
+  gemSprite: {fileID: 21300000, guid: 614431da823cfbc41a2258fe07db6bb2, type: 3}
+  gemHighlightSprite: {fileID: 21300000, guid: caa3c1e8c5b35054593e2d450effd5e9, type: 3}
+  bonusCoinSprite: {fileID: 21300000, guid: 7de0dfd3d0a19fd41b1bc9cb9ee30aa4, type: 3}
+  oneWayArrowSprite: {fileID: 21300000, guid: 106b83dcb4bea47448b88400e17c329f, type: 3}
+  oneWayArrowHighlightSprite: {fileID: 21300000, guid: 01cdbef7a5933f24c9b30b46dda5d9da, type: 3}
+  oneWayArrowVerticalSprite: {fileID: 21300000, guid: d688e3160aa9102489c0d53d732de782, type: 3}
+  oneWayArrowVerticalHighlightSprite: {fileID: 21300000, guid: 18282e35dadae0443a5ae589d37f7888, type: 3}
+  shutterRimSprite: {fileID: 21300000, guid: 009a2c82cc484dc44a725d46826f5a26, type: 3}
+  shutterCylindersSprite: {fileID: 21300000, guid: 57edb862231905040ab050523092814c, type: 3}
+  machineBodySprite: {fileID: 21300000, guid: c7d1ab54ec280ef4abb4ae2b2e55f6af, type: 3}
+  machineScreenSprite: {fileID: 21300000, guid: d07744228958d8d49ac9d7ab7d6496a7, type: 3}
+  machineVentSprite: {fileID: 21300000, guid: 1d9a5788e25ba7d488dc245244e7df8c, type: 3}
+  machineButtonSprite: {fileID: 21300000, guid: 000db09211a97324f9eeffedc308de0b, type: 3}
+  elevatorRimSprite: {fileID: 21300000, guid: 7629308ace55ab34e8ae4622cbbd4915, type: 3}
+  elevatorHazardLeftSprite: {fileID: 21300000, guid: 96ee7a27d087c3641a4bc2cb5e25e650, type: 3}
+  elevatorHazardRightSprite: {fileID: 21300000, guid: 3644e5a62333bb7438b51e579d8c2163, type: 3}
+  elevatorDoorSprite: {fileID: 21300000, guid: ddd4af98aef11f141b50f6cec8562b11, type: 3}
+  elevatorHandleSprite: {fileID: 21300000, guid: 524f31e15b9e2c44492ac51fc01c855a, type: 3}
+  badgeHeightCells: 0.421875
+  badgeDigitWidthCells: 0.078125
+  badgePaddingCells: 0.1796875
+  badgeShadowMarginCells: 0.1015625
+  raisedShadowMarginCells: 0.1796875
+  shutterInnerInsetCells: 0.171875
+  elevatorInnerInsetAcrossCells: 0.171875
+  elevatorInnerInsetUpCells: 0.125
+  elevatorDoorGapCells: 0.0234375
+  elevatorDoorShadowMarginCells: 0.09375
+  elevatorHandleOffsetCells: 0.1015625
+  elevatorHazardCentreCells: 0.1015625
+  elevatorHazardEndCells: 0.1875
+  oneWayArrowEndInsetCells: 0.1640625
+  padlockCountDropCells: 0.15625
+  bonusCoinCells: 0.375
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.16
   bottomBandScreenFraction: 0.145
   frameThicknessCells: 0.45
   floorUnderlayCells: 0.2
-  lipOffsetCells: 0.09
   lipDarken: 0.5
   seamOverlapCells: 0.002
   gateArrowSizeCells: 0.3
@@ -103,34 +154,30 @@ MonoBehaviour:
   layerEdgeDarken: 0.35
   layerStudSpacingCells: 0.42
   layerStudClearanceCells: 0.18
-  badgeHeightCells: 0.34
-  badgeDigitWidthCells: 0.15
-  badgePaddingCells: 0.08
-  badgeRimCells: 0.035
-  blockBadgeInsetCells: 0.14
-  chainThicknessCells: 0.2
+  blockBadgeInsetCells: 0.265625
   chainEndInsetCells: 0.1
   padlockSizeCells: 0.62
-  padlockBadgeDropCells: 0.1
   keySizeCells: 0.72
   keyRotationDegrees: 35
   frozenMarkRaiseCells: 0.3
   timeBonusMarkFormat: +{0}
-  timeBonusMarkIconCells: 0.24
-  timeBonusMarkIconGapCells: 0.03
+  timeBonusMarkGapCells: 0
+  timeBonusMarkCharacterWidthCells: 0.125
   timeBonusMarkColor: {r: 0.2, g: 0.62, b: 0.3, a: 1}
   timeBonusMarkRimColor: {r: 0.62, g: 0.95, b: 0.62, a: 1}
   timeBonusMarkIconColor: {r: 1, g: 1, b: 1, a: 1}
   crowdedMarkScale: 0.6
   crowdedTripleMarkScale: 0.45
-  shutterBorderCells: 0.07
-  elevatorBorderCells: 0.05
-  elevatorDividerCells: 0.07
   machineDepthCells: 1
   machineSideOverhangCells: 0.12
   machineFrameOverlapCells: 0.15
   machineScreenInsetCells: 0.12
-  machineCornerCells: 0.18
+  machineCountRoomHeightCells: 0.34
+  machineCountRoomDigitWidthCells: 0.15
+  machineCountRoomPaddingCells: 0.08
+  machineScreenCountShare: 0.35
+  machineMiniatureFillShare: 0.72
+  machineFittingOffsetsCells: {x: -0.109375, y: 0.1875}
   pushThresholdCells: 0.3
   followRate: 20
   cornerAssistCells: 0.3
@@ -317,11 +364,11 @@ MonoBehaviour:
   - {r: 0.9647059, g: 0.4, b: 0.047058824, a: 1}
   - {r: 0.9647059, g: 0.23529412, b: 0.63529414, a: 1}
   - {r: 0.023529412, g: 0.65882355, b: 0.9647059, a: 1}
-  backgroundTop: {r: 0.3764706, g: 0.1764706, b: 0.627451, a: 1}
-  backgroundBottom: {r: 0.1254902, g: 0.05490196, b: 0.23529412, a: 1}
+  backgroundTop: {r: 0.16470589, g: 0.14117648, b: 0.3764706, a: 1}
+  backgroundBottom: {r: 0.08627451, g: 0.07058824, b: 0.21176471, a: 1}
   vignetteColor: {r: 0, g: 0, b: 0, a: 0.5}
   floorColor: {r: 0.19215687, g: 0.09411765, b: 0.37254903, a: 1}
-  frameColor: {r: 0.28627452, g: 0.12941177, b: 0.5176471, a: 1}
+  frameColor: {r: 0.28235295, g: 0.23529412, b: 0.65882355, a: 1}
   contourColor: {r: 0.10980392, g: 0.043137256, b: 0.22745098, a: 1}
   blockLightColor: {r: 1, g: 1, b: 1, a: 1}
   frameLightColor: {r: 1, g: 1, b: 1, a: 0.7}
@@ -329,45 +376,71 @@ MonoBehaviour:
   gateArrowColor: {r: 1, g: 1, b: 1, a: 1}
   axisArrowColor: {r: 1, g: 1, b: 1, a: 0.9}
   iceColor: {r: 0.72, g: 0.86, b: 0.95, a: 1}
-  frostColor: {r: 1, g: 1, b: 1, a: 0.85}
-  badgeColor: {r: 0.8, g: 0.45, b: 0.18, a: 1}
-  badgeRimColor: {r: 1, g: 0.78, b: 0.45, a: 1}
   badgeTextColor: {r: 1, g: 0.96, b: 0.85, a: 1}
-  chainColor: {r: 0.62, g: 0.64, b: 0.7, a: 1}
   padlockColor: {r: 1, g: 0.8, b: 0.25, a: 1}
   keyColor: {r: 1, g: 0.8, b: 0.25, a: 1}
   shutterSlatColor: {r: 0.3, g: 0.18, b: 0.45, a: 1}
   shutterBorderColor: {r: 1, g: 0.66, b: 0.2, a: 1}
-  machineColor: {r: 0.55, g: 0.58, b: 0.7, a: 1}
-  machineScreenColor: {r: 0.06, g: 0.07, b: 0.12, a: 1}
-  elevatorDoorColor: {r: 0.22, g: 0.14, b: 0.34, a: 1}
-  elevatorDividerColor: {r: 1, g: 0.78, b: 0.3, a: 1}
-  elevatorBorderColor: {r: 1, g: 0.66, b: 0.2, a: 1}
-  badgeLabelFontSize: 2.5
+  iceTintColor: {r: 0.84705883, g: 0.9529412, b: 1, a: 1}
+  iceRimColor: {r: 0.9019608, g: 0.96862745, b: 1, a: 1}
+  iceStreakColor: {r: 1, g: 1, b: 1, a: 1}
+  countBadgeColor: {r: 0.8980392, g: 0.22352941, b: 0.20784314, a: 1}
+  countBadgeRimColor: {r: 1, g: 0.77254903, b: 0.19215687, a: 1}
+  countTextColor: {r: 1, g: 1, b: 1, a: 1}
+  chainSilverColor: {r: 0.7490196, g: 0.7647059, b: 0.85490197, a: 1}
+  lockGoldColor: {r: 1, g: 0.77254903, b: 0.19215687, a: 1}
+  keyholeColor: {r: 0.41960785, g: 0.2627451, b: 0, a: 1}
+  coinColor: {r: 1, g: 0.83137256, b: 0.16470589, a: 1}
+  coinFaceColor: {r: 1, g: 0.95686275, b: 0.76862746, a: 1}
+  coinHandColor: {r: 0.3529412, g: 0.22745098, b: 0, a: 1}
+  shutterRimColor: {r: 0.95686275, g: 0.6392157, b: 0, a: 1}
+  shutterCylinderColor: {r: 0.29411766, g: 0.23137255, b: 0.7529412, a: 1}
+  machineMetalColor: {r: 0.5568628, g: 0.6039216, b: 0.7529412, a: 1}
+  machineGlassColor: {r: 0.043137256, g: 0.11764706, b: 0.36862746, a: 1}
+  machineRivetColor: {r: 0.78039217, g: 0.80784315, b: 0.9019608, a: 1}
+  machineButtonColor: {r: 1, g: 0.47843137, b: 0, a: 1}
+  machineCountColor: {r: 0.49803922, g: 0.8901961, b: 1, a: 1}
+  elevatorRimColor: {r: 0.9843137, g: 0.43529412, b: 0, a: 1}
+  hazardColor: {r: 1, g: 0.77254903, b: 0.19215687, a: 1}
+  hazardDarkColor: {r: 0.22745098, g: 0.13725491, b: 0.4392157, a: 1}
+  elevatorRecessColor: {r: 0.07058824, g: 0.039215688, b: 0.18039216, a: 1}
+  elevatorPanelColor: {r: 0.35686275, g: 0.27058825, b: 0.6901961, a: 1}
+  elevatorHandleColor: {r: 0.84313726, g: 0.85490197, b: 0.9254902, a: 1}
+  countFontSize: 2.65625
+  padlockCountFontSize: 2.03125
+  machineCountFontSize: 2.03125
+  labelShadowColor: {r: 0, g: 0, b: 0, a: 0.5}
+  labelShadowOffset: {x: 0.15, y: -0.3}
+  labelShadowSoftness: 0.3
   backgroundOrder: -20
   vignetteOrder: -19
   floorUnderlayOrder: -1
   floorOrder: 0
-  elevatorDoorOrder: 1
-  elevatorDividerOrder: 2
-  elevatorBorderOrder: 3
-  machineLipOrder: 4
+  elevatorRimOrder: 1
+  elevatorHazardOrder: 2
+  elevatorDoorPanelOrder: 3
+  elevatorHandleOrder: 4
   machineOrder: 5
   machineScreenOrder: 6
-  miniatureLipOrder: 7
+  machineFittingsOrder: 7
   miniatureOrder: 8
+  miniatureStudOrder: 9
+  miniatureGlossOrder: 10
   frameContourOrder: 9
   frameLipOrder: 10
   frameOrder: 11
   frameShineOrder: 12
   gateArrowOutlineOrder: 13
   gateMarkOrder: 14
+  gateIceOrder: 13
   blockContourOrder: 15
   blockLipOrder: 16
   blockOrder: 17
   blockShineOrder: 18
   studOrder: 19
   glossOrder: 20
+  iceOrder: 21
+  iceStreakOrder: 22
   layerEdgeOrder: 21
   layerOrder: 22
   layerShineOrder: 23
@@ -376,14 +449,16 @@ MonoBehaviour:
   chainOrder: 26
   iconOrder: 27
   keyGemOrder: 28
-  shutterOrder: 29
-  shutterBorderOrder: 30
-  badgeRimOrder: 31
-  badgeOrder: 32
-  labelOrder: 33
+  keyGemHighlightOrder: 29
+  shutterOrder: 30
+  shutterBorderOrder: 31
+  badgeRimOrder: 32
+  badgeOrder: 33
+  badgeHighlightOrder: 34
+  labelOrder: 35
   outlineOrder: 14
-  liftedBlockOrder: 34
-  effectOrder: 35
+  liftedBlockOrder: 36
+  effectOrder: 37
   pullGlowOrder: 14
-  generatorPreviewRimOrder: 4
-  generatorPreviewOrder: 5
+  generatorPreviewRimOrder: 5
+  generatorPreviewOrder: 6
