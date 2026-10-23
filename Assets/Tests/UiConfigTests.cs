@@ -253,8 +253,8 @@ namespace GateRush.Tests
         [TestCase("firstRewardFormat", "First Reward Format", "Win {0} in a row: {2}")]
         [TestCase("moreWinsFormat", "More Wins Format", "{0} more wins: {2}")]
         [TestCase("oneMoreWinFormat", "One More Win Format", "1 more win: {1}")]
-        [TestCase("currentStreakFormat", "Current Streak Format", "Streak {1}")]
-        [TestCase("bestStreakFormat", "Best Streak Format", "Best {1}")]
+        [TestCase("currentStreakFormat", "Current Streak Format", "Streak: {1}")]
+        [TestCase("bestStreakFormat", "Best Streak Format", "Best: {1}")]
         [TestCase("ladderWinsFormat", "Ladder Wins Format", "{1} wins")]
         [TestCase("ladderRewardFormat", "Ladder Reward Format", "{0} x{2}")]
         [TestCase("markerCountFormat", "Marker Count Format", "x{1}")]
@@ -269,7 +269,7 @@ namespace GateRush.Tests
         [TestCase("jokerCountBadgeFormat", "Joker Count Badge Format", "{1}")]
         [TestCase("jokerPriceBadgeFormat", "Joker Price Badge Format", "{1}")]
         [TestCase("goldEarnedFormat", "Gold Earned Format", "+{1}")]
-        [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format", "You will lose a life and your {1}-win streak.")]
+        [TestCase("loseLifeAndStreakFormat", "Lose Life And Streak Format", "You will lose a life and your win streak of {1}.")]
         [TestCase("jokerLockedBadgeFormat", "Joker Locked Badge Format", "Lv {1}")]
         [TestCase("unlocksAtFormat", "Unlocks At Format", "Unlocks at Level {1}")]
         [TestCase("lockedPrizeFormat", "Locked Prize Format", "+{0} {1}, opens at Level {3}")]
@@ -372,6 +372,14 @@ namespace GateRush.Tests
             Assert.AreEqual("Lv {0}", config.JokerLockedBadgeFormat);
             Assert.AreEqual("Unlocks at Level {0}", config.UnlocksAtFormat);
             Assert.AreEqual("+{0} {1}, opens at Level {2}", config.LockedPrizeFormat);
+            Assert.AreEqual(0.7f, config.LockedIconAlpha, "a locked joker's icon shows a little behind its lock");
+        }
+
+        [Test]
+        public void Defaults_PageNotes_AreTheShortenedOneLineTexts()
+        {
+            Assert.AreEqual("Test store: no real money is charged.", config.TestStoreNote);
+            Assert.AreEqual("Demo players: online leaderboard not connected.", config.LeaderboardSimulatedNote);
         }
 
         [Test]
@@ -384,7 +392,7 @@ namespace GateRush.Tests
             Assert.AreEqual("Leave level?", config.LeaveLevelTitle);
             Assert.AreEqual("Restart level?", config.RestartLevelTitle);
             Assert.AreEqual("You will lose a life.", config.LoseLifeLine);
-            Assert.AreEqual("You will lose a life and your {0}-win streak.", config.LoseLifeAndStreakFormat);
+            Assert.AreEqual("You will lose a life and your win streak of {0}.", config.LoseLifeAndStreakFormat, "no hyphen to break the line at");
             Assert.AreEqual("Lose a life", config.LoseLifeLabel);
             Assert.AreEqual("Keep playing", config.KeepPlayingLabel);
         }

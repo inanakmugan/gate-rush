@@ -87,7 +87,7 @@ namespace GateRush.UI
         [SerializeField] private string livesHeader = "Lives";
 
         [Tooltip("The line under the Store's sections, never hidden (D72).")]
-        [SerializeField] private string testStoreNote = "Test store: purchases are simulated and no money is charged.";
+        [SerializeField] private string testStoreNote = "Test store: no real money is charged.";
 
         [Tooltip("The test purchase sheet's title.")]
         [SerializeField] private string testPurchaseTitle = "Test Purchase";
@@ -128,10 +128,10 @@ namespace GateRush.UI
         [SerializeField] private string allRewardsCollectedLabel = "Every reward collected";
 
         [Tooltip("The Win Streak overlay's current streak; {0} is the streak.")]
-        [SerializeField] private string currentStreakFormat = "Streak {0}";
+        [SerializeField] private string currentStreakFormat = "Streak: {0}";
 
         [Tooltip("The Win Streak overlay's best streak; {0} is the best.")]
-        [SerializeField] private string bestStreakFormat = "Best {0}";
+        [SerializeField] private string bestStreakFormat = "Best: {0}";
 
         [Tooltip("A ladder row's wins; {0} is the wins.")]
         [SerializeField] private string ladderWinsFormat = "{0} wins";
@@ -187,7 +187,7 @@ namespace GateRush.UI
 
         [Header("Leaderboard texts (formats use the invariant culture)")]
         [Tooltip("The line under the Leaderboard's title, never hidden while the table is simulated (D73).")]
-        [SerializeField] private string leaderboardSimulatedNote = "Demo players. The online leaderboard is not connected.";
+        [SerializeField] private string leaderboardSimulatedNote = "Demo players: online leaderboard not connected.";
 
         [Tooltip("The Leaderboard page while a fetch is pending.")]
         [SerializeField] private string leaderboardLoadingText = "Loading…";
@@ -258,7 +258,7 @@ namespace GateRush.UI
         [SerializeField] private string loseLifeLine = "You will lose a life.";
 
         [Tooltip("The confirmation's line with a win streak at risk; {0} is the streak.")]
-        [SerializeField] private string loseLifeAndStreakFormat = "You will lose a life and your {0}-win streak.";
+        [SerializeField] private string loseLifeAndStreakFormat = "You will lose a life and your win streak of {0}.";
 
         [Tooltip("The label of the confirmation's red button: loses a life, then leaves or restarts.")]
         [SerializeField] private string loseLifeLabel = "Lose a life";
@@ -304,7 +304,7 @@ namespace GateRush.UI
         [SerializeField] private string lockedPrizeFormat = "+{0} {1}, opens at Level {2}";
 
         [Tooltip("The opacity a locked joker's icon is drawn at, on its button and on its Store card: above 0, at most 1.")]
-        [SerializeField] private float lockedIconAlpha = 0.6f;
+        [SerializeField] private float lockedIconAlpha = 0.7f;
 
         [Tooltip("Seconds one pulse of a marked joker button takes, from rest to its largest; it then eases back. Unscaled time. Positive.")]
         [SerializeField] private float markedPulseSeconds = 0.9f;

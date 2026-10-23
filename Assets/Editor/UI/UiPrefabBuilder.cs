@@ -101,6 +101,7 @@ namespace GateRush.UI.Editor
         private const string SilverMedalSpritePath = "Assets/Art/Sprites/UI/medal_silver.png";
         private const string BronzeMedalSpritePath = "Assets/Art/Sprites/UI/medal_bronze.png";
         private const string RingSelectSpritePath = "Assets/Art/Sprites/UI/ring_select.png";
+        private const string MarkerBaseSpritePath = "Assets/Art/Sprites/UI/button_round_blue.png";
 
         // The game's own white rounded rectangle (D46), sliced: the plain
         // shape behind a tinted highlight, ring, glow or selection, which
@@ -254,7 +255,6 @@ namespace GateRush.UI.Editor
         private const string GoldLabelName = "Gold";
         private const string LivesPillName = "Lives Pill";
         private const string PillsName = "Pills";
-        private const string PillName = "Pill";
         private const string LossArtName = "Loss Art";
         private const string LifeLostName = "Life Lost";
         private const string NextLifeName = "Next Life";
@@ -373,9 +373,37 @@ namespace GateRush.UI.Editor
         // The "-1" beside the heart on the result panel after a campaign loss.
         private const string LifeLostColorHex = "#E8384F";
 
-        // The pill behind the Store's test store line: the dark pill at 70
-        // percent, so the painting shows through a little.
-        private const string TestStoreNotePillColorHex = "#FFFFFFB3";
+        // White text straight on the painting — the Store's section headers
+        // and test store line, the Leaderboard's subtitle — uses this material
+        // preset: the button font's own material with the theme's purple outline and a soft dark
+        // underlay a little below the letters. The build creates it in
+        // Assets/Art/Fonts, and Unity makes its .meta. The values stay within
+        // the Fredoka atlas's padding (see WriteOutlinedTextMaterial).
+        private const string OutlinedTextMaterialPath = "Assets/Art/Fonts/Fredoka-Bold SDF - Outline Underlay.mat";
+        private const string OutlineColorProperty = "_OutlineColor";
+        private const string OutlineWidthProperty = "_OutlineWidth";
+        private const string FaceDilateProperty = "_FaceDilate";
+        private const string UnderlayColorProperty = "_UnderlayColor";
+        private const string UnderlayOffsetXProperty = "_UnderlayOffsetX";
+        private const string UnderlayOffsetYProperty = "_UnderlayOffsetY";
+        private const string UnderlayDilateProperty = "_UnderlayDilate";
+        private const string UnderlaySoftnessProperty = "_UnderlaySoftness";
+        private const string UnderlayKeyword = "UNDERLAY_ON";
+        private const string TextOutlineColorHex = "#2A1650";
+        private const float TextOutlineWidth = 0.2f;
+        private const float TextFaceDilate = 0.1f;
+        private const string TextUnderlayColorHex = "#2A165099";
+        private const float TextUnderlayOffsetX = 0f;
+        private const float TextUnderlayOffsetY = -0.4f;
+        private const float TextUnderlayDilate = 0.1f;
+        private const float TextUnderlaySoftness = 0.4f;
+
+        // Two material colours are the same within one step of an 8-bit channel.
+        private const float ColourChannelTolerance = 1f / 255f;
+
+        // The Leaderboard's subtitle on one line: its font shrinks from the
+        // usual size only as far as the line needs, never below the floor.
+        private const float LeaderboardNoteMinFontSize = 32f;
 
         // The HUD's white text, on the dark pills.
         private const string HudTextColorHex = "#FFFFFF";
@@ -395,9 +423,6 @@ namespace GateRush.UI.Editor
         // The panel on cards and rows 120 to 200 units tall: 109 of border.
         private const float CardPanelPixelsPerUnitMultiplier = 1f;
 
-        // The streak marker's 84-unit disc: 75 units of border.
-        private const float MarkerDiscPixelsPerUnitMultiplier = 1.5f;
-
         // The timer pill, 106 tall, and the gold and lives pills, 66 tall:
         // 102 and 61 units of border.
         private const float TimerPillPixelsPerUnitMultiplier = 1.2f;
@@ -415,11 +440,12 @@ namespace GateRush.UI.Editor
         // The streak bar's 36-unit track and its fill: 34 units of border.
         private const float BarPixelsPerUnitMultiplier = 1.25f;
 
-        // The joker badge, 72 square: 58 units of border.
-        private const float BadgePixelsPerUnitMultiplier = 1.4f;
+        // The joker badge, 86 square: 70 units of border.
+        private const float BadgePixelsPerUnitMultiplier = 1.17f;
 
-        // The 196-unit square joker buttons: 118 units of border.
-        private const float JokerButtonPixelsPerUnitMultiplier = 1.3f;
+        // The 235-unit square joker buttons: 143 units of border, the same
+        // share of the button as Module 45's 118 of 196.
+        private const float JokerButtonPixelsPerUnitMultiplier = 1.08f;
 
         // The plain rounded rectangle at its own scale: 13 units of border.
         private const float PlainPixelsPerUnitMultiplier = 1f;
@@ -454,16 +480,9 @@ namespace GateRush.UI.Editor
         private const float SectionHeaderHeight = 90f;
         private const float SectionHeaderFontSize = 60f;
         private const float TestStoreNoteHeight = 120f;
-        private const float TestStoreNoteFontSize = 40f;
 
-        // The test store line on the dark pill, so it reads on the painting:
-        // the text's padding inside the pill, and the column it wraps in at
-        // the 1080-unit reference. The pill is sized to the config's text when
-        // the build runs; a changed Test Store Note needs a rebuild.
-        private const float ReferenceWidth = 1080f;
-        private const float StoreColumnWidth = ReferenceWidth - (StoreSideInset + StoreSideInset);
-        private const float TestStoreNotePaddingX = 24f;
-        private const float TestStoreNotePaddingY = 10f;
+        // One line, outlined, straight on the painting.
+        private const float TestStoreNoteFontSize = 32f;
 
         // Every Store card. Its width is the layout's; this one is the Gold
         // Pack Card prefab's own, for the Editor.
@@ -490,7 +509,14 @@ namespace GateRush.UI.Editor
         private const float OverlayTitleFontSize = 80f;
         private const float OverlayTitlePosY = -30f;
         private const float OverlayTitleHeight = 110f;
-        private const float CloseButtonInset = 10f;
+        // The close button fully inside the panel, this far in from its
+        // top-right corner at every panel size: the introduction card's
+        // placement (RuntimeConfig's Intro Panel Padding Units). The title
+        // keeps TitleCloseGap clear of it and shrinks no further than
+        // OverlayTitleMinFontSize to fit.
+        private const float CloseButtonInset = 40f;
+        private const float TitleCloseGap = 10f;
+        private const float OverlayTitleMinFontSize = 56f;
         private const float PanelButtonPosY = 70f;
         private const float OverlayTextInset = 60f;
 
@@ -505,6 +531,15 @@ namespace GateRush.UI.Editor
         private const float HapticsRowPosY = SoundRowPosY - SoundRowHeight - SettingsRowSpacing;
         private const float SoundLabelWidthFraction = 0.5f;
         private const float SoundLabelFontSize = 64f;
+
+        // Each Settings look's glyph box moved right by this share of the
+        // button's width, so its drawn shape is centred: Button Round's glyph
+        // box is tuned for plus.png, whose opaque bounds centre at 0.52 of the
+        // file, against audioOn's 0.50, audioOff's 0.38 (the speaker alone)
+        // and phone's 0.49. The haptics cross moves with its phone.
+        private const float SoundOnGlyphShift = 0.015f;
+        private const float SoundOffGlyphShift = 0.105f;
+        private const float PhoneGlyphShift = 0.0225f;
 
         // The cross over the haptics phone: inset by this fraction of the
         // icon on every side, so it covers its middle 70%.
@@ -551,19 +586,20 @@ namespace GateRush.UI.Editor
         private const int LevelGridColumns = 4;
 
         // Lives overlay. Every PosY is a top edge, down from the panel's top:
-        // the heart spans 160 to 280 (its width the sprite's own aspect, so
-        // Preserve Aspect leaves no room around it), "Next life in" 310 to
-        // 370 and the wait 390 to 480, all clear of the title above and of
-        // Refill at the foot, whose top is 580.
+        // the heart spans 160 to 310 (its width the sprite's own aspect, so
+        // Preserve Aspect leaves no room around it; the count scaled with it,
+        // 48 in a 120 heart), "Next life in" 330 to 390 and the wait 410 to
+        // 500, all clear of the title above and of Refill at the foot, whose
+        // top is 580.
         private const float LivesPanelWidth = 820f;
         private const float LivesPanelHeight = 800f;
-        private const float HeartHeight = 120f;
+        private const float HeartHeight = 150f;
         private const float HeartPosY = -160f;
-        private const float LivesOverlayCountFontSize = 48f;
-        private const float NextLifePosY = -310f;
+        private const float LivesOverlayCountFontSize = 60f;
+        private const float NextLifePosY = -330f;
         private const float NextLifeHeight = 60f;
         private const float NextLifeFontSize = 44f;
-        private const float StatusPosY = -390f;
+        private const float StatusPosY = -410f;
         private const float StatusHeight = 90f;
         private const float StatusFontSize = 56f;
 
@@ -596,9 +632,12 @@ namespace GateRush.UI.Editor
         private const float SheetButtonHeight = 140f;
         private const float SheetButtonOffsetX = 200f;
 
-        // Streak Marker, centred on the bar's track at its reward's place.
+        // Streak Marker, centred on the bar's track at its reward's place: a
+        // round base, and on the next reward the gold ring, 112 across, over
+        // the base, its hole (two thirds of it) covering the base's rim. The
+        // ring stays inside the 200-unit bar, clear of the line under it.
         private const float MarkerSize = 84f;
-        private const float MarkerHighlightOutset = 8f;
+        private const float MarkerHighlightOutset = 14f;
         private const float MarkerIconSize = 56f;
         private const float MarkerCountWidth = 56f;
         private const float MarkerCountHeight = 34f;
@@ -658,13 +697,12 @@ namespace GateRush.UI.Editor
         private const float LadderBottom = RulePosY + RuleHeight + LadderRuleGap;
 
         // Streak Prize. Its width is the column's; this one is the prefab's
-        // own, for the Editor.
+        // own, for the Editor. The icon and the label are centred as a group,
+        // PrizeSpacing apart.
         private const float PrizePreviewWidth = 700f;
         private const float PrizeHeight = 110f;
-        private const float PrizeIconLeft = 120f;
         private const float PrizeIconSize = 90f;
-        private const float PrizeLabelLeft = 230f;
-        private const float PrizeLabelRight = 40f;
+        private const float PrizeSpacing = 20f;
         private const float PrizeFontSize = 56f;
 
         // Streak Reward overlay: tall enough for one line per joker kind
@@ -783,45 +821,51 @@ namespace GateRush.UI.Editor
         private const float PillTextInset = 16f;
 
         // Module 40: the Joker Bar's row, laid out at the reference and
-        // scaled down by BandFit when the bottom band (0.14 of the screen's
-        // height since Module 45, 269 units at the 1920-unit reference) is
-        // smaller.
+        // scaled down by BandFit when the bottom band is smaller.
         //
-        // Module 45 (the Samsung M33 note): the square buttons, the badge,
-        // the icon and the lock are about 1.4 times Module 42's, the gap
-        // between the buttons too. Each slot stands JokerBottomClearance
-        // above the row's foot under its badge, so the bar sits off the
-        // screen's bottom edge: its centre is -136 + 22 + 16 + 98 = 0. In
-        // the 272-unit row the raised glow's top reaches 98 + 20 + 16 = 134,
-        // the raised ring's 129, and a raised button at the UI Config's
-        // default pulse of 1.06 reaches 103.9 + 20 = 123.9, all inside the
-        // row's 136. The outer badge's right edge is at 392 + 98 + 16 = 506,
-        // inside the row's 540. "Lv 15" widens the badge to about 170 units,
-        // within the 196-unit button.
+        // The interface review: the square buttons, the icon and the badge
+        // with everything in it are about 1.2 times Module 45's, the gap
+        // between the buttons half a button, the three grouped in the centre
+        // of a row only as wide as they need. The bottom band (0.145 of the
+        // screen's height, the most the board-fit floor allows with the top
+        // band at 0.16) scales the 312-unit row: about 0.89 at the 1920-unit
+        // reference and the web build's window, about 1 on a tall phone,
+        // where the screen's width holds it to about 0.96.
+        //
+        // Each slot stands JokerBottomClearance above the row's foot under its
+        // badge: its centre is -156 + 22 + 19 + 117.5 = 2.5. The raised
+        // glow's top reaches 2.5 + 117.5 + 20 + 16 = 156, the row's half
+        // height; the raised ring's 153, and a raised button at the UI
+        // Config's default pulse of 1.06 reaches 2.5 + 124.6 + 20 = 147.1. The
+        // outer badge's right edge is at 353 + 117.5 + 19 = 489.5, inside the
+        // row's 499.5. "Lv 15" widens the badge to about 205 units, within the
+        // 235-unit button.
         //
         // The square sprite has 29 pixels of outline and lip at its foot and
         // 15 of outline at its top; drawn at JokerButtonPixelsPerUnitMultiplier
-        // the face's middle sits (29 - 15) / 2 / 1.3, about 6 units, above
+        // the face's middle sits (29 - 15) / 2 / 1.08, about 6.5 units, above
         // the button's, so the icon is raised by JokerIconRaise.
-        private const float JokerRowWidth = 1080f;
-        private const float JokerRowHeight = 272f;
-        private const float JokerButtonSize = 196f;
-        private const float JokerSlotGap = 196f;
+        private const float JokerButtonSize = 235f;
+        private const float JokerSlotGap = 118f;
+        private const float BadgeOutset = 19f;
+        private const float JokerRowSideMargin = 10f;
+        private const float JokerRowWidth = 2f * (JokerButtonSize + JokerSlotGap + JokerButtonSize / 2f + BadgeOutset + JokerRowSideMargin);
+        private const float JokerRowHeight = 312f;
         private const float JokerBottomClearance = 22f;
         private const float JokerRaise = 20f;
-        private const float JokerRingOutset = 11f;
-        private const float JokerIconRaise = 6f;
-        private const float JokerIconSize = 134f;
-        private const float BadgeSize = 72f;
-        private const float BadgeOutset = 16f;
-        private const int BadgePadding = 14;
-        private const float BadgeSpacing = 6f;
-        private const float BadgeCoinSize = 56f;
-        private const float BadgeFontSize = 56f;
+        private const float JokerRingOutset = 13f;
+        private const float JokerIconRaise = 6.5f;
+        private const float JokerIconSize = 161f;
+        private const float BadgeSize = 86f;
+        private const int BadgePadding = 17;
+        private const float BadgeSpacing = 7f;
+        private const float BadgeCoinSize = 67f;
+        private const float BadgeFontSize = 67f;
 
-        // Module 43: a locked joker's lock, centred on its icon, and a marked
-        // joker's glow behind the button (the extents above include it).
-        private const float JokerLockSize = 78f;
+        // Module 43: a locked joker's lock, centred on its icon — about half
+        // the button since the interface review — and a marked joker's glow
+        // behind the button (the extents above include it).
+        private const float JokerLockSize = 118f;
         private const float JokerGlowOutset = 16f;
 
         // Module 43: a locked joker's lock on its Store card, centred on the
@@ -1095,6 +1139,7 @@ namespace GateRush.UI.Editor
             }
 
             var sources = Sources.Load();
+            sources.WriteOutlinedText();
             var scene = EditorSceneManager.NewPreviewScene();
             try
             {
@@ -1233,7 +1278,12 @@ namespace GateRush.UI.Editor
                 content, sources, LivesCardName, sources.Heart, RefillLivesText,
                 config.LivesFullLabel, config.LivesFullLabel);
 
-            var note = AddTestStoreNote(content, sources, config.TestStoreNote);
+            var note = AddSectionLine(content, sources, TestStoreNoteName, config.TestStoreNote, TestStoreNoteHeight, TestStoreNoteFontSize, true);
+            note.textWrappingMode = TextWrappingModes.NoWrap;
+            UseOutlinedText(goldHeader, sources);
+            UseOutlinedText(jokersHeader, sources);
+            UseOutlinedText(livesHeader, sources);
+            UseOutlinedText(note, sources);
 
             var scrollRect = AddVerticalScroll(scroll, viewport, content);
 
@@ -1327,7 +1377,11 @@ namespace GateRush.UI.Editor
 
             var note = UiBuilder.CreateRect(NoteName, root.transform);
             TopStretch(note, LeaderboardInset, LeaderboardNotePosY, LeaderboardNoteHeight);
-            var noteLabel = AddWrappingText(note, sources, config.LeaderboardSimulatedNote, LeaderboardNoteFontSize, PageTitleColorHex);
+            var noteLabel = AddText(note, sources, config.LeaderboardSimulatedNote, LeaderboardNoteFontSize, PageTitleColorHex);
+            noteLabel.enableAutoSizing = true;
+            noteLabel.fontSizeMin = LeaderboardNoteMinFontSize;
+            noteLabel.fontSizeMax = LeaderboardNoteFontSize;
+            UseOutlinedText(noteLabel, sources);
 
             var scroll = UiBuilder.CreateRect(ScrollViewName, root.transform);
             UiBuilder.Stretch(scroll);
@@ -1432,14 +1486,14 @@ namespace GateRush.UI.Editor
             var frame = BuildOverlayFrame(scene, sources, SettingsOverlayName, SettingsTitle, SettingsPanelWidth, SettingsPanelHeight, true);
 
             var sound = AddToggleRow(frame.Panel, sources, SoundRowName, SoundText, SoundRowPosY);
-            var soundOnLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOnLookName, sources.SoundOn);
-            var soundOffLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOffLookName, sources.SoundOff);
+            var soundOnLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOnLookName, sources.SoundOn, SoundOnGlyphShift);
+            var soundOffLook = AddLook(sound.Toggle, sound.OwnIcon, SoundOffLookName, sources.SoundOff, SoundOffGlyphShift);
             soundOffLook.SetActive(false);
 
             // Off is the phone with the red cross over its middle.
             var haptics = AddToggleRow(frame.Panel, sources, HapticsRowName, sources.Config.HapticsLabel, HapticsRowPosY);
-            var hapticsOnLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOnLookName, sources.Phone);
-            var hapticsOffLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOffLookName, sources.Phone);
+            var hapticsOnLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOnLookName, sources.Phone, PhoneGlyphShift);
+            var hapticsOffLook = AddLook(haptics.Toggle, haptics.OwnIcon, HapticsOffLookName, sources.Phone, PhoneGlyphShift);
             var cross = UiBuilder.CreateRect(CrossName, hapticsOffLook.transform);
             UiBuilder.SetAnchors(
                 cross, new Vector2(HapticsCrossInset, HapticsCrossInset), new Vector2(AnchorHigh - HapticsCrossInset, AnchorHigh - HapticsCrossInset));
@@ -1656,9 +1710,10 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// One reward's marker on the streak bar, the prefab the bar
-        /// instantiates per reward: the highlight behind (shown on the next
-        /// reward), the disc, the joker's icon, its count and the check
-        /// (shown once reached). Centred, so the bar only moves its anchor.
+        /// instantiates per reward: the round base, the gold ring over its rim
+        /// (shown on the next reward; drawn in its own colours, untinted), the
+        /// joker's icon, its count and the check (shown once reached).
+        /// Centred, so the bar only moves its anchor.
         /// </summary>
         private static GameObject BuildStreakMarker(Scene scene, Sources sources)
         {
@@ -1666,17 +1721,16 @@ namespace GateRush.UI.Editor
             var rect = (RectTransform)root.transform;
             UiBuilder.PlaceCentered(rect, new Vector2(MarkerSize, MarkerSize));
 
+            var disc = UiBuilder.CreateRect(DiscName, rect);
+            UiBuilder.Stretch(disc);
+            UiBuilder.AddIcon(disc, sources.MarkerBase, ParseColor(OwnColorsHex));
+
             var highlight = UiBuilder.CreateRect(HighlightName, rect);
             UiBuilder.Stretch(highlight);
             highlight.offsetMin = new Vector2(-MarkerHighlightOutset, -MarkerHighlightOutset);
             highlight.offsetMax = new Vector2(MarkerHighlightOutset, MarkerHighlightOutset);
-            var highlightImage = AddSliced(highlight, sources.Plain, PanelColorHex, PlainPixelsPerUnitMultiplier);
-            AddTint(highlight.gameObject, highlightImage, UiColorRole.Streak);
+            UiBuilder.AddIcon(highlight, sources.RingSelect, ParseColor(OwnColorsHex));
             highlight.gameObject.SetActive(false);
-
-            var disc = UiBuilder.CreateRect(DiscName, rect);
-            UiBuilder.Stretch(disc);
-            AddSliced(disc, sources.Panel, PanelColorHex, MarkerDiscPixelsPerUnitMultiplier);
 
             var icon = UiBuilder.CreateRect(IconName, rect);
             UiBuilder.PlaceCentered(icon, new Vector2(MarkerIconSize, MarkerIconSize));
@@ -1866,7 +1920,7 @@ namespace GateRush.UI.Editor
             return LadderTop + rows * LadderRowHeight + (rows - 1) * LadderSpacing + LadderBottom;
         }
 
-        /// <summary>One line of the Streak Reward overlay: a joker's icon and "+1 Rocket".</summary>
+        /// <summary>One line of the Streak Reward overlay: a joker's icon and "+1 Rocket", centred together.</summary>
         private static GameObject BuildStreakPrize(Scene scene, Sources sources)
         {
             var prize = new JokerPrize(JokerKind.Rocket, PlaceholderRewardCount);
@@ -1875,12 +1929,25 @@ namespace GateRush.UI.Editor
             UiBuilder.PlaceCentered(rect, new Vector2(PrizePreviewWidth, PrizeHeight));
             root.AddComponent<LayoutElement>().preferredHeight = PrizeHeight;
 
+            // The icon and the label centred together as one group, under the
+            // centred lines above them, whatever the label's width.
+            var group = root.AddComponent<HorizontalLayoutGroup>();
+            group.spacing = PrizeSpacing;
+            group.childAlignment = TextAnchor.MiddleCenter;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = false;
+
             var icon = UiBuilder.CreateRect(IconName, rect);
-            UiBuilder.Place(icon, new Vector2(AnchorLow, AnchorMid), new Vector2(PrizeIconLeft, 0f), new Vector2(PrizeIconSize, PrizeIconSize));
+            var iconElement = icon.gameObject.AddComponent<LayoutElement>();
+            iconElement.preferredWidth = PrizeIconSize;
+            iconElement.preferredHeight = PrizeIconSize;
             var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(prize.Joker), ParseColor(IconColorHex));
 
-            var label = AddBandText(
-                rect, sources, PrizeLabelName, PrizeLabelLeft, PrizeLabelRight, StreakTexts.Prize(prize, sources.Config), PrizeFontSize);
+            var labelRect = UiBuilder.CreateRect(PrizeLabelName, rect);
+            var label = AddText(labelRect, sources, StreakTexts.Prize(prize, sources.Config), PrizeFontSize, OverlayTextColorHex);
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rect);
 
             var component = root.AddComponent<StreakPrize>();
             SetReferences(component, (IconField, iconImage), (LabelField, label));
@@ -2868,15 +2935,25 @@ namespace GateRush.UI.Editor
             // A raycast target, as the panel always was: taps on it stop there.
             panelImage.raycastTarget = true;
 
+            // With a close button the title keeps clear of it on both sides,
+            // so it stays centred, and shrinks when it would not fit.
+            var closeSize = ((RectTransform)sources.ButtonClose.transform).sizeDelta;
+            var titleInset = hasClose ? CloseButtonInset + closeSize.x + TitleCloseGap : 0f;
             var titleRect = UiBuilder.CreateRect(TitleName, panel);
-            TopStretch(titleRect, 0f, OverlayTitlePosY, OverlayTitleHeight);
+            TopStretch(titleRect, titleInset, OverlayTitlePosY, OverlayTitleHeight);
             var titleLabel = AddText(titleRect, sources, title, OverlayTitleFontSize, OverlayTextColorHex);
+            if (hasClose)
+            {
+                titleLabel.enableAutoSizing = true;
+                titleLabel.fontSizeMin = OverlayTitleMinFontSize;
+                titleLabel.fontSizeMax = OverlayTitleFontSize;
+            }
 
             Button closeButton = null;
             if (hasClose)
             {
                 var close = Nest(sources.ButtonClose, panel);
-                UiBuilder.Place(close, new Vector2(AnchorHigh, AnchorHigh), new Vector2(-CloseButtonInset, -CloseButtonInset), close.sizeDelta);
+                UiBuilder.Place(close, new Vector2(AnchorHigh, AnchorHigh), new Vector2(-CloseButtonInset, -CloseButtonInset), closeSize);
                 Record(close);
                 closeButton = Single<Button>(close.gameObject, ButtonCloseName);
             }
@@ -3169,41 +3246,119 @@ namespace GateRush.UI.Editor
         }
 
         /// <summary>
-        /// The Store's test store line: its slot in the column, and in it,
-        /// centred, the dark pill sized to <paramref name="text"/> wrapped
-        /// within the column, with the white text inside its padding. The
-        /// pill's slice borders are scaled to its height, so its ends stay
-        /// round whatever the number of lines.
+        /// Gives <paramref name="label"/>, white text straight on the painting,
+        /// the outlined material with its soft underlay, so it reads on any
+        /// part of the picture.
         /// </summary>
-        private static TMP_Text AddTestStoreNote(RectTransform column, Sources sources, string text)
+        private static void UseOutlinedText(TMP_Text label, Sources sources)
         {
-            var line = UiBuilder.CreateRect(TestStoreNoteName, column);
-            line.gameObject.AddComponent<LayoutElement>().preferredHeight = TestStoreNoteHeight;
-
-            var pill = UiBuilder.CreateRect(PillName, line);
-            var labelRect = UiBuilder.CreateRect(TextName, pill);
-            UiBuilder.Stretch(labelRect);
-            labelRect.offsetMin = new Vector2(TestStoreNotePaddingX, TestStoreNotePaddingY);
-            labelRect.offsetMax = new Vector2(-TestStoreNotePaddingX, -TestStoreNotePaddingY);
-            var label = AddWrappingText(labelRect, sources, text, TestStoreNoteFontSize, PageTitleColorHex);
-
-            var maxTextWidth = StoreColumnWidth - (TestStoreNotePaddingX + TestStoreNotePaddingX);
-            var textSize = label.GetPreferredValues(text, maxTextWidth, TestStoreNoteHeight);
-            var pillSize = new Vector2(
-                Mathf.Min(textSize.x, maxTextWidth) + TestStoreNotePaddingX + TestStoreNotePaddingX,
-                textSize.y + TestStoreNotePaddingY + TestStoreNotePaddingY);
-            UiBuilder.PlaceCentered(pill, pillSize);
-            var border = sources.Pill.border;
-            AddSliced(pill, sources.Pill, TestStoreNotePillColorHex, (border.y + border.w) / pillSize.y);
-            return label;
+            label.fontSharedMaterial = sources.OutlinedText;
         }
 
-        /// <summary>An icon placed exactly where <paramref name="template"/> is, tinted as an icon.</summary>
-        private static GameObject AddLook(RectTransform parent, RectTransform template, string name, Sprite sprite)
+        /// <summary>
+        /// Creates or updates the outlined text material at
+        /// <see cref="OutlinedTextMaterialPath"/>: a copy of
+        /// <paramref name="font"/>'s own material, so it samples the same
+        /// atlas, with the theme's purple outline and a soft dark underlay a
+        /// little below the letters. Saved only when it differs.
+        /// </summary>
+        /// <remarks>
+        /// The values stay within what the atlas's padding supports, so no
+        /// glyph edge clips: Fredoka-Bold SDF is sampled at 94 points with a
+        /// padding of 7, which TMP reads as a range of 1 — outline and face
+        /// dilate with the bold weight come to 0.49, and the underlay's
+        /// offset, dilate and softness to 0.9.
+        /// </remarks>
+        private static Material WriteOutlinedTextMaterial(TMP_FontAsset font)
+        {
+            var source = font.material;
+            if (source == null)
+            {
+                throw new InvalidOperationException($"{font.name} has no material to outline. Nothing was written.");
+            }
+
+            var material = AssetDatabase.LoadAssetAtPath<Material>(OutlinedTextMaterialPath);
+            if (material == null)
+            {
+                material = new Material(source);
+                AssetDatabase.CreateAsset(material, OutlinedTextMaterialPath);
+            }
+
+            var before = new Material(material);
+            material.shader = source.shader;
+            material.CopyPropertiesFromMaterial(source);
+            material.SetColor(OutlineColorProperty, ParseColor(TextOutlineColorHex));
+            material.SetFloat(OutlineWidthProperty, TextOutlineWidth);
+            material.SetFloat(FaceDilateProperty, TextFaceDilate);
+            material.SetColor(UnderlayColorProperty, ParseColor(TextUnderlayColorHex));
+            material.SetFloat(UnderlayOffsetXProperty, TextUnderlayOffsetX);
+            material.SetFloat(UnderlayOffsetYProperty, TextUnderlayOffsetY);
+            material.SetFloat(UnderlayDilateProperty, TextUnderlayDilate);
+            material.SetFloat(UnderlaySoftnessProperty, TextUnderlaySoftness);
+            material.EnableKeyword(UnderlayKeyword);
+
+            if (!HasSameLook(before, material))
+            {
+                EditorUtility.SetDirty(material);
+                AssetDatabase.SaveAssetIfDirty(material);
+            }
+
+            Object.DestroyImmediate(before);
+            return material;
+        }
+
+        /// <summary>
+        /// True when every channel of <paramref name="a"/> and <paramref name="b"/>
+        /// is within <see cref="ColourChannelTolerance"/>: a colour read back
+        /// from a saved material may differ from its constant in the last
+        /// float digits, which must not count as a change.
+        /// </summary>
+        private static bool IsSameColour(Color a, Color b) =>
+            Mathf.Abs(a.r - b.r) <= ColourChannelTolerance && Mathf.Abs(a.g - b.g) <= ColourChannelTolerance
+            && Mathf.Abs(a.b - b.b) <= ColourChannelTolerance && Mathf.Abs(a.a - b.a) <= ColourChannelTolerance;
+
+        /// <summary>True when <paramref name="a"/> and <paramref name="b"/> have the same shader, keywords and outline and underlay values.</summary>
+        private static bool HasSameLook(Material a, Material b)
+        {
+            if (a.shader != b.shader || a.IsKeywordEnabled(UnderlayKeyword) != b.IsKeywordEnabled(UnderlayKeyword))
+            {
+                return false;
+            }
+
+            foreach (var color in new[] { OutlineColorProperty, UnderlayColorProperty })
+            {
+                if (!IsSameColour(a.GetColor(color), b.GetColor(color)))
+                {
+                    return false;
+                }
+            }
+
+            foreach (var value in new[]
+                     {
+                         OutlineWidthProperty, FaceDilateProperty, UnderlayOffsetXProperty, UnderlayOffsetYProperty, UnderlayDilateProperty,
+                         UnderlaySoftnessProperty
+                     })
+            {
+                if (!Mathf.Approximately(a.GetFloat(value), b.GetFloat(value)))
+                {
+                    return false;
+                }
+            }
+
+            return a.mainTexture == b.mainTexture;
+        }
+
+        /// <summary>
+        /// An icon placed where <paramref name="template"/> is, its anchors
+        /// moved right by <paramref name="shift"/> of the parent's width so the
+        /// glyph's drawn shape, not its file, is centred; tinted as an icon.
+        /// </summary>
+        private static GameObject AddLook(RectTransform parent, RectTransform template, string name, Sprite sprite, float shift)
         {
             var look = UiBuilder.CreateRect(name, parent);
-            look.anchorMin = template.anchorMin;
-            look.anchorMax = template.anchorMax;
+            var offset = new Vector2(shift, 0f);
+            look.anchorMin = template.anchorMin + offset;
+            look.anchorMax = template.anchorMax + offset;
             look.pivot = template.pivot;
             look.anchoredPosition = template.anchoredPosition;
             look.sizeDelta = template.sizeDelta;
@@ -3536,6 +3691,9 @@ namespace GateRush.UI.Editor
             public int Layer { get; private set; }
             public TMP_FontAsset Font { get; private set; }
             public UiConfig Config { get; private set; }
+
+            /// <summary>The outlined text material, written by <see cref="WriteOutlinedText"/> once every input has loaded.</summary>
+            public Material OutlinedText { get; private set; }
             /// <summary>The light pop-up panel, 9-sliced: overlays, cards, rows, the streak bar and its marker discs.</summary>
             public Sprite Panel { get; private set; }
 
@@ -3567,6 +3725,9 @@ namespace GateRush.UI.Editor
 
             /// <summary>The gold ring over the chosen avatar's disc, drawn in its own colours.</summary>
             public Sprite RingSelect { get; private set; }
+
+            /// <summary>The round base of every streak marker: the theme's blue round button.</summary>
+            public Sprite MarkerBase { get; private set; }
 
             public Sprite Home { get; private set; }
             public Sprite Return { get; private set; }
@@ -3649,6 +3810,7 @@ namespace GateRush.UI.Editor
                     SilverMedal = LoadSprite(SilverMedalSpritePath),
                     BronzeMedal = LoadSprite(BronzeMedalSpritePath),
                     RingSelect = LoadSprite(RingSelectSpritePath),
+                    MarkerBase = LoadSprite(MarkerBaseSpritePath),
                     Home = LoadSprite(HomeSpritePath),
                     Return = LoadSprite(ReturnSpritePath),
                     Hourglass = LoadSprite(HourglassSpritePath),
@@ -3672,6 +3834,16 @@ namespace GateRush.UI.Editor
                     sources.ButtonClose, sources.ButtonPrimary, sources.ButtonRound, sources.ButtonSecondary, sources.HomePage,
                     sources.TabBar, sources.TopBar, sources.LevelButton.gameObject);
                 return sources;
+            }
+
+            /// <summary>
+            /// Creates or updates the outlined text material from the button
+            /// font: the build's first write, after every input has loaded and
+            /// been checked.
+            /// </summary>
+            public void WriteOutlinedText()
+            {
+                OutlinedText = WriteOutlinedTextMaterial(Font);
             }
 
             /// <summary>

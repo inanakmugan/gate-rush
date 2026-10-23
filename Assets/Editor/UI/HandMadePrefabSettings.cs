@@ -19,7 +19,12 @@ namespace GateRush.UI.Editor
     /// <para>So far: Button Round's icon sits in a smaller, centred glyph box;
     /// in Top Bar the plus buttons' icons follow it, the lives count takes
     /// the HUD's font size, the heart sits close to the coin's size and the
-    /// avatar fills its frame inside a thin rim (Module 45 follow-ups).</para>
+    /// avatar fills its frame inside a thin rim (Module 45 follow-ups); in
+    /// Tab Bar the selected tabs' labels share the largest size at which
+    /// "Leaderboard" fits its tile; in Home Page the Play button sits just
+    /// above the tab bar with the notice above it (the interface review).
+    /// Button Round and Top Bar run first, then Tab Bar and Home Page, which
+    /// depend on neither.</para>
     /// <para>Every object is found by its exact Hierarchy path. Each value is
     /// compared before it is set, so a run over prefabs that already hold
     /// every value changes nothing and saves nothing; a prefab is saved only
@@ -56,11 +61,39 @@ namespace GateRush.UI.Editor
         /// <inheritdoc cref="AvatarAnchorMin"/>
         public static readonly Vector2 AvatarAnchorMax = new Vector2(0.94f, 0.94f);
 
+        // Tab Bar.
+
+        /// <summary>The largest size the selected tabs' labels may take; one size for all three.</summary>
+        public const float TabLabelMaxFontSize = 44f;
+
+        /// <summary>The selected tile's dark outline on each side (16 of the 256-pixel square sprite, drawn at its own scale): the face is the tile less this.</summary>
+        public const float TabTileOutline = 16f;
+
+        /// <summary>The space kept between the longest label and the tile's face on each side.</summary>
+        public const float TabLabelMargin = 12f;
+
+        // Home Page.
+
+        /// <summary>The Play button's foot above the page's foot, which is the tab bar's top: in the lower third, within a thumb's reach.</summary>
+        public const float PlayButtonBottomGap = 60f;
+
+        /// <summary>The space between the Play button's top and the notice above it.</summary>
+        public const float NoticeGap = 20f;
+
+        /// <summary>The anchor and pivot the Play button and the notice are pinned by: the middle of the page's foot.</summary>
+        public static readonly Vector2 BottomCentre = new Vector2(0.5f, 0f);
+
         /// <summary>The prefabs the command sets.</summary>
         public const string ButtonRoundPath = "Assets/Prefabs/UI/Button Round.prefab";
 
         /// <inheritdoc cref="ButtonRoundPath"/>
         public const string TopBarPath = "Assets/Prefabs/UI/Top Bar.prefab";
+
+        /// <inheritdoc cref="ButtonRoundPath"/>
+        public const string TabBarPath = "Assets/Prefabs/UI/Tab Bar.prefab";
+
+        /// <inheritdoc cref="ButtonRoundPath"/>
+        public const string HomePagePath = "Assets/Prefabs/UI/Home Page.prefab";
 
         /// <summary>Hierarchy paths, from each prefab's root.</summary>
         public const string ButtonRoundIconPath = "Button Round/Icon";
@@ -86,6 +119,27 @@ namespace GateRush.UI.Editor
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string NameTagPath = "Top Bar/Avatar Frame/Name Tag";
 
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string HomeTabLabelPath = "Tab Bar/Home Tab/Selected/Plate/Name";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string StoreTabLabelPath = "Tab Bar/Store Tab/Selected/Plate/Name";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string LeaderboardTabLabelPath = "Tab Bar/LeaderBoard Tab/Selected/Plate/Name";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string PlayButtonPath = "Home Page/Play Button";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string NoticePath = "Home Page/Notice";
+
+        /// <summary>The selected tabs' labels; the Leaderboard's, the longest, sets their one size.</summary>
+        public static IReadOnlyList<string> TabLabelPaths { get; } = Array.AsReadOnly(new[] { HomeTabLabelPath, StoreTabLabelPath, LeaderboardTabLabelPath });
+
+        // The smallest step the tab labels' font is searched in: whole sizes.
+        private const float FontSizeStep = 1f;
+
         private const string LogPrefix = "Apply Hand-Made Prefab Settings";
         private const char PathSeparator = '/';
 
@@ -102,7 +156,33 @@ namespace GateRush.UI.Editor
             {
                 Debug.LogError($"{LogPrefix}: {TopBarPath} refused: Button Round was refused, and its plus icons follow Button Round.");
             }
+
+            Apply(TabBarPath, SetTabBar);
+            Apply(HomePagePath, SetHomePage);
         }
+
+        /// <summary>
+        /// The one font size the selected tabs' labels share: the largest whole
+        /// size, up to <see cref="TabLabelMaxFontSize"/>, at which
+        /// <paramref name="longest"/>'s text fits <paramref name="room"/>.
+        /// Leaves <paramref name="longest"/> at that size, not auto-sized.
+        /// </summary>
+        public static float FittingFontSize(TMP_Text longest, float room)
+        {
+            longest.enableAutoSizing = false;
+            var size = TabLabelMaxFontSize;
+            longest.fontSize = size;
+            while (size > FontSizeStep && longest.GetPreferredValues(longest.text).x > room)
+            {
+                size -= FontSizeStep;
+                longest.fontSize = size;
+            }
+
+            return size;
+        }
+
+        /// <summary>The room a selected tab's label has on <paramref name="tileWidth"/>: the tile's face less the margin on both sides.</summary>
+        public static float TabLabelRoom(float tileWidth) => tileWidth - (TabTileOutline + TabLabelMargin) - (TabTileOutline + TabLabelMargin);
 
         /// <summary>
         /// The object at <paramref name="path"/> under <paramref name="root"/>,
@@ -245,6 +325,104 @@ namespace GateRush.UI.Editor
             }
 
             return null;
+        }
+
+        /// <summary>
+        /// Tab Bar's steps: the three selected tabs' labels share one fixed
+        /// size, the largest at which "Leaderboard" fits its tile's face with
+        /// the margin, on one line, their rects inset to that room. Returns
+        /// the refusal, or null.
+        /// </summary>
+        private static string SetTabBar(GameObject root, List<string> changes)
+        {
+            var labels = new List<TMP_Text>();
+            var missing = new List<string>();
+            foreach (var path in TabLabelPaths)
+            {
+                var found = FindByPath(root, path);
+                var label = found == null ? null : found.GetComponent<TMP_Text>();
+                AddIfMissing(missing, label, $"a TextMeshPro text at '{path}'");
+                labels.Add(label);
+            }
+
+            var longest = labels[labels.Count - 1];
+            var tile = longest == null ? null : longest.transform.parent as RectTransform;
+            if (longest != null && tile == null)
+            {
+                missing.Add($"a RectTransform tile above '{LeaderboardTabLabelPath}'");
+            }
+
+            if (missing.Count > 0)
+            {
+                return $"it needs {string.Join(", ", missing)}";
+            }
+
+            // Read before the measurement below changes the longest label.
+            var before = new List<(bool isAutoSized, float fontSize, TextWrappingModes wrapping, float width)>();
+            foreach (var label in labels)
+            {
+                before.Add((label.enableAutoSizing, label.fontSize, label.textWrappingMode, ((RectTransform)label.transform).sizeDelta.x));
+            }
+
+            var room = TabLabelRoom(tile.sizeDelta.x);
+            var size = FittingFontSize(longest, room);
+            for (var i = 0; i < labels.Count; i++)
+            {
+                var label = labels[i];
+                var rect = (RectTransform)label.transform;
+                label.enableAutoSizing = false;
+                label.fontSize = size;
+                label.textWrappingMode = TextWrappingModes.NoWrap;
+                rect.sizeDelta = new Vector2(room - tile.sizeDelta.x, rect.sizeDelta.y);
+
+                var was = before[i];
+                if (was.isAutoSized || !Mathf.Approximately(was.fontSize, size) || was.wrapping != TextWrappingModes.NoWrap
+                    || !Mathf.Approximately(was.width, rect.sizeDelta.x))
+                {
+                    changes.Add($"{TabLabelPaths[i]} font size {size}, no auto-size, one line, {room} wide");
+                }
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Home Page's steps: the Play button just above the tab bar, its size
+        /// kept, and the notice just above it. Returns the refusal, or null.
+        /// </summary>
+        private static string SetHomePage(GameObject root, List<string> changes)
+        {
+            var play = FindByPath(root, PlayButtonPath) as RectTransform;
+            var notice = FindByPath(root, NoticePath) as RectTransform;
+            var missing = new List<string>();
+            AddIfMissing(missing, play, $"a RectTransform at '{PlayButtonPath}'");
+            AddIfMissing(missing, notice, $"a RectTransform at '{NoticePath}'");
+            if (missing.Count > 0)
+            {
+                return $"it needs {string.Join(", ", missing)}";
+            }
+
+            SetBottomCentred(play, PlayButtonBottomGap, PlayButtonPath, changes);
+            SetBottomCentred(notice, PlayButtonBottomGap + play.sizeDelta.y + NoticeGap, NoticePath, changes);
+            return null;
+        }
+
+        /// <summary>Pins <paramref name="rect"/> by its foot's middle to its parent's foot, <paramref name="height"/> above it, its size kept, noting a change.</summary>
+        private static void SetBottomCentred(RectTransform rect, float height, string path, List<string> changes)
+        {
+            var position = new Vector2(0f, height);
+            if (rect.anchorMin == BottomCentre && rect.anchorMax == BottomCentre && rect.pivot == BottomCentre && rect.anchoredPosition == position)
+            {
+                return;
+            }
+
+            var size = rect.sizeDelta;
+            rect.anchorMin = BottomCentre;
+            rect.anchorMax = BottomCentre;
+            rect.pivot = BottomCentre;
+            rect.sizeDelta = size;
+            rect.anchoredPosition = position;
+            changes.Add($"{path} bottom centre, {height} above the page's foot");
         }
 
         /// <summary>

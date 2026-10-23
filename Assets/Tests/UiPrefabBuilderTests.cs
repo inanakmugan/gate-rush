@@ -159,27 +159,79 @@ namespace GateRush.Tests
         private const float GlyphMaxShare = 0.50f;
         private const float KenneyGlyphFill = 0.64f;
 
+        // The Settings looks: each one's shift of Button Round's glyph box,
+        // and the horizontal centre of its glyph's opaque bounds as a share
+        // of the 100-pixel file (measured), which the shift centres on the
+        // button. A file's own centre is half its width.
+        private const float FileCentre = 0.5f;
+        private const float GlyphCentreTolerance = 0.005f;
+
+        private static (string look, float shift, float drawnCentre)[] SettingsLooks => new[]
+        {
+            ("Sound On Look", 0.015f, 0.50f),
+            ("Sound Off Look", 0.105f, 0.38f),
+            ("Haptics On Look", 0.0225f, 0.49f),
+            ("Haptics Off Look", 0.0225f, 0.49f)
+        };
+
         // The result panel's Menu is close to the rectangular buttons' height.
         private const float MenuMinHeightShare = 0.9f;
 
         // The rule sits right under the ladder: at most this far below it.
         private const float RuleMaxGap = 24f;
 
-        // The Lives overlay's heart, about 120 tall, and where every panel's
-        // foot button sits.
-        private const float LivesHeartHeight = 120f;
+        // The Lives overlay's heart, about 150 tall, its count scaled as 48 was
+        // in a 120 heart, and where every panel's foot button sits.
+        private const float LivesHeartHeight = 150f;
+        private const float LivesCountFontPerHeartHeight = 48f / 120f;
         private const float PanelButtonPosY = 70f;
 
         // A scrolling list's soft edge: 40 units at the top and bottom.
         private const int SoftEdgeUnits = 40;
 
-        // The Store's test store line: its padding inside the pill, the
-        // pill's opacity, and the column it must fit (1080 less 40 a side).
-        private const float NotePaddingX = 24f;
-        private const float NotePaddingY = 10f;
-        private const float NotePillAlpha = 0.7f;
-        private const float ColourTolerance = 0.01f;
-        private const float StoreColumnWidth = 1000f;
+        // The outlined text on the painting: the material the build makes,
+        // its shader, the theme's purple outline, the Store's test store line
+        // at 32 on one line, and the Leaderboard's subtitle shrinking from 40
+        // no lower than 32. TMP reads an atlas's padding as a range of 1, so
+        // the outline (with face dilate and the bold weight) and the underlay
+        // (offset, dilate and softness) each stay within it.
+        private const string OutlinedTextMaterialPath = "Assets/Art/Fonts/Fredoka-Bold SDF - Outline Underlay.mat";
+        private const string DistanceFieldShaderName = "TextMeshPro/Distance Field";
+        private const string OutlineColorHex = "#2A1650";
+        private const string UnderlayColorHex = "#2A165099";
+        private const string UnderlayColorProperty = "_UnderlayColor";
+
+        // A colour read back from a material or a saved prefab may differ from
+        // its constant in the last float digits: one step of an 8-bit channel.
+        private const float ColourChannelTolerance = 1f / 255f;
+        private const string UnderlayKeyword = "UNDERLAY_ON";
+        private const string OutlineColorProperty = "_OutlineColor";
+        private const string OutlineWidthProperty = "_OutlineWidth";
+        private const string FaceDilateProperty = "_FaceDilate";
+        private const string WeightBoldProperty = "_WeightBold";
+        private const string UnderlayOffsetXProperty = "_UnderlayOffsetX";
+        private const string UnderlayOffsetYProperty = "_UnderlayOffsetY";
+        private const string UnderlayDilateProperty = "_UnderlayDilate";
+        private const string UnderlaySoftnessProperty = "_UnderlaySoftness";
+        private const float TestStoreNoteFontSize = 32f;
+        private const float LeaderboardNoteMaxFontSize = 40f;
+        private const float LeaderboardNoteMinFontSize = 32f;
+        private const float PaddingRange = 1f;
+        private const float BoldWeightShare = 0.25f;
+
+        // Every overlay's title beside the close button: from 80 down to 56.
+        private const float OverlayTitleFontSize = 80f;
+        private const float OverlayTitleMinFontSize = 56f;
+
+        // Every overlay with a close button.
+        private static string[] ClosedOverlayNames => new[]
+        {
+            "Settings Overlay", "Levels Overlay", "Lives Overlay", "Not Enough Gold Overlay", "Test Purchase Overlay",
+            "Win Streak Overlay", ProfileOverlayName, GoldPacksOverlayName
+        };
+
+        // The streak marker: its round base, and the ring over its rim.
+        private const string MarkerBaseSpritePath = "Assets/Art/Sprites/UI/button_round_blue.png";
 
         // Every overlay the build draws over a scrim.
         private static string[] ScrimmedOverlayNames => new[]
@@ -189,11 +241,16 @@ namespace GateRush.Tests
             ResultOverlayName, ConfirmOverlayName
         };
 
-        // Module 42's joker bar, which Module 45 makes about 1.4 times larger.
-        private const float Module42JokerButtonSize = 140f;
-        private const float Module42BadgeSize = 52f;
-        private const float Module42JokerSlotPitch = 280f;
-        private const float AboutOnePointFourTimes = 1.35f;
+        // Module 45's joker bar, which the interface review makes about 1.2
+        // times larger, with half a button between the buttons; and its
+        // lock, about half the button.
+        private const float Module45JokerButtonSize = 196f;
+        private const float Module45BadgeToButton = 72f / 196f;
+        private const float AboutOnePointTwoTimes = 1.18f;
+        private const float HalfAButton = 0.5f;
+        private const float ShareTolerance = 0.02f;
+        private const float LockMinShare = 0.45f;
+        private const float LockMaxShare = 0.55f;
 
         private static string[] OutputNames => new[]
         {
@@ -729,6 +786,9 @@ namespace GateRush.Tests
                 using (var serialized = new SerializedObject(view))
                 {
                     AssertLockOnIcon(serialized, view.name);
+                    var lockSize = ((RectTransform)Reference<GameObject>(serialized, "lockIcon").transform).sizeDelta.x;
+                    var buttonSize = ((RectTransform)view.transform).sizeDelta.x;
+                    Assert.That(lockSize / buttonSize, Is.InRange(LockMinShare, LockMaxShare), $"{view.name}'s lock is about half the button");
                 }
             }
         }
@@ -814,7 +874,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_JokerBar_ButtonsBadgeAndGapAreAboutOnePointFourTimesModule42s()
+        public void Build_JokerBar_ButtonsAreAboutOnePointTwoTimesLargerWithHalfAButtonBetweenThemInTheCentre()
         {
             var bar = LoadBuilt(JokerBarName).GetComponent<JokerBarView>();
             Assert.IsNotNull(bar, nameof(JokerBarView));
@@ -832,11 +892,14 @@ namespace GateRush.Tests
 
                 var pitch = rocket.anchoredPosition.x - clock.anchoredPosition.x;
 
-                Assert.That(rocket.sizeDelta.x, Is.GreaterThanOrEqualTo(Module42JokerButtonSize * AboutOnePointFourTimes), "the buttons");
-                Assert.That(badge.sizeDelta.y, Is.GreaterThanOrEqualTo(Module42BadgeSize * AboutOnePointFourTimes), "the badge");
-                Assert.That(badge.GetComponent<LayoutElement>().minWidth, Is.GreaterThanOrEqualTo(Module42BadgeSize * AboutOnePointFourTimes), "the badge's width");
-                Assert.That(pitch - rocket.sizeDelta.x, Is.GreaterThan(Module42JokerSlotPitch - Module42JokerButtonSize), "more room between them");
+                var size = rocket.sizeDelta.x;
+
+                Assert.That(size, Is.GreaterThanOrEqualTo(Module45JokerButtonSize * AboutOnePointTwoTimes), "the buttons");
+                Assert.AreEqual(Module45BadgeToButton, badge.sizeDelta.y / size, ShareTolerance, "the badge scales with the button");
+                Assert.AreEqual(Module45BadgeToButton, badge.GetComponent<LayoutElement>().minWidth / size, ShareTolerance, "the badge's width too");
+                Assert.AreEqual(HalfAButton, (pitch - size) / size, ShareTolerance, "half a button between them");
                 Assert.AreEqual(pitch, broom.anchoredPosition.x - rocket.anchoredPosition.x, Tolerance, "evenly spaced");
+                Assert.AreEqual(0f, rocket.anchoredPosition.x, Tolerance, "grouped in the centre");
             }
         }
 
@@ -1281,8 +1344,28 @@ namespace GateRush.Tests
             });
             ForEachLoaded("Settings Overlay", contents =>
             {
-                AssertGlyphBoxes(
-                    new[] { "Sound On Look", "Sound Off Look", "Haptics On Look", "Haptics Off Look" }.Select(look => Named(contents, look)));
+                foreach (var (look, shift, _) in SettingsLooks)
+                {
+                    AssertGlyphBox(Named(contents, look), shift);
+                }
+            });
+        }
+
+        [Test]
+        public void Build_SettingsLooks_AreShiftedToCentreTheirDrawnShape()
+        {
+            ForEachLoaded("Settings Overlay", contents =>
+            {
+                foreach (var (look, _, drawnCentre) in SettingsLooks)
+                {
+                    var rect = Named(contents, look);
+                    var boxCentre = (rect.anchorMin.x + rect.anchorMax.x) / 2f;
+                    var boxWidth = rect.anchorMax.x - rect.anchorMin.x;
+
+                    var shapeCentre = boxCentre + (drawnCentre - FileCentre) * boxWidth;
+
+                    Assert.AreEqual(FileCentre, shapeCentre, GlyphCentreTolerance, $"{look}'s drawn shape is centred on its button");
+                }
             });
         }
 
@@ -1433,7 +1516,9 @@ namespace GateRush.Tests
                 var title = ExtentBelowTop((RectTransform)panel.Find("Title"));
 
                 Assert.AreEqual(HeartSpritePath, AssetDatabase.GetAssetPath(sprite));
-                Assert.AreEqual(LivesHeartHeight, heart.sizeDelta.y, Tolerance, "about 120 tall");
+                Assert.AreEqual(LivesHeartHeight, heart.sizeDelta.y, Tolerance, "about 150 tall");
+                Assert.AreEqual(
+                    LivesCountFontPerHeartHeight * heart.sizeDelta.y, count.GetComponent<TMP_Text>().fontSize, Tolerance, "the count scales with the heart");
                 Assert.AreEqual(sprite.rect.width / sprite.rect.height, heart.sizeDelta.x / heart.sizeDelta.y, Tolerance, "at its sprite's own aspect");
                 Assert.AreEqual(Vector2.zero, count.anchorMin, "the count is stretched in the heart, so centred");
                 Assert.AreEqual(Vector2.one, count.anchorMax, "the count is stretched in the heart, so centred");
@@ -1476,7 +1561,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_StorePage_TestStoreNoteSitsOnTheDarkPill()
+        public void Build_StorePage_TestStoreNoteIsOneOutlinedLineWithNoPill()
         {
             var screen = LoadBuilt("Store Page").GetComponent<StoreScreen>();
             Assert.IsNotNull(screen, nameof(StoreScreen));
@@ -1484,21 +1569,139 @@ namespace GateRush.Tests
             using (var serialized = new SerializedObject(screen))
             {
                 var label = Label(serialized, "testStoreNote");
-                var text = (RectTransform)label.transform;
-                var pill = (RectTransform)text.parent;
-                var image = pill.GetComponent<Image>();
 
-                Assert.AreEqual(PillSpritePath, AssetDatabase.GetAssetPath(image.sprite), "the dark pill");
-                Assert.AreEqual(Image.Type.Sliced, image.type, "9-sliced");
-                Assert.AreEqual(NotePillAlpha, image.color.a, ColourTolerance, "about 70 percent opaque");
-                Assert.AreEqual(Color.white, new Color(image.color.r, image.color.g, image.color.b), "in its own colours");
-                Assert.AreEqual(Color.white, label.color, "the text stays white");
-                Assert.AreEqual(new Vector2(NotePaddingX, NotePaddingY), text.offsetMin, "padding inside the pill");
-                Assert.AreEqual(new Vector2(-NotePaddingX, -NotePaddingY), text.offsetMax, "padding inside the pill");
-                Assert.AreEqual(new Vector2(0.5f, 0.5f), pill.anchorMin, "centred in its slot");
-                Assert.AreEqual(Vector2.zero, pill.anchoredPosition, "centred in its slot");
-                Assert.That(pill.sizeDelta.x, Is.InRange(NotePaddingX + NotePaddingX, StoreColumnWidth), "sized to the text, within the column");
-                Assert.That(pill.sizeDelta.y, Is.GreaterThan(NotePaddingY + NotePaddingY), "sized to the text");
+                Assert.IsNull(label.GetComponent<Image>(), "no pill behind the line");
+                Assert.IsNull(label.transform.parent.GetComponent<Image>(), "no pill behind the line");
+                Assert.AreEqual(OutlinedTextMaterialPath, AssetDatabase.GetAssetPath(label.fontSharedMaterial), "outlined, with the underlay");
+                AssertColourNear(Color.white, label.color, "the text stays white");
+                Assert.AreEqual(TestStoreNoteFontSize, label.fontSize, Tolerance);
+                Assert.AreEqual(TextWrappingModes.NoWrap, label.textWrappingMode, "one line");
+            }
+        }
+
+        [Test]
+        public void Build_OutlinedTextMaterial_HasThePurpleOutlineAndASoftUnderlayWithinThePadding()
+        {
+            var material = AssetDatabase.LoadAssetAtPath<Material>(OutlinedTextMaterialPath);
+            Assert.IsNotNull(material, OutlinedTextMaterialPath);
+            var font = AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePath("Button Primary")).GetComponentInChildren<TMP_Text>(true).font;
+            var outline = material.GetFloat(OutlineWidthProperty) + material.GetFloat(FaceDilateProperty)
+                          + font.material.GetFloat(WeightBoldProperty) * BoldWeightShare;
+            var underlay = Mathf.Max(Mathf.Abs(material.GetFloat(UnderlayOffsetXProperty)), Mathf.Abs(material.GetFloat(UnderlayOffsetYProperty)))
+                           + material.GetFloat(UnderlayDilateProperty) + material.GetFloat(UnderlaySoftnessProperty);
+
+            Assert.AreEqual(DistanceFieldShaderName, material.shader.name);
+            Assert.AreEqual(font.material.mainTexture, material.mainTexture, "it samples the button font's atlas");
+            AssertColourNear(ParseHex(OutlineColorHex), material.GetColor(OutlineColorProperty), "the theme's purple outline");
+            AssertColourNear(ParseHex(UnderlayColorHex), material.GetColor(UnderlayColorProperty), "the soft dark underlay");
+            Assert.That(material.GetFloat(OutlineWidthProperty), Is.GreaterThan(0f));
+            Assert.IsTrue(material.IsKeywordEnabled(UnderlayKeyword), "the underlay is on");
+            Assert.That(material.GetFloat(UnderlayOffsetYProperty), Is.LessThan(0f), "the shadow sits below the letters");
+            Assert.That(material.GetFloat(UnderlaySoftnessProperty), Is.GreaterThan(0f), "a soft shadow");
+            Assert.That(outline, Is.LessThanOrEqualTo(PaddingRange), "the outline stays within the atlas's padding");
+            Assert.That(underlay, Is.LessThanOrEqualTo(PaddingRange), "the underlay stays within the atlas's padding");
+        }
+
+        [Test]
+        public void Build_PageTextsOnThePainting_UseTheOutlinedMaterial()
+        {
+            var store = LoadBuilt("Store Page").GetComponent<StoreScreen>();
+            var leaderboard = LoadBuilt(LeaderboardPageName).GetComponent<LeaderboardScreen>();
+            var labels = new List<TMP_Text>();
+            using (var serialized = new SerializedObject(store))
+            {
+                labels.Add(Label(serialized, "goldHeader"));
+                labels.Add(Label(serialized, "jokersHeader"));
+                labels.Add(Label(serialized, "livesHeader"));
+            }
+
+            TMP_Text note;
+            using (var serialized = new SerializedObject(leaderboard))
+            {
+                note = Label(serialized, "noteLabel");
+            }
+
+            labels.Add(note);
+            foreach (var label in labels)
+            {
+                Assert.AreEqual(OutlinedTextMaterialPath, AssetDatabase.GetAssetPath(label.fontSharedMaterial), $"{label.name}: outlined");
+            }
+
+            Assert.AreEqual(TextWrappingModes.NoWrap, note.textWrappingMode, "the subtitle is one line");
+            Assert.IsTrue(note.enableAutoSizing, "it shrinks only as far as it needs");
+            Assert.AreEqual(LeaderboardNoteMaxFontSize, note.fontSizeMax, Tolerance);
+            Assert.AreEqual(LeaderboardNoteMinFontSize, note.fontSizeMin, Tolerance, "never below 32");
+        }
+
+        [TestCaseSource(nameof(ClosedOverlayNames))]
+        public void Build_Overlays_CloseButtonSitsInsideThePanelCornerClearOfTheTitle(string overlayName)
+        {
+            var runtimeConfig = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(RuntimeConfigPath);
+            Assert.IsNotNull(runtimeConfig, RuntimeConfigPath);
+            var panel = LoadBuilt(overlayName).transform.Find("Panel");
+            Assert.IsNotNull(panel, $"{overlayName}'s panel");
+            var close = panel.GetComponentsInChildren<Button>(true).Single(button => SourcePath(button) == HandMadePath("Button Close"));
+            var rect = (RectTransform)close.transform;
+            var title = (RectTransform)panel.Find("Title");
+            var titleLabel = title.GetComponent<TMP_Text>();
+            var inset = runtimeConfig.IntroPanelPaddingUnits;
+            var corner = new Vector2(1f, 1f);
+
+            Assert.AreEqual(corner, rect.anchorMin, "anchored to the panel's top-right corner");
+            Assert.AreEqual(corner, rect.anchorMax, "anchored to the panel's top-right corner");
+            Assert.AreEqual(corner, rect.pivot, "by its own top-right corner, so it is fully inside");
+            Assert.AreEqual(new Vector2(-inset, -inset), rect.anchoredPosition, "as far in as the introduction card's close button");
+            Assert.That(-title.offsetMax.x, Is.GreaterThan(inset + rect.sizeDelta.x), "the title keeps clear of the button");
+            Assert.AreEqual(title.offsetMin.x, -title.offsetMax.x, Tolerance, "and stays centred");
+            Assert.IsTrue(titleLabel.enableAutoSizing, "a long title shrinks to fit");
+            Assert.AreEqual(OverlayTitleFontSize, titleLabel.fontSizeMax, Tolerance);
+            Assert.AreEqual(OverlayTitleMinFontSize, titleLabel.fontSizeMin, Tolerance);
+        }
+
+        [Test]
+        public void Build_StreakPrize_IconAndTextAreCentredAsOneGroup()
+        {
+            var prize = LoadBuilt(StreakPrizeName);
+            var group = prize.GetComponent<HorizontalLayoutGroup>();
+            Assert.IsNotNull(group, "the line lays out its icon and label as one group");
+
+            using (var serialized = new SerializedObject(prize.GetComponent<StreakPrize>()))
+            {
+                var icon = Reference<Image>(serialized, "icon");
+                var label = Label(serialized, "label");
+
+                Assert.AreEqual(TextAnchor.MiddleCenter, group.childAlignment, "centred under the title");
+                Assert.IsFalse(group.childForceExpandWidth, "the group is only as wide as its icon and label");
+                Assert.IsTrue(group.childControlWidth, "the label takes its own width");
+                Assert.AreEqual(prize.transform, icon.transform.parent);
+                Assert.AreEqual(prize.transform, label.transform.parent);
+                Assert.That(icon.transform.GetSiblingIndex(), Is.LessThan(label.transform.GetSiblingIndex()), "the icon, then the text");
+            }
+        }
+
+        [Test]
+        public void Build_StreakMarker_RoundBaseWithTheGoldRingOnTheNext()
+        {
+            var marker = LoadBuilt(StreakMarkerName).GetComponent<StreakMarker>();
+            Assert.IsNotNull(marker, nameof(StreakMarker));
+
+            using (var serialized = new SerializedObject(marker))
+            {
+                var ring = (RectTransform)Reference<GameObject>(serialized, "highlight").transform;
+                var icon = Reference<Image>(serialized, "icon");
+                var disc = (RectTransform)marker.transform.Find("Disc");
+                var ringImage = ring.GetComponent<Image>();
+                var discImage = disc.GetComponent<Image>();
+
+                Assert.AreEqual(MarkerBaseSpritePath, AssetDatabase.GetAssetPath(discImage.sprite), "a round base");
+                Assert.AreEqual(Image.Type.Simple, discImage.type, "drawn whole, not as a square tile");
+                Assert.AreEqual(RingSelectSpritePath, AssetDatabase.GetAssetPath(ringImage.sprite), "the gold ring");
+                AssertColourNear(Color.white, ringImage.color, "drawn in its own colours");
+                Assert.IsNull(ring.GetComponent<UiTint>(), "never tinted");
+                Assert.IsFalse(ring.gameObject.activeSelf, "saved hidden: only the next reward shows it");
+                Assert.That(ring.GetSiblingIndex(), Is.GreaterThan(disc.GetSiblingIndex()), "over the base's rim");
+                Assert.That(ring.GetSiblingIndex(), Is.LessThan(icon.transform.GetSiblingIndex()), "under the icon");
+                Assert.That(ring.offsetMin.x, Is.LessThan(0f), "around the base");
             }
         }
 
@@ -1553,6 +1756,21 @@ namespace GateRush.Tests
 
         private static string HandMadePath(string name) => $"{HandMadeFolder}/{name}.prefab";
 
+        private static Color ParseHex(string hex)
+        {
+            Assert.IsTrue(ColorUtility.TryParseHtmlString(hex, out var color), hex);
+            return color;
+        }
+
+        /// <summary><paramref name="actual"/> matches <paramref name="expected"/> channel by channel within <see cref="ColourChannelTolerance"/>.</summary>
+        private static void AssertColourNear(Color expected, Color actual, string message)
+        {
+            Assert.AreEqual(expected.r, actual.r, ColourChannelTolerance, $"{message}: red");
+            Assert.AreEqual(expected.g, actual.g, ColourChannelTolerance, $"{message}: green");
+            Assert.AreEqual(expected.b, actual.b, ColourChannelTolerance, $"{message}: blue");
+            Assert.AreEqual(expected.a, actual.a, ColourChannelTolerance, $"{message}: alpha");
+        }
+
         /// <summary>
         /// Where <paramref name="rect"/> reaches, measured down from its
         /// parent's top edge, for a rect anchored to that edge.
@@ -1592,12 +1810,22 @@ namespace GateRush.Tests
         {
             foreach (var icon in icons)
             {
-                Assert.IsNotNull(icon, "a round button's icon");
-                Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMin, icon.anchorMin, $"{icon.name} on {icon.parent.name}");
-                Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMax, icon.anchorMax, $"{icon.name} on {icon.parent.name}");
-                Assert.AreEqual(Vector2.zero, icon.anchoredPosition, $"{icon.name} on {icon.parent.name}: no offset");
-                Assert.AreEqual(Vector2.zero, icon.sizeDelta, $"{icon.name} on {icon.parent.name}: no offset");
+                AssertGlyphBox(icon, 0f);
             }
+        }
+
+        /// <summary>
+        /// The icon is anchored to Button Round's glyph box moved right by
+        /// <paramref name="shift"/> of its button's width, with no offsets.
+        /// </summary>
+        private static void AssertGlyphBox(RectTransform icon, float shift)
+        {
+            Assert.IsNotNull(icon, "a round button's icon");
+            var offset = new Vector2(shift, 0f);
+            Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMin + offset, icon.anchorMin, $"{icon.name} on {icon.parent.name}");
+            Assert.AreEqual(HandMadePrefabSettings.GlyphAnchorMax + offset, icon.anchorMax, $"{icon.name} on {icon.parent.name}");
+            Assert.AreEqual(Vector2.zero, icon.anchoredPosition, $"{icon.name} on {icon.parent.name}: no offset");
+            Assert.AreEqual(Vector2.zero, icon.sizeDelta, $"{icon.name} on {icon.parent.name}: no offset");
         }
 
         /// <summary>How much of a round button its own icon's glyph covers.</summary>

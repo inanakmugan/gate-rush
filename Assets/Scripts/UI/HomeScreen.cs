@@ -20,7 +20,7 @@ namespace GateRush.UI
         [Tooltip("The play button's label.")]
         [SerializeField] private TMP_Text playLabel;
 
-        [Tooltip("The line under the play button, empty until a notice is shown.")]
+        [Tooltip("The line above the play button, empty until a notice is shown.")]
         [SerializeField] private TMP_Text noticeLabel;
 
         /// <summary>Raised when Play is pressed.</summary>
@@ -32,7 +32,7 @@ namespace GateRush.UI
             playLabel.text = HomeTexts.PlayLabel(state.CampaignLevelNumber, config);
         }
 
-        /// <summary>Shows <paramref name="text"/> under the play button.</summary>
+        /// <summary>Shows <paramref name="text"/> above the play button.</summary>
         public void ShowNotice(string text)
         {
             noticeLabel.text = text;

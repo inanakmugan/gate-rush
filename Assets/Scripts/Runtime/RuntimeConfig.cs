@@ -156,8 +156,8 @@ namespace GateRush.Runtime
         [Tooltip("Part of the screen's height kept free above the board for the HUD, from 0 to 1. Top and bottom together must stay below 1. 0.16 holds the 306-unit HUD of the Module 45 follow-up — ribbon, timer, pills — at the 1920-unit reference height.")]
         [SerializeField] private float topBandScreenFraction = 0.16f;
 
-        [Tooltip("Part of the screen's height kept free below the board for the joker bar, from 0 to 1. Top and bottom together must stay below 1. 0.14 holds the 272-unit bar of Module 45 at the 1920-unit reference height.")]
-        [SerializeField] private float bottomBandScreenFraction = 0.14f;
+        [Tooltip("Part of the screen's height kept free below the board for the joker bar, from 0 to 1. Top and bottom together must stay below 1. 0.145 is the most the board-fit floor allows with the top band at 0.16; the 312-unit joker bar is scaled to it.")]
+        [SerializeField] private float bottomBandScreenFraction = 0.145f;
 
         [Tooltip("Thickness of the frame around the grid, in cells: above 0, at most 1. Closed gates are drawn at this thickness too.")]
         [SerializeField] private float frameThicknessCells = 0.45f;
@@ -502,7 +502,7 @@ namespace GateRush.Runtime
         [SerializeField] private float generatorPreviewFadeOutSeconds = 0.12f;
 
         [Header("Meta game (Module 32; the result panel's and the confirmation's texts are the UI Config's, Module 41)")]
-        [Tooltip("Shown under Home's play button when Play is pressed after the last campaign level (Module 35).")]
+        [Tooltip("Shown above Home's play button when Play is pressed after the last campaign level (Module 35).")]
         [SerializeField] private string campaignDoneNotice = "All levels played. Play any level from Settings.";
 
         [Header("Introduction cards (canvas units; the theme's panel, font and close button, Module 41)")]
@@ -1157,7 +1157,7 @@ namespace GateRush.Runtime
         /// <summary>Easing of that fade.</summary>
         public Ease BreakFadeEase => breakFadeEase;
 
-        /// <summary>The notice under Home's play button when Play is pressed after the last campaign level.</summary>
+        /// <summary>The notice above Home's play button when Play is pressed after the last campaign level.</summary>
         public string CampaignDoneNotice => campaignDoneNotice;
 
         /// <summary>

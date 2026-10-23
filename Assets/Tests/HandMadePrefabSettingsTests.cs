@@ -15,8 +15,10 @@ namespace GateRush.Tests
     /// own and follow it; the lives count takes the HUD's font size; the
     /// heart is 86 square with Preserve Aspect and the count stretched in it;
     /// the avatar fills its 120-unit frame inside a thin rim with no Layout
-    /// Element of its own; and the Name Tag stays centred on the frame's
-    /// bottom edge.
+    /// Element of its own; the Name Tag stays centred on the frame's bottom
+    /// edge; the selected tabs' labels share the largest fixed size at which
+    /// "Leaderboard" fits its tile; and Home's Play button sits just above
+    /// the tab bar, its size kept, with the notice just above it.
     /// </summary>
     /// <remarks>
     /// These read the project's real prefabs, so they fail until the owner
@@ -27,6 +29,12 @@ namespace GateRush.Tests
     {
         private static readonly Vector2 Centre = new Vector2(0.5f, 0.5f);
         private static readonly Vector2 BottomMiddle = new Vector2(0.5f, 0f);
+
+        // Home's Play button keeps the size it was laid out at by hand.
+        private static readonly Vector2 PlayButtonSize = new Vector2(620f, 190f);
+
+        // The tab labels' font is searched in whole sizes.
+        private const float FontSizeStep = 1f;
 
         private GameObject buttonRound;
         private GameObject topBar;
@@ -123,6 +131,63 @@ namespace GateRush.Tests
             Assert.AreEqual(BottomMiddle, tag.anchorMax);
             Assert.AreEqual(Centre, tag.pivot, "its middle on the edge");
             Assert.AreEqual(Vector2.zero, tag.anchoredPosition);
+        }
+
+        [Test]
+        public void TabBar_Labels_ShareTheLargestFontThatFitsLeaderboard()
+        {
+            var contents = PrefabUtility.LoadPrefabContents(HandMadePrefabSettings.TabBarPath);
+            try
+            {
+                var labels = HandMadePrefabSettings.TabLabelPaths.Select(path => Rect(contents, path).GetComponent<TMP_Text>()).ToList();
+                var longest = labels.Last();
+                var tile = (RectTransform)longest.transform.parent;
+                var room = HandMadePrefabSettings.TabLabelRoom(tile.sizeDelta.x);
+                var size = longest.fontSize;
+
+                foreach (var label in labels)
+                {
+                    Assert.IsFalse(label.enableAutoSizing, $"{label.name}: one fixed size");
+                    Assert.AreEqual(size, label.fontSize, $"{label.text}: the same size as Leaderboard");
+                    Assert.AreEqual(TextWrappingModes.NoWrap, label.textWrappingMode, $"{label.text}: one line");
+                    Assert.AreEqual(room - tile.sizeDelta.x, ((RectTransform)label.transform).sizeDelta.x, $"{label.text}: inset to the face less the margin");
+                }
+
+                var width = longest.GetPreferredValues(longest.text).x;
+                longest.fontSize = size + FontSizeStep;
+                var widthOneLarger = longest.GetPreferredValues(longest.text).x;
+
+                Assert.That(width, Is.LessThanOrEqualTo(room), "Leaderboard fits its tile's face with the margin");
+                Assert.That(
+                    size >= HandMadePrefabSettings.TabLabelMaxFontSize || widthOneLarger > room, "the largest such size, up to the cap");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
+        }
+
+        [Test]
+        public void HomePage_PlayButton_SitsJustAboveTheTabBarWithTheNoticeAboveIt()
+        {
+            var homePage = AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePrefabSettings.HomePagePath);
+            Assert.IsNotNull(homePage, HandMadePrefabSettings.HomePagePath);
+            var play = Rect(homePage, HandMadePrefabSettings.PlayButtonPath);
+            var notice = Rect(homePage, HandMadePrefabSettings.NoticePath);
+            var bottom = HandMadePrefabSettings.BottomCentre;
+
+            Assert.AreEqual(bottom, play.anchorMin, "pinned to the page's foot, which is the tab bar's top");
+            Assert.AreEqual(bottom, play.anchorMax);
+            Assert.AreEqual(bottom, play.pivot);
+            Assert.AreEqual(new Vector2(0f, HandMadePrefabSettings.PlayButtonBottomGap), play.anchoredPosition, "a gap above the tab bar");
+            Assert.AreEqual(PlayButtonSize, play.sizeDelta, "its size kept");
+            Assert.AreEqual(bottom, notice.anchorMin);
+            Assert.AreEqual(bottom, notice.anchorMax);
+            Assert.AreEqual(bottom, notice.pivot);
+            Assert.AreEqual(
+                HandMadePrefabSettings.PlayButtonBottomGap + play.sizeDelta.y + HandMadePrefabSettings.NoticeGap, notice.anchoredPosition.y,
+                "the notice just above the button");
+            Assert.AreEqual(0f, notice.anchoredPosition.x);
         }
 
         private static RectTransform Rect(GameObject root, string path)
