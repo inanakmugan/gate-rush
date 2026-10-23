@@ -558,6 +558,57 @@ namespace GateRush.Tests
             }
         }
 
+        [Test]
+        public void CornerBadge_SingleCell_IsItsBottomRightCornerPulledInByTheInset()
+        {
+            const float inset = 0.14f;
+
+            var corner = MarkLayout.CornerBadge(Single, inset);
+
+            AssertPoint(new Vector2(1f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_Square_IsTheBottomRowsRightCell()
+        {
+            const float inset = 0.14f;
+
+            var corner = MarkLayout.CornerBadge(Square, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_BarWithAFootToTheLeft_IsTheFootRowsRightMostCell()
+        {
+            // A bar three high in column 1 with its foot to the left at the
+            // bottom: the lowest row is the foot's, and its right-most cell
+            // is the bar's foot.
+            var cells = new[] { new Coord(0, 0), new Coord(1, 0), new Coord(1, 1), new Coord(1, 2) };
+            const float inset = 0.2f;
+
+            var corner = MarkLayout.CornerBadge(cells, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_T_IsOnTheLowestRowEvenWhereItIsOneCell()
+        {
+            const float inset = 0.1f;
+
+            var corner = MarkLayout.CornerBadge(T, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_NoCells_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => MarkLayout.CornerBadge(Array.Empty<Coord>(), 0.1f));
+            Assert.Throws<ArgumentException>(() => MarkLayout.CornerBadge(null, 0.1f));
+        }
+
         private static void AssertPoint(Vector2 expected, Vector2 actual)
         {
             Assert.AreEqual(expected.x, actual.x, Tolerance, "x");

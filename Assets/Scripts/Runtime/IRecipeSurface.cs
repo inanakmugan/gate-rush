@@ -37,11 +37,12 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// One piece per quarter of <paramref name="tiles"/>, in their order,
-        /// each posed as its tile says over the rectangle
-        /// <paramref name="rectOf"/> gives it.
+        /// drawn with <paramref name="layer"/>'s sprite for its piece and posed
+        /// as its tile says over the rectangle <paramref name="rectOf"/> gives it.
         /// </summary>
         List<TPiece> Quarters(
-            TGroup parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order);
+            TGroup parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
+            int order);
 
         /// <summary>
         /// <paramref name="sprite"/> stretched over <paramref name="size"/>

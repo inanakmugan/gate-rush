@@ -1,8 +1,12 @@
+using System;
+using System.Collections.Generic;
+using GateRush.Core;
 using GateRush.Meta;
 using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace GateRush.Tests
 {
@@ -19,7 +23,11 @@ namespace GateRush.Tests
     /// the rules' seconds) and subtitle are the specified ones; a missing,
     /// blank, duplicated or unusable entry, an empty subtitle, unassigned
     /// Joker Icons, an icon size that is not positive and a transparent icon
-    /// colour are each reported by name.
+    /// colour are each reported by name. Module 46: the default palette and
+    /// board colours are the measured ones; translucent faces and backdrops,
+    /// shine alphas past 1, outline and shine orders out of place, a negative
+    /// block lip and unassigned outline and shine sprites are each reported
+    /// by name; each quarter layer resolves to its own sprite.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
@@ -38,6 +46,10 @@ namespace GateRush.Tests
         private const int PanelTextureSize = 64;
         private const float PanelPixelsPerUnit = 100f;
         private const float PanelBorder = 16f;
+
+        // Green's luminance stays this far above Red's (Module 46: about 0.27
+        // against 0.20).
+        private const float MinRedGreenLuminanceGap = 0.05f;
 
         private RuntimeConfig config;
 
@@ -279,20 +291,31 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.None.Contains("Lip Offset Cells"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Block Lip Cells"), string.Join(" | ", problems));
         }
 
         [Test]
-        public void Problems_LipOffsetPlusLayerInsetReachingHalfACell_IsReportedByName()
+        public void Problems_BlockLipPlusLayerInsetReachingHalfACell_IsReportedByName()
         {
             // Half a cell of lip alone: with any inset above 0, the default's
             // included, the two together pass it.
-            SetFloat("lipOffsetCells", 0.5f);
+            SetFloat("blockLipCells", 0.5f);
 
             var problems = config.Problems();
 
             Assert.That(
-                problems, Has.Some.Contains("Lip Offset Cells plus Layer Inset Cells must be below 0.5"),
+                problems, Has.Some.Contains("Block Lip Cells plus Layer Inset Cells must be below 0.5"),
                 string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NegativeBlockLip_IsReportedByName()
+        {
+            SetFloat("blockLipCells", -0.01f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Block Lip Cells may not be negative"), string.Join(" | ", problems));
         }
 
         [Test]
@@ -305,29 +328,93 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains("Layer Inset Cells must be above 0 and below 0.5"), string.Join(" | ", problems));
         }
 
-        [Test]
-        public void Problems_LayerEdgeNotBelowTheInset_IsReportedByName()
+        [TestCase(-0.01f)]
+        [TestCase(0.5f)]
+        public void Problems_BlockBadgeInsetOffItsCornerCell_IsReportedByName(float value)
         {
-            var serialized = new SerializedObject(config);
-            var inset = serialized.FindProperty("layerInsetCells").floatValue;
-            serialized.FindProperty("layerEdgeCells").floatValue = inset;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
+            SetFloat("blockBadgeInsetCells", value);
 
             var problems = config.Problems();
 
-            Assert.That(problems, Has.Some.Contains("Layer Edge Cells must be at least 0 and below Layer Inset Cells"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Block Badge Inset Cells must be at least 0 and below 0.5"), string.Join(" | ", problems));
         }
 
         [Test]
-        public void Problems_StudOrderNotAboveLayerOrder_IsReportedByName()
+        public void Problems_NegativeLayerEdge_IsReportedByName()
+        {
+            SetFloat("layerEdgeCells", -0.01f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Layer Edge Cells may not be negative"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_WindowLeavingTheInnerBlockNoHeight_IsReportedByName()
+        {
+            // Below half a cell on its own, but with the rim and the lip the
+            // inner block would vanish.
+            SetFloat("layerInsetCells", 0.45f);
+
+            var problems = config.Problems();
+
+            Assert.That(
+                problems, Has.Some.Contains("Layer Inset Cells, Layer Edge Cells and Block Lip Cells together must be below 0.5"),
+                string.Join(" | ", problems));
+        }
+
+        [TestCase("layeredOuterDarken", 1.5f)]
+        [TestCase("layerEdgeDarken", -0.1f)]
+        public void Problems_LayerDarkenOutOfRange_IsReportedByName(string field, float value)
+        {
+            SetFloat(field, value);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Layered Outer Darken and Layer Edge Darken must be from 0 to 1"), string.Join(" | ", problems));
+        }
+
+        [TestCase("layerStudSpacingCells")]
+        [TestCase("layerStudClearanceCells")]
+        public void Problems_NonPositiveLayerStudSpacingOrClearance_IsReportedByName(string field)
+        {
+            SetFloat(field, 0f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Layer Stud Spacing Cells and Layer Stud Clearance Cells must be above 0"), string.Join(" | ", problems));
+        }
+
+        [TestCase("studOrder", "layerEdgeOrder")]
+        [TestCase("layerEdgeOrder", "glossOrder")]
+        [TestCase("layerOrder", "layerEdgeOrder")]
+        [TestCase("layerShineOrder", "layerStudOrder")]
+        [TestCase("layerGlossOrder", "chainOrder")]
+        public void Problems_LayeredOrderOutOfPlace_IsReportedByName(string field, string sameAs)
         {
             var serialized = new SerializedObject(config);
-            serialized.FindProperty("studOrder").intValue = serialized.FindProperty("layerOrder").intValue;
+            serialized.FindProperty(field).intValue = serialized.FindProperty(sameAs).intValue;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var problems = config.Problems();
 
-            Assert.That(problems, Has.Some.Contains("Stud Order above Layer Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("must rise in that order between Block Order and Chain Order"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void LayeredFills_AnOuterColour_AreItDarkenedByEachShare()
+        {
+            var outer = new Color(0.8f, 0.4f, 0.2f, 1f);
+            var serialized = new SerializedObject(config);
+            var outerShare = serialized.FindProperty("layeredOuterDarken").floatValue;
+            var edgeShare = serialized.FindProperty("layerEdgeDarken").floatValue;
+
+            var outerFill = config.LayeredOuterFill(outer);
+            var edgeFill = config.LayerEdgeFill(outer);
+
+            Assert.AreEqual(new Color(outer.r * outerShare, outer.g * outerShare, outer.b * outerShare, 1f), outerFill);
+            Assert.AreEqual(new Color(outer.r * edgeShare, outer.g * edgeShare, outer.b * edgeShare, 1f), edgeFill);
+            Assert.Less(edgeFill.r, outerFill.r, "the rim is darker than the surround");
         }
 
         [Test]
@@ -414,15 +501,15 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_PullGlowOrderNotBelowTheBlockLip_IsReportedByName()
+        public void Problems_PullGlowOrderNotBelowTheBlockContour_IsReportedByName()
         {
             var serialized = new SerializedObject(config);
-            serialized.FindProperty("pullGlowOrder").intValue = serialized.FindProperty("blockLipOrder").intValue;
+            serialized.FindProperty("pullGlowOrder").intValue = serialized.FindProperty("blockContourOrder").intValue;
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             var problems = config.Problems();
 
-            Assert.That(problems, Has.Some.Contains("Pull Glow Order must be below Block Lip Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Pull Glow Order must be below Block Contour Order"), string.Join(" | ", problems));
         }
 
         [Test]
@@ -708,6 +795,213 @@ namespace GateRush.Tests
         {
             var serialized = new SerializedObject(config);
             serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        [Test]
+        public void BlockFill_DefaultPalette_IsTheMeasuredFaceOfEveryColour()
+        {
+            // The faces' middles measured from the reference screenshots
+            // (Module 46), Green lightened at its hue to a luminance clear of
+            // Red's. A face is white there, so the palette entry is the
+            // colour the player sees.
+            var expected = new Dictionary<BlockColor, Color32>
+            {
+                { BlockColor.Red, new Color32(0xF0, 0x2A, 0x1E, 0xFF) },
+                { BlockColor.Blue, new Color32(0x00, 0x54, 0xF6, 0xFF) },
+                { BlockColor.Green, new Color32(0x07, 0xA5, 0x15, 0xFF) },
+                { BlockColor.Yellow, new Color32(0xF6, 0xBA, 0x00, 0xFF) },
+                { BlockColor.Purple, new Color32(0xA2, 0x36, 0xF6, 0xFF) },
+                { BlockColor.Orange, new Color32(0xF6, 0x66, 0x0C, 0xFF) },
+                { BlockColor.Pink, new Color32(0xF6, 0x3C, 0xA2, 0xFF) },
+                { BlockColor.Cyan, new Color32(0x06, 0xA8, 0xF6, 0xFF) },
+            };
+
+            var palette = new SerializedObject(config).FindProperty("blockPalette");
+
+            Assert.AreEqual(Enum.GetValues(typeof(BlockColor)).Length, palette.arraySize, "one entry per colour");
+            foreach (BlockColor color in Enum.GetValues(typeof(BlockColor)))
+            {
+                Assert.AreEqual(expected[color], (Color32)config.BlockFill(color), color.ToString());
+            }
+        }
+
+        [Test]
+        public void BlockFill_DefaultRedAndGreen_DifferInLuminanceForRedGreenColourBlindness()
+        {
+            // Relative luminance, from linear channels. Red and green that
+            // match in it differ only in a hue the commonest colour blindness
+            // cannot see.
+            float Luminance(Color color)
+            {
+                var linear = color.linear;
+                return 0.2126f * linear.r + 0.7152f * linear.g + 0.0722f * linear.b;
+            }
+
+            var red = Luminance(config.BlockFill(BlockColor.Red));
+            var green = Luminance(config.BlockFill(BlockColor.Green));
+
+            Assert.GreaterOrEqual(green - red, MinRedGreenLuminanceGap, $"red {red:0.000}, green {green:0.000}");
+        }
+
+        [Test]
+        public void Defaults_BoardColours_AreTheMeasuredOnes()
+        {
+            var colours = new[]
+            {
+                (Actual: config.ContourColor, Expected: new Color32(0x1C, 0x0B, 0x3A, 0xFF), Name: "contour"),
+                (Actual: config.FrameColor, Expected: new Color32(0x49, 0x21, 0x84, 0xFF), Name: "frame"),
+                (Actual: config.FloorColor, Expected: new Color32(0x31, 0x18, 0x5F, 0xFF), Name: "floor"),
+                (Actual: config.BackgroundTop, Expected: new Color32(0x60, 0x2D, 0xA0, 0xFF), Name: "background top"),
+                (Actual: config.BackgroundBottom, Expected: new Color32(0x20, 0x0E, 0x3C, 0xFF), Name: "background bottom"),
+            };
+
+            foreach (var colour in colours)
+            {
+                Assert.AreEqual(colour.Expected, (Color32)colour.Actual, colour.Name);
+            }
+        }
+
+        [Test]
+        public void Problems_DefaultBoardLookValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("must be opaque"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("alpha must be from 0 to 1"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Contour Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Shine Order"), string.Join(" | ", problems));
+        }
+
+        [TestCase("contourColor", "Contour Color")]
+        [TestCase("floorColor", "Floor Color")]
+        [TestCase("frameColor", "Frame Color")]
+        [TestCase("backgroundTop", "Background Top")]
+        [TestCase("backgroundBottom", "Background Bottom")]
+        public void Problems_TranslucentBoardColour_IsReportedByName(string field, string shownName)
+        {
+            SetAlpha(new SerializedObject(config), field, 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be opaque"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_TranslucentPaletteEntry_IsReportedByName()
+        {
+            var serialized = new SerializedObject(config);
+            var entry = serialized.FindProperty("blockPalette").GetArrayElementAtIndex((int)BlockColor.Green);
+            var color = entry.colorValue;
+            color.a = 0.5f;
+            entry.colorValue = color;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Block Palette entry 2 (Green) must be opaque"), string.Join(" | ", problems));
+        }
+
+        [TestCase("blockShineTopColor", "Block Shine Top Color")]
+        [TestCase("frameShineTopColor", "Frame Shine Top Color")]
+        [TestCase("frameShineBottomColor", "Frame Shine Bottom Color")]
+        public void Problems_ShineAlphaAboveOne_IsReportedByName(string field, string shownName)
+        {
+            SetAlpha(new SerializedObject(config), field, 1.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName}'s alpha must be from 0 to 1"), string.Join(" | ", problems));
+        }
+
+        [TestCase("frameContourOrder", "frameLipOrder", "Frame Contour Order must be below Frame Lip Order")]
+        [TestCase("frameShineOrder", "frameOrder", "Frame Shine Order must be above Frame Order")]
+        [TestCase("gateArrowOutlineOrder", "frameShineOrder", "Gate Arrow Outline Order above Frame Shine Order")]
+        [TestCase("gateArrowOutlineOrder", "gateMarkOrder", "Gate Mark Order above Gate Arrow Outline Order")]
+        [TestCase("blockContourOrder", "gateMarkOrder", "Block Contour Order must be above Gate Mark Order and below Block Lip Order")]
+        [TestCase("blockContourOrder", "blockLipOrder", "Block Contour Order must be above Gate Mark Order and below Block Lip Order")]
+        [TestCase("blockShineOrder", "blockOrder", "must rise in that order between Block Order and Chain Order")]
+        [TestCase("blockShineOrder", "studOrder", "must rise in that order between Block Order and Chain Order")]
+        [TestCase("outlineOrder", "blockContourOrder", "Outline Order must be below Block Contour Order")]
+        public void Problems_BoardLookOrderOutOfPlace_IsReportedByName(string field, string sameAs, string complaint)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).intValue = serialized.FindProperty(sameAs).intValue;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(complaint), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_UnassignedOutlineAndShineSprites_AreReportedByName()
+        {
+            var problems = config.Problems();
+
+            foreach (var shownName in new[]
+                     {
+                         "Contour Outer Sprite", "Contour Edge Sprite", "Contour Concave Sprite", "Shine Outer Sprite",
+                         "Shine Edge Sprite", "Shine Concave Sprite", "Gate Arrow Outline Sprite", "Single Stud Sprite",
+                         "Single Stud Gloss Sprite"
+                     })
+            {
+                Assert.That(problems, Has.Some.Contains(shownName), shownName);
+            }
+        }
+
+        [Test]
+        public void QuarterSprite_EachLayerAndKind_IsThatLayersSprite()
+        {
+            var texture = new Texture2D(4, 4);
+            var sprites = new Dictionary<string, Sprite>();
+            var serialized = new SerializedObject(config);
+            foreach (var field in new[]
+                     {
+                         "quarterOuterSprite", "quarterEdgeSprite", "quarterFillSprite", "quarterConcaveSprite",
+                         "contourOuterSprite", "contourEdgeSprite", "contourConcaveSprite",
+                         "shineOuterSprite", "shineEdgeSprite", "shineConcaveSprite"
+                     })
+            {
+                sprites[field] = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), Vector2.one * 0.5f);
+                serialized.FindProperty(field).objectReferenceValue = sprites[field];
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            try
+            {
+                Assert.AreSame(sprites["quarterOuterSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Outer));
+                Assert.AreSame(sprites["quarterEdgeSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Edge));
+                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Fill));
+                Assert.AreSame(sprites["quarterConcaveSprite"], config.QuarterSprite(QuarterLayer.Face, QuarterSpriteKind.Concave));
+                Assert.AreSame(sprites["contourOuterSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Outer));
+                Assert.AreSame(sprites["contourEdgeSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Edge));
+                Assert.AreSame(sprites["quarterFillSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Fill), "a fill's contour is the face fill");
+                Assert.AreSame(sprites["contourConcaveSprite"], config.QuarterSprite(QuarterLayer.Contour, QuarterSpriteKind.Concave));
+                Assert.AreSame(sprites["shineOuterSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Outer));
+                Assert.AreSame(sprites["shineEdgeSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Edge));
+                Assert.IsNull(config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Fill), "a fill carries no shine");
+                Assert.AreSame(sprites["shineConcaveSprite"], config.QuarterSprite(QuarterLayer.Shine, QuarterSpriteKind.Concave));
+            }
+            finally
+            {
+                foreach (var sprite in sprites.Values)
+                {
+                    Object.DestroyImmediate(sprite);
+                }
+
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        private static void SetAlpha(SerializedObject serialized, string field, float alpha)
+        {
+            var property = serialized.FindProperty(field);
+            Assert.IsNotNull(property, $"the config has a serialized field '{field}'");
+            var color = property.colorValue;
+            color.a = alpha;
+            property.colorValue = color;
             serialized.ApplyModifiedPropertiesWithoutUndo();
         }
 

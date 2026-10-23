@@ -19,10 +19,19 @@ MonoBehaviour:
   quarterEdgeSprite: {fileID: 21300000, guid: 97b3def5b3c7ae7458d9d385a69a40f4, type: 3}
   quarterFillSprite: {fileID: 21300000, guid: 7405c1a7af3ad7f46b0d2754c31ce09c, type: 3}
   quarterConcaveSprite: {fileID: 21300000, guid: 0e8673d3b50821a4cbc7512c4934b515, type: 3}
+  contourOuterSprite: {fileID: 21300000, guid: 01852c0078853d3468ad11dc31dc3eb1, type: 3}
+  contourEdgeSprite: {fileID: 21300000, guid: 9687a1ceaa73867428e7598f4b646235, type: 3}
+  contourConcaveSprite: {fileID: 21300000, guid: 25b0c3ac59f5b904dbba2176e1051244, type: 3}
+  shineOuterSprite: {fileID: 21300000, guid: ca4f4557e97e1da47bd330b6ce560805, type: 3}
+  shineEdgeSprite: {fileID: 21300000, guid: 40ccb9cc6e532ae46b8967d96f474a8d, type: 3}
+  shineConcaveSprite: {fileID: 21300000, guid: 1e54174799b765c4fabb82142ef17d41, type: 3}
   studsSprite: {fileID: 21300000, guid: 6e89ead6c0b9e044f9ee09ebc16889df, type: 3}
   studGlossSprite: {fileID: 21300000, guid: 3e8805fceec003c40b6c6681b6e2f108, type: 3}
+  singleStudSprite: {fileID: 21300000, guid: 2a32eb33788a69343a80f4ec1f5fa168, type: 3}
+  singleStudGlossSprite: {fileID: 21300000, guid: 142aa15fdce89e045879847e03b09e74, type: 3}
   floorSprite: {fileID: 21300000, guid: 423e28b26555a1046be27ae3cc42840b, type: 3}
   gateArrowSprite: {fileID: 21300000, guid: ce7612c84b6e4ab4b81287dfaef1ca69, type: 3}
+  gateArrowOutlineSprite: {fileID: 21300000, guid: 9ea0fb72e1efd2d428452e023fad8102, type: 3}
   axisArrowSprite: {fileID: 21300000, guid: a3b998a840230234998d0d2bf0af528e, type: 3}
   backgroundRampSprite: {fileID: 21300000, guid: 3cc213a1173216d489edbeda5e8ccfd0, type: 3}
   vignetteSprite: {fileID: 21300000, guid: 48d7720f252d65444b9aa161843ef1d8, type: 3}
@@ -47,18 +56,23 @@ MonoBehaviour:
   frameThicknessCells: 0.45
   floorUnderlayCells: 0.2
   lipOffsetCells: 0.09
-  lipDarken: 0.6
+  blockLipCells: 0.08
+  lipDarken: 0.5
   seamOverlapCells: 0.002
   gateArrowSizeCells: 0.3
   axisArrowThicknessCells: 0.42
   axisArrowEndInsetCells: 0.14
-  layerInsetCells: 0.1
+  layerInsetCells: 0.31
   layerEdgeCells: 0.02
-  layerStudScale: 0.9
+  layeredOuterDarken: 0.85
+  layerEdgeDarken: 0.35
+  layerStudSpacingCells: 0.42
+  layerStudClearanceCells: 0.18
   badgeHeightCells: 0.34
   badgeDigitWidthCells: 0.15
   badgePaddingCells: 0.08
   badgeRimCells: 0.035
+  blockBadgeInsetCells: 0.14
   chainThicknessCells: 0.2
   chainEndInsetCells: 0.1
   padlockSizeCells: 0.62
@@ -260,19 +274,23 @@ MonoBehaviour:
   sparkleMinScale: 0.45
   sparkleMinAlpha: 0.2
   blockPalette:
-  - {r: 0.93, g: 0.2, b: 0.25, a: 1}
-  - {r: 0.16, g: 0.47, b: 0.98, a: 1}
-  - {r: 0.22, g: 0.8, b: 0.3, a: 1}
-  - {r: 1, g: 0.83, b: 0.1, a: 1}
-  - {r: 0.62, g: 0.3, b: 0.95, a: 1}
-  - {r: 1, g: 0.52, b: 0.1, a: 1}
-  - {r: 1, g: 0.45, b: 0.75, a: 1}
-  - {r: 0.15, g: 0.85, b: 0.95, a: 1}
-  backgroundTop: {r: 0.23, g: 0.2, b: 0.42, a: 1}
-  backgroundBottom: {r: 0.07, g: 0.07, b: 0.15, a: 1}
+  - {r: 0.9411765, g: 0.16470589, b: 0.11764706, a: 1}
+  - {r: 0, g: 0.32941177, b: 0.9647059, a: 1}
+  - {r: 0.02745098, g: 0.64705884, b: 0.08235294, a: 1}
+  - {r: 0.9647059, g: 0.7294118, b: 0, a: 1}
+  - {r: 0.63529414, g: 0.21176471, b: 0.9647059, a: 1}
+  - {r: 0.9647059, g: 0.4, b: 0.047058824, a: 1}
+  - {r: 0.9647059, g: 0.23529412, b: 0.63529414, a: 1}
+  - {r: 0.023529412, g: 0.65882355, b: 0.9647059, a: 1}
+  backgroundTop: {r: 0.3764706, g: 0.1764706, b: 0.627451, a: 1}
+  backgroundBottom: {r: 0.1254902, g: 0.05490196, b: 0.23529412, a: 1}
   vignetteColor: {r: 0, g: 0, b: 0, a: 0.5}
-  floorColor: {r: 0.13, g: 0.14, b: 0.22, a: 1}
-  frameColor: {r: 0.26726595, g: 0.33834106, b: 0.6226415, a: 1}
+  floorColor: {r: 0.19215687, g: 0.09411765, b: 0.37254903, a: 1}
+  frameColor: {r: 0.28627452, g: 0.12941177, b: 0.5176471, a: 1}
+  contourColor: {r: 0.10980392, g: 0.043137256, b: 0.22745098, a: 1}
+  blockShineTopColor: {r: 1, g: 1, b: 1, a: 0.3}
+  frameShineTopColor: {r: 1, g: 1, b: 1, a: 0.2}
+  frameShineBottomColor: {r: 1, g: 1, b: 1, a: 0.1}
   glossColor: {r: 1, g: 1, b: 1, a: 0.85}
   gateArrowColor: {r: 1, g: 1, b: 1, a: 1}
   axisArrowColor: {r: 1, g: 1, b: 1, a: 0.9}
@@ -304,26 +322,34 @@ MonoBehaviour:
   machineScreenOrder: 6
   miniatureLipOrder: 7
   miniatureOrder: 8
-  frameLipOrder: 9
-  frameOrder: 10
-  gateMarkOrder: 11
-  blockLipOrder: 12
-  blockOrder: 13
-  layerEdgeOrder: 14
-  layerOrder: 15
-  studOrder: 16
-  glossOrder: 17
-  chainOrder: 18
-  iconOrder: 19
-  keyGemOrder: 20
-  shutterOrder: 21
-  shutterBorderOrder: 22
-  badgeRimOrder: 23
-  badgeOrder: 24
-  labelOrder: 25
-  outlineOrder: 11
-  liftedBlockOrder: 26
-  effectOrder: 27
-  pullGlowOrder: 11
+  frameContourOrder: 9
+  frameLipOrder: 10
+  frameOrder: 11
+  frameShineOrder: 12
+  gateArrowOutlineOrder: 13
+  gateMarkOrder: 14
+  blockContourOrder: 15
+  blockLipOrder: 16
+  blockOrder: 17
+  blockShineOrder: 18
+  studOrder: 19
+  glossOrder: 20
+  layerEdgeOrder: 21
+  layerOrder: 22
+  layerShineOrder: 23
+  layerStudOrder: 24
+  layerGlossOrder: 25
+  chainOrder: 26
+  iconOrder: 27
+  keyGemOrder: 28
+  shutterOrder: 29
+  shutterBorderOrder: 30
+  badgeRimOrder: 31
+  badgeOrder: 32
+  labelOrder: 33
+  outlineOrder: 14
+  liftedBlockOrder: 34
+  effectOrder: 35
+  pullGlowOrder: 14
   generatorPreviewRimOrder: 4
   generatorPreviewOrder: 5

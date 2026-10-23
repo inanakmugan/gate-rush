@@ -49,63 +49,63 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A block under <paramref name="body"/>, whose frame starts at the
-        /// corner of the footprint's origin cell: a <c>Lip</c> group filling
-        /// the footprint's quarters in the darker lip colour, and a
-        /// <c>Face</c> group with the quarters in <paramref name="fill"/>,
-        /// raised on their downward sides so the lip shows beneath
-        /// (<see cref="FaceShape"/>); for a layered block (M4) its inner shape
-        /// in <paramref name="beneath"/> — the same tiles pulled inward by
-        /// <see cref="RuntimeConfig.LayerInsetCells"/>, over a copy in the lip
-        /// colour reaching <see cref="RuntimeConfig.LayerEdgeCells"/> further
-        /// out, its edge; then frost on every cell when it is ice, studs with
-        /// their gloss on every cell when it is not, and — for an
-        /// axis-restricted block (M7), ice or not — one double-headed arrow
-        /// along its axis instead of studs. Studs and the arrow are raised by
+        /// corner of the footprint's origin cell: a <c>Contour</c> group, the
+        /// footprint's silhouette in the untinted outline colour (D79); a
+        /// <c>Lip</c> group filling the footprint's quarters in the darker lip
+        /// colour, and a <c>Face</c> group with the quarters in
+        /// <paramref name="fill"/>, raised on their downward sides by
+        /// <see cref="RuntimeConfig.BlockLipCells"/> so the lip shows beneath
+        /// (<see cref="FaceShape"/>); the untinted shine along the face's top
+        /// edges; then frost on every cell when it is ice, the cell's studs
+        /// with their gloss when it is not, and — for an axis-restricted block
+        /// (M7), ice or not — one double-headed arrow along its axis instead of
+        /// studs. Studs and the arrow are raised by
         /// <see cref="FaceShape.ContentRise"/>, which keeps them on the
         /// shortened face; frost stays on its cell, clear of the lip by its
-        /// own inset. A layered block's studs take the colour beneath.
+        /// own inset.
         /// </summary>
         /// <remarks>
-        /// Studs and gloss are drawn at full size, whatever the block. A
-        /// layered block's are to be scaled about their own centres by
-        /// <see cref="BlockParts{TPiece}.StudScale"/>, which the caller does
-        /// in its own medium: the board records each one's full size first, so
-        /// a peel can grow them back.
+        /// <para><b>Layered (M4, Module 46).</b> With a colour
+        /// <paramref name="beneath"/>, the block is drawn as above in its outer
+        /// colour darkened (<see cref="RuntimeConfig.LayeredOuterFill"/>), and
+        /// an <c>Inner</c> group sets a recessed window into it, above the
+        /// outer studs, so it covers them where they meet: the same tiles
+        /// pulled in by <see cref="RuntimeConfig.LayerInsetCells"/> as a dark
+        /// rim in <see cref="RuntimeConfig.LayerEdgeFill"/>, and inside it the
+        /// inner block in the colour beneath,
+        /// with its own top shine and its own studs on its own grid
+        /// (<see cref="LayerStuds"/>) — Module 20's studs that take the colour
+        /// beneath. A layered axis-restricted block's arrow sits over the
+        /// window.</para>
+        /// <para>Pieces are added from the bottom up, so the introduction
+        /// cards, which draw in hierarchy order, layer them as the board's
+        /// sorting orders do.</para>
         /// </remarks>
         /// <param name="tiles"><see cref="BlockTiling.Compute"/> of <paramref name="cells"/>.</param>
         public BlockParts<TPiece> Block(
             TGroup body, IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, Color fill, Color? beneath,
             bool isIce, MovementAxis axis)
         {
-            var lipCells = config.LipOffsetCells;
+            var lipCells = config.BlockLipCells;
+            var outerFill = beneath.HasValue ? config.LayeredOuterFill(fill) : fill;
+
+            var contour = surface.Group(body, "Contour", Vector2.zero, 1f);
+            surface.Quarters(
+                contour, QuarterLayers.Contour(tiles), BlockTiling.QuarterRect, QuarterLayer.Contour, config.ContourColor,
+                config.BlockContourOrder);
 
             var lip = surface.Group(body, "Lip", Vector2.zero, 1f);
-            var lipQuarters = surface.Quarters(lip, tiles, BlockTiling.QuarterRect, config.LipFill(fill), config.BlockLipOrder);
+            var lipQuarters = surface.Quarters(
+                lip, tiles, BlockTiling.QuarterRect, QuarterLayer.Face, config.LipFill(outerFill), config.BlockLipOrder);
 
             var face = surface.Group(body, "Face", Vector2.zero, 1f);
-            var faceQuarters = surface.Quarters(
-                face, tiles, tile => FaceShape.QuarterRect(tile, 0f, lipCells), fill, config.BlockOrder);
-
-            List<TPiece> layerEdgeQuarters = null;
-            List<TPiece> layerQuarters = null;
-            var studFill = fill;
-            var studScale = 1f;
-            if (beneath.HasValue)
-            {
-                var inset = config.LayerInsetCells;
-                var edgeInset = inset - config.LayerEdgeCells;
-                var inner = surface.Group(face, "Inner", Vector2.zero, 1f);
-                layerEdgeQuarters = surface.Quarters(
-                    inner, tiles, tile => FaceShape.QuarterRect(tile, edgeInset, lipCells), config.LipFill(beneath.Value),
-                    config.LayerEdgeOrder);
-                layerQuarters = surface.Quarters(
-                    inner, tiles, tile => FaceShape.QuarterRect(tile, inset, lipCells), beneath.Value, config.LayerOrder);
-                studFill = beneath.Value;
-                studScale = config.LayerStudScale;
-            }
+            Func<QuarterTile, Rect> faceRect = tile => FaceShape.QuarterRect(tile, 0f, lipCells);
+            var faceQuarters = surface.Quarters(face, tiles, faceRect, QuarterLayer.Face, outerFill, config.BlockOrder);
+            var shineQuarters = TopShine(face, tiles, faceRect, config.BlockShineTopColor, config.BlockShineOrder);
 
             var studs = new List<TPiece>();
             var rise = new Vector2(0f, FaceShape.ContentRise(lipCells));
+            var hasStuds = !isIce && axis == MovementAxis.Free;
             for (var c = 0; c < cells.Count; c++)
             {
                 var cell = cells[c];
@@ -114,22 +114,87 @@ namespace GateRush.Runtime
                 {
                     surface.Sprite(face, $"Frost {cell}", config.FrostSprite, center, Vector2.one, config.FrostColor, config.StudOrder, 0f);
                 }
-                else if (axis == MovementAxis.Free)
+                else if (hasStuds)
                 {
                     studs.Add(surface.Sprite(
-                        face, $"Studs {cell}", config.StudsSprite, center + rise, Vector2.one, studFill, config.StudOrder, 0f));
-                    studs.Add(surface.Sprite(
+                        face, $"Studs {cell}", config.StudsSprite, center + rise, Vector2.one, outerFill, config.StudOrder, 0f));
+                    surface.Sprite(
                         face, $"Gloss {cell}", config.StudGlossSprite, center + rise, Vector2.one, config.GlossColor,
-                        config.GlossOrder, 0f));
+                        config.GlossOrder, 0f);
                 }
+            }
+
+            LayerParts<TPiece> layer = null;
+            if (beneath.HasValue)
+            {
+                layer = Window(face, cells, tiles, fill, beneath.Value, hasStuds);
             }
 
             if (axis != MovementAxis.Free)
             {
-                AxisArrow(face, cells, axis, rise);
+                AxisArrow(face, cells, axis, rise, beneath.HasValue ? config.LayerGlossOrder : config.GlossOrder);
             }
 
-            return new BlockParts<TPiece>(lipQuarters, faceQuarters, layerEdgeQuarters, layerQuarters, studs, studScale);
+            return new BlockParts<TPiece>(lipQuarters, faceQuarters, shineQuarters, studs, layer);
+        }
+
+        /// <summary>
+        /// A layered block's window, in an <c>Inner</c> group under
+        /// <paramref name="face"/>: the dark rim at the window's inset, the
+        /// inner block inside it in <paramref name="beneath"/> with its top
+        /// shine, and — when the block carries studs — the inner block's studs
+        /// with their gloss (<see cref="LayerStuds"/>). The shine's quarters
+        /// keep to their own span along the edge
+        /// (<see cref="FaceShape.ShineQuarterRect"/>), so its band is one
+        /// strength along the window's top.
+        /// </summary>
+        private LayerParts<TPiece> Window(
+            TGroup face, IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, Color outer, Color beneath, bool hasStuds)
+        {
+            var lipCells = config.BlockLipCells;
+            var edgeInset = config.LayerInsetCells;
+            var innerInset = config.LayerInnerInsetCells;
+            Func<QuarterTile, Rect> innerRect = tile => FaceShape.QuarterRect(tile, innerInset, lipCells);
+            Func<QuarterTile, Rect> innerShineRect = tile => FaceShape.ShineQuarterRect(tile, tiles, innerInset, lipCells);
+
+            var inner = surface.Group(face, "Inner", Vector2.zero, 1f);
+            var edge = surface.Quarters(
+                inner, tiles, tile => FaceShape.QuarterRect(tile, edgeInset, lipCells), QuarterLayer.Face,
+                config.LayerEdgeFill(outer), config.LayerEdgeOrder);
+            var innerFace = surface.Quarters(inner, tiles, innerRect, QuarterLayer.Face, beneath, config.LayerOrder);
+            var innerShine = TopShine(inner, tiles, innerShineRect, config.BlockShineTopColor, config.LayerShineOrder);
+
+            var innerStuds = new List<TPiece>();
+            if (hasStuds)
+            {
+                var centers = LayerStuds.Centers(
+                    cells, innerInset, lipCells, config.LayerStudSpacingCells, config.LayerStudClearanceCells);
+                for (var i = 0; i < centers.Count; i++)
+                {
+                    innerStuds.Add(surface.Sprite(
+                        inner, $"Inner stud {i}", config.SingleStudSprite, centers[i], Vector2.one, beneath,
+                        config.LayerStudOrder, 0f));
+                    innerStuds.Add(surface.Sprite(
+                        inner, $"Inner gloss {i}", config.SingleStudGlossSprite, centers[i], Vector2.one, config.GlossColor,
+                        config.LayerGlossOrder, 0f));
+                }
+            }
+
+            return new LayerParts<TPiece>(edge, innerFace, innerShine, innerStuds);
+        }
+
+        /// <summary>
+        /// A <c>Shine</c> group under <paramref name="parent"/>: the shine
+        /// pieces over the face pieces at <paramref name="rectOf"/>, in
+        /// <paramref name="color"/>, on the shape's top edges alone
+        /// (<see cref="QuarterLayers.Shine"/>). A block's and a gate's bottom
+        /// edge carries none: above a thin lip, a light line would not read.
+        /// </summary>
+        /// <returns>The shine pieces, in the order of <see cref="QuarterLayers.Shine"/>.</returns>
+        private List<TPiece> TopShine(TGroup parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order)
+        {
+            var shine = surface.Group(parent, "Shine", Vector2.zero, 1f);
+            return surface.Quarters(shine, QuarterLayers.Shine(tiles, isTop: true), rectOf, QuarterLayer.Shine, color, order);
         }
 
         /// <summary>
@@ -141,7 +206,7 @@ namespace GateRush.Runtime
         /// height and only its sliced middle stretches, so the heads keep
         /// their shape at any length.
         /// </summary>
-        private void AxisArrow(TGroup face, IReadOnlyList<Coord> cells, MovementAxis axis, Vector2 rise)
+        private void AxisArrow(TGroup face, IReadOnlyList<Coord> cells, MovementAxis axis, Vector2 rise, int order)
         {
             var isHorizontal = axis == MovementAxis.HorizontalOnly;
             var arrow = MarkLayout.AxisArrowRect(cells, axis, config.AxisArrowThicknessCells, config.AxisArrowEndInsetCells);
@@ -149,7 +214,7 @@ namespace GateRush.Runtime
             surface.Strip(
                 face, "Axis arrow", config.AxisArrowSprite, arrow.center + rise,
                 isHorizontal ? arrow.width : arrow.height, isHorizontal ? arrow.height : arrow.width,
-                config.AxisArrowColor, config.GlossOrder,
+                config.AxisArrowColor, order,
                 isHorizontal ? 0f : Vector2.SignedAngle(Vector2.right, Vector2.up));
         }
 
@@ -262,8 +327,9 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A gate under <paramref name="root"/>: its own segment of the frame,
-        /// with a lip hanging below its face. Open, it is in
-        /// <paramref name="openColor"/> with a white arrow pointing out of the
+        /// with an outline, a lip hanging below its face and a block's shine
+        /// (Module 46). Open, it is in <paramref name="openColor"/> with a
+        /// white arrow outlined in the outline colour, pointing out of the
         /// board. Closed (M2) — <paramref name="openColor"/> null — it is ice
         /// with frost on each of its cells and
         /// <paramref name="opensInClears"/> on a badge at its middle, and no
@@ -280,17 +346,31 @@ namespace GateRush.Runtime
             Func<int, Rect> cellOfSpan, BlockColor? openColor, int opensInClears)
         {
             var fill = openColor.HasValue ? config.BlockFill(openColor.Value) : config.IceColor;
-            var lip = surface.Group(root, "Lip", new Vector2(0f, -config.LipOffsetCells), 1f);
-            surface.Quarters(lip, tiles, rectOf, config.LipFill(fill), config.FrameLipOrder);
-            surface.Quarters(root, tiles, rectOf, fill, config.FrameOrder);
+            var lipOffset = new Vector2(0f, -config.LipOffsetCells);
+
+            // The outline rings the face and, drawn again at the lip's
+            // offset, the lip hanging below it, so no coloured lip shows
+            // outside the outline.
+            var contourTiles = QuarterLayers.Contour(tiles);
+            var contour = surface.Group(root, "Contour", Vector2.zero, 1f);
+            surface.Quarters(contour, contourTiles, rectOf, QuarterLayer.Contour, config.ContourColor, config.FrameContourOrder);
+            var contourLip = surface.Group(root, "Contour lip", lipOffset, 1f);
+            surface.Quarters(contourLip, contourTiles, rectOf, QuarterLayer.Contour, config.ContourColor, config.FrameContourOrder);
+
+            var lip = surface.Group(root, "Lip", lipOffset, 1f);
+            surface.Quarters(lip, tiles, rectOf, QuarterLayer.Face, config.LipFill(fill), config.FrameLipOrder);
+            surface.Quarters(root, tiles, rectOf, QuarterLayer.Face, fill, config.FrameOrder);
+            TopShine(root, tiles, rectOf, config.BlockShineTopColor, config.FrameShineOrder);
 
             if (openColor.HasValue)
             {
-                var arrow = config.GateArrowSizeCells;
+                var arrow = new Vector2(config.GateArrowSizeCells, config.GateArrowSizeCells);
+                var turn = Vector2.SignedAngle(Vector2.up, GateExit.Outward(gate.Edge));
                 surface.Sprite(
-                    root, "Arrow", config.GateArrowSprite, span.center, new Vector2(arrow, arrow),
-                    config.GateArrowColor, config.GateMarkOrder,
-                    Vector2.SignedAngle(Vector2.up, GateExit.Outward(gate.Edge)));
+                    root, "Arrow outline", config.GateArrowOutlineSprite, span.center, arrow, config.ContourColor,
+                    config.GateArrowOutlineOrder, turn);
+                surface.Sprite(
+                    root, "Arrow", config.GateArrowSprite, span.center, arrow, config.GateArrowColor, config.GateMarkOrder, turn);
                 return null;
             }
 
@@ -384,7 +464,7 @@ namespace GateRush.Runtime
         {
             var perCell = BoardView.MiniatureFit(cells, screen, out var shapeCenter);
             var tiles = BlockTiling.Compute(cells);
-            var lipCells = config.LipOffsetCells;
+            var lipCells = config.BlockLipCells;
 
             // A rectangle in the block's cell units, on the screen.
             Rect OnScreen(Rect cellRect) =>
@@ -393,9 +473,11 @@ namespace GateRush.Runtime
             var miniature = surface.Group(parent, "Next block", Vector2.zero, 1f);
             var lip = surface.Group(miniature, "Lip", Vector2.zero, 1f);
             surface.Quarters(
-                lip, tiles, tile => OnScreen(BlockTiling.QuarterRect(tile)), config.LipFill(fill), config.MiniatureLipOrder);
+                lip, tiles, tile => OnScreen(BlockTiling.QuarterRect(tile)), QuarterLayer.Face, config.LipFill(fill),
+                config.MiniatureLipOrder);
             surface.Quarters(
-                miniature, tiles, tile => OnScreen(FaceShape.QuarterRect(tile, 0f, lipCells)), fill, config.MiniatureOrder);
+                miniature, tiles, tile => OnScreen(FaceShape.QuarterRect(tile, 0f, lipCells)), QuarterLayer.Face, fill,
+                config.MiniatureOrder);
         }
     }
 
@@ -404,38 +486,55 @@ namespace GateRush.Runtime
     internal readonly struct BlockParts<TPiece>
         where TPiece : class
     {
-        public BlockParts(
-            List<TPiece> lip, List<TPiece> face, List<TPiece> layerEdge, List<TPiece> layer, List<TPiece> studs, float studScale)
+        public BlockParts(List<TPiece> lip, List<TPiece> face, List<TPiece> shine, List<TPiece> studs, LayerParts<TPiece> layer)
         {
             Lip = lip;
             Face = face;
-            LayerEdge = layerEdge;
-            Layer = layer;
+            Shine = shine;
             Studs = studs;
-            StudScale = studScale;
+            Layer = layer;
         }
 
         /// <summary>The lip's quarters, filling the footprint under the face, in the tiles' order.</summary>
         public List<TPiece> Lip { get; }
 
-        /// <summary>The face's quarters, in the block's colour, in the tiles' order.</summary>
+        /// <summary>The face's quarters, in the block's colour (darkened when layered), in the tiles' order.</summary>
         public List<TPiece> Face { get; }
 
-        /// <summary>The quarters of a layered block's inner shape's darker edge, in the tiles' order; null when it shows no colour beneath.</summary>
-        public List<TPiece> LayerEdge { get; }
+        /// <summary>The face's top shine pieces (<see cref="QuarterLayers.Shine"/>).</summary>
+        public List<TPiece> Shine { get; }
 
-        /// <summary>The quarters of a layered block's inner shape (M4), in the tiles' order; null when it shows no colour beneath.</summary>
-        public List<TPiece> Layer { get; }
-
-        /// <summary>Every stud sprite and its gloss, cell by cell, drawn at full size; empty for an ice or axis-restricted block.</summary>
+        /// <summary>The tinted per-cell stud sprites, without their gloss; empty for an ice or axis-restricted block.</summary>
         public List<TPiece> Studs { get; }
 
-        /// <summary>
-        /// The scale <see cref="Studs"/> are to be shown at, about their own
-        /// centres: <see cref="RuntimeConfig.LayerStudScale"/> on a layered
-        /// block, whose studs sit on its smaller inner shape, and 1 otherwise.
-        /// </summary>
-        public float StudScale { get; }
+        /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>
+        public LayerParts<TPiece> Layer { get; }
+    }
+
+    /// <summary>The pieces of a layered block's window that a peel animates (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>).</summary>
+    /// <typeparam name="TPiece">The surface's drawn sprite.</typeparam>
+    internal sealed class LayerParts<TPiece>
+        where TPiece : class
+    {
+        public LayerParts(List<TPiece> edge, List<TPiece> face, List<TPiece> shine, List<TPiece> studs)
+        {
+            Edge = edge;
+            Face = face;
+            Shine = shine;
+            Studs = studs;
+        }
+
+        /// <summary>The window's dark rim, in the tiles' order.</summary>
+        public List<TPiece> Edge { get; }
+
+        /// <summary>The inner block's face, in the colour beneath, in the tiles' order.</summary>
+        public List<TPiece> Face { get; }
+
+        /// <summary>The inner block's top shine pieces (<see cref="QuarterLayers.Shine"/>).</summary>
+        public List<TPiece> Shine { get; }
+
+        /// <summary>The inner block's studs and their gloss, alternately; empty when none fit or the block carries none.</summary>
+        public List<TPiece> Studs { get; }
     }
 
     /// <summary>The pieces of an elevator that its owner hides while a wave rises (<see cref="BoardRecipes{TGroup, TPiece}.Elevator"/>).</summary>

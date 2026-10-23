@@ -108,8 +108,16 @@ namespace GateRush.Runtime
                 case LevelMechanic.IceBlock:
                 {
                     var body = DrawBlock(root, "Ice block", Vector2.zero, Horizontal2, config.IceColor, isIce: true);
-                    recipes.Badge(body, MarkLayout.Anchor(Horizontal2), config.IntroCount, config.BadgeRimColor);
-                    return BlockBounds(Vector2.zero, Horizontal2);
+                    var corner = MarkLayout.CornerBadge(Horizontal2, config.BlockBadgeInsetCells);
+                    recipes.Badge(body, corner, config.IntroCount, config.BadgeRimColor);
+
+                    // The badge overlaps the block's edge at its corner, so
+                    // the card frames it too.
+                    var bounds = BlockBounds(Vector2.zero, Horizontal2);
+                    var halfBadge = new Vector2(config.BadgeWidthCells(config.IntroCount), config.BadgeHeightCells) * 0.5f;
+                    return Rect.MinMaxRect(
+                        bounds.xMin, Mathf.Min(bounds.yMin, corner.y - halfBadge.y),
+                        Mathf.Max(bounds.xMax, corner.x + halfBadge.x), bounds.yMax);
                 }
 
                 case LevelMechanic.IceDoor:
@@ -246,9 +254,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A block at <paramref name="origin"/>, by the board's recipe
-        /// (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>). A layered
-        /// block's studs are shown at the recipe's stud scale here, about
-        /// their own centres, as the board shows them.
+        /// (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>), as the board
+        /// shows it.
         /// </summary>
         /// <returns>The block's body, whose frame is the footprint's: marks go under it.</returns>
         private RectTransform DrawBlock(
@@ -256,13 +263,7 @@ namespace GateRush.Runtime
             Color? beneath = null, bool isIce = false, MovementAxis axis = MovementAxis.Free)
         {
             var body = AddGroup(parent, name, origin);
-            var parts = recipes.Block(body, cells, BlockTiling.Compute(cells), fill, beneath, isIce, axis);
-
-            for (var s = 0; s < parts.Studs.Count; s++)
-            {
-                parts.Studs[s].rectTransform.localScale = new Vector3(parts.StudScale, parts.StudScale, 1f);
-            }
-
+            recipes.Block(body, cells, BlockTiling.Compute(cells), fill, beneath, isIce, axis);
             return body;
         }
 
@@ -323,8 +324,9 @@ namespace GateRush.Runtime
         }
 
         List<Image> IRecipeSurface<RectTransform, Image>.Quarters(
-            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order) =>
-            AddQuarters(parent, tiles, rectOf, color);
+            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
+            int order) =>
+            AddQuarters(parent, tiles, rectOf, layer, color);
 
         Image IRecipeSurface<RectTransform, Image>.Sprite(
             RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
@@ -369,10 +371,11 @@ namespace GateRush.Runtime
         /// like a <c>SpriteRenderer</c>'s flip on the board — acts in the
         /// sprite's own frame, before the rotation.
         /// </summary>
-        private List<Image> AddQuarters(RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color)
+        private List<Image> AddQuarters(
+            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color)
         {
             var images = new List<Image>(tiles.Count);
-            var overlap = config.SeamOverlapCells * 2f;
+            var overlap = QuarterLayers.SeamOverlap(color, config.SeamOverlapCells) * 2f;
             for (var i = 0; i < tiles.Count; i++)
             {
                 var tile = tiles[i];
@@ -380,7 +383,7 @@ namespace GateRush.Runtime
                 var size = rect.size + new Vector2(overlap, overlap);
                 var frameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
                 var image = AddSprite(
-                    parent, tile.ToString(), config.QuarterSprite(tile.SpriteKind), rect.center, frameSize, color,
+                    parent, tile.ToString(), config.QuarterSprite(layer, tile.SpriteKind), rect.center, frameSize, color,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 image.rectTransform.localScale = new Vector3(tile.FlipX ? -1f : 1f, tile.FlipY ? -1f : 1f, 1f);
                 images.Add(image);

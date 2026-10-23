@@ -30,13 +30,17 @@ namespace GateRush.Runtime
     /// <para><b>Shapes from quarters (Module 15).</b> Blocks, the frame, gates
     /// and the next block on a generator's screen are drawn from the generated
     /// quarter sprites, laid out by <see cref="BlockTiling"/> and
-    /// <see cref="FrameTiling"/> and tinted at runtime. Each is drawn twice: a
+    /// <see cref="FrameTiling"/> and tinted at runtime. Each is drawn as a
     /// darker copy (the lip), then the face. The frame's and a gate's lip is
     /// offset downward. A block's is not: it fills the footprint's quarters,
     /// and the face over it is raised on its downward sides
     /// (<see cref="FaceShape"/>), so the lip shows as a strip along the
     /// block's lower outline and nothing of a resting block is drawn outside
-    /// its cells.</para>
+    /// its cells. Since Module 46 (D79) blocks, the frame and gates also
+    /// carry an untinted outline under the lip — the contour pieces, whole
+    /// silhouettes the face pieces sit inside — and an untinted shine over
+    /// the face along their top and bottom edges
+    /// (<see cref="QuarterLayers"/>).</para>
     /// <para><b>State (Module 16, D48).</b> A frozen block and a closed gate are
     /// ice with frost and a count; a locked block carries a chain along each
     /// row of its cells and a gold padlock with the keys still required; a
@@ -55,17 +59,19 @@ namespace GateRush.Runtime
     /// frame, which marks a block gets and everything a move animates are
     /// drawn here alone.</para>
     /// <para><b>Blocks.</b> Each shown block gets a root at its origin's corner
-    /// and, under it, a <c>Body</c> holding everything it draws: a <c>Lip</c>
-    /// group, a <c>Face</c> group (quarters, a layered block's inner shape,
-    /// then studs and gloss, frost, or the axis arrow), then chains, padlock
+    /// and, under it, a <c>Body</c> holding everything it draws: a
+    /// <c>Contour</c> group, a <c>Lip</c> group, a <c>Face</c> group
+    /// (quarters, the shine, then studs and gloss, frost, or the axis arrow,
+    /// and a layered block's <c>Inner</c> window), then chains, padlock
     /// or key, badges and labels. The drag, the settle and the exit move the root; the lift,
     /// a spawn and a rise scale the body about the footprint's centre, so the
     /// two never overwrite each other.</para>
-    /// <para><b>Layered blocks (Module 20, M4).</b> A block with a colour
-    /// beneath shows it as one inner shape: its own quarter tiles drawn again
-    /// in that colour, each pulled inward by <see cref="FaceShape"/>, over a
-    /// slightly larger copy in the darker lip colour that reads as its edge.
-    /// The studs sit on the inner shape, in its colour. A peel re-poses these
+    /// <para><b>Layered blocks (Modules 20 and 46, M4).</b> A block with a
+    /// colour beneath is drawn in its outer colour darkened, with a recessed
+    /// window set into it over its studs: its own quarter tiles drawn again,
+    /// each pulled inward by <see cref="FaceShape"/>, as a dark rim and,
+    /// inside it, a smaller block in the colour beneath
+    /// with its own studs (<see cref="LayerStuds"/>). A peel re-poses these
     /// same renderers.</para>
     /// <para><b>Tweens.</b> DOTween keeps static state, and Enter Play Mode
     /// runs without a domain reload. Every tween of a presentation, a lift or
@@ -503,14 +509,31 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>The frame ring and every wall cell, lip then face.</summary>
+        /// <summary>
+        /// The frame ring and every wall cell: its outline, lip and face, and
+        /// a lighter rim along its top and bottom edges (Module 46). The lip
+        /// hangs below the outline: dark purple on dark, it reads as part of it.
+        /// </summary>
         private void DrawFrame()
         {
+            var contour = AddGroup(board, "Frame contour", Vector2.zero);
+            AddQuarters(
+                contour, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Contour, config.ContourColor,
+                config.FrameContourOrder);
+
             var lip = AddGroup(board, "Frame lip", LipOffset());
-            AddQuarters(lip, frameTiles, frameQuarterRect, config.LipFill(config.FrameColor), config.FrameLipOrder);
+            AddQuarters(lip, frameTiles, frameQuarterRect, QuarterLayer.Face, config.LipFill(config.FrameColor), config.FrameLipOrder);
 
             var face = AddGroup(board, "Frame", Vector2.zero);
-            AddQuarters(face, frameTiles, frameQuarterRect, config.FrameColor, config.FrameOrder);
+            AddQuarters(face, frameTiles, frameQuarterRect, QuarterLayer.Face, config.FrameColor, config.FrameOrder);
+
+            var shine = AddGroup(board, "Frame shine", Vector2.zero);
+            AddQuarters(
+                shine, QuarterLayers.Shine(frameTiles, isTop: true), frameQuarterRect, QuarterLayer.Shine,
+                config.FrameShineTopColor, config.FrameShineOrder);
+            AddQuarters(
+                shine, QuarterLayers.Shine(frameTiles, isTop: false), frameQuarterRect, QuarterLayer.Shine,
+                config.FrameShineBottomColor, config.FrameShineOrder);
         }
 
         /// <summary>
@@ -614,21 +637,10 @@ namespace GateRush.Runtime
                 var drawn = new DrawnBlock(root, body, FootprintCenterInBlock(cells), parts.Lip, cells, tiles, spec.Axis, visual.IsFrozen)
                 {
                     FaceQuarters = parts.Face,
-                    LayerEdgeQuarters = parts.LayerEdge,
-                    LayerQuarters = parts.Layer,
+                    ShineQuarters = parts.Shine,
+                    Studs = parts.Studs,
+                    Layer = parts.Layer,
                 };
-
-                // Recorded at the full size they were drawn at, then shown at
-                // the layered scale, so a peel can grow them back.
-                for (var s = 0; s < parts.Studs.Count; s++)
-                {
-                    drawn.AddStuds(parts.Studs[s]);
-                }
-
-                if (beneath.HasValue)
-                {
-                    drawn.SetStudScale(parts.StudScale);
-                }
 
                 drawnBlocks[i] = drawn;
 
@@ -644,7 +656,7 @@ namespace GateRush.Runtime
         /// What a peel re-poses the drawn quarters with.
         /// </summary>
         private Rect FaceQuarterRect(QuarterTile tile, float insetCells) =>
-            CellRectToLocal(FaceShape.QuarterRect(tile, insetCells, config.LipOffsetCells));
+            CellRectToLocal(FaceShape.QuarterRect(tile, insetCells, config.BlockLipCells));
 
         /// <summary>
         /// Poses <paramref name="quarters"/> — drawn from <paramref name="tiles"/>,
@@ -660,34 +672,51 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// Poses <paramref name="quarters"/> — a shape's shine, drawn from
+        /// <paramref name="shineTiles"/>, in their order — over a shape
+        /// <paramref name="insetCells"/> inside the face of the block whose
+        /// quarters are <paramref name="tiles"/>, each keeping to its own span
+        /// along the edge (<see cref="FaceShape.ShineQuarterRect"/>).
+        /// </summary>
+        private void PoseShineInset(
+            List<SpriteRenderer> quarters, IReadOnlyList<QuarterTile> shineTiles, IReadOnlyList<QuarterTile> tiles, float insetCells)
+        {
+            for (var i = 0; i < shineTiles.Count; i++)
+            {
+                var rect = FaceShape.ShineQuarterRect(shineTiles[i], tiles, insetCells, config.BlockLipCells);
+                PoseQuarter(quarters[i], shineTiles[i], CellRectToLocal(rect));
+            }
+        }
+
+        /// <summary>
         /// Everything block <paramref name="blockIndex"/> carries on top of its
         /// face, under its body:
         /// <list type="bullet">
         /// <item>frozen (M3): the clears still needed on a badge at the
-        /// footprint's anchor (<see cref="MarkLayout.Anchor"/>);</item>
+        /// footprint's bottom-right corner (<see cref="MarkLayout.CornerBadge"/>);</item>
         /// <item>locked (M8): chains and a padlock with the keys still required
         /// (<see cref="DrawLock"/>);</item>
         /// <item>carrying a key: a gold key whose gem is its lock's colour
         /// (D47);</item>
         /// <item>carrying a time bonus (M10): the clock and "+N" on a badge in
         /// the bonus colours (<see cref="BoardRecipes{TGroup, TPiece}.TimeBonusMark"/>);</item>
-        /// <item>layered deeper than two (M4): the colours left on a badge,
-        /// which a frozen block never shows.</item>
+        /// <item>layered deeper than two (M4): the colours left on a badge at
+        /// the footprint's bottom-right corner, which a frozen block never
+        /// shows, so the two corner badges never meet.</item>
         /// </list>
-        /// Where the padlock or key, the layer badge and the time-bonus mark
-        /// go, alone or sharing the block, is <see cref="MarksOf"/>'s.
+        /// Where the padlock or key and the time-bonus mark go, alone or
+        /// sharing the block, is <see cref="MarksOf"/>'s.
         /// </summary>
         private void DrawBlockMarks(int blockIndex, Transform body, IReadOnlyList<Coord> cells, BlockVisual visual)
         {
+            var corner = MarkLayout.CornerBadge(cells, config.BlockBadgeInsetCells);
             if (visual.IsFrozen)
             {
                 badges[new CountPop(CountKind.Frozen, blockIndex)] =
-                    recipes.Badge(body, MarkLayout.Anchor(cells), visual.FrozenRemaining, config.BadgeRimColor);
+                    recipes.Badge(body, corner, visual.FrozenRemaining, config.BadgeRimColor);
             }
 
-            var marks = MarksOf(
-                cells, visual.IsFrozen, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds > 0,
-                visual.LayerNumeral.HasValue);
+            var marks = MarksOf(cells, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds > 0);
 
             if (visual.IsLocked)
             {
@@ -707,27 +736,27 @@ namespace GateRush.Runtime
 
             if (visual.LayerNumeral.HasValue)
             {
-                var badge = recipes.Badge(body, marks.Layers, visual.LayerNumeral.Value, config.BadgeRimColor);
+                var badge = recipes.Badge(body, corner, visual.LayerNumeral.Value, config.BadgeRimColor);
                 badge.name = "Layer count";
-                badge.localScale = new Vector3(marks.Scale, marks.Scale, 1f);
             }
         }
 
         /// <summary>
-        /// Where a block's padlock or key, its layer badge and its time-bonus
-        /// mark sit, relative to its body in cells, and how large. One of them
-        /// alone sits at the footprint's anchor at full size; two or three
-        /// take a row's slots, in that order, and where the row is crowded
-        /// shrink (<see cref="RuntimeConfig.MarkScale"/>). On a frozen block
-        /// they are raised above the frozen badge. The decision is
-        /// <see cref="MarkLayout.Slots"/>', which the Level Editor shares;
-        /// this only adds the scale. The one rule for a block's drawing and
-        /// for the lock that fades away when it opens, so the fading padlock
-        /// is where the drawn one was.
+        /// Where a block's padlock or key and its time-bonus mark sit,
+        /// relative to its body in cells, and how large. One of them alone
+        /// sits at the footprint's anchor at full size; two take a row's
+        /// slots, in that order, and where the row is crowded shrink
+        /// (<see cref="RuntimeConfig.MarkScale"/>). The board's count badges
+        /// sit in the bottom-right corner (Module 46), so they neither take a
+        /// slot nor raise the marks, as the Level Editor's layout still does.
+        /// The decision is <see cref="MarkLayout.Slots"/>'; this only adds the
+        /// scale. The one rule for a block's drawing and for the lock that
+        /// fades away when it opens, so the fading padlock is where the drawn
+        /// one was.
         /// </summary>
-        private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool isFrozen, bool hasIcon, bool hasBonus, bool hasLayers)
+        private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool hasIcon, bool hasBonus)
         {
-            var slots = MarkLayout.Slots(cells, isFrozen, hasIcon, hasLayers, hasBonus, config.FrozenMarkRaiseCells);
+            var slots = MarkLayout.Slots(cells, false, hasIcon, false, hasBonus, config.FrozenMarkRaiseCells);
             return new BlockMarks(slots.Icon, slots.Layers, slots.Bonus, config.MarkScale(slots.Crowding));
         }
 
@@ -826,8 +855,9 @@ namespace GateRush.Runtime
         }
 
         List<SpriteRenderer> IRecipeSurface<Transform, SpriteRenderer>.Quarters(
-            Transform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order) =>
-            AddQuarters(parent, tiles, tile => CellRectToLocal(rectOf(tile)), color, order);
+            Transform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
+            int order) =>
+            AddQuarters(parent, tiles, tile => CellRectToLocal(rectOf(tile)), layer, color, order);
 
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Sprite(
             Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
@@ -872,21 +902,23 @@ namespace GateRush.Runtime
         /// <summary>
         /// Draws <paramref name="tiles"/> under <paramref name="parent"/>, one
         /// renderer per quarter, each posed as its tile says
-        /// (<see cref="PoseQuarter"/>). The one path for block faces and lips,
-        /// the frame and its lip, gates and their lips, the next block on a
+        /// (<see cref="PoseQuarter"/>). The one path for block faces, lips,
+        /// outlines and shine, the frame's, gates', the next block on a
         /// generator's screen, and a grabbed block's outline; only the
         /// arguments differ.
         /// </summary>
         /// <param name="rectOf">Where a tile goes, in <paramref name="parent"/>'s local world units.</param>
+        /// <param name="layer">Which generated set the quarters are drawn with.</param>
         private List<SpriteRenderer> AddQuarters(
-            Transform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order)
+            Transform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
+            int order)
         {
             var renderers = new List<SpriteRenderer>(tiles.Count);
             for (var i = 0; i < tiles.Count; i++)
             {
                 var tile = tiles[i];
                 var renderer = AddRenderer(
-                    parent, tile.ToString(), config.QuarterSprite(tile.SpriteKind), Vector2.zero, color, order,
+                    parent, tile.ToString(), config.QuarterSprite(layer, tile.SpriteKind), Vector2.zero, color, order,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 renderer.flipX = tile.FlipX;
                 renderer.flipY = tile.FlipY;
@@ -899,11 +931,14 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// Places a quarter renderer over <paramref name="rect"/>, enlarged by
-        /// the seam overlap. A rotated sprite's own x runs along the board's y.
+        /// the seam overlap while its colour is opaque and not at all while it
+        /// is translucent (<see cref="QuarterLayers.SeamOverlap"/>), so a
+        /// shine or a fading quarter is never blended twice at a
+        /// seam. A rotated sprite's own x runs along the board's y.
         /// </summary>
         private void PoseQuarter(SpriteRenderer renderer, QuarterTile tile, Rect rect)
         {
-            var overlap = CellsToWorld(config.SeamOverlapCells) * 2f;
+            var overlap = CellsToWorld(QuarterLayers.SeamOverlap(renderer.color, config.SeamOverlapCells)) * 2f;
             var size = rect.size + new Vector2(overlap, overlap);
             var frameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
             var bounds = renderer.sprite.bounds.size;
@@ -1103,11 +1138,6 @@ namespace GateRush.Runtime
         /// <summary>A drawn block: its root, its body, and the parts its effects animate.</summary>
         private sealed class DrawnBlock
         {
-            // A block's studs and their gloss, with the scale each was drawn
-            // at, so a stud scale is set from the original, never compounded.
-            private readonly List<Transform> studs = new List<Transform>();
-            private readonly List<Vector3> studFullScales = new List<Vector3>();
-
             public DrawnBlock(
                 Transform root, Transform body, Vector2 footprintCenter, List<SpriteRenderer> lipQuarters,
                 IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, MovementAxis axis, bool isIce)
@@ -1134,14 +1164,14 @@ namespace GateRush.Runtime
             /// <summary>The lip's quarter renderers, filling the footprint under the face, in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> LipQuarters { get; }
 
-            /// <summary>The face's quarter renderers, in the block's colour, in <see cref="Tiles"/> order.</summary>
+            /// <summary>The face's quarter renderers, in the block's colour (darkened when layered), in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> FaceQuarters { get; set; }
 
-            /// <summary>The quarter renderers of a layered block's inner shape (M4), in <see cref="Tiles"/> order; null when it shows no colour beneath.</summary>
-            public List<SpriteRenderer> LayerQuarters { get; set; }
+            /// <summary>The face's top shine renderers, in the order of <see cref="QuarterLayers.Shine"/>.</summary>
+            public List<SpriteRenderer> ShineQuarters { get; set; }
 
-            /// <summary>The quarter renderers of the inner shape's darker edge, in <see cref="Tiles"/> order; null with <see cref="LayerQuarters"/>.</summary>
-            public List<SpriteRenderer> LayerEdgeQuarters { get; set; }
+            /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>
+            public LayerParts<SpriteRenderer> Layer { get; set; }
 
             /// <summary>The footprint, relative to the origin.</summary>
             public IReadOnlyList<Coord> Cells { get; }
@@ -1155,26 +1185,11 @@ namespace GateRush.Runtime
             /// <summary>True for a frozen block (M3): its face is ice with frost, without studs.</summary>
             public bool IsIce { get; }
 
-            /// <summary>Records a stud or gloss sprite, drawn at full size, as one <see cref="SetStudScale"/> scales.</summary>
-            public void AddStuds(SpriteRenderer renderer)
-            {
-                studs.Add(renderer.transform);
-                studFullScales.Add(renderer.transform.localScale);
-            }
-
             /// <summary>
-            /// Scales every stud and its gloss about its own cell's centre to
-            /// <paramref name="scale"/> times the size it was drawn at. Does
-            /// nothing for a block without studs: ice, or axis-restricted.
+            /// The tinted per-cell stud renderers, in the face's colour; empty
+            /// for a block without studs: ice, or axis-restricted.
             /// </summary>
-            public void SetStudScale(float scale)
-            {
-                for (var i = 0; i < studs.Count; i++)
-                {
-                    var full = studFullScales[i];
-                    studs[i].localScale = new Vector3(full.x * scale, full.y * scale, full.z);
-                }
-            }
+            public List<SpriteRenderer> Studs { get; set; }
 
             /// <summary>How far the block is lifted, from 0 (resting) to 1 (held).</summary>
             public float LiftAmount { get; set; }

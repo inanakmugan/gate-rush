@@ -56,6 +56,36 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// Where a block's count badge goes on the board (Module 46): the
+        /// outer bottom-right corner of the footprint's bottom-right cell —
+        /// the right-most cell of its lowest row, so an L's is its foot's end
+        /// — pulled in by <paramref name="insetCells"/> on both axes, so the
+        /// badge sits over the corner and overlaps the block's edge, clear of
+        /// the window of a layered block. In cell units relative to the
+        /// footprint's origin.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        public static Vector2 CornerBadge(IReadOnlyList<Coord> cells, float insetCells)
+        {
+            if (cells == null || cells.Count == 0)
+            {
+                throw new ArgumentException("A footprint has at least one cell.", nameof(cells));
+            }
+
+            var corner = cells[0];
+            for (var i = 1; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                if (cell.Y < corner.Y || (cell.Y == corner.Y && cell.X > corner.X))
+                {
+                    corner = cell;
+                }
+            }
+
+            return new Vector2(corner.X + 1 - insetCells, corner.Y + insetCells);
+        }
+
+        /// <summary>
         /// Where two marks sharing one block go — a padlock or a key, and the
         /// time-bonus mark (M10) — in cell units relative to the footprint's
         /// origin. They sit half a cell either side of <see cref="Anchor"/>,

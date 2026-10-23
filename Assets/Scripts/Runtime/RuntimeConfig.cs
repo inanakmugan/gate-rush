@@ -28,8 +28,8 @@ namespace GateRush.Runtime
     /// <para>The art sprites are generated in greyscale from the
     /// <c>ArtRecipe</c> asset (<i>Gate Rush → Generate Art</i>) and tinted here:
     /// one set serves every colour (D46). What must not take a block's colour —
-    /// the stud gloss, the arrows, the frost, the key's gold — has its own
-    /// sprite and its own colour below.</para>
+    /// the outline and the shine (D79), the stud gloss, the arrows, the frost,
+    /// the key's gold — has its own sprite and its own colour below.</para>
     /// <para><b>Sorting orders</b> have their defaults as constants, used both by
     /// the fields and by <i>Reset Sorting Orders</i> in the component's context
     /// menu, which resets those fields alone.</para>
@@ -49,29 +49,37 @@ namespace GateRush.Runtime
         private const int DefaultMachineScreenOrder = 6;
         private const int DefaultMiniatureLipOrder = 7;
         private const int DefaultMiniatureOrder = 8;
-        private const int DefaultFrameLipOrder = 9;
-        private const int DefaultFrameOrder = 10;
-        private const int DefaultGateMarkOrder = 11;
-        private const int DefaultBlockLipOrder = 12;
-        private const int DefaultBlockOrder = 13;
-        private const int DefaultLayerEdgeOrder = 14;
-        private const int DefaultLayerOrder = 15;
-        private const int DefaultStudOrder = 16;
-        private const int DefaultGlossOrder = 17;
-        private const int DefaultChainOrder = 18;
-        private const int DefaultIconOrder = 19;
-        private const int DefaultKeyGemOrder = 20;
-        private const int DefaultShutterOrder = 21;
-        private const int DefaultShutterBorderOrder = 22;
-        private const int DefaultBadgeRimOrder = 23;
-        private const int DefaultBadgeOrder = 24;
-        private const int DefaultLabelOrder = 25;
+        private const int DefaultFrameContourOrder = 9;
+        private const int DefaultFrameLipOrder = 10;
+        private const int DefaultFrameOrder = 11;
+        private const int DefaultFrameShineOrder = 12;
+        private const int DefaultGateArrowOutlineOrder = 13;
+        private const int DefaultGateMarkOrder = 14;
+        private const int DefaultBlockContourOrder = 15;
+        private const int DefaultBlockLipOrder = 16;
+        private const int DefaultBlockOrder = 17;
+        private const int DefaultBlockShineOrder = 18;
+        private const int DefaultStudOrder = 19;
+        private const int DefaultGlossOrder = 20;
+        private const int DefaultLayerEdgeOrder = 21;
+        private const int DefaultLayerOrder = 22;
+        private const int DefaultLayerShineOrder = 23;
+        private const int DefaultLayerStudOrder = 24;
+        private const int DefaultLayerGlossOrder = 25;
+        private const int DefaultChainOrder = 26;
+        private const int DefaultIconOrder = 27;
+        private const int DefaultKeyGemOrder = 28;
+        private const int DefaultShutterOrder = 29;
+        private const int DefaultShutterBorderOrder = 30;
+        private const int DefaultBadgeRimOrder = 31;
+        private const int DefaultBadgeOrder = 32;
+        private const int DefaultLabelOrder = 33;
 
         // Compared only inside a lifted block's sorting group, where it has to
-        // sort below the block's lip and nothing else. Sharing a value with
-        // another board layer (the gate marks) is harmless: nothing outside
-        // the group is compared with it.
-        private const int DefaultOutlineOrder = DefaultBlockLipOrder - 1;
+        // sort below the block's contour and nothing else. Sharing a value
+        // with another board layer (the gate marks) is harmless: nothing
+        // outside the group is compared with it.
+        private const int DefaultOutlineOrder = DefaultBlockContourOrder - 1;
 
         /// <summary>
         /// The cube burst's maximum delay. Not a tunable: a stream spreads its
@@ -98,9 +106,9 @@ namespace GateRush.Runtime
         /// </summary>
         private const int DeepestLayerCountChecked = 99;
 
-        private const int DefaultLiftedBlockOrder = 26;
-        private const int DefaultEffectOrder = 27;
-        private const int DefaultPullGlowOrder = DefaultBlockLipOrder - 1;
+        private const int DefaultLiftedBlockOrder = 34;
+        private const int DefaultEffectOrder = 35;
+        private const int DefaultPullGlowOrder = DefaultBlockContourOrder - 1;
 
         // The generator preview lies inside the grid, over the floor and an
         // elevator's doors and under every block. Sharing values with the
@@ -119,15 +127,24 @@ namespace GateRush.Runtime
         [Tooltip("TextMeshPro font asset for the board's labels: its counts, and the counts and marks in the introduction cards' illustrations. Lilita One (D46), created from Assets/Art/Fonts. The cards' own texts use Intro Font.")]
         [SerializeField] private TMP_FontAsset labelFont;
 
-        [Header("Generated art (Assets/Art/Generated)")]
+        [Header("Generated art (Assets/Art/Generated; Gate Rush → Generate Art assigns these)")]
         [SerializeField] private Sprite quarterOuterSprite;
         [SerializeField] private Sprite quarterEdgeSprite;
         [SerializeField] private Sprite quarterFillSprite;
         [SerializeField] private Sprite quarterConcaveSprite;
+        [SerializeField] private Sprite contourOuterSprite;
+        [SerializeField] private Sprite contourEdgeSprite;
+        [SerializeField] private Sprite contourConcaveSprite;
+        [SerializeField] private Sprite shineOuterSprite;
+        [SerializeField] private Sprite shineEdgeSprite;
+        [SerializeField] private Sprite shineConcaveSprite;
         [SerializeField] private Sprite studsSprite;
         [SerializeField] private Sprite studGlossSprite;
+        [SerializeField] private Sprite singleStudSprite;
+        [SerializeField] private Sprite singleStudGlossSprite;
         [SerializeField] private Sprite floorSprite;
         [SerializeField] private Sprite gateArrowSprite;
+        [SerializeField] private Sprite gateArrowOutlineSprite;
         [SerializeField] private Sprite axisArrowSprite;
         [SerializeField] private Sprite backgroundRampSprite;
         [SerializeField] private Sprite vignetteSprite;
@@ -156,7 +173,7 @@ namespace GateRush.Runtime
         [Tooltip("Part of the screen's height kept free above the board for the HUD, from 0 to 1. Top and bottom together must stay below 1. 0.16 holds the 306-unit HUD of the Module 45 follow-up — ribbon, timer, pills — at the 1920-unit reference height.")]
         [SerializeField] private float topBandScreenFraction = 0.16f;
 
-        [Tooltip("Part of the screen's height kept free below the board for the joker bar, from 0 to 1. Top and bottom together must stay below 1. 0.145 is the most the board-fit floor allows with the top band at 0.16; the 312-unit joker bar is scaled to it.")]
+        [Tooltip("Part of the screen's height kept free below the board for the joker bar, from 0 to 1. Top and bottom together must stay below 1. 0.145 is the most the board-fit floor allows with the top band at 0.16; the 399-unit joker bar (Module 46) is scaled to it, its foot on the band's.")]
         [SerializeField] private float bottomBandScreenFraction = 0.145f;
 
         [Tooltip("Thickness of the frame around the grid, in cells: above 0, at most 1. Closed gates are drawn at this thickness too.")]
@@ -165,11 +182,14 @@ namespace GateRush.Runtime
         [Tooltip("How far the floor's backing reaches past the grid under the frame, in cells, so no background shows between floor and frame. At most the frame thickness.")]
         [SerializeField] private float floorUnderlayCells = 0.2f;
 
-        [Tooltip("How much of its darker copy (the lip) shows below a face, in cells. It reads as thickness. A block's lip stays inside its cells and its face is shortened by this from below; the frame's, a gate's and a machine's lip hangs below the face by it. At least 0, and with Layer Inset Cells below 0.5.")]
+        [Tooltip("How far the frame's, a gate's and a machine's darker copy (the lip) hangs below its face, in cells. It reads as thickness. At least 0.")]
         [SerializeField] private float lipOffsetCells = 0.09f;
 
+        [Tooltip("How much of a block's footprint its lip takes along the bottom, in cells (Module 46). The lip stays inside the block's cells and the face is shortened by this from below. At least 0, and with Layer Inset Cells below 0.5.")]
+        [SerializeField] private float blockLipCells = 0.08f;
+
         [Tooltip("The lip's colour is the face colour with RGB multiplied by this, from 0 (black) to 1 (no darkening).")]
-        [SerializeField] private float lipDarken = 0.6f;
+        [SerializeField] private float lipDarken = 0.5f;
 
         [Tooltip("How much each quarter tile is enlarged on every side, in cells, to hide sub-pixel cracks between tiles. 0 turns it off.")]
         [SerializeField] private float seamOverlapCells = 0.002f;
@@ -184,14 +204,23 @@ namespace GateRush.Runtime
         [SerializeField] private float axisArrowEndInsetCells = 0.14f;
 
         [Header("Layered blocks (M4)")]
-        [Tooltip("How far the inner shape, in the colour beneath, sits inside a layered block's footprint, in cells: above 0, below 0.5. The outer colour shows as a rim of about this width.")]
-        [SerializeField] private float layerInsetCells = 0.1f;
+        [Tooltip("How far a layered block's window sits inside its footprint, in cells, on every side (Module 46): the darker outer block, with its studs, shows around it. Above 0; with Layer Edge Cells and Block Lip Cells below 0.5.")]
+        [SerializeField] private float layerInsetCells = 0.31f;
 
-        [Tooltip("Width of the darker edge round the inner shape, in cells: at least 0, below Layer Inset Cells. Its colour is the colour beneath, darkened as a lip is.")]
+        [Tooltip("Width of the window's dark rim, in cells, in the outer colour darkened by Layer Edge Darken. At least 0.")]
         [SerializeField] private float layerEdgeCells = 0.02f;
 
-        [Tooltip("Scale of a layered block's studs about each cell's centre, so they stay on the inner shape: above 0, at most 1. A peel grows them back to 1.")]
-        [SerializeField] private float layerStudScale = 0.9f;
+        [Tooltip("A layered block's outer block, around the window, is its colour with RGB multiplied by this, from 0 to 1, so it reads as a recessed surround.")]
+        [SerializeField] private float layeredOuterDarken = 0.85f;
+
+        [Tooltip("The window's rim is the outer colour with RGB multiplied by this, from 0 to 1: a very dark shade of it, never the outline colour.")]
+        [SerializeField] private float layerEdgeDarken = 0.35f;
+
+        [Tooltip("Distance between neighbouring studs of the inner block in a layered block's window, in cells: its own grid, centred, as many studs as fit. Above 0.")]
+        [SerializeField] private float layerStudSpacingCells = 0.42f;
+
+        [Tooltip("How far an inner stud's centre stays from the inner block's edge, in cells, on the inner block's rectangles; it covers the stud, its foot and a margin of face. Above 0. StudFitTests checks it against the art recipe.")]
+        [SerializeField] private float layerStudClearanceCells = 0.18f;
 
         [Header("Count badge")]
         [Tooltip("Height of the badge every count sits on, in cells.")]
@@ -205,6 +234,9 @@ namespace GateRush.Runtime
 
         [Tooltip("Thickness of a badge's lighter rim, in cells. Below half the badge's height.")]
         [SerializeField] private float badgeRimCells = 0.035f;
+
+        [Tooltip("How far a block's count badge — a frozen block's clears, a deep layered block's colours — sits in from the outer bottom-right corner of its bottom-right cell, on both axes, in cells (Module 46). Below half a badge's height, the badge overlaps the block's edge. At least 0, below 0.5.")]
+        [SerializeField] private float blockBadgeInsetCells = 0.14f;
 
         [Header("Locks and keys")]
         [Tooltip("Thickness of a locked block's chains, in cells: above 0, at most 1.")]
@@ -664,30 +696,45 @@ namespace GateRush.Runtime
         [SerializeField] private float sparkleMinAlpha = 0.2f;
 
         [Header("Colours")]
-        [Tooltip("One colour per BlockColor, in enum order: Red, Blue, Green, Yellow, Purple, Orange, Pink, Cyan.")]
+        [Tooltip("One colour per BlockColor, in enum order: Red, Blue, Green, Yellow, Purple, Orange, Pink, Cyan. A face is white in its middle, so each entry is the face colour the player sees there. Opaque.")]
         [SerializeField] private Color[] blockPalette =
         {
-            new Color(0.93f, 0.20f, 0.25f),
-            new Color(0.16f, 0.47f, 0.98f),
-            new Color(0.22f, 0.80f, 0.30f),
-            new Color(1.00f, 0.83f, 0.10f),
-            new Color(0.62f, 0.30f, 0.95f),
-            new Color(1.00f, 0.52f, 0.10f),
-            new Color(1.00f, 0.45f, 0.75f),
-            new Color(0.15f, 0.85f, 0.95f)
+            new Color32(0xF0, 0x2A, 0x1E, 0xFF),
+            new Color32(0x00, 0x54, 0xF6, 0xFF),
+            new Color32(0x07, 0xA5, 0x15, 0xFF),
+            new Color32(0xF6, 0xBA, 0x00, 0xFF),
+            new Color32(0xA2, 0x36, 0xF6, 0xFF),
+            new Color32(0xF6, 0x66, 0x0C, 0xFF),
+            new Color32(0xF6, 0x3C, 0xA2, 0xFF),
+            new Color32(0x06, 0xA8, 0xF6, 0xFF)
         };
 
-        [Tooltip("Top of the background gradient.")]
-        [SerializeField] private Color backgroundTop = new Color(0.23f, 0.20f, 0.42f);
+        [Tooltip("Top of the background gradient. Opaque.")]
+        [SerializeField] private Color backgroundTop = new Color32(0x60, 0x2D, 0xA0, 0xFF);
 
-        [Tooltip("Bottom of the background gradient; also the camera's clear colour.")]
-        [SerializeField] private Color backgroundBottom = new Color(0.07f, 0.07f, 0.15f);
+        [Tooltip("Bottom of the background gradient; also the camera's clear colour. Opaque.")]
+        [SerializeField] private Color backgroundBottom = new Color32(0x20, 0x0E, 0x3C, 0xFF);
 
         [Tooltip("Colour of the vignette at the screen's corners; its alpha is the vignette's strength.")]
         [SerializeField] private Color vignetteColor = new Color(0f, 0f, 0f, 0.5f);
 
-        [SerializeField] private Color floorColor = new Color(0.13f, 0.14f, 0.22f);
-        [SerializeField] private Color frameColor = new Color(0.42f, 0.46f, 0.62f);
+        [Tooltip("The floor tiles' tint. The tile is greyscale, darker than its grid line, so the floor shows darker than this and the grid shows this. Opaque.")]
+        [SerializeField] private Color floorColor = new Color32(0x31, 0x18, 0x5F, 0xFF);
+
+        [Tooltip("The frame's face, white in its middle, so this is the colour shown there. Opaque.")]
+        [SerializeField] private Color frameColor = new Color32(0x49, 0x21, 0x84, 0xFF);
+
+        [Tooltip("The dark outline round every block, the frame, every gate and the gate arrow (D79). Never tinted by a block's colour. Opaque.")]
+        [SerializeField] private Color contourColor = new Color32(0x1C, 0x0B, 0x3A, 0xFF);
+
+        [Tooltip("The highlight along a block's or a gate's top edges, just above its studs, untinted: white, its alpha the highlight's strength. Their bottom edges carry none.")]
+        [SerializeField] private Color blockShineTopColor = new Color(1f, 1f, 1f, 0.3f);
+
+        [Tooltip("The frame's lighter rim along its top edges, untinted.")]
+        [SerializeField] private Color frameShineTopColor = new Color(1f, 1f, 1f, 0.2f);
+
+        [Tooltip("The frame's lighter rim along its bottom edges, untinted.")]
+        [SerializeField] private Color frameShineBottomColor = new Color(1f, 1f, 1f, 0.1f);
 
         [Tooltip("The highlight on each stud. Not tinted by the block's colour.")]
         [SerializeField] private Color glossColor = new Color(1f, 1f, 1f, 0.85f);
@@ -746,29 +793,53 @@ namespace GateRush.Runtime
         [SerializeField] private int miniatureLipOrder = DefaultMiniatureLipOrder;
         [SerializeField] private int miniatureOrder = DefaultMiniatureOrder;
 
+        [Tooltip("The frame's outline, and a gate's: below Frame Lip Order.")]
+        [SerializeField] private int frameContourOrder = DefaultFrameContourOrder;
+
         [Tooltip("The frame's lip, and a gate's.")]
         [SerializeField] private int frameLipOrder = DefaultFrameLipOrder;
 
         [Tooltip("The frame's face, and a gate's.")]
         [SerializeField] private int frameOrder = DefaultFrameOrder;
 
+        [Tooltip("The frame's lighter rim and a gate's gloss: above Frame Order, below Gate Arrow Outline Order.")]
+        [SerializeField] private int frameShineOrder = DefaultFrameShineOrder;
+
+        [Tooltip("The dark outline under an open gate's arrow: below Gate Mark Order.")]
+        [SerializeField] private int gateArrowOutlineOrder = DefaultGateArrowOutlineOrder;
+
         [Tooltip("An open gate's arrow and a closed gate's frost.")]
         [SerializeField] private int gateMarkOrder = DefaultGateMarkOrder;
+
+        [Tooltip("A block's outline: above Gate Mark Order, below Block Lip Order.")]
+        [SerializeField] private int blockContourOrder = DefaultBlockContourOrder;
 
         [SerializeField] private int blockLipOrder = DefaultBlockLipOrder;
         [SerializeField] private int blockOrder = DefaultBlockOrder;
 
-        [Tooltip("The darker edge round a layered block's inner shape: above Block Order, below Layer Order.")]
-        [SerializeField] private int layerEdgeOrder = DefaultLayerEdgeOrder;
-
-        [Tooltip("A layered block's inner shape, in the colour beneath: above Layer Edge Order, below Stud Order.")]
-        [SerializeField] private int layerOrder = DefaultLayerOrder;
+        [Tooltip("A block's top highlight: above Block Order, below Stud Order.")]
+        [SerializeField] private int blockShineOrder = DefaultBlockShineOrder;
 
         [Tooltip("Studs, and a frozen block's frost, which has no studs.")]
         [SerializeField] private int studOrder = DefaultStudOrder;
 
         [Tooltip("Stud gloss, and an axis-restricted block's arrow, which has no studs.")]
         [SerializeField] private int glossOrder = DefaultGlossOrder;
+
+        [Tooltip("A layered block's window rim: above Gloss Order, so the window covers the outer studs.")]
+        [SerializeField] private int layerEdgeOrder = DefaultLayerEdgeOrder;
+
+        [Tooltip("A layered block's inner block, in the colour beneath: above Layer Edge Order, below Layer Shine Order.")]
+        [SerializeField] private int layerOrder = DefaultLayerOrder;
+
+        [Tooltip("The inner block's top highlight: above Layer Order, below Layer Stud Order.")]
+        [SerializeField] private int layerShineOrder = DefaultLayerShineOrder;
+
+        [Tooltip("The inner block's studs, in the colour beneath: above Layer Shine Order, below Layer Gloss Order.")]
+        [SerializeField] private int layerStudOrder = DefaultLayerStudOrder;
+
+        [Tooltip("The inner studs' gloss, and a layered axis-restricted block's arrow, which must show over the window: below Chain Order.")]
+        [SerializeField] private int layerGlossOrder = DefaultLayerGlossOrder;
 
         [SerializeField] private int chainOrder = DefaultChainOrder;
 
@@ -787,7 +858,7 @@ namespace GateRush.Runtime
         [Tooltip("Every label: the numbers on badges, in front of every other board layer. A time-bonus mark's clock icon shares it.")]
         [SerializeField] private int labelOrder = DefaultLabelOrder;
 
-        [Tooltip("A grabbed block's outline. Compared only inside the lifted block's sorting group, where it must sort below Block Lip Order; equal to another board layer's order is fine.")]
+        [Tooltip("A grabbed block's outline. Compared only inside the lifted block's sorting group, where it must sort below Block Contour Order; equal to another board layer's order is fine.")]
         [SerializeField] private int outlineOrder = DefaultOutlineOrder;
 
         [Tooltip("Sorting group order of a grabbed block, lifted above every other board layer.")]
@@ -796,7 +867,7 @@ namespace GateRush.Runtime
         [Tooltip("Cubes and ice shards, above everything else on the board.")]
         [SerializeField] private int effectOrder = DefaultEffectOrder;
 
-        [Tooltip("The glow of a gate pulling a dragged block: below Block Lip Order, so it lights the gate's mouth and never a block, and at least Gate Mark Order. Equal to Gate Mark Order is fine: the glow lies inside the grid, the marks outside it.")]
+        [Tooltip("The glow of a gate pulling a dragged block: below Block Contour Order, so it lights the gate's mouth and never a block, and at least Gate Mark Order. Equal to Gate Mark Order is fine: the glow lies inside the grid, the marks outside it.")]
         [SerializeField] private int pullGlowOrder = DefaultPullGlowOrder;
 
         [Tooltip("A previewed cell's rim (D53): above Floor Order and Elevator Border Order, below Generator Preview Order. Equal to a machine's order is fine: the preview lies inside the grid, machines outside the frame.")]
@@ -814,11 +885,20 @@ namespace GateRush.Runtime
         /// <summary>The font of the board's labels and of the introduction cards' illustrations: Lilita One.</summary>
         public TMP_FontAsset LabelFont => labelFont;
 
-        /// <summary>A block's 2×2 studs for one cell, tinted with its colour.</summary>
+        /// <summary>A block's grid of studs for one cell, each with its darker foot, tinted with its colour.</summary>
         public Sprite StudsSprite => studsSprite;
 
         /// <summary>The highlights on one cell's studs, drawn in <see cref="GlossColor"/>.</summary>
         public Sprite StudGlossSprite => studGlossSprite;
+
+        /// <summary>One stud with its foot, centred on a cell's canvas, tinted: a layered block's inner studs, each placed on the inner block's own grid.</summary>
+        public Sprite SingleStudSprite => singleStudSprite;
+
+        /// <summary>The highlight on <see cref="SingleStudSprite"/>, drawn in <see cref="GlossColor"/>.</summary>
+        public Sprite SingleStudGlossSprite => singleStudGlossSprite;
+
+        /// <summary>The dark outline under an open gate's arrow: the arrow grown by the outline's width, drawn in <see cref="ContourColor"/>.</summary>
+        public Sprite GateArrowOutlineSprite => gateArrowOutlineSprite;
 
         /// <summary>One floor tile with its faint grid line, tinted <see cref="FloorColor"/>.</summary>
         public Sprite FloorSprite => floorSprite;
@@ -896,11 +976,18 @@ namespace GateRush.Runtime
         public float FloorUnderlayCells => floorUnderlayCells;
 
         /// <summary>
-        /// How much of a lip shows below its face, in cells: inside a block's
-        /// cells (<see cref="FaceShape"/>), below the face of the frame, a
-        /// gate and a machine.
+        /// How far the lip of the frame, a gate and a machine hangs below its
+        /// face, in cells.
         /// </summary>
         public float LipOffsetCells => lipOffsetCells;
+
+        /// <summary>
+        /// How much of a block's footprint its lip takes along the bottom, in
+        /// cells: the face is shortened by this from below
+        /// (<see cref="FaceShape"/>). Also a layered block's inner shape's and
+        /// a machine screen's miniature's.
+        /// </summary>
+        public float BlockLipCells => blockLipCells;
 
         /// <summary>How much each quarter tile is enlarged on every side, in cells.</summary>
         public float SeamOverlapCells => seamOverlapCells;
@@ -914,14 +1001,23 @@ namespace GateRush.Runtime
         /// <summary>How far the axis arrow stops short of each end of the block, in cells.</summary>
         public float AxisArrowEndInsetCells => axisArrowEndInsetCells;
 
-        /// <summary>How far a layered block's inner shape sits inside its footprint, in cells (<see cref="LayerInset"/>).</summary>
+        /// <summary>How far a layered block's window sits inside its footprint, in cells (<see cref="FaceShape"/>).</summary>
         public float LayerInsetCells => layerInsetCells;
 
-        /// <summary>Width of the darker edge round a layered block's inner shape, in cells.</summary>
+        /// <summary>Width of the window's dark rim, in cells.</summary>
         public float LayerEdgeCells => layerEdgeCells;
 
-        /// <summary>Scale of a layered block's studs about each cell's centre.</summary>
-        public float LayerStudScale => layerStudScale;
+        /// <summary>
+        /// How far a layered block's inner block, in the colour beneath, sits
+        /// inside its footprint, in cells: the window, less its rim.
+        /// </summary>
+        public float LayerInnerInsetCells => layerInsetCells + layerEdgeCells;
+
+        /// <summary>Distance between the inner block's neighbouring studs, in cells (<see cref="LayerStuds"/>).</summary>
+        public float LayerStudSpacingCells => layerStudSpacingCells;
+
+        /// <summary>How far an inner stud's centre stays from the inner block's edge, in cells (<see cref="LayerStuds"/>).</summary>
+        public float LayerStudClearanceCells => layerStudClearanceCells;
 
         /// <summary>Height of a count badge, in cells.</summary>
         public float BadgeHeightCells => badgeHeightCells;
@@ -931,6 +1027,9 @@ namespace GateRush.Runtime
 
         /// <summary>Thickness of a badge's rim, in cells.</summary>
         public float BadgeRimCells => badgeRimCells;
+
+        /// <summary>How far a block's count badge sits in from its bottom-right corner, in cells (<see cref="MarkLayout.CornerBadge"/>).</summary>
+        public float BlockBadgeInsetCells => blockBadgeInsetCells;
 
         /// <summary>Thickness of a locked block's chains, in cells.</summary>
         public float ChainThicknessCells => chainThicknessCells;
@@ -1301,6 +1400,18 @@ namespace GateRush.Runtime
         /// <summary>Tint of the frame and of walls, which are drawn as frame.</summary>
         public Color FrameColor => frameColor;
 
+        /// <summary>The outline round every block, the frame, every gate and the gate arrow; drawn untinted (D79).</summary>
+        public Color ContourColor => contourColor;
+
+        /// <summary>The shine on a block's and a gate's top edges: white with the highlight's strength as alpha.</summary>
+        public Color BlockShineTopColor => blockShineTopColor;
+
+        /// <summary>The frame's rim on its top edges.</summary>
+        public Color FrameShineTopColor => frameShineTopColor;
+
+        /// <summary>The frame's rim on its bottom edges.</summary>
+        public Color FrameShineBottomColor => frameShineBottomColor;
+
         /// <summary>Colour of the stud highlights.</summary>
         public Color GlossColor => glossColor;
 
@@ -1394,14 +1505,26 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of the next block on a machine's screen.</summary>
         public int MiniatureOrder => miniatureOrder;
 
+        /// <summary>Sorting order of the frame's and gates' outline.</summary>
+        public int FrameContourOrder => frameContourOrder;
+
         /// <summary>Sorting order of the frame's and gates' lip.</summary>
         public int FrameLipOrder => frameLipOrder;
 
         /// <summary>Sorting order of the frame's and gates' face.</summary>
         public int FrameOrder => frameOrder;
 
+        /// <summary>Sorting order of the frame's rim and a gate's gloss.</summary>
+        public int FrameShineOrder => frameShineOrder;
+
+        /// <summary>Sorting order of the outline under an open gate's arrow.</summary>
+        public int GateArrowOutlineOrder => gateArrowOutlineOrder;
+
         /// <summary>Sorting order of an open gate's arrow and a closed gate's frost.</summary>
         public int GateMarkOrder => gateMarkOrder;
+
+        /// <summary>Sorting order of a block's outline.</summary>
+        public int BlockContourOrder => blockContourOrder;
 
         /// <summary>Sorting order of a block's lip.</summary>
         public int BlockLipOrder => blockLipOrder;
@@ -1409,11 +1532,23 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of a block's face quarters.</summary>
         public int BlockOrder => blockOrder;
 
-        /// <summary>Sorting order of the darker edge round a layered block's inner shape.</summary>
+        /// <summary>Sorting order of a layered block's window rim, above the outer studs.</summary>
         public int LayerEdgeOrder => layerEdgeOrder;
 
-        /// <summary>Sorting order of a layered block's inner shape.</summary>
+        /// <summary>Sorting order of a layered block's inner block.</summary>
         public int LayerOrder => layerOrder;
+
+        /// <summary>Sorting order of the inner block's top highlight.</summary>
+        public int LayerShineOrder => layerShineOrder;
+
+        /// <summary>Sorting order of the inner block's studs.</summary>
+        public int LayerStudOrder => layerStudOrder;
+
+        /// <summary>Sorting order of the inner studs' gloss and of a layered axis-restricted block's arrow.</summary>
+        public int LayerGlossOrder => layerGlossOrder;
+
+        /// <summary>Sorting order of a block's top highlight.</summary>
+        public int BlockShineOrder => blockShineOrder;
 
         /// <summary>Sorting order of a block's studs, and of a frozen block's frost.</summary>
         public int StudOrder => studOrder;
@@ -1463,19 +1598,31 @@ namespace GateRush.Runtime
         /// <summary>Sorting order of a previewed cell's fill, below every block, a grabbed block's outline and a closed shutter.</summary>
         public int GeneratorPreviewOrder => generatorPreviewOrder;
 
-        /// <summary>The generated sprite for one of the four quarter pieces.</summary>
-        public Sprite QuarterSprite(QuarterSpriteKind kind)
+        /// <summary>
+        /// The generated sprite for one of the four quarter pieces in
+        /// <paramref name="layer"/>'s set. A fill has no contour or shine of
+        /// its own: its contour would be the opaque white face fill, which is
+        /// returned, and it carries no shine (<see cref="QuarterLayers"/>), so
+        /// null is.
+        /// </summary>
+        public Sprite QuarterSprite(QuarterLayer layer, QuarterSpriteKind kind)
         {
             switch (kind)
             {
                 case QuarterSpriteKind.Outer:
-                    return quarterOuterSprite;
+                    return layer == QuarterLayer.Contour ? contourOuterSprite
+                        : layer == QuarterLayer.Shine ? shineOuterSprite
+                        : quarterOuterSprite;
                 case QuarterSpriteKind.Edge:
-                    return quarterEdgeSprite;
+                    return layer == QuarterLayer.Contour ? contourEdgeSprite
+                        : layer == QuarterLayer.Shine ? shineEdgeSprite
+                        : quarterEdgeSprite;
                 case QuarterSpriteKind.Fill:
-                    return quarterFillSprite;
+                    return layer == QuarterLayer.Shine ? null : quarterFillSprite;
                 default:
-                    return quarterConcaveSprite;
+                    return layer == QuarterLayer.Contour ? contourConcaveSprite
+                        : layer == QuarterLayer.Shine ? shineConcaveSprite
+                        : quarterConcaveSprite;
             }
         }
 
@@ -1492,6 +1639,14 @@ namespace GateRush.Runtime
 
             return blockPalette[index];
         }
+
+        /// <summary>A layered block's outer block around its window, for an outer colour of <paramref name="outer"/>: its RGB darkened, its alpha kept.</summary>
+        public Color LayeredOuterFill(Color outer) => Darken(outer, layeredOuterDarken);
+
+        /// <summary>The window's dark rim, for an outer colour of <paramref name="outer"/>: its RGB darkened, its alpha kept.</summary>
+        public Color LayerEdgeFill(Color outer) => Darken(outer, layerEdgeDarken);
+
+        private static Color Darken(Color color, float by) => new Color(color.r * by, color.g * by, color.b * by, color.a);
 
         /// <summary>The lip colour under a face of <paramref name="face"/>: its RGB darkened, its alpha kept.</summary>
         public Color LipFill(Color face) =>
@@ -1660,10 +1815,19 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, quarterEdgeSprite, "Quarter Edge Sprite");
             AddIfUnassigned(problems, quarterFillSprite, "Quarter Fill Sprite");
             AddIfUnassigned(problems, quarterConcaveSprite, "Quarter Concave Sprite");
+            AddIfUnassigned(problems, contourOuterSprite, "Contour Outer Sprite");
+            AddIfUnassigned(problems, contourEdgeSprite, "Contour Edge Sprite");
+            AddIfUnassigned(problems, contourConcaveSprite, "Contour Concave Sprite");
+            AddIfUnassigned(problems, shineOuterSprite, "Shine Outer Sprite");
+            AddIfUnassigned(problems, shineEdgeSprite, "Shine Edge Sprite");
+            AddIfUnassigned(problems, shineConcaveSprite, "Shine Concave Sprite");
             AddIfUnassigned(problems, studsSprite, "Studs Sprite");
             AddIfUnassigned(problems, studGlossSprite, "Stud Gloss Sprite");
+            AddIfUnassigned(problems, singleStudSprite, "Single Stud Sprite");
+            AddIfUnassigned(problems, singleStudGlossSprite, "Single Stud Gloss Sprite");
             AddIfUnassigned(problems, floorSprite, "Floor Sprite");
             AddIfUnassigned(problems, gateArrowSprite, "Gate Arrow Sprite");
+            AddIfUnassigned(problems, gateArrowOutlineSprite, "Gate Arrow Outline Sprite");
             AddIfUnassigned(problems, axisArrowSprite, "Axis Arrow Sprite");
             AddIfUnassigned(problems, backgroundRampSprite, "Background Ramp Sprite");
             AddIfUnassigned(problems, vignetteSprite, "Vignette Sprite");
@@ -1703,9 +1867,14 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Lip Offset Cells may not be negative.");
             }
 
-            if (!(lipOffsetCells + layerInsetCells < 0.5f))
+            if (!(blockLipCells >= 0f))
             {
-                problems.Add($"{name}: Lip Offset Cells plus Layer Inset Cells must be below 0.5, so the bottom of a block's face, and of a layered block's inner shape, keeps a height.");
+                problems.Add($"{name}: Block Lip Cells may not be negative.");
+            }
+
+            if (!(blockLipCells + layerInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Block Lip Cells plus Layer Inset Cells must be below 0.5, so the bottom of a block's face, and of a layered block's inner shape, keeps a height.");
             }
 
             if (!(lipDarken >= 0f && lipDarken <= 1f))
@@ -1741,6 +1910,11 @@ namespace GateRush.Runtime
             if (!(badgeRimCells >= 0f && badgeRimCells < badgeHeightCells * 0.5f))
             {
                 problems.Add($"{name}: Badge Rim Cells must be at least 0 and below half of Badge Height Cells.");
+            }
+
+            if (!(blockBadgeInsetCells >= 0f && blockBadgeInsetCells < 0.5f))
+            {
+                problems.Add($"{name}: Block Badge Inset Cells must be at least 0 and below 0.5, so a count badge stays on its corner cell.");
             }
 
             if (!(chainThicknessCells > 0f && chainThicknessCells <= 1f))
@@ -1794,6 +1968,8 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Block Palette needs {colourCount} entries, one per BlockColor.");
             }
 
+            AddBoardLookProblems(problems);
+
             AddMetaProblems(problems);
             AddJokerBreakProblems(problems);
             AddMarkProblems(problems);
@@ -1803,11 +1979,74 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The constraints on a layered block's inner shape (Module 20), each
-        /// message naming its field. The inset is bounded by half a cell: an
-        /// outer corner's quarter is pulled in on both sides and scales as a
-        /// whole, its rounding with it, so the inner shape stays visible for
-        /// every inset below that.
+        /// The constraints on Module 46's board look, each message naming its
+        /// field: the colours a face or a backdrop shows must be opaque, or the
+        /// floor and the background would show through them; the shine's
+        /// alpha is its strength and must lie in [0, 1]; and the outline sits
+        /// under what it rings, the shine over the face and under the studs.
+        /// </summary>
+        private void AddBoardLookProblems(List<string> problems)
+        {
+            if (blockPalette != null)
+            {
+                for (var i = 0; i < blockPalette.Length; i++)
+                {
+                    if (!(blockPalette[i].a >= 1f))
+                    {
+                        problems.Add($"{name}: Block Palette entry {i} ({(BlockColor)i}) must be opaque.");
+                    }
+                }
+            }
+
+            AddIfNotOpaque(problems, contourColor, "Contour Color");
+            AddIfNotOpaque(problems, floorColor, "Floor Color");
+            AddIfNotOpaque(problems, frameColor, "Frame Color");
+            AddIfNotOpaque(problems, backgroundTop, "Background Top");
+            AddIfNotOpaque(problems, backgroundBottom, "Background Bottom");
+
+            AddIfAlphaOutOfRange(problems, blockShineTopColor, "Block Shine Top Color");
+            AddIfAlphaOutOfRange(problems, frameShineTopColor, "Frame Shine Top Color");
+            AddIfAlphaOutOfRange(problems, frameShineBottomColor, "Frame Shine Bottom Color");
+
+            if (!(frameContourOrder < frameLipOrder))
+            {
+                problems.Add($"{name}: Frame Contour Order must be below Frame Lip Order, so the outline sits under the frame and its gates.");
+            }
+
+            if (!(frameOrder < frameShineOrder && frameShineOrder < gateArrowOutlineOrder && gateArrowOutlineOrder < gateMarkOrder))
+            {
+                problems.Add($"{name}: Frame Shine Order must be above Frame Order, Gate Arrow Outline Order above Frame Shine Order and Gate Mark Order above Gate Arrow Outline Order, so a gate's arrow sits on its outline over the gloss.");
+            }
+
+            if (!(gateMarkOrder < blockContourOrder && blockContourOrder < blockLipOrder))
+            {
+                problems.Add($"{name}: Block Contour Order must be above Gate Mark Order and below Block Lip Order, so a block's outline sits under its lip and over the frame.");
+            }
+        }
+
+        private void AddIfNotOpaque(List<string> problems, Color color, string shownName)
+        {
+            if (!(color.a >= 1f))
+            {
+                problems.Add($"{name}: {shownName} must be opaque.");
+            }
+        }
+
+        private void AddIfAlphaOutOfRange(List<string> problems, Color color, string shownName)
+        {
+            if (!(color.a >= 0f && color.a <= 1f))
+            {
+                problems.Add($"{name}: {shownName}'s alpha must be from 0 to 1.");
+            }
+        }
+
+        /// <summary>
+        /// The constraints on a layered block's window and inner block (Modules
+        /// 20 and 46), each message naming its field. The insets are bounded
+        /// by half a cell: an outer corner's quarter is pulled in on both sides
+        /// and scales as a whole, its rounding with it, so the inner block
+        /// stays visible while the window, its rim and the lip
+        /// leave it a height.
         /// </summary>
         private void AddLayerProblems(List<string> problems)
         {
@@ -1816,19 +2055,34 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Layer Inset Cells must be above 0 and below 0.5, so a layered block keeps a visible inner shape.");
             }
 
-            if (!(layerEdgeCells >= 0f && layerEdgeCells < layerInsetCells))
+            if (!(layerEdgeCells >= 0f))
             {
-                problems.Add($"{name}: Layer Edge Cells must be at least 0 and below Layer Inset Cells.");
+                problems.Add($"{name}: Layer Edge Cells may not be negative.");
             }
 
-            if (!(layerStudScale > 0f && layerStudScale <= 1f))
+            if (!(layerInsetCells + layerEdgeCells + blockLipCells < 0.5f))
             {
-                problems.Add($"{name}: Layer Stud Scale must be above 0 and at most 1.");
+                problems.Add($"{name}: Layer Inset Cells, Layer Edge Cells and Block Lip Cells together must be below 0.5, so a layered block's inner block keeps a height.");
             }
 
-            if (!(blockOrder < layerEdgeOrder && layerEdgeOrder < layerOrder && layerOrder < studOrder))
+            if (!(layeredOuterDarken >= 0f && layeredOuterDarken <= 1f && layerEdgeDarken >= 0f && layerEdgeDarken <= 1f))
             {
-                problems.Add($"{name}: Layer Edge Order must be above Block Order, Layer Order above Layer Edge Order and Stud Order above Layer Order, so the inner shape sits on the face and under the studs.");
+                problems.Add($"{name}: Layered Outer Darken and Layer Edge Darken must be from 0 to 1.");
+            }
+
+            if (!(layerStudSpacingCells > 0f && layerStudClearanceCells > 0f))
+            {
+                problems.Add($"{name}: Layer Stud Spacing Cells and Layer Stud Clearance Cells must be above 0.");
+            }
+
+            // The window covers the outer studs, and the inner block's studs
+            // sit on the window.
+            if (!(blockOrder < blockShineOrder && blockShineOrder < studOrder && studOrder < glossOrder
+                  && glossOrder < layerEdgeOrder && layerEdgeOrder < layerOrder
+                  && layerOrder < layerShineOrder && layerShineOrder < layerStudOrder && layerStudOrder < layerGlossOrder
+                  && layerGlossOrder < chainOrder))
+            {
+                problems.Add($"{name}: Block Shine Order, Stud Order, Gloss Order, Layer Edge Order, Layer Order, Layer Shine Order, Layer Stud Order and Layer Gloss Order must rise in that order between Block Order and Chain Order, so a layered block's window covers its outer studs and carries its own.");
             }
         }
 
@@ -2217,15 +2471,15 @@ namespace GateRush.Runtime
             AddIfNotPositive(problems, doorsCloseSeconds, "Doors Close Seconds");
             AddIfNotPositive(problems, riseSeconds, "Rise Seconds");
 
-            if (!(outlineOrder < blockLipOrder))
+            if (!(outlineOrder < blockContourOrder))
             {
-                problems.Add($"{name}: Outline Order must be below Block Lip Order, so the outline sits under the lip.");
+                problems.Add($"{name}: Outline Order must be below Block Contour Order, so the outline sits under the block's contour.");
             }
 
-            if (!(pullGlowOrder < blockLipOrder && pullGlowOrder >= gateMarkOrder))
+            if (!(pullGlowOrder < blockContourOrder && pullGlowOrder >= gateMarkOrder))
             {
                 problems.Add(
-                    $"{name}: Pull Glow Order must be below Block Lip Order and at least Gate Mark Order, so the glow lights the gate's mouth and not a block.");
+                    $"{name}: Pull Glow Order must be below Block Contour Order and at least Gate Mark Order, so the glow lights the gate's mouth and not a block.");
             }
 
             if (!(generatorPreviewFillAlpha > 0f && generatorPreviewFillAlpha <= 1f
@@ -2316,13 +2570,21 @@ namespace GateRush.Runtime
             machineScreenOrder = DefaultMachineScreenOrder;
             miniatureLipOrder = DefaultMiniatureLipOrder;
             miniatureOrder = DefaultMiniatureOrder;
+            frameContourOrder = DefaultFrameContourOrder;
             frameLipOrder = DefaultFrameLipOrder;
             frameOrder = DefaultFrameOrder;
+            frameShineOrder = DefaultFrameShineOrder;
+            gateArrowOutlineOrder = DefaultGateArrowOutlineOrder;
             gateMarkOrder = DefaultGateMarkOrder;
+            blockContourOrder = DefaultBlockContourOrder;
             blockLipOrder = DefaultBlockLipOrder;
             blockOrder = DefaultBlockOrder;
             layerEdgeOrder = DefaultLayerEdgeOrder;
             layerOrder = DefaultLayerOrder;
+            layerShineOrder = DefaultLayerShineOrder;
+            layerStudOrder = DefaultLayerStudOrder;
+            layerGlossOrder = DefaultLayerGlossOrder;
+            blockShineOrder = DefaultBlockShineOrder;
             studOrder = DefaultStudOrder;
             glossOrder = DefaultGlossOrder;
             chainOrder = DefaultChainOrder;

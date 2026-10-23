@@ -434,8 +434,11 @@ namespace GateRush.Runtime
             if (block.Outline == null)
             {
                 block.Outline = AddGroup(block.Body, "Outline", Vector2.zero);
+                // The contour pieces are the block's whole silhouette, so the
+                // outline grows out from its outer edge, as it did before the
+                // outline was drawn (Module 46).
                 block.OutlineQuarters = AddQuarters(
-                    block.Outline, block.Tiles, blockQuarterRect, config.OutlineColor, config.OutlineOrder);
+                    block.Outline, block.Tiles, blockQuarterRect, QuarterLayer.Contour, config.OutlineColor, config.OutlineOrder);
                 ApplyLift(block, block.LiftAmount);
             }
 
@@ -1378,55 +1381,114 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A surviving layered block peels its removed outer colour (Module
-        /// 20), on the renderers it was drawn with: the inner shape grows from
-        /// its inset to the whole face (<see cref="FaceShape"/>), its studs
-        /// with it, while the
-        /// outer face shrinks inward by that inset and fades, the inner
-        /// shape's edge fades, and the lip turns from the outer colour's to
-        /// <paramref name="exposed"/>'s. It ends as a plain block of the
-        /// exposed colour, which is what the redraw then shows — with a third
-        /// colour's inner shape inside it when the stack goes deeper.
+        /// A surviving layered block peels its removed outer colour (Modules
+        /// 20 and 46), on the renderers it was drawn with: the window grows
+        /// from its inset to the whole face (<see cref="FaceShape"/>) — its
+        /// rim fading as it goes, the inner block and its top
+        /// shine growing with it over the darker outer block and its studs —
+        /// while the lip turns from the outer colour's to
+        /// <paramref name="exposed"/>'s and the inner block's own studs fade
+        /// out as the per-cell studs of a plain block, in the exposed colour,
+        /// fade in. It ends as a plain block of the exposed colour, which is
+        /// what the redraw then shows — with a third colour in its window when
+        /// the stack goes deeper.
         /// </summary>
         /// <returns>
         /// The peel, to run in the leave stage's sequence, which carries this
-        /// view as its id; or null for a block drawn without an inner shape —
-        /// one that was cleared while frozen (M3 hides its colours) — which has
+        /// view as its id; or null for a block drawn without a window — one
+        /// that was cleared while frozen (M3 hides its colours) — which has
         /// nothing to peel and is left to the redraw.
         /// </returns>
         private Tween PeelEffect(DrawnBlock block, BlockColor exposed)
         {
-            if (block.LayerQuarters == null)
+            var layer = block.Layer;
+            if (layer == null)
             {
                 return null;
             }
 
-            var inset = config.LayerInsetCells;
-            var edgeInset = inset - config.LayerEdgeCells;
+            var edgeInset = config.LayerInsetCells;
+            var innerInset = config.LayerInnerInsetCells;
+            var shineTiles = QuarterLayers.Shine(block.Tiles, isTop: true);
 
-            // A footprint has at least one cell, so each list holds at least
-            // four quarters, all drawn in one colour.
-            var faceColor = block.FaceQuarters[0].color;
-            var edgeColor = block.LayerEdgeQuarters[0].color;
+            // A footprint has at least one cell, so each quarter list holds
+            // at least four quarters, all drawn in one colour.
+            var edgeColor = layer.Edge[0].color;
             var lipFrom = block.LipQuarters[0].color;
-            var lipTo = config.LipFill(config.BlockFill(exposed));
+            var exposedFill = config.BlockFill(exposed);
+            var lipTo = config.LipFill(exposedFill);
+            var innerStudColors = new Color[layer.Studs.Count];
+            for (var i = 0; i < innerStudColors.Length; i++)
+            {
+                innerStudColors[i] = layer.Studs[i].color;
+            }
+
+            var plainStuds = AddPeelStuds(block, exposedFill);
 
             return DOVirtual.Float(0f, 1f, config.PeelSeconds, t =>
                 {
                     // An easing may overshoot; a size may follow it, an
                     // opacity may not.
-                    var opacity = 1f - Mathf.Clamp01(t);
+                    var shown = Mathf.Clamp01(t);
+                    var opacity = 1f - shown;
 
-                    PoseInset(block.LayerQuarters, block.Tiles, inset * (1f - t));
-                    PoseInset(block.LayerEdgeQuarters, block.Tiles, edgeInset * (1f - t));
-                    PoseInset(block.FaceQuarters, block.Tiles, inset * t);
-                    block.SetStudScale(Mathf.LerpUnclamped(config.LayerStudScale, 1f, t));
+                    // Colours first: a quarter's seam overlap follows its
+                    // opacity (QuarterLayers.SeamOverlap).
+                    SetColor(layer.Edge, WithOpacity(edgeColor, opacity));
 
-                    SetColor(block.FaceQuarters, WithOpacity(faceColor, opacity));
-                    SetColor(block.LayerEdgeQuarters, WithOpacity(edgeColor, opacity));
+                    PoseInset(layer.Edge, block.Tiles, edgeInset * (1f - t));
+                    PoseInset(layer.Face, block.Tiles, innerInset * (1f - t));
+                    PoseShineInset(layer.Shine, shineTiles, block.Tiles, innerInset * (1f - t));
+
                     SetColor(block.LipQuarters, Color.Lerp(lipFrom, lipTo, t));
+                    for (var i = 0; i < layer.Studs.Count; i++)
+                    {
+                        layer.Studs[i].color = WithOpacity(innerStudColors[i], opacity);
+                    }
+
+                    for (var i = 0; i < plainStuds.Count; i++)
+                    {
+                        plainStuds[i].Renderer.color = WithOpacity(plainStuds[i].Color, shown);
+                    }
                 })
                 .SetEase(config.PeelEase);
+        }
+
+        /// <summary>
+        /// The per-cell studs and gloss of a plain block of
+        /// <paramref name="exposedFill"/>, added over the window at nothing
+        /// and paired with the colour each fades in to. None for a block that
+        /// carries no studs. They are masked as the block's face is, should a
+        /// gate's clip hold it.
+        /// </summary>
+        private List<(SpriteRenderer Renderer, Color Color)> AddPeelStuds(DrawnBlock block, Color exposedFill)
+        {
+            var studs = new List<(SpriteRenderer Renderer, Color Color)>();
+            if (block.IsIce || block.Axis != MovementAxis.Free)
+            {
+                return studs;
+            }
+
+            IRecipeSurface<Transform, SpriteRenderer> surface = this;
+            var mask = block.FaceQuarters[0].maskInteraction;
+            var rise = new Vector2(0f, FaceShape.ContentRise(config.BlockLipCells));
+            for (var c = 0; c < block.Cells.Count; c++)
+            {
+                var cell = block.Cells[c];
+                var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f) + rise;
+                var stud = surface.Sprite(
+                    block.Body, $"Peel studs {cell}", config.StudsSprite, center, Vector2.one, WithOpacity(exposedFill, 0f),
+                    config.LayerStudOrder, 0f);
+                var gloss = surface.Sprite(
+                    block.Body, $"Peel gloss {cell}", config.StudGlossSprite, center, Vector2.one,
+                    WithOpacity(config.GlossColor, 0f), config.LayerGlossOrder, 0f);
+                stud.maskInteraction = mask;
+                gloss.maskInteraction = mask;
+                studs.Add((stud, exposedFill));
+                studs.Add((gloss, config.GlossColor));
+            }
+
+            return studs;
         }
 
         private static void SetColor(List<SpriteRenderer> renderers, Color color)
@@ -1473,12 +1535,9 @@ namespace GateRush.Runtime
             var cells = ctx.SpecAt(blockIndex).Cells;
 
             // The marks as the old drawing had them: the block was locked, so
-            // it had its padlock, beside a layer badge and a time-bonus mark
-            // if it carried them.
+            // it had its padlock, beside a time-bonus mark if it carried one.
             var shown = before != null ? visibility.Block(before, blockIndex) : default;
-            var marks = MarksOf(
-                cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0,
-                hasLayers: shown.LayerNumeral.HasValue);
+            var marks = MarksOf(cells, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0);
             var icon = marks.Icon * layout.CellSize;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);
