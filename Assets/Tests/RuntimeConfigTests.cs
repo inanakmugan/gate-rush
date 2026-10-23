@@ -289,14 +289,6 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_DefaultLipOffset_ReportsNothingAboutIt()
-        {
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.None.Contains("Lip Offset Cells"), string.Join(" | ", problems));
-        }
-
-        [Test]
         public void Problems_LayerInsetOfHalfACell_IsReportedByName()
         {
             SetFloat("layerInsetCells", 0.5f);
@@ -565,7 +557,7 @@ namespace GateRush.Tests
         }
 
         [TestCase("generatorPreviewRimOrder", "floorOrder")]
-        [TestCase("generatorPreviewRimOrder", "elevatorBorderOrder")]
+        [TestCase("generatorPreviewRimOrder", "elevatorHandleOrder")]
         [TestCase("generatorPreviewRimOrder", "generatorPreviewOrder")]
         public void Problems_GeneratorPreviewRimOrderNotInItsPlace_IsReportedByName(string field, string sameAs)
         {
@@ -574,7 +566,7 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(
-                problems, Has.Some.Contains("Generator Preview Rim Order must be above Floor Order and Elevator Border Order"),
+                problems, Has.Some.Contains("Generator Preview Rim Order must be above Floor Order and Elevator Handle Order"),
                 string.Join(" | ", problems));
         }
 
@@ -828,16 +820,139 @@ namespace GateRush.Tests
             var colours = new[]
             {
                 (Actual: config.ContourColor, Expected: new Color32(0x1C, 0x0B, 0x3A, 0xFF), Name: "contour"),
-                (Actual: config.FrameColor, Expected: new Color32(0x49, 0x21, 0x84, 0xFF), Name: "frame"),
+                (Actual: config.FrameColor, Expected: new Color32(0x48, 0x3C, 0xA8, 0xFF), Name: "frame, the reference game's (Module 46, pass 2)"),
                 (Actual: config.FloorColor, Expected: new Color32(0x31, 0x18, 0x5F, 0xFF), Name: "floor"),
-                (Actual: config.BackgroundTop, Expected: new Color32(0x60, 0x2D, 0xA0, 0xFF), Name: "background top"),
-                (Actual: config.BackgroundBottom, Expected: new Color32(0x20, 0x0E, 0x3C, 0xFF), Name: "background bottom"),
+                (Actual: config.BackgroundTop, Expected: new Color32(0x2A, 0x24, 0x60, 0xFF), Name: "background top, the reference game's"),
+                (Actual: config.BackgroundBottom, Expected: new Color32(0x16, 0x12, 0x36, 0xFF), Name: "background bottom, darker"),
             };
 
             foreach (var colour in colours)
             {
                 Assert.AreEqual(colour.Expected, (Color32)colour.Actual, colour.Name);
             }
+        }
+
+        [Test]
+        public void Defaults_FrameAndBackground_TheFrameIsLighterThanTheBackgroundsTopAndTheTopLighterThanTheBottom()
+        {
+            // So the board's edge reads against the background (Module 46, pass 2).
+            Assert.Greater(config.FrameColor.grayscale, config.BackgroundTop.grayscale, "the frame over the background's top");
+            Assert.Greater(config.BackgroundTop.grayscale, config.BackgroundBottom.grayscale, "the gradient darkens downward");
+        }
+
+        [Test]
+        public void Defaults_MechanicColours_AreTheReferenceScripts()
+        {
+            // mechanics_reference.py's colours, one per painted or tinted part.
+            var colours = new[]
+            {
+                (Actual: config.IceTintColor, Expected: new Color32(0xD8, 0xF3, 0xFF, 0xFF), Name: "ice tint"),
+                (Actual: config.IceRimColor, Expected: new Color32(0xE6, 0xF7, 0xFF, 0xFF), Name: "ice rim"),
+                (Actual: config.CountBadgeColor, Expected: new Color32(0xE5, 0x39, 0x35, 0xFF), Name: "badge face"),
+                (Actual: config.CountBadgeRimColor, Expected: new Color32(0xFF, 0xC5, 0x31, 0xFF), Name: "badge rim"),
+                (Actual: config.ChainSilverColor, Expected: new Color32(0xBF, 0xC3, 0xDA, 0xFF), Name: "chain and shackle"),
+                (Actual: config.LockGoldColor, Expected: new Color32(0xFF, 0xC5, 0x31, 0xFF), Name: "padlock and key"),
+                (Actual: config.KeyholeColor, Expected: new Color32(0x6B, 0x43, 0x00, 0xFF), Name: "keyhole"),
+                (Actual: config.CoinColor, Expected: new Color32(0xFF, 0xD4, 0x2A, 0xFF), Name: "coin"),
+                (Actual: config.CoinFaceColor, Expected: new Color32(0xFF, 0xF4, 0xC4, 0xFF), Name: "coin face"),
+                (Actual: config.CoinHandColor, Expected: new Color32(0x5A, 0x3A, 0x00, 0xFF), Name: "coin hands"),
+                (Actual: config.ShutterRimColor, Expected: new Color32(0xF4, 0xA3, 0x00, 0xFF), Name: "shutter rim"),
+                (Actual: config.ShutterCylinderColor, Expected: new Color32(0x4B, 0x3B, 0xC0, 0xFF), Name: "shutter slats"),
+                (Actual: config.MachineMetalColor, Expected: new Color32(0x8E, 0x9A, 0xC0, 0xFF), Name: "machine metal"),
+                (Actual: config.MachineGlassColor, Expected: new Color32(0x0B, 0x1E, 0x5E, 0xFF), Name: "machine glass"),
+                (Actual: config.MachineRivetColor, Expected: new Color32(0xC7, 0xCE, 0xE6, 0xFF), Name: "rivets"),
+                (Actual: config.MachineButtonColor, Expected: new Color32(0xFF, 0x7A, 0x00, 0xFF), Name: "button"),
+                (Actual: config.MachineCountColor, Expected: new Color32(0x7F, 0xE3, 0xFF, 0xFF), Name: "screen count"),
+                (Actual: config.ElevatorRimColor, Expected: new Color32(0xFB, 0x6F, 0x00, 0xFF), Name: "elevator rim"),
+                (Actual: config.HazardColor, Expected: new Color32(0xFF, 0xC5, 0x31, 0xFF), Name: "hazard light"),
+                (Actual: config.HazardDarkColor, Expected: new Color32(0x3A, 0x23, 0x70, 0xFF), Name: "hazard dark"),
+                (Actual: config.ElevatorRecessColor, Expected: new Color32(0x12, 0x0A, 0x2E, 0xFF), Name: "recess"),
+                (Actual: config.ElevatorPanelColor, Expected: new Color32(0x5B, 0x45, 0xB0, 0xFF), Name: "doors"),
+                (Actual: config.ElevatorHandleColor, Expected: new Color32(0xD7, 0xDA, 0xEC, 0xFF), Name: "handles"),
+            };
+
+            foreach (var colour in colours)
+            {
+                Assert.AreEqual(colour.Expected, (Color32)colour.Actual, colour.Name);
+            }
+
+            Assert.AreEqual(Color.white, config.CountTextColor, "the digits are white");
+        }
+
+        [Test]
+        public void Problems_DefaultMechanicValues_ReportNothingAboutThem()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("must be at least 0 and below 0.5; run"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Badge Height Cells and Badge Digit Width Cells"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Machine Screen Count Share"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Machine Miniature Fill Share"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Machine Count Room"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Elevator Rim Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Machine Order, Machine Screen Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Ice Order must be above"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Key Gem Highlight Order"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Font Size must be positive"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Label Shadow Softness"), string.Join(" | ", problems));
+        }
+
+        [TestCase("lockGoldColor", "Lock Gold Color")]
+        [TestCase("iceTintColor", "Ice Tint Color")]
+        [TestCase("countBadgeColor", "Count Badge Color")]
+        [TestCase("elevatorPanelColor", "Elevator Panel Color")]
+        public void Problems_TranslucentMechanicColour_IsReportedByName(string field, string shownName)
+        {
+            SetAlpha(new SerializedObject(config), field, 0.5f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains($"{shownName} must be opaque"), string.Join(" | ", problems));
+        }
+
+        [TestCase("iceOrder", "glossOrder", "Ice Order must be above Gloss Order")]
+        [TestCase("gateIceOrder", "frameShineOrder", "Gate Ice Order above Frame Shine Order")]
+        [TestCase("badgeHighlightOrder", "labelOrder", "Badge Highlight Order above Badge Order and below Label Order")]
+        [TestCase("elevatorHazardOrder", "elevatorRimOrder", "Elevator Rim Order, Elevator Hazard Order")]
+        [TestCase("miniatureStudOrder", "miniatureOrder", "Miniature Order, Miniature Stud Order")]
+        public void Problems_MechanicOrderOutOfPlace_IsReportedByName(string field, string sameAs, string complaint)
+        {
+            SetOrderEqualTo(field, sameAs);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(complaint), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_UnassignedMechanicSpritesAndShadowMaterial_AreReportedByName()
+        {
+            var problems = config.Problems();
+
+            foreach (var shownName in new[]
+                     {
+                         "Ice Outer Top Left Sprite", "Ice Fill Sprite", "Ice Streaks Sprite", "Ice Streaks Wide Sprite",
+                         "Badge Rim Sprite", "Badge Face Sprite", "Badge Highlight Sprite", "Lock Sprite", "Gold Key Sprite",
+                         "Gem Sprite", "Gem Highlight Sprite", "Bonus Coin Sprite", "One Way Arrow Sprite",
+                         "One Way Arrow Vertical Highlight Sprite", "Shutter Rim Sprite", "Shutter Cylinders Sprite",
+                         "Machine Body Sprite", "Machine Screen Sprite", "Machine Vent Sprite", "Machine Button Sprite",
+                         "Elevator Rim Sprite", "Elevator Hazard Left Sprite", "Elevator Hazard Right Sprite",
+                         "Elevator Door Sprite", "Elevator Handle Sprite", "Label Shadow Material"
+                     })
+            {
+                Assert.That(problems, Has.Some.Contains($"{shownName} is not assigned"), shownName);
+            }
+        }
+
+        [Test]
+        public void TimeBonusMarkWidthCells_IsTheCoinAndItsText_WithNoPlate()
+        {
+            var text = config.TimeBonusMarkText(5);
+
+            var width = config.TimeBonusMarkWidthCells(text);
+
+            Assert.AreEqual(
+                config.BonusCoinCells + config.TimeBonusMarkGapCells + config.TimeBonusMarkTextWidthCells(text), width, 1e-6f);
         }
 
         [Test]

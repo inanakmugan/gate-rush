@@ -95,5 +95,26 @@ namespace GateRush.Tests
                 Assert.AreEqual(ArtGenerator.PathOf(sprite), AssetDatabase.GetAssetPath(held), $"'{field}'");
             }
         }
+
+        [Test]
+        public void ProjectRuntimeConfig_HoldsTheProjectRecipesMeasuresAndTheLabelShadow()
+        {
+            // Generate Art writes the sizes the sprites were painted at, and
+            // the digits' shadow material, with the sprites (Module 46, pass 2).
+            var configGuids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
+            var recipeGuids = AssetDatabase.FindAssets($"t:{nameof(ArtRecipe)}");
+            Assert.AreEqual(1, configGuids.Length, "the project has one Runtime Config");
+            Assert.AreEqual(1, recipeGuids.Length, "the project has one Art Recipe");
+            var config = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(AssetDatabase.GUIDToAssetPath(configGuids[0]));
+            var recipe = AssetDatabase.LoadAssetAtPath<ArtRecipe>(AssetDatabase.GUIDToAssetPath(recipeGuids[0]));
+            var serialized = new SerializedObject(config);
+
+            foreach (var (field, value) in recipe.BoardMeasures())
+            {
+                Assert.AreEqual(value, serialized.FindProperty(field).floatValue, 1e-6f, $"'{field}'");
+            }
+
+            Assert.IsNotNull(config.LabelShadowMaterial, "the label shadow material is assigned");
+        }
     }
 }

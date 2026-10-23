@@ -10,8 +10,8 @@ namespace GateRush.Tests
     /// <summary>
     /// Covers <see cref="QuarterLayers"/> (Module 46): every quarter but a fill
     /// casts a shadow past the shape, in the tiles' order, and a quarter
-    /// overlaps its neighbours only while it is opaque and neither a shadow
-    /// nor a highlight.
+    /// overlaps its neighbours only while it is opaque and neither a shadow,
+    /// a highlight nor the ice (Module 46, pass 2).
     /// </summary>
     public class QuarterLayersTests
     {
@@ -69,6 +69,7 @@ namespace GateRush.Tests
 
         [TestCase(QuarterLayer.Shadow)]
         [TestCase(QuarterLayer.Body)]
+        [TestCase(QuarterLayer.Ice)]
         public void SeamOverlap_ShadowOrHighlightInOpaqueWhite_IsNone(QuarterLayer layer)
         {
             var piece = QuarterLayers.SeamOverlap(layer, Color.white, 0.002f);

@@ -1,4 +1,5 @@
 using GateRush.Editor;
+using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -61,13 +62,10 @@ namespace GateRush.Tests
         [TestCase("gateArrowOutlinePixels", 6f, "Gate Arrow Outline Pixels")]
         [TestCase("axisArrowHeadLengthPixels", 96f, "Axis Arrow Head Length Pixels")]
         [TestCase("vignetteInner", 1f, "Vignette Inner")]
-        [TestCase("frostInsetPixels", 5f, "Frost Inset Pixels")]
         [TestCase("panelCornerRadiusPixels", 40f, "Panel Corner Radius Pixels")]
-        [TestCase("chainLinkWallPixels", 20f, "Chain Link Wall Pixels")]
         [TestCase("padlockShackleRadius", 0.5f, "Padlock Shackle Radius")]
         [TestCase("keyGemDiameterPixels", 40f, "gem inside hole")]
         [TestCase("slatGapPixels", 40f, "Slat Gap Pixels")]
-        [TestCase("doorLineWidthPixels", 70f, "Door Line Width Pixels")]
         [TestCase("clockRimThickness", 0.6f, "Clock Rim Thickness")]
         [TestCase("clockMinuteHandLength", 0.45f, "Clock Minute Hand Length")]
         [TestCase("clockHandThickness", 0f, "Clock Hand Thickness")]
@@ -83,6 +81,20 @@ namespace GateRush.Tests
         [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
         [TestCase("sparkleWaist", 0f, "Sparkle Waist")]
         [TestCase("sparkleWaist", 0.25f, "Sparkle Waist")]
+        [TestCase("iceInsetPixels", 3f, "Ice Inset Pixels")]
+        [TestCase("iceBevelPixels", 30f, "Ice Bevel Pixels")]
+        [TestCase("badgeDigitWidthPixels", 0f, "Badge Size Pixels")]
+        [TestCase("badgeShadow.blurPixels", 0f, "Badge Shadow")]
+        [TestCase("gemFinish.shininess", 0.5f, "Gem Finish")]
+        [TestCase("chainSpacingPixels", 30.5f, "Chain Spacing Pixels")]
+        [TestCase("keyholeRisePixels", 30f, "Keyhole Rise Pixels")]
+        [TestCase("gemRadiusPixels", 13f, "Gem Radius Pixels")]
+        [TestCase("coinMinuteHandPixels", 20f, "Coin Minute Hand Pixels")]
+        [TestCase("oneWayTipPixels", 120f, "One Way Tip Pixels")]
+        [TestCase("shutterInnerInsetPixels", 2f, "Shutter Inner Inset Pixels")]
+        [TestCase("machineGlareFadePixels.y", 40f, "Machine Glare Fade Pixels")]
+        [TestCase("elevatorHazardCentrePixels", 2f, "Elevator Hazard Centre Pixels")]
+        [TestCase("elevatorDoorPanelInsetPixels.x", 60f, "Elevator Door Panel Inset Pixels")]
         public void Problems_FloatOutOfRange_IsReportedByName(string field, float value, string label)
         {
             // Some fields feed more than one constraint — frost's inset depends
@@ -227,6 +239,79 @@ namespace GateRush.Tests
             }
 
             Assert.AreEqual(7, compared);
+        }
+
+        [Test]
+        public void Defaults_Mechanics_AreTheReferenceScriptsNumbers()
+        {
+            // mechanics_reference.py, function by function.
+            Assert.AreEqual(new Vector2(56f, 54f), recipe.BadgeSizePixels, "count_badge: w, h");
+            Assert.AreEqual(10f, recipe.BadgeDigitWidthPixels, "the two-digit badge is 66 wide");
+            Assert.AreEqual((15f, 8f, 9f), (recipe.BadgeRim.CornerPixels, recipe.BadgeRim.BevelPixels, recipe.BadgeRim.HeightPixels), "the rim");
+            Assert.AreEqual(7f, recipe.BadgeFaceInsetPixels, "the face's inset");
+            Assert.AreEqual((5f, 14f, 10f), (recipe.IceInsetPixels, recipe.IceBevelPixels, recipe.IceHeightPixels), "frozen: the ice");
+            Assert.AreEqual((60f, 0.7f), (recipe.IceFinish.Shininess, recipe.IceFinish.Specular), "the ice's highlight");
+            Assert.AreEqual(0.32f, recipe.IceTintAlpha, "the thin tint");
+            CollectionAssert.AreEqual(new[] { 95f, 140f, 175f }, recipe.IceStreakOffsetsPixels, "the three streaks");
+            Assert.AreEqual(31f, recipe.ChainSpacingPixels, "locked: the links' spacing");
+            Assert.AreEqual(new Vector2(30f, 26f), recipe.LockBodyHalfSizePixels, "the padlock's body");
+            Assert.AreEqual(24f, recipe.GoldKeyBowRadiusPixels, 1e-5f, "key: the bow, 1.2 times the script's 20");
+            Assert.AreEqual(7.2f, recipe.GoldKeyShaftHalfPixels, 1e-5f, "the shaft, 1.2 times the script's 6");
+            Assert.AreEqual((24f, 16f), (recipe.CoinRadiusPixels, recipe.CoinFaceRadiusPixels), "time_bonus: the coin and its face");
+            Assert.AreEqual((48f, 94f, 14f), (recipe.OneWayHeadStartPixels, recipe.OneWayTipPixels, recipe.OneWayRaisePixels), "one_way: the heads, the tips, the height");
+            Assert.AreEqual((22f, 24), (recipe.ShutterInnerInsetPixels, recipe.ShutterCylinderPitchPixels), "shutter: the inner edge and the slats");
+            Assert.AreEqual(new Vector2(68f, 56f), recipe.MachineScreenSizePixels, "generator: the screen");
+            Assert.AreEqual(new Vector2(22f, 16f), recipe.ElevatorInnerInsetPixels, "elevator: the recess");
+            Assert.AreEqual(new Vector2(3f, -5f), recipe.RaisedShadow.OffsetPixels, "the floor shadow, y up");
+        }
+
+        [Test]
+        public void BoardMeasures_DefaultRecipe_AreRuntimeConfigsCodeDefaults()
+        {
+            // What Generate Art writes is what a fresh config already holds,
+            // so the code defaults draw the default recipe's sprites as painted.
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            try
+            {
+                var serialized = new SerializedObject(config);
+                var measures = recipe.BoardMeasures();
+
+                foreach (var (field, value) in measures)
+                {
+                    var property = serialized.FindProperty(field);
+                    Assert.IsNotNull(property, $"RuntimeConfig has a measure field '{field}'");
+                    Assert.AreEqual(value, property.floatValue, 1e-6f, field);
+                }
+
+                Assert.AreEqual(16, measures.Count, "every measure is checked");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
+        public void MarkSizes_DefaultRecipe_FitWithinTheConfigsLayoutSizes()
+        {
+            // The marks' layout checks (RuntimeConfig.Problems) measure the
+            // padlock and the key by the config's sizes; what the board draws
+            // must lie within them.
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            try
+            {
+                float cell = recipe.CellPixels;
+                var padlock = 2f * recipe.LockBodyHalfSizePixels.x / cell;
+                var key = (recipe.GoldKeyBowOffsetPixels + recipe.GoldKeyBowRadiusPixels
+                           + Mathf.Max(recipe.GoldKeyShaftEndPixels, recipe.GoldKeySecondToothPixels.y)) / cell;
+
+                Assert.LessOrEqual(padlock, config.PadlockSizeCells, "the padlock's body");
+                Assert.LessOrEqual(key, config.KeySizeCells, "the key, bow to tip");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
         }
 
         private void SetFloat(string field, float value)
