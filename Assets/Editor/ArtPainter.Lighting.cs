@@ -76,10 +76,31 @@ namespace GateRush.Editor
             private readonly double hy;
             private readonly double hz;
             private readonly ArtRecipe recipe;
+            private readonly double bevel;
+            private readonly double height;
+            private readonly double shininess;
+            private readonly double specular;
+            private readonly bool isOccluded;
 
+            /// <summary>The lit body's model: its bevel, height and highlight, with its occlusion.</summary>
             public LitModel(ArtRecipe recipe)
+                : this(recipe, recipe.BevelPixels, recipe.BodyHeightPixels, new LitFinish(recipe.Shininess, recipe.SpecularStrength), true)
+            {
+            }
+
+            /// <summary>
+            /// A raised part lit as the body is, with its own bevel, height and
+            /// finish, and the body's occlusion when <paramref name="isOccluded"/>:
+            /// the ice of Module 46's second pass has none, as the reference has not.
+            /// </summary>
+            public LitModel(ArtRecipe recipe, double bevel, double height, LitFinish finish, bool isOccluded)
             {
                 this.recipe = recipe;
+                this.bevel = bevel;
+                this.height = height;
+                shininess = finish.Shininess;
+                specular = finish.Specular;
+                this.isOccluded = isOccluded;
                 var light = recipe.LightDirection;
                 var length = Math.Sqrt((double)light.x * light.x + (double)light.y * light.y + (double)light.z * light.z);
                 lx = light.x / length;
@@ -105,9 +126,9 @@ namespace GateRush.Editor
                 // 0 at its top, the slope is k·u/√(1 − u²), and the normal
                 // (k·u·out, √(1 − u²)) over its length — horizontal at the
                 // very edge, straight up on the flat.
-                var t = Clamp01(depth / recipe.BevelPixels);
+                var t = Clamp01(depth / bevel);
                 var u = 1.0 - t;
-                var k = (double)recipe.BodyHeightPixels / recipe.BevelPixels;
+                var k = height / bevel;
                 var rise = Math.Sqrt(1.0 - u * u);
                 var length = Math.Sqrt(k * k * u * u + rise * rise);
                 var nx = k * u * outX / length;
@@ -116,9 +137,9 @@ namespace GateRush.Editor
 
                 var diffuse = Math.Max(0.0, nx * lx + ny * ly + nz * lz);
                 var mirror = Math.Max(0.0, nx * hx + ny * hy + nz * hz);
-                var specular = recipe.SpecularStrength * StablePow(mirror, recipe.Shininess);
-                var shade = (recipe.Ambient + recipe.Diffuse * diffuse) * Occlusion(depth);
-                return (shade, specular);
+                var highlight = specular * StablePow(mirror, shininess);
+                var shade = (recipe.Ambient + recipe.Diffuse * diffuse) * (isOccluded ? Occlusion(depth) : 1.0);
+                return (shade, highlight);
             }
 
             /// <summary>
@@ -140,50 +161,62 @@ namespace GateRush.Editor
         {
             switch (sprite)
             {
+                case ArtSprite.IceOuterTopLeft:
                 case ArtSprite.FaceOuterTopLeft:
                 case ArtSprite.BodyOuterTopLeft:
                 case ArtSprite.ShadowOuterTopLeft:
                     return new Place(QuarterShape.Outer, -1, 1);
+                case ArtSprite.IceOuterTopRight:
                 case ArtSprite.FaceOuterTopRight:
                 case ArtSprite.BodyOuterTopRight:
                 case ArtSprite.ShadowOuterTopRight:
                     return new Place(QuarterShape.Outer, 1, 1);
+                case ArtSprite.IceOuterBottomLeft:
                 case ArtSprite.FaceOuterBottomLeft:
                 case ArtSprite.BodyOuterBottomLeft:
                 case ArtSprite.ShadowOuterBottomLeft:
                     return new Place(QuarterShape.Outer, -1, -1);
+                case ArtSprite.IceOuterBottomRight:
                 case ArtSprite.FaceOuterBottomRight:
                 case ArtSprite.BodyOuterBottomRight:
                 case ArtSprite.ShadowOuterBottomRight:
                     return new Place(QuarterShape.Outer, 1, -1);
+                case ArtSprite.IceConcaveTopLeft:
                 case ArtSprite.FaceConcaveTopLeft:
                 case ArtSprite.BodyConcaveTopLeft:
                 case ArtSprite.ShadowConcaveTopLeft:
                     return new Place(QuarterShape.Concave, -1, 1);
+                case ArtSprite.IceConcaveTopRight:
                 case ArtSprite.FaceConcaveTopRight:
                 case ArtSprite.BodyConcaveTopRight:
                 case ArtSprite.ShadowConcaveTopRight:
                     return new Place(QuarterShape.Concave, 1, 1);
+                case ArtSprite.IceConcaveBottomLeft:
                 case ArtSprite.FaceConcaveBottomLeft:
                 case ArtSprite.BodyConcaveBottomLeft:
                 case ArtSprite.ShadowConcaveBottomLeft:
                     return new Place(QuarterShape.Concave, -1, -1);
+                case ArtSprite.IceConcaveBottomRight:
                 case ArtSprite.FaceConcaveBottomRight:
                 case ArtSprite.BodyConcaveBottomRight:
                 case ArtSprite.ShadowConcaveBottomRight:
                     return new Place(QuarterShape.Concave, 1, -1);
+                case ArtSprite.IceEdgeTop:
                 case ArtSprite.FaceEdgeTop:
                 case ArtSprite.BodyEdgeTop:
                 case ArtSprite.ShadowEdgeTop:
                     return new Place(QuarterShape.Edge, 0, 1);
+                case ArtSprite.IceEdgeBottom:
                 case ArtSprite.FaceEdgeBottom:
                 case ArtSprite.BodyEdgeBottom:
                 case ArtSprite.ShadowEdgeBottom:
                     return new Place(QuarterShape.Edge, 0, -1);
+                case ArtSprite.IceEdgeLeft:
                 case ArtSprite.FaceEdgeLeft:
                 case ArtSprite.BodyEdgeLeft:
                 case ArtSprite.ShadowEdgeLeft:
                     return new Place(QuarterShape.Edge, -1, 0);
+                case ArtSprite.IceEdgeRight:
                 case ArtSprite.FaceEdgeRight:
                 case ArtSprite.BodyEdgeRight:
                 case ArtSprite.ShadowEdgeRight:

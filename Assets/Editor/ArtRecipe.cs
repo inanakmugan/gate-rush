@@ -27,7 +27,7 @@ namespace GateRush.Editor
     /// sharp.</para>
     /// </remarks>
     [CreateAssetMenu(fileName = "ArtRecipe", menuName = "Gate Rush/Art Recipe")]
-    public sealed class ArtRecipe : ScriptableObject
+    public sealed partial class ArtRecipe : ScriptableObject
     {
         /// <summary>Pixel centres sit half a pixel inside a sprite's border.</summary>
         private const float HalfPixel = 0.5f;
@@ -208,50 +208,13 @@ namespace GateRush.Editor
         [Tooltip("Where the vignette reaches full strength, as a fraction of the distance from the centre to a corner.")]
         [SerializeField, Range(0f, 2f)] private float vignetteOuter = 1f;
 
-        [Header("Frost (one cell; drawn untinted over ice)")]
-        [SerializeField] private int frostStreakCount = 3;
-        [SerializeField] private float frostStreakWidthPixels = 5f;
-
-        [Tooltip("Distance between neighbouring streaks, across them, in pixels.")]
-        [SerializeField] private float frostStreakSpacingPixels = 26f;
-
-        [Tooltip("Length of the middle streak, in pixels; the outer ones are shorter.")]
-        [SerializeField] private float frostStreakLengthPixels = 70f;
-
-        [Tooltip("Margin from every side of the cell that no streak crosses, in pixels. It must clear half the gap and an outer corner's rounding, so frost never leaves a block's face.")]
-        [SerializeField] private float frostInsetPixels = 22f;
-
-        [SerializeField, Range(0f, 1f)] private float frostAlpha = 0.75f;
-
-        [Header("Rounded box (9-sliced; badges, machines, dividers)")]
+        [Header("Rounded box (9-sliced; the generator preview's cells)")]
         [SerializeField] private int panelPixels = 64;
 
         [Tooltip("Corner radius, in pixels. Shaded with the face's outline and rim.")]
         [SerializeField] private float panelCornerRadiusPixels = 16f;
 
-        [Header("Ring (9-sliced outline; shutter and elevator borders)")]
-        [SerializeField] private int ringPixels = 32;
-
-        [Tooltip("Width of the outline, in pixels; also its outer corner radius and its slice border.")]
-        [SerializeField] private int ringWidthPixels = 6;
-
-        [Header("Chain (one period, tiled along x)")]
-        [SerializeField] private int chainPeriodPixels = 64;
-        [SerializeField] private int chainThicknessPixels = 32;
-
-        [Tooltip("Length of the link seen face-on, in pixels.")]
-        [SerializeField] private float chainLinkLengthPixels = 44f;
-
-        [Tooltip("Length of the link seen edge-on, which straddles the period's ends, in pixels.")]
-        [SerializeField] private float chainEdgeLinkLengthPixels = 30f;
-
-        [Tooltip("Thickness of a link's metal, in pixels.")]
-        [SerializeField] private float chainLinkWallPixels = 7f;
-
-        [SerializeField, Range(0f, 1f)] private float chainTone = 1f;
-        [SerializeField, Range(0f, 1f)] private float chainShadeTone = 0.6f;
-
-        [Header("Padlock (sizes as fractions of the sprite)")]
+        [Header("Padlock (the Level Editor's; sizes as fractions of the sprite)")]
         [SerializeField] private int padlockPixels = 128;
         [SerializeField, Range(0f, 1f)] private float padlockBodyWidth = 0.78f;
         [SerializeField, Range(0f, 1f)] private float padlockBodyHeight = 0.56f;
@@ -263,7 +226,7 @@ namespace GateRush.Editor
         [SerializeField, Range(0f, 1f)] private float padlockShackleThickness = 0.1f;
         [SerializeField, Range(0f, 1f)] private float padlockShackleTone = 0.8f;
 
-        [Header("Key (horizontal: bow on the left)")]
+        [Header("Key (the Level Editor's; horizontal: bow on the left)")]
         [SerializeField] private int keyWidthPixels = 128;
         [SerializeField] private int keyHeightPixels = 64;
         [SerializeField] private float keyBowDiameterPixels = 56f;
@@ -278,7 +241,7 @@ namespace GateRush.Editor
         [SerializeField, Range(0f, 1f)] private float keyGemTone = 0.95f;
         [SerializeField, Range(0f, 1f)] private float keyGemEdgeTone = 0.55f;
 
-        [Header("Shutter slats (one cell, tiled)")]
+        [Header("Shutter slats (the Level Editor's; one cell, tiled)")]
         [SerializeField] private int slatsPerCell = 4;
 
         [Tooltip("Width of the groove between two slats, in pixels.")]
@@ -288,13 +251,7 @@ namespace GateRush.Editor
         [SerializeField, Range(0f, 1f)] private float slatShadeTone = 0.7f;
         [SerializeField, Range(0f, 1f)] private float slatGapTone = 0.35f;
 
-        [Header("Lift doors (one cell, tiled)")]
-        [SerializeField] private int doorLinesPerCell = 2;
-        [SerializeField] private float doorLineWidthPixels = 2f;
-        [SerializeField, Range(0f, 1f)] private float doorTone = 0.85f;
-        [SerializeField, Range(0f, 1f)] private float doorLineTone = 1f;
-
-        [Header("Clock icon (white; sizes as fractions of the sprite)")]
+        [Header("Clock icon (the Level Editor's; white; sizes as fractions of the sprite)")]
         [SerializeField] private int clockPixels = 128;
 
         [Tooltip("Thickness of the round rim.")]
@@ -571,56 +528,11 @@ namespace GateRush.Editor
         /// <summary>Where the vignette is full, as a fraction of the centre-to-corner distance.</summary>
         public float VignetteOuter => vignetteOuter;
 
-        /// <summary>Number of frost streaks per cell.</summary>
-        public int FrostStreakCount => frostStreakCount;
-
-        /// <summary>Width of a frost streak, in pixels.</summary>
-        public float FrostStreakWidthPixels => frostStreakWidthPixels;
-
-        /// <summary>Distance between neighbouring streaks, in pixels.</summary>
-        public float FrostStreakSpacingPixels => frostStreakSpacingPixels;
-
-        /// <summary>Length of the middle streak, in pixels.</summary>
-        public float FrostStreakLengthPixels => frostStreakLengthPixels;
-
-        /// <summary>Margin from the cell's sides no streak crosses, in pixels.</summary>
-        public float FrostInsetPixels => frostInsetPixels;
-
-        /// <summary>Opacity of the frost.</summary>
-        public float FrostAlpha => frostAlpha;
-
         /// <summary>Side of the rounded box sprite, in pixels.</summary>
         public int PanelPixels => panelPixels;
 
         /// <summary>Corner radius of the rounded box, in pixels.</summary>
         public float PanelCornerRadiusPixels => panelCornerRadiusPixels;
-
-        /// <summary>Side of the ring sprite, in pixels.</summary>
-        public int RingPixels => ringPixels;
-
-        /// <summary>Width of the ring's outline, in pixels.</summary>
-        public int RingWidthPixels => ringWidthPixels;
-
-        /// <summary>Length of one chain period, in pixels.</summary>
-        public int ChainPeriodPixels => chainPeriodPixels;
-
-        /// <summary>Thickness of the chain sprite, in pixels.</summary>
-        public int ChainThicknessPixels => chainThicknessPixels;
-
-        /// <summary>Length of the face-on link, in pixels.</summary>
-        public float ChainLinkLengthPixels => chainLinkLengthPixels;
-
-        /// <summary>Length of the edge-on link, in pixels.</summary>
-        public float ChainEdgeLinkLengthPixels => chainEdgeLinkLengthPixels;
-
-        /// <summary>Thickness of a link's metal, in pixels.</summary>
-        public float ChainLinkWallPixels => chainLinkWallPixels;
-
-        /// <summary>Tone inside a link's metal.</summary>
-        public float ChainTone => chainTone;
-
-        /// <summary>Tone at a link's edges.</summary>
-        public float ChainShadeTone => chainShadeTone;
 
         /// <summary>Side of the padlock sprite, in pixels.</summary>
         public int PadlockPixels => padlockPixels;
@@ -687,18 +599,6 @@ namespace GateRush.Editor
 
         /// <summary>Tone of the groove between slats.</summary>
         public float SlatGapTone => slatGapTone;
-
-        /// <summary>Number of vertical lines per cell of lift door.</summary>
-        public int DoorLinesPerCell => doorLinesPerCell;
-
-        /// <summary>Width of a door line, in pixels.</summary>
-        public float DoorLineWidthPixels => doorLineWidthPixels;
-
-        /// <summary>Tone of a door panel.</summary>
-        public float DoorTone => doorTone;
-
-        /// <summary>Tone of a door line.</summary>
-        public float DoorLineTone => doorLineTone;
 
         /// <summary>Side of the clock icon, in pixels.</summary>
         public int ClockPixels => clockPixels;
@@ -792,15 +692,6 @@ namespace GateRush.Editor
         /// </summary>
         public int PanelBorderPixels =>
             (int)Math.Ceiling(Math.Max(panelCornerRadiusPixels, outlineWidthPixels + rimWidthPixels) + antiAliasPixels);
-
-        /// <summary>
-        /// Where frost may not reach from a cell's side, in pixels, for it to
-        /// stay on a block's face: half the gap, plus how far the edge's
-        /// corner cuts in along the cell's diagonal, plus the anti-aliased edge.
-        /// </summary>
-        private float MinFrostInsetPixels =>
-            blockGapPixels / 2f + cornerRadiusPixels
-            - cornerRadiusPixels * (float)(1.0 / Math.Sqrt(2.0)) + antiAliasPixels;
 
         /// <summary>
         /// Every reason this recipe cannot generate the art, as messages naming
@@ -900,6 +791,7 @@ namespace GateRush.Editor
             }
 
             AddStateProblems(problems);
+            AddMechanicProblems(problems);
             AddIconProblems(problems);
             AddFeedbackProblems(problems);
             AddIntroductionProblems(problems);
@@ -1166,34 +1058,9 @@ namespace GateRush.Editor
         /// <summary>The constraints on Module 16's sprites, each message naming its field.</summary>
         private void AddStateProblems(List<string> problems)
         {
-            var quarter = cellPixels / 2f;
-
-            if (frostStreakCount < 1 || !(frostStreakWidthPixels > 0f && frostStreakSpacingPixels > 0f && frostStreakLengthPixels > 0f))
-            {
-                problems.Add($"{name}: Frost Streak Count must be at least 1, and Frost Streak Width, Spacing and Length Pixels positive.");
-            }
-
-            if (!(frostInsetPixels >= MinFrostInsetPixels && frostInsetPixels < quarter))
-            {
-                problems.Add($"{name}: Frost Inset Pixels must be at least {MinFrostInsetPixels:0.##} (half the gap plus the corner's rounding) and below half a cell, or frost leaves the block's face.");
-            }
-
             if (!(panelCornerRadiusPixels >= 0f && PanelBorderPixels * 2 < panelPixels))
             {
                 problems.Add($"{name}: Panel Corner Radius Pixels must be at least 0, and the corner and bevel must leave a middle to stretch in Panel Pixels.");
-            }
-
-            if (!(ringWidthPixels >= 1 && ringWidthPixels * 2 < ringPixels))
-            {
-                problems.Add($"{name}: Ring Width Pixels must be at least 1 and leave a middle to stretch in Ring Pixels.");
-            }
-
-            if (!(chainPeriodPixels >= 8 && chainThicknessPixels >= 8
-                  && chainLinkLengthPixels > 0f && chainLinkLengthPixels < chainPeriodPixels
-                  && chainEdgeLinkLengthPixels > 0f && chainEdgeLinkLengthPixels < chainPeriodPixels
-                  && chainLinkWallPixels > 0f && chainLinkWallPixels * 2f < chainThicknessPixels))
-            {
-                problems.Add($"{name}: Chain Link Length Pixels and Chain Edge Link Length Pixels must be positive and below Chain Period Pixels, and Chain Link Wall Pixels positive and below half of Chain Thickness Pixels.");
             }
 
             var shackleHalf = padlockShackleThickness / 2f;
@@ -1218,11 +1085,6 @@ namespace GateRush.Editor
             if (!(slatsPerCell >= 1 && cellPixels % slatsPerCell == 0 && slatGapPixels >= 0f && slatGapPixels < (float)cellPixels / slatsPerCell))
             {
                 problems.Add($"{name}: Slats Per Cell must be at least 1 and divide Cell Pixels, so tiles meet at a groove, and Slat Gap Pixels at least 0 and below a slat's height.");
-            }
-
-            if (!(doorLinesPerCell >= 1 && cellPixels % doorLinesPerCell == 0 && doorLineWidthPixels >= 0f && doorLineWidthPixels < (float)cellPixels / doorLinesPerCell))
-            {
-                problems.Add($"{name}: Door Lines Per Cell must be at least 1 and divide Cell Pixels, so tiles meet at a line, and Door Line Width Pixels at least 0 and below the space between lines.");
             }
         }
     }

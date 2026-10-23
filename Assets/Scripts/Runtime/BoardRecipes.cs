@@ -8,7 +8,7 @@ namespace GateRush.Runtime
 {
     /// <summary>
     /// How the things on a board are composed from sprites, written once
-    /// (Module 28): a block's lip, face, inner shape, studs, frost and axis
+    /// (Module 28): a block's shadow, lit body, inner shape, studs, ice and axis
     /// arrow; the count badge; a lock's chains and padlock; a key; the
     /// time-bonus mark; a gate; a shutter's panel; an elevator's doors; a
     /// generator's machine and the miniature on its screen.
@@ -27,6 +27,13 @@ namespace GateRush.Runtime
     /// bottom up — see <see cref="IRecipeSurface{TGroup, TPiece}"/>. The group
     /// and piece names are the board's; its effects find parts by the groups
     /// these recipes return, and its hierarchy must not change under them.</para>
+    /// <para><b>The mechanics' art (Module 46, pass 2).</b> Each mechanic's
+    /// sprites are drawn at their painted size — a sprite's pixels per unit
+    /// are a cell's pixels, so its rectangle over its pixels per unit is its
+    /// size in cells — and the parts that fit any size are 9-sliced at their
+    /// painted border or tiled at their painted tile. A part painted in its own
+    /// colours is drawn white; a grey one is tinted, its white highlight added
+    /// over it.</para>
     /// </remarks>
     /// <typeparam name="TGroup">The surface's group.</typeparam>
     /// <typeparam name="TPiece">The surface's drawn sprite.</typeparam>
@@ -34,8 +41,8 @@ namespace GateRush.Runtime
         where TGroup : class
         where TPiece : class
     {
-        /// <summary>A shutter's slats and an elevator's doors repeat once per cell. The sprites' own shape, not a tunable.</summary>
-        private const float PanelTileCells = 1f;
+        /// <summary>A one-digit count: the badge as it is painted. Not a tunable.</summary>
+        private const int OneDigitCount = 1;
 
         private readonly RuntimeConfig config;
         private readonly IRecipeSurface<TGroup, TPiece> surface;
@@ -54,12 +61,17 @@ namespace GateRush.Runtime
         /// floor, untinted (<see cref="QuarterLayer.Shadow"/>; the group keeps
         /// the outline's name), and a <c>Face</c> group with the footprint's
         /// lit quarters in <paramref name="fill"/> and over them their white
-        /// highlight; then frost on every cell when it is ice, the cell's studs
-        /// with their gloss when it is not, and — for an axis-restricted block
-        /// (M7), ice or not — one double-headed arrow along its axis instead of
-        /// studs.
+        /// highlight; then the cell's studs with their gloss, or — for an
+        /// axis-restricted block (M7) — its raised arrow along its axis
+        /// instead; and, when it is ice, the ice over all of it and its frost.
         /// </summary>
         /// <remarks>
+        /// <para><b>Ice (M3, Module 46, pass 2).</b> A frozen block is drawn in
+        /// the ice colour, studs and all — its real colour stays hidden — and
+        /// over it lies the ice, a placed quarter set on the block's own tiles
+        /// (<see cref="QuarterLayer.Ice"/>), so it follows any shape without a
+        /// seam, and one sprite of frost streaks at its top row's leftmost
+        /// cell (<see cref="Frost"/>).</para>
         /// <para><b>Layered (M4, Module 46).</b> With a colour
         /// <paramref name="beneath"/>, the block is drawn as above in its outer
         /// colour darkened (<see cref="RuntimeConfig.LayeredOuterFill"/>), and
@@ -95,22 +107,18 @@ namespace GateRush.Runtime
                 face, tiles, tile => FaceShape.LightQuarterRect(tile, tiles, 0f), config.BlockLightColor, config.BlockShineOrder);
 
             var studs = new List<TPiece>();
-            var hasStuds = !isIce && axis == MovementAxis.Free;
-            for (var c = 0; c < cells.Count; c++)
+            var hasStuds = axis == MovementAxis.Free;
+            if (hasStuds)
             {
-                var cell = cells[c];
-                var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
-                if (isIce)
+                for (var c = 0; c < cells.Count; c++)
                 {
-                    surface.Sprite(face, $"Frost {cell}", config.FrostSprite, center, Vector2.one, config.FrostColor, config.StudOrder, 0f);
-                }
-                else if (hasStuds)
-                {
-                    studs.Add(surface.LitSprite(
-                        face, $"Studs {cell}", config.StudsSprite, center, Vector2.one, outerFill, config.StudOrder));
+                    var cell = cells[c];
+                    var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
+                    studs.Add(surface.Sprite(
+                        face, $"Studs {cell}", config.StudsSprite, center, Vector2.one, outerFill, config.StudOrder, 0f, SpriteLook.Lit));
                     surface.Sprite(
-                        face, $"Gloss {cell}", config.StudGlossSprite, center, Vector2.one, config.GlossColor,
-                        config.GlossOrder, 0f);
+                        face, $"Gloss {cell}", config.StudGlossSprite, center, Vector2.one, config.GlossColor, config.GlossOrder, 0f,
+                        SpriteLook.Plain);
                 }
             }
 
@@ -122,10 +130,48 @@ namespace GateRush.Runtime
 
             if (axis != MovementAxis.Free)
             {
-                AxisArrow(face, cells, axis, beneath.HasValue ? config.LayerGlossOrder : config.GlossOrder);
+                var isLayered = beneath.HasValue;
+                AxisArrow(
+                    face, cells, axis, fill, isLayered ? config.LayerStudOrder : config.StudOrder,
+                    isLayered ? config.LayerGlossOrder : config.GlossOrder);
+            }
+
+            if (isIce)
+            {
+                surface.Quarters(face, tiles, BlockTiling.QuarterRect, QuarterLayer.Ice, Color.white, config.IceOrder);
+                Frost(face, cells);
             }
 
             return new BlockParts<TPiece>(faceQuarters, shineQuarters, studs, layer);
+        }
+
+        /// <summary>
+        /// A frozen block's frost streaks: one sprite with its top-left corner
+        /// on the top-left corner of the block's top row's leftmost cell, two
+        /// cells wide when the cell to that one's right is the block's.
+        /// </summary>
+        private void Frost(TGroup face, IReadOnlyList<Coord> cells)
+        {
+            var anchor = cells[0];
+            for (var c = 1; c < cells.Count; c++)
+            {
+                var cell = cells[c];
+                if (cell.Y > anchor.Y || (cell.Y == anchor.Y && cell.X < anchor.X))
+                {
+                    anchor = cell;
+                }
+            }
+
+            var isWide = false;
+            for (var c = 0; c < cells.Count; c++)
+            {
+                isWide |= cells[c].X == anchor.X + 1 && cells[c].Y == anchor.Y;
+            }
+
+            var sprite = isWide ? config.IceStreaksWideSprite : config.IceStreaksSprite;
+            var size = NaturalSize(sprite);
+            var center = new Vector2(anchor.X + size.x * 0.5f, anchor.Y + 1f - size.y * 0.5f);
+            surface.Sprite(face, "Frost", sprite, center, size, config.IceStreakColor, config.IceStreakOrder, 0f, SpriteLook.Plain);
         }
 
         /// <summary>
@@ -162,12 +208,12 @@ namespace GateRush.Runtime
                     cells, innerInset, config.LayerStudSpacingCells, config.LayerStudClearanceCells);
                 for (var i = 0; i < centers.Count; i++)
                 {
-                    innerStuds.Add(surface.LitSprite(
+                    innerStuds.Add(surface.Sprite(
                         inner, $"Inner stud {i}", config.SingleStudSprite, centers[i], Vector2.one, beneath,
-                        config.LayerStudOrder));
+                        config.LayerStudOrder, 0f, SpriteLook.Lit));
                     innerStuds.Add(surface.Sprite(
                         inner, $"Inner gloss {i}", config.SingleStudGlossSprite, centers[i], Vector2.one, config.GlossColor,
-                        config.LayerGlossOrder, 0f));
+                        config.LayerGlossOrder, 0f, SpriteLook.Plain));
                 }
             }
 
@@ -190,131 +236,154 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The M7 arrow: a 9-sliced sprite through the centre of the
-        /// footprint's bounding box, along the block's axis, stopping
-        /// <see cref="RuntimeConfig.AxisArrowEndInsetCells"/> short of each end
-        /// (<see cref="MarkLayout.AxisArrowRect"/>, the rule the Level Editor
-        /// shares). Its thickness is the sprite's whole height and only its
-        /// sliced middle stretches, so the heads keep their shape at any
-        /// length.
+        /// The M7 arrow (Module 46, pass 2): a raised double-headed arrow in
+        /// <paramref name="fill"/>, the block's colour, with its highlight,
+        /// through the centre of the footprint's bounding box along the
+        /// block's axis, stopping <see cref="RuntimeConfig.OneWayArrowEndInsetCells"/>
+        /// short of each end (<see cref="MarkLayout.AxisArrowRect"/>). A
+        /// vertical arrow is its own sprite, never turned, so its light falls
+        /// from the top left. Only its sliced middle stretches; on a block too
+        /// short for both heads at their painted size, the whole arrow shrinks.
         /// </summary>
-        private void AxisArrow(TGroup face, IReadOnlyList<Coord> cells, MovementAxis axis, int order)
+        private void AxisArrow(TGroup face, IReadOnlyList<Coord> cells, MovementAxis axis, Color fill, int order, int highlightOrder)
         {
-            var isHorizontal = axis == MovementAxis.HorizontalOnly;
-            var arrow = MarkLayout.AxisArrowRect(cells, axis, config.AxisArrowThicknessCells, config.AxisArrowEndInsetCells);
+            var isVertical = axis == MovementAxis.VerticalOnly;
+            var sprite = isVertical ? config.OneWayArrowVerticalSprite : config.OneWayArrowSprite;
+            var highlight = isVertical ? config.OneWayArrowVerticalHighlightSprite : config.OneWayArrowHighlightSprite;
+            var natural = NaturalSize(sprite);
+            var thickness = isVertical ? natural.x : natural.y;
+            var arrow = MarkLayout.AxisArrowRect(cells, axis, thickness, config.OneWayArrowEndInsetCells);
+            var length = isVertical ? arrow.height : arrow.width;
 
+            // The heads at their painted size need the borders along the
+            // length; a shorter arrow keeps its shape, smaller.
+            var border = sprite.border;
+            var heads = (isVertical ? border.y + border.w : border.x + border.z) / sprite.pixelsPerUnit;
+            if (length < heads)
+            {
+                thickness *= length / heads;
+            }
+
+            surface.Strip(face, "Axis arrow", sprite, arrow.center, length, thickness, isVertical, fill, order, SpriteLook.Lit);
             surface.Strip(
-                face, "Axis arrow", config.AxisArrowSprite, arrow.center,
-                isHorizontal ? arrow.width : arrow.height, isHorizontal ? arrow.height : arrow.width,
-                config.AxisArrowColor, order,
-                isHorizontal ? 0f : Vector2.SignedAngle(Vector2.right, Vector2.up));
+                face, "Axis arrow highlight", highlight, arrow.center, length, thickness, isVertical, Color.white, highlightOrder,
+                SpriteLook.Highlight);
         }
 
         /// <summary>
-        /// The one count badge (D48): a rounded box in <paramref name="rim"/>
-        /// with a slightly smaller one in the badge colour on it, and
-        /// <paramref name="value"/> in cream on top. It widens with the number
-        /// of digits (<see cref="MarkLayout.BadgeWidth"/>).
+        /// The one count badge (D48, Module 46, pass 2): a raised rim in
+        /// <paramref name="rim"/> with its shadow, a raised face in the badge
+        /// colour inside it, their highlight, and <paramref name="value"/> in
+        /// white with its soft drop shadow on top. Sliced along its width, it
+        /// widens by a digit's width per digit past the first
+        /// (<see cref="MarkLayout.BadgeWidth"/>).
         /// </summary>
         /// <returns>The badge's group, centred on <paramref name="center"/>: scaling it pops the badge.</returns>
         public TGroup Badge(TGroup parent, Vector2 center, int value, Color rim)
         {
-            var height = config.BadgeHeightCells;
-            var width = config.BadgeWidthCells(value);
-            var rimThickness = config.BadgeRimCells;
-            var inner = new Vector2(width - 2f * rimThickness, height - 2f * rimThickness);
+            var natural = NaturalSize(config.BadgeRimSprite);
+            var size = new Vector2(natural.x + config.BadgeWidthCells(value) - config.BadgeWidthCells(OneDigitCount), natural.y);
+            var border = SliceBorder(config.BadgeRimSprite);
 
             var badge = surface.Group(parent, "Badge", center, 1f);
-            surface.Sliced(badge, "Rim", config.RoundedRectSprite, Vector2.zero, new Vector2(width, height), height * 0.5f, rim, config.BadgeRimOrder);
-            surface.Sliced(badge, "Fill", config.RoundedRectSprite, Vector2.zero, inner, inner.y * 0.5f, config.BadgeColor, config.BadgeOrder);
+            surface.Sliced(badge, "Rim", config.BadgeRimSprite, Vector2.zero, size, border, rim, config.BadgeRimOrder, SpriteLook.Lit);
+            surface.Sliced(
+                badge, "Fill", config.BadgeFaceSprite, Vector2.zero, size, border, config.CountBadgeColor, config.BadgeOrder,
+                SpriteLook.Lit);
+            surface.Sliced(
+                badge, "Highlight", config.BadgeHighlightSprite, Vector2.zero, size, border, Color.white, config.BadgeHighlightOrder,
+                SpriteLook.Highlight);
             surface.Label(
-                badge, "Count", Vector2.zero, value.ToString(CultureInfo.InvariantCulture),
-                config.BadgeLabelFontSize, config.BadgeTextColor);
+                badge, "Count", Vector2.zero, value.ToString(CultureInfo.InvariantCulture), config.CountFontSize,
+                config.CountTextColor, true);
             return badge;
         }
 
         /// <summary>
         /// A lock (M8) under <paramref name="parent"/>, whose frame is a block
-        /// body's: a chain along each row of <paramref name="cells"/>
-        /// (<see cref="MarkLayout.ChainStrips"/>), and a gold padlock centred
-        /// on <paramref name="icon"/> at <paramref name="scale"/>, with
-        /// <paramref name="keysStillRequired"/> on a badge on its body, or no
-        /// badge when that is null. The one drawing of a lock, for a locked
-        /// block, for the lock that fades away when it opens, and for the
-        /// Lock &amp; Key card.
+        /// body's (Module 46, pass 2): silver tube links along each row of
+        /// <paramref name="cells"/> (<see cref="MarkLayout.ChainStrips"/>), as
+        /// many whole periods as fit each row, stretched a little to fit it;
+        /// and the gold padlock centred on <paramref name="icon"/> at
+        /// <paramref name="scale"/>, with <paramref name="keysStillRequired"/>
+        /// in white on its body, or nothing written when that is null. The one
+        /// drawing of a lock, for a locked block, for the lock that fades away
+        /// when it opens, and for the Lock &amp; Key card.
         /// </summary>
-        /// <returns>The badge, or null when none was drawn.</returns>
+        /// <returns>The count's group, or null when none was written.</returns>
         public TGroup Lock(TGroup parent, IReadOnlyList<Coord> cells, Vector2 icon, float scale, int? keysStillRequired)
         {
             var chains = surface.Group(parent, "Chains", Vector2.zero, 1f);
-            var thickness = config.ChainThicknessCells;
-            var strips = MarkLayout.ChainStrips(cells, thickness, config.ChainEndInsetCells);
+            var period = NaturalSize(config.ChainSprite);
+            var strips = MarkLayout.ChainStrips(cells, period.y, config.ChainEndInsetCells);
             for (var s = 0; s < strips.Count; s++)
             {
-                surface.Tiled(
-                    chains, $"Chain {s}", config.ChainSprite, strips[s].center, strips[s].size, thickness,
-                    tileIsMeasuredByHeight: true, config.ChainColor, config.ChainOrder);
+                var strip = strips[s];
+                var count = Mathf.Max(1, Mathf.RoundToInt(strip.width / period.x));
+                var length = strip.width / count;
+                var size = new Vector2(length, period.y * length / period.x);
+                for (var k = 0; k < count; k++)
+                {
+                    surface.Sprite(
+                        chains, $"Chain {s}.{k}", config.ChainSprite, new Vector2(strip.xMin + (k + 0.5f) * length, strip.center.y), size,
+                        Color.white, config.ChainOrder, 0f, SpriteLook.Lit);
+                }
             }
 
             var mark = surface.Group(parent, "Padlock", icon, scale);
-            var padlock = config.PadlockSizeCells;
             surface.Sprite(
-                mark, "Body", config.PadlockSprite, Vector2.zero, new Vector2(padlock, padlock), config.PadlockColor,
-                config.IconOrder, 0f);
+                mark, "Body", config.LockSprite, Vector2.zero, NaturalSize(config.LockSprite), Color.white, config.IconOrder, 0f,
+                SpriteLook.Lit);
             if (!keysStillRequired.HasValue)
             {
                 return null;
             }
 
-            return Badge(mark, new Vector2(0f, -config.PadlockBadgeDropCells), keysStillRequired.Value, config.BadgeRimColor);
+            var keys = surface.Group(mark, "Count", new Vector2(0f, -config.PadlockCountDropCells), 1f);
+            surface.Label(
+                keys, "Keys", Vector2.zero, keysStillRequired.Value.ToString(CultureInfo.InvariantCulture), config.PadlockCountFontSize,
+                config.CountTextColor, true);
+            return keys;
         }
 
         /// <summary>
         /// A key (M8) under a block's body, centred on <paramref name="icon"/>
-        /// at <paramref name="scale"/>: the gold body, then its gem in
-        /// <paramref name="gem"/>, the colour of the lock it opens (D47).
+        /// at <paramref name="scale"/>: the gold key, lying flat so its light
+        /// falls from the top left, then its gem in <paramref name="gem"/>, the
+        /// colour of the lock it opens (D47), and the gem's highlight.
         /// </summary>
         public void Key(TGroup parent, Vector2 icon, float scale, Color gem)
         {
             var key = surface.Group(parent, "Key", icon, scale);
-            var bounds = config.KeyBodySprite.bounds.size;
-            var length = config.KeySizeCells;
-            var size = new Vector2(length, length * bounds.y / bounds.x);
-            surface.Sprite(key, "Body", config.KeyBodySprite, Vector2.zero, size, config.KeyColor, config.IconOrder, config.KeyRotationDegrees);
-            surface.Sprite(key, "Gem", config.KeyGemSprite, Vector2.zero, size, gem, config.KeyGemOrder, config.KeyRotationDegrees);
+            var size = NaturalSize(config.GoldKeySprite);
+            surface.Sprite(key, "Body", config.GoldKeySprite, Vector2.zero, size, Color.white, config.IconOrder, 0f, SpriteLook.Lit);
+            surface.Sprite(key, "Gem", config.GemSprite, Vector2.zero, size, gem, config.KeyGemOrder, 0f, SpriteLook.Lit);
+            surface.Sprite(
+                key, "Gem highlight", config.GemHighlightSprite, Vector2.zero, size, Color.white, config.KeyGemHighlightOrder, 0f,
+                SpriteLook.Highlight);
         }
 
         /// <summary>
         /// A time-bonus block's mark (M10) under a block's body, centred on
-        /// <paramref name="center"/> at <paramref name="scale"/>: the count
-        /// badge's shape in the bonus colours, the clock icon at its left and
-        /// the seconds through <see cref="RuntimeConfig.TimeBonusMarkText"/>
-        /// beside it. It widens with the text
-        /// (<see cref="MarkLayout.BonusBadgeWidth"/>).
+        /// <paramref name="center"/> at <paramref name="scale"/> (Module 46,
+        /// pass 2): the gold clock coin on the left and the seconds through
+        /// <see cref="RuntimeConfig.TimeBonusMarkText"/> beside it, in white
+        /// with their soft shadow, with no plate. It widens with the text
+        /// (<see cref="RuntimeConfig.TimeBonusMarkWidthCells"/>).
         /// </summary>
         public void TimeBonusMark(TGroup parent, Vector2 center, float scale, int seconds)
         {
             var text = config.TimeBonusMarkText(seconds);
-            var height = config.BadgeHeightCells;
             var width = config.TimeBonusMarkWidthCells(text);
-            var rim = config.BadgeRimCells;
-            var inner = new Vector2(width - 2f * rim, height - 2f * rim);
-            var icon = config.TimeBonusMarkIconCells;
-            var padding = config.BadgePaddingCells;
-
-            // The icon sits inside the left padding; the text is centred in
-            // what is left between the icon's gap and the right padding.
-            var iconCenter = -width * 0.5f + padding + icon * 0.5f;
-            var textLeft = iconCenter + icon * 0.5f + config.TimeBonusMarkIconGapCells;
-            var textRight = width * 0.5f - padding;
+            var coin = config.BonusCoinCells;
+            var coinCenter = -width * 0.5f + coin * 0.5f;
+            var textCenter = -width * 0.5f + coin + config.TimeBonusMarkGapCells + config.TimeBonusMarkTextWidthCells(text) * 0.5f;
 
             var mark = surface.Group(parent, "Time bonus", center, scale);
-            surface.Sliced(mark, "Rim", config.RoundedRectSprite, Vector2.zero, new Vector2(width, height), height * 0.5f, config.TimeBonusMarkRimColor, config.BadgeRimOrder);
-            surface.Sliced(mark, "Fill", config.RoundedRectSprite, Vector2.zero, inner, inner.y * 0.5f, config.TimeBonusMarkColor, config.BadgeOrder);
             surface.Sprite(
-                mark, "Clock", config.ClockSprite, new Vector2(iconCenter, 0f), new Vector2(icon, icon),
-                config.TimeBonusMarkIconColor, config.LabelOrder, 0f);
-            surface.Label(mark, "Seconds", new Vector2((textLeft + textRight) * 0.5f, 0f), text, config.BadgeLabelFontSize, config.BadgeTextColor);
+                mark, "Coin", config.BonusCoinSprite, new Vector2(coinCenter, 0f), NaturalSize(config.BonusCoinSprite), Color.white,
+                config.IconOrder, 0f, SpriteLook.Lit);
+            surface.Label(mark, "Seconds", new Vector2(textCenter, 0f), text, config.CountFontSize, config.CountTextColor, true);
         }
 
         /// <summary>
@@ -322,20 +391,19 @@ namespace GateRush.Runtime
         /// a lit body like a block's with its highlight and its shadow on the
         /// floor (Module 46). Open, it is in <paramref name="openColor"/> with a
         /// white arrow outlined in the outline colour, pointing out of the
-        /// board. Closed (M2) — <paramref name="openColor"/> null — it is ice
-        /// with frost on each of its cells and
+        /// board. Closed (M2) — <paramref name="openColor"/> null — it is in
+        /// the ice colour under the ice (Module 46, pass 2), with
         /// <paramref name="opensInClears"/> on a badge at its middle, and no
         /// arrow.
         /// </summary>
         /// <param name="tiles">The quarters of the gate's span on the frame (<see cref="FrameTiling.GateCells"/>).</param>
         /// <param name="rectOf">Where a quarter goes, in <paramref name="root"/>'s frame.</param>
         /// <param name="span">The gate's whole span on the frame, in <paramref name="root"/>'s frame.</param>
-        /// <param name="cellOfSpan">Cell <c>i</c> of that span, in <paramref name="root"/>'s frame; read only for a closed gate.</param>
         /// <param name="opensInClears">The clears still needed; read only for a closed gate.</param>
         /// <returns>The badge of a closed gate; null for an open one.</returns>
         public TGroup Gate(
             TGroup root, GateDefinition gate, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Rect span,
-            Func<int, Rect> cellOfSpan, BlockColor? openColor, int opensInClears)
+            BlockColor? openColor, int opensInClears)
         {
             var fill = openColor.HasValue ? config.BlockFill(openColor.Value) : config.IceColor;
 
@@ -353,111 +421,202 @@ namespace GateRush.Runtime
                 var turn = Vector2.SignedAngle(Vector2.up, GateExit.Outward(gate.Edge));
                 surface.Sprite(
                     root, "Arrow outline", config.GateArrowOutlineSprite, span.center, arrow, config.ContourColor,
-                    config.GateArrowOutlineOrder, turn);
+                    config.GateArrowOutlineOrder, turn, SpriteLook.Plain);
                 surface.Sprite(
-                    root, "Arrow", config.GateArrowSprite, span.center, arrow, config.GateArrowColor, config.GateMarkOrder, turn);
+                    root, "Arrow", config.GateArrowSprite, span.center, arrow, config.GateArrowColor, config.GateMarkOrder, turn,
+                    SpriteLook.Plain);
                 return null;
             }
 
-            for (var i = 0; i < gate.Width; i++)
-            {
-                var cell = cellOfSpan(i);
-                surface.Sprite(root, $"Frost {i}", config.FrostSprite, cell.center, cell.size, config.FrostColor, config.GateMarkOrder, 0f);
-            }
-
-            return Badge(root, span.center, opensInClears, config.BadgeRimColor);
+            surface.Quarters(root, tiles, rectOf, QuarterLayer.Ice, Color.white, config.GateIceOrder);
+            return Badge(root, span.center, opensInClears, config.CountBadgeRimColor);
         }
 
         /// <summary>
-        /// A closed shutter's panel (M5) under <paramref name="parent"/>:
-        /// slats over the whole of <paramref name="region"/> and a border,
-        /// and — when <paramref name="opensInClears"/> is given — the clears
-        /// still needed on a badge at its centre, rimmed in
-        /// <paramref name="rim"/>. The one drawing of a shutter, for a closed
-        /// one, for the panel that lifts off when it opens, and for the
-        /// Shutter card.
+        /// A closed shutter's panel (M5) under <paramref name="parent"/>
+        /// (Module 46, pass 2): cylinder slats tiled over the region inside its
+        /// rim, the raised gold rim round the region, 9-sliced to its size with
+        /// its shadow and the recess under it, and — when
+        /// <paramref name="opensInClears"/> is given — the clears still needed
+        /// on a badge at its centre, rimmed in <paramref name="rim"/>: the
+        /// colour a colour-bound shutter counts, as before. The one drawing of
+        /// a shutter, for a closed one, for the panel that lifts off when it
+        /// opens, and for the Shutter card.
         /// </summary>
         /// <returns>The badge, or null when none was drawn.</returns>
         public TGroup ShutterPanel(TGroup parent, Rect region, int? opensInClears, Color rim)
         {
+            var inset = config.ShutterInnerInsetCells;
+            var inner = new Rect(region.x + inset, region.y + inset, region.width - 2f * inset, region.height - 2f * inset);
             surface.Tiled(
-                parent, "Slats", config.ShutterSlatsSprite, region.center, region.size, PanelTileCells,
-                tileIsMeasuredByHeight: false, config.ShutterSlatColor, config.ShutterOrder);
+                parent, "Slats", config.ShutterCylindersSprite, inner.center, inner.size, NaturalSize(config.ShutterCylindersSprite).y,
+                tileIsMeasuredByHeight: true, Color.white, config.ShutterOrder, SpriteLook.Lit);
             surface.Sliced(
-                parent, "Border", config.RingSprite, region.center, region.size, config.ShutterBorderCells,
-                config.ShutterBorderColor, config.ShutterBorderOrder);
+                parent, "Border", config.ShutterRimSprite, region.center, Grown(region.size, config.RaisedShadowMarginCells),
+                SliceBorder(config.ShutterRimSprite), Color.white, config.ShutterBorderOrder, SpriteLook.Lit);
 
             return opensInClears.HasValue ? Badge(parent, region.center, opensInClears.Value, rim) : null;
         }
 
         /// <summary>
-        /// An elevator's lift doors (M9) under <paramref name="root"/>: door
-        /// panels over <paramref name="region"/>, a divider down the middle,
-        /// and a border.
+        /// An elevator (M9) under <paramref name="root"/> (Module 46, pass 2):
+        /// the raised orange rim round <paramref name="region"/> with its shadow
+        /// and the dark recess inside it, a hazard strip tiled down each side
+        /// of the rim, and in a <c>Doors</c> group the two doors standing in
+        /// the recess, each with its handle by the seam
+        /// (<see cref="BoardView.ElevatorDoorRects"/>).
         /// </summary>
-        public ElevatorParts<TPiece> Elevator(TGroup root, Rect region)
+        public ElevatorParts<TGroup> Elevator(TGroup root, Rect region)
         {
-            var doors = surface.Tiled(
-                root, "Doors", config.DoorPanelSprite, region.center, region.size, PanelTileCells,
-                tileIsMeasuredByHeight: false, config.ElevatorDoorColor, config.ElevatorDoorOrder);
-
-            var dividerWidth = config.ElevatorDividerCells;
-            var divider = surface.Sliced(
-                root, "Divider", config.RoundedRectSprite, region.center, new Vector2(dividerWidth, region.height),
-                dividerWidth * 0.5f, config.ElevatorDividerColor, config.ElevatorDividerOrder);
             surface.Sliced(
-                root, "Border", config.RingSprite, region.center, region.size, config.ElevatorBorderCells,
-                config.ElevatorBorderColor, config.ElevatorBorderOrder);
+                root, "Border", config.ElevatorRimSprite, region.center, Grown(region.size, config.RaisedShadowMarginCells),
+                SliceBorder(config.ElevatorRimSprite), Color.white, config.ElevatorRimOrder, SpriteLook.Lit);
 
-            return new ElevatorParts<TPiece>(doors, divider);
+            var strip = NaturalSize(config.ElevatorHazardLeftSprite);
+            var length = region.height - 2f * config.ElevatorHazardEndCells;
+            if (length > 0f)
+            {
+                var size = new Vector2(strip.x, length);
+                var reach = config.ElevatorHazardCentreCells;
+                surface.Tiled(
+                    root, "Hazard left", config.ElevatorHazardLeftSprite, new Vector2(region.xMin + reach, region.center.y), size, strip.y,
+                    tileIsMeasuredByHeight: true, Color.white, config.ElevatorHazardOrder, SpriteLook.Lit);
+                surface.Tiled(
+                    root, "Hazard right", config.ElevatorHazardRightSprite, new Vector2(region.xMax - reach, region.center.y), size,
+                    strip.y, tileIsMeasuredByHeight: true, Color.white, config.ElevatorHazardOrder, SpriteLook.Lit);
+            }
+
+            var doors = surface.Group(root, "Doors", Vector2.zero, 1f);
+            var (left, right) = BoardView.ElevatorDoorRects(config, region);
+            Door(doors, "Left door", left);
+            Door(doors, "Right door", right);
+            Handle(doors, "Left handle", new Vector2(region.center.x - config.ElevatorHandleOffsetCells, region.center.y));
+            Handle(doors, "Right handle", new Vector2(region.center.x + config.ElevatorHandleOffsetCells, region.center.y));
+            return new ElevatorParts<TGroup>(doors);
         }
 
+        /// <summary>One elevator door over <paramref name="door"/>, 9-sliced, its sprite reaching past it for its shadow.</summary>
+        public TPiece Door(TGroup parent, string name, Rect door) =>
+            surface.Sliced(
+                parent, name, config.ElevatorDoorSprite, door.center, Grown(door.size, config.ElevatorDoorShadowMarginCells),
+                SliceBorder(config.ElevatorDoorSprite), Color.white, config.ElevatorDoorPanelOrder, SpriteLook.Lit);
+
+        /// <summary>One door handle centred on <paramref name="center"/>.</summary>
+        public TPiece Handle(TGroup parent, string name, Vector2 center) =>
+            surface.Sprite(
+                parent, name, config.ElevatorHandleSprite, center, NaturalSize(config.ElevatorHandleSprite), Color.white,
+                config.ElevatorHandleOrder, 0f, SpriteLook.Lit);
+
         /// <summary>
-        /// A generator's machine (M6, D48) under <paramref name="root"/>: a
-        /// body with a lip hanging below it, a dark screen showing the next
-        /// block in miniature (<see cref="Miniature"/>), and the queued count
-        /// on a badge.
+        /// A generator's machine (M6, D48) under <paramref name="root"/>
+        /// (Module 46, pass 2): the raised metal body with its rivets, 9-sliced
+        /// to <paramref name="body"/>; the recessed glass screen over
+        /// <paramref name="screen"/>, showing the next block lit with its studs
+        /// and, at its end, the queued count; and the vent and the button in
+        /// the room left on the body's outer side.
         /// </summary>
         /// <param name="body">The machine's body, in <paramref name="root"/>'s frame (<see cref="MachinePlacement.Body"/>).</param>
         /// <param name="screen">Its screen (<see cref="MachinePlacement.Screen"/>).</param>
-        /// <param name="badgeCenter">Where its badge goes (<see cref="MachinePlacement.BadgeCenter"/>).</param>
         /// <param name="nextFill">The colour the next block is shown in: its own, or ice when it would spawn frozen (M3).</param>
-        /// <returns>The badge.</returns>
-        public TGroup Machine(
-            TGroup root, Rect body, Rect screen, Vector2 badgeCenter, IReadOnlyList<Coord> nextCells, Color nextFill, int queued)
+        /// <returns>The count's group: scaling it pops the count.</returns>
+        public TGroup Machine(TGroup root, Rect body, Rect screen, IReadOnlyList<Coord> nextCells, Color nextFill, int queued)
         {
-            var corner = config.MachineCornerCells;
+            surface.Sliced(
+                root, "Body", config.MachineBodySprite, body.center, Grown(body.size, config.RaisedShadowMarginCells),
+                SliceBorder(config.MachineBodySprite), Color.white, config.MachineOrder, SpriteLook.Lit);
+            surface.Sliced(
+                root, "Screen", config.MachineScreenSprite, screen.center, screen.size, SliceBorder(config.MachineScreenSprite),
+                Color.white, config.MachineScreenOrder, SpriteLook.Lit);
 
-            var lip = surface.Group(root, "Lip", new Vector2(0f, -config.LipOffsetCells), 1f);
-            surface.Sliced(lip, "Body", config.RoundedRectSprite, body.center, body.size, corner, config.LipFill(config.MachineColor), config.MachineLipOrder);
-            surface.Sliced(root, "Body", config.RoundedRectSprite, body.center, body.size, corner, config.MachineColor, config.MachineOrder);
-            surface.Sliced(root, "Screen", config.RoundedRectSprite, screen.center, screen.size, corner, config.MachineScreenColor, config.MachineScreenOrder);
+            var room = OuterRoom(body, screen);
+            var along = room.width >= room.height ? Vector2.right : Vector2.up;
+            var offsets = config.MachineFittingOffsetsCells;
+            surface.Sprite(
+                root, "Vent", config.MachineVentSprite, room.center + along * offsets.x, NaturalSize(config.MachineVentSprite),
+                Color.white, config.MachineFittingsOrder, 0f, SpriteLook.Lit);
+            surface.Sprite(
+                root, "Button", config.MachineButtonSprite, room.center + along * offsets.y, NaturalSize(config.MachineButtonSprite),
+                Color.white, config.MachineFittingsOrder, 0f, SpriteLook.Lit);
 
-            Miniature(root, nextCells, screen, nextFill);
-            return Badge(root, badgeCenter, queued, config.BadgeRimColor);
+            var (blockArea, countArea) = BoardView.SplitScreen(screen, config.MachineScreenCountShare, config.MachineMiniatureFillShare);
+            Miniature(root, nextCells, blockArea, nextFill);
+
+            var count = surface.Group(root, "Badge", countArea.center, 1f);
+            surface.Label(
+                count, "Count", Vector2.zero, queued.ToString(CultureInfo.InvariantCulture), config.MachineCountFontSize,
+                config.MachineCountColor, false);
+            return count;
+        }
+
+        /// <summary>
+        /// The room a machine's <paramref name="body"/> leaves beyond its
+        /// <paramref name="screen"/> on its widest side, the outer one
+        /// (<see cref="GeneratorMachine.Place"/> keeps it there).
+        /// </summary>
+        private static Rect OuterRoom(Rect body, Rect screen)
+        {
+            var below = screen.yMin - body.yMin;
+            var above = body.yMax - screen.yMax;
+            var left = screen.xMin - body.xMin;
+            var right = body.xMax - screen.xMax;
+            var most = Mathf.Max(Mathf.Max(below, above), Mathf.Max(left, right));
+            if (most == below)
+            {
+                return Rect.MinMaxRect(body.xMin, body.yMin, body.xMax, screen.yMin);
+            }
+
+            if (most == above)
+            {
+                return Rect.MinMaxRect(body.xMin, screen.yMax, body.xMax, body.yMax);
+            }
+
+            return most == left
+                ? Rect.MinMaxRect(body.xMin, body.yMin, screen.xMin, body.yMax)
+                : Rect.MinMaxRect(screen.xMax, body.yMin, body.xMax, body.yMax);
         }
 
         /// <summary>
         /// The next block on a machine's screen: its lit body as a block on
-        /// the board has it, scaled uniformly to fit <paramref name="screen"/>
-        /// (<see cref="BoardView.MiniatureFit"/>) and centred on it. Blocks
-        /// never rotate, so it shows the block as it will arrive. No studs, no
-        /// highlight and no marks: it is a preview of shape and colour.
+        /// the board has it, with its studs and their gloss, scaled uniformly
+        /// to fit <paramref name="area"/> (<see cref="BoardView.MiniatureFit"/>)
+        /// and centred on it. Blocks never rotate, so it shows the block as it
+        /// will arrive. No highlight and no marks: it is a preview of shape
+        /// and colour.
         /// </summary>
-        private void Miniature(TGroup parent, IReadOnlyList<Coord> cells, Rect screen, Color fill)
+        private void Miniature(TGroup parent, IReadOnlyList<Coord> cells, Rect area, Color fill)
         {
-            var perCell = BoardView.MiniatureFit(cells, screen, out var shapeCenter);
+            var perCell = BoardView.MiniatureFit(cells, area, out var shapeCenter);
             var tiles = BlockTiling.Compute(cells);
 
             // A rectangle in the block's cell units, on the screen.
             Rect OnScreen(Rect cellRect) =>
-                new Rect(screen.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
+                new Rect(area.center + (cellRect.min - shapeCenter) * perCell, cellRect.size * perCell);
 
             var miniature = surface.Group(parent, "Next block", Vector2.zero, 1f);
             surface.Quarters(
                 miniature, tiles, tile => OnScreen(BlockTiling.QuarterRect(tile)), QuarterLayer.Lit, fill,
                 config.MiniatureOrder);
+
+            var stud = new Vector2(perCell, perCell);
+            for (var c = 0; c < cells.Count; c++)
+            {
+                var center = OnScreen(new Rect(cells[c].X, cells[c].Y, 1f, 1f)).center;
+                surface.Sprite(
+                    miniature, $"Studs {cells[c]}", config.StudsSprite, center, stud, fill, config.MiniatureStudOrder, 0f, SpriteLook.Lit);
+                surface.Sprite(
+                    miniature, $"Gloss {cells[c]}", config.StudGlossSprite, center, stud, config.GlossColor, config.MiniatureGlossOrder,
+                    0f, SpriteLook.Plain);
+            }
         }
+
+        /// <summary>A generated sprite's painted size, in cells: its pixels per unit are a cell's pixels.</summary>
+        private static Vector2 NaturalSize(Sprite sprite) => new Vector2(sprite.rect.width, sprite.rect.height) / sprite.pixelsPerUnit;
+
+        /// <summary>A 9-sliced generated sprite's left border at its painted size, in cells.</summary>
+        private static float SliceBorder(Sprite sprite) => sprite.border.x / sprite.pixelsPerUnit;
+
+        /// <summary><paramref name="size"/> with <paramref name="margin"/> added on every side: a sprite reaching past its part for its shadow.</summary>
+        private static Vector2 Grown(Vector2 size, float margin) => size + Vector2.one * (2f * margin);
     }
 
     /// <summary>The pieces of a block that its owner goes on to animate (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>).</summary>
@@ -479,7 +638,7 @@ namespace GateRush.Runtime
         /// <summary>The body's highlight pieces, in the tiles' order.</summary>
         public List<TPiece> Shine { get; }
 
-        /// <summary>The tinted per-cell stud sprites, without their gloss; empty for an ice or axis-restricted block.</summary>
+        /// <summary>The tinted per-cell stud sprites, without their gloss; empty for an axis-restricted block.</summary>
         public List<TPiece> Studs { get; }
 
         /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>
@@ -512,21 +671,17 @@ namespace GateRush.Runtime
         public List<TPiece> Studs { get; }
     }
 
-    /// <summary>The pieces of an elevator that its owner hides while a wave rises (<see cref="BoardRecipes{TGroup, TPiece}.Elevator"/>).</summary>
-    /// <typeparam name="TPiece">The surface's drawn sprite.</typeparam>
-    internal readonly struct ElevatorParts<TPiece>
-        where TPiece : class
+    /// <summary>The part of an elevator that its owner hides while a wave rises (<see cref="BoardRecipes{TGroup, TPiece}.Elevator"/>).</summary>
+    /// <typeparam name="TGroup">The surface's group.</typeparam>
+    internal readonly struct ElevatorParts<TGroup>
+        where TGroup : class
     {
-        public ElevatorParts(TPiece doors, TPiece divider)
+        public ElevatorParts(TGroup doors)
         {
             Doors = doors;
-            Divider = divider;
         }
 
-        /// <summary>The door panels over the region.</summary>
-        public TPiece Doors { get; }
-
-        /// <summary>The divider down the middle; null when its configured width draws nothing.</summary>
-        public TPiece Divider { get; }
+        /// <summary>The doors and their handles, in one group.</summary>
+        public TGroup Doors { get; }
     }
 }

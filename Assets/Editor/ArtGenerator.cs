@@ -78,15 +78,41 @@ namespace GateRush.Editor
                 return;
             }
 
-            var report = Generate(recipe);
+            if (!TryFindRuntimeConfig(out var config, out var configError))
+            {
+                Debug.LogError($"Generate Art: {configError} Its colours paint the mechanics (Module 46); nothing was generated.");
+                return;
+            }
+
+            var report = Generate(recipe, ArtPalette.From(config));
             Debug.Log(
                 $"Generate Art: {ArtPainter.All.Count} sprites from {recipe.name} into {OutputFolder} — " +
                 $"{report.Written} PNG(s) written, {report.Reimported} reimported with new settings, " +
                 $"{report.Unchanged} unchanged.",
                 recipe);
 
-            var materials = GenerateMaterials(recipe);
-            AssignToRuntimeConfig(materials);
+            var materials = GenerateMaterials(recipe, config);
+            AssignToRuntimeConfig(config, materials, recipe);
+        }
+
+        /// <summary>
+        /// The project's only <see cref="RuntimeConfig"/>; false, with why,
+        /// when there is none or more than one.
+        /// </summary>
+        internal static bool TryFindRuntimeConfig(out RuntimeConfig config, out string error)
+        {
+            config = null;
+            var guids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
+            if (guids.Length != 1)
+            {
+                error = $"the project has {guids.Length} Runtime Configs, not one.";
+                return false;
+            }
+
+            var path = AssetDatabase.GUIDToAssetPath(guids[0]);
+            config = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(path);
+            error = config != null ? null : $"the Runtime Config at {path} could not be loaded.";
+            return config != null;
         }
 
         /// <summary>Where the generated materials live.</summary>
@@ -101,15 +127,18 @@ namespace GateRush.Editor
         public const string BoardUiShaderName = "Gate Rush/Board UI Sprite";
 
         /// <summary>
-        /// The four materials the lit body draws with (Module 46), keyed by
-        /// their <see cref="RuntimeConfig"/> field: for SpriteRenderers and
-        /// for UI Images, a lit one that multiplies faces and studs back by
+        /// The materials the lit body draws with (Module 46), keyed by their
+        /// <see cref="RuntimeConfig"/> field: for SpriteRenderers and for UI
+        /// Images, a lit one that multiplies faces and studs back by
         /// <see cref="ArtRecipe.ShadeHeadroom"/>, and a highlight one that adds
-        /// its white. Each is created at <see cref="MaterialFolder"/> when
-        /// missing and brought to these settings, saved only when one changed.
+        /// its white; and the board's labels' material with its soft drop
+        /// shadow (Module 46, pass 2), a copy of the label font's own with the
+        /// underlay <paramref name="config"/> sets. Each is created at
+        /// <see cref="MaterialFolder"/> when missing and brought to these
+        /// settings, saved only when one changed.
         /// </summary>
         /// <returns>The materials made or found; empty when a shader could not be found, which is logged.</returns>
-        public static IReadOnlyDictionary<string, Material> GenerateMaterials(ArtRecipe recipe)
+        public static IReadOnlyDictionary<string, Material> GenerateMaterials(ArtRecipe recipe, RuntimeConfig config)
         {
             if (!AssetDatabase.IsValidFolder(MaterialFolder))
             {
@@ -124,13 +153,93 @@ namespace GateRush.Editor
                 return new Dictionary<string, Material>();
             }
 
-            return new Dictionary<string, Material>
+            var materials = new Dictionary<string, Material>
             {
                 ["litMaterial"] = EnsureMaterial("BoardLit", board, recipe.ShadeHeadroom, isAdditive: false),
                 ["specularMaterial"] = EnsureMaterial("BoardSpecular", board, 1f, isAdditive: true),
                 ["uiLitMaterial"] = EnsureMaterial("BoardUiLit", ui, recipe.ShadeHeadroom, isAdditive: false),
                 ["uiSpecularMaterial"] = EnsureMaterial("BoardUiSpecular", ui, 1f, isAdditive: true),
             };
+
+            var shadow = EnsureLabelShadowMaterial(config);
+            if (shadow != null)
+            {
+                materials["labelShadowMaterial"] = shadow;
+            }
+
+            return materials;
+        }
+
+        // The TextMeshPro distance-field shader's underlay: its keyword and
+        // properties, named as the shader declares them.
+        private const string UnderlayKeyword = "UNDERLAY_ON";
+        private const string UnderlayColor = "_UnderlayColor";
+        private const string UnderlayOffsetX = "_UnderlayOffsetX";
+        private const string UnderlayOffsetY = "_UnderlayOffsetY";
+        private const string UnderlaySoftness = "_UnderlaySoftness";
+
+        /// <summary>
+        /// <c>LabelShadow.mat</c> under <see cref="MaterialFolder"/>: the label
+        /// font's own material with its underlay on, in
+        /// <see cref="RuntimeConfig.LabelShadowColor"/>, moved by
+        /// <see cref="RuntimeConfig.LabelShadowOffset"/> and softened by
+        /// <see cref="RuntimeConfig.LabelShadowSoftness"/> — the soft drop shadow
+        /// under the board's white digits. Made from the font's material when
+        /// missing, so it carries the font's atlas; null, logged, when the
+        /// config has no label font.
+        /// </summary>
+        private static Material EnsureLabelShadowMaterial(RuntimeConfig config)
+        {
+            var source = config.LabelFontMaterial;
+            if (source == null)
+            {
+                Debug.LogError($"Generate Art: {config.name} has no Label Font, so no label shadow material was made.", config);
+                return null;
+            }
+
+            var path = $"{MaterialFolder}/LabelShadow.mat";
+            var material = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (material == null)
+            {
+                material = new Material(source);
+                AssetDatabase.CreateAsset(material, path);
+            }
+
+            var isChanged = false;
+            if (material.shader != source.shader)
+            {
+                material.shader = source.shader;
+                isChanged = true;
+            }
+
+            if (material.mainTexture != source.mainTexture)
+            {
+                material.mainTexture = source.mainTexture;
+                isChanged = true;
+            }
+
+            if (!material.IsKeywordEnabled(UnderlayKeyword))
+            {
+                material.EnableKeyword(UnderlayKeyword);
+                isChanged = true;
+            }
+
+            if (material.GetColor(UnderlayColor) != config.LabelShadowColor)
+            {
+                material.SetColor(UnderlayColor, config.LabelShadowColor);
+                isChanged = true;
+            }
+
+            isChanged |= SetFloat(material, UnderlayOffsetX, config.LabelShadowOffset.x);
+            isChanged |= SetFloat(material, UnderlayOffsetY, config.LabelShadowOffset.y);
+            isChanged |= SetFloat(material, UnderlaySoftness, config.LabelShadowSoftness);
+            if (isChanged)
+            {
+                EditorUtility.SetDirty(material);
+                AssetDatabase.SaveAssetIfDirty(material);
+            }
+
+            return material;
         }
 
         /// <summary>
@@ -200,31 +309,18 @@ namespace GateRush.Editor
         public static string PathOf(ArtSprite sprite) => $"{OutputFolder}/{sprite}.png";
 
         /// <summary>
-        /// Sets every generated sprite into its field of the project's only
-        /// <see cref="RuntimeConfig"/> (<see cref="RuntimeConfigField"/>), and
-        /// each of <paramref name="materials"/> into the field it is keyed by,
-        /// so the config always holds what the generator wrote. Saves only
-        /// when a field changed, and logs one line per field it set; logs an
-        /// error and sets nothing it cannot resolve.
+        /// Sets every generated sprite into its field of
+        /// <paramref name="config"/> (<see cref="RuntimeConfigField"/>), each of
+        /// <paramref name="materials"/> into the field it is keyed by, and
+        /// every one of <paramref name="recipe"/>'s
+        /// <see cref="ArtRecipe.BoardMeasures"/> into its field, so the config
+        /// always holds what the generator wrote and the sizes it was painted
+        /// at. Saves only when a field changed, and logs one line per field it
+        /// set; logs an error and sets nothing it cannot resolve.
         /// </summary>
-        private static void AssignToRuntimeConfig(IReadOnlyDictionary<string, Material> materials)
+        private static void AssignToRuntimeConfig(
+            RuntimeConfig config, IReadOnlyDictionary<string, Material> materials, ArtRecipe recipe)
         {
-            var guids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
-            if (guids.Length != 1)
-            {
-                Debug.LogError(
-                    $"Generate Art: the project has {guids.Length} Runtime Configs, not one; no sprite was assigned.");
-                return;
-            }
-
-            var configPath = AssetDatabase.GUIDToAssetPath(guids[0]);
-            var config = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(configPath);
-            if (config == null)
-            {
-                Debug.LogError($"Generate Art: the Runtime Config at {configPath} could not be loaded; no sprite was assigned.");
-                return;
-            }
-
             var serialized = new SerializedObject(config);
             var set = new List<string>();
             foreach (var sprite in ArtPainter.All)
@@ -273,6 +369,22 @@ namespace GateRush.Editor
                 }
             }
 
+            foreach (var (field, value) in recipe.BoardMeasures())
+            {
+                var property = serialized.FindProperty(field);
+                if (property == null || property.propertyType != SerializedPropertyType.Float)
+                {
+                    Debug.LogError($"Generate Art: {config.name} has no measure field '{field}'.", config);
+                    continue;
+                }
+
+                if (property.floatValue != value)
+                {
+                    property.floatValue = value;
+                    set.Add($"{field} = {value}");
+                }
+            }
+
             if (set.Count == 0)
             {
                 return;
@@ -288,10 +400,11 @@ namespace GateRush.Editor
 
         /// <summary>
         /// Paints and writes every sprite from <paramref name="recipe"/>, which
-        /// must have no <see cref="ArtRecipe.Problems"/>, and applies the import
-        /// settings.
+        /// must have no <see cref="ArtRecipe.Problems"/>, in
+        /// <paramref name="palette"/>'s colours where a sprite has its own, and
+        /// applies the import settings.
         /// </summary>
-        public static GenerationReport Generate(ArtRecipe recipe)
+        public static GenerationReport Generate(ArtRecipe recipe, ArtPalette palette)
         {
             if (!AssetDatabase.IsValidFolder(OutputFolder))
             {
@@ -304,7 +417,7 @@ namespace GateRush.Editor
 
             foreach (var sprite in ArtPainter.All)
             {
-                var image = ArtPainter.Paint(recipe, sprite);
+                var image = ArtPainter.Paint(recipe, palette, sprite);
                 var bytes = ArtPainter.EncodePng(image);
                 var path = PathOf(sprite);
 

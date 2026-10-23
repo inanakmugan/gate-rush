@@ -31,7 +31,14 @@ namespace GateRush.Runtime
         ReversedLit,
 
         /// <summary>The lit body's white highlight, untinted, added by the specular material.</summary>
-        Body
+        Body,
+
+        /// <summary>
+        /// The ice over a frozen block or a closed gate (Module 46, pass 2):
+        /// painted in its own colours, translucent, drawn untinted with the lit
+        /// material over the lit body.
+        /// </summary>
+        Ice
     }
 
     /// <summary>
@@ -73,10 +80,11 @@ namespace GateRush.Runtime
         /// sub-pixel cracks at its seams: all of <paramref name="overlapCells"/>
         /// when it is opaque, where two neighbours covering the same strip
         /// look like one; none when it is translucent or added — a shadow, a
-        /// highlight, or anything drawn or fading below full alpha — where that
-        /// strip would be blended twice and show as a line along every seam.
+        /// highlight, the ice, or anything drawn or fading below full alpha —
+        /// where that strip would be blended twice and show as a line along
+        /// every seam.
         /// </summary>
         public static float SeamOverlap(QuarterLayer layer, Color color, float overlapCells) =>
-            layer != QuarterLayer.Shadow && layer != QuarterLayer.Body && color.a >= 1f ? overlapCells : 0f;
+            layer != QuarterLayer.Shadow && layer != QuarterLayer.Body && layer != QuarterLayer.Ice && color.a >= 1f ? overlapCells : 0f;
     }
 }

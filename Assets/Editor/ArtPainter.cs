@@ -60,21 +60,56 @@ namespace GateRush.Editor
         AxisArrow,
         BackgroundRamp,
         Vignette,
-        Frost,
         RoundedRect,
-        Ring,
         Chain,
         Padlock,
         KeyBody,
         KeyGem,
         ShutterSlats,
-        DoorPanel,
         Clock,
         Restart,
         Cube,
         Shard,
         GateGlow,
-        Sparkle
+        Sparkle,
+        IceOuterTopLeft,
+        IceOuterTopRight,
+        IceOuterBottomLeft,
+        IceOuterBottomRight,
+        IceConcaveTopLeft,
+        IceConcaveTopRight,
+        IceConcaveBottomLeft,
+        IceConcaveBottomRight,
+        IceEdgeTop,
+        IceEdgeBottom,
+        IceEdgeLeft,
+        IceEdgeRight,
+        IceFill,
+        IceStreaks,
+        IceStreaksWide,
+        BadgeRim,
+        BadgeFace,
+        BadgeHighlight,
+        Lock,
+        GoldKey,
+        Gem,
+        GemHighlight,
+        BonusCoin,
+        OneWayArrow,
+        OneWayArrowHighlight,
+        OneWayArrowVertical,
+        OneWayArrowVerticalHighlight,
+        ShutterRim,
+        ShutterCylinders,
+        MachineBody,
+        MachineScreen,
+        MachineVent,
+        MachineButton,
+        ElevatorRim,
+        ElevatorHazardLeft,
+        ElevatorHazardRight,
+        ElevatorDoor,
+        ElevatorHandle
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -109,8 +144,9 @@ namespace GateRush.Editor
 
     /// <summary>
     /// Paints every generated sprite of Modules 15, 16, 17, 18, 19 and 46 from an
-    /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
-    /// to tint (D46).
+    /// <see cref="ArtRecipe"/>, in greyscale plus alpha for the runtime to
+    /// tint where a colour varies (D46), and in an <see cref="ArtPalette"/>'s
+    /// colours where it never does (Module 46, pass 2).
     /// </summary>
     /// <remarks>
     /// <para><b>Shapes</b> are signed distance functions evaluated at pixel
@@ -134,10 +170,12 @@ namespace GateRush.Editor
     /// used, all exactly rounded — no <c>Mathf</c>,
     /// <c>Pow</c> or <c>Exp</c>, no randomness, no clock — and each value is
     /// rounded to a byte with an explicit midpoint rule. The exceptions —
-    /// the highlight's and the stud rim's powers and the sRGB encoding — go
-    /// through <c>Math.Pow</c> and are rounded to nine decimals
-    /// (<see cref="StablePow"/>), so a last-bit difference never reaches a
-    /// byte. The same recipe always paints the same bytes.</para>
+    /// the highlight's and the stud rim's powers and the sRGB encoding, and
+    /// the mechanics' blurs and slats (<c>ArtPainter.Mechanics.cs</c>) — go
+    /// through <c>Math.Pow</c>, <c>Math.Exp</c> or <c>Math.Sin</c> and are
+    /// rounded to nine decimals (<see cref="StablePow"/>), so a last-bit
+    /// difference never reaches a byte. The same recipe and palette always
+    /// paint the same bytes.</para>
     /// </remarks>
     public static partial class ArtPainter
     {
@@ -167,13 +205,46 @@ namespace GateRush.Editor
         /// <summary>Every sprite, in the order the generator writes them.</summary>
         public static IReadOnlyList<ArtSprite> All { get; } = (ArtSprite[])Enum.GetValues(typeof(ArtSprite));
 
-        /// <summary>Paints <paramref name="sprite"/> from <paramref name="recipe"/>.</summary>
-        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null.</exception>
-        public static ArtImage Paint(ArtRecipe recipe, ArtSprite sprite)
+        /// <summary>
+        /// Paints <paramref name="sprite"/> from <paramref name="recipe"/>, for
+        /// a sprite that takes no colour of its own (<see cref="NeedsPalette"/>).
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null, or the sprite needs a palette.</exception>
+        public static ArtImage Paint(ArtRecipe recipe, ArtSprite sprite) => Paint(recipe, null, sprite);
+
+        /// <summary>
+        /// True for the sprites painted in colours of their own, read from
+        /// <paramref name="sprite"/>'s <see cref="ArtPalette"/> (Module 46,
+        /// pass 2): the parts of the mechanics whose colour never varies.
+        /// </summary>
+        public static bool NeedsPalette(ArtSprite sprite) =>
+            IsIcePiece(sprite)
+            || sprite == ArtSprite.Chain || sprite == ArtSprite.Lock || sprite == ArtSprite.GoldKey
+            || sprite == ArtSprite.BonusCoin || sprite == ArtSprite.ShutterRim || sprite == ArtSprite.ShutterCylinders
+            || sprite == ArtSprite.MachineBody || sprite == ArtSprite.MachineScreen || sprite == ArtSprite.MachineButton
+            || sprite == ArtSprite.ElevatorRim || sprite == ArtSprite.ElevatorHazardLeft
+            || sprite == ArtSprite.ElevatorHazardRight || sprite == ArtSprite.ElevatorDoor || sprite == ArtSprite.ElevatorHandle;
+
+        /// <summary>
+        /// Paints <paramref name="sprite"/> from <paramref name="recipe"/>, in
+        /// <paramref name="palette"/>'s colours where it has colours of its own.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null, or <paramref name="palette"/> is and the sprite needs it.</exception>
+        public static ArtImage Paint(ArtRecipe recipe, ArtPalette palette, ArtSprite sprite)
         {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
+            }
+
+            if (palette == null && NeedsPalette(sprite))
+            {
+                throw new ArgumentNullException(nameof(palette), $"{sprite} is painted in the palette's colours.");
+            }
+
+            if (IsIcePiece(sprite))
+            {
+                return PaintIce(recipe, palette, PlaceOf(sprite));
             }
 
             switch (sprite)
@@ -244,14 +315,10 @@ namespace GateRush.Editor
                     return PaintRamp(recipe);
                 case ArtSprite.Vignette:
                     return PaintVignette(recipe);
-                case ArtSprite.Frost:
-                    return PaintFrost(recipe);
                 case ArtSprite.RoundedRect:
                     return PaintRoundedRect(recipe);
-                case ArtSprite.Ring:
-                    return PaintRing(recipe);
                 case ArtSprite.Chain:
-                    return PaintChain(recipe);
+                    return PaintChain(recipe, palette);
                 case ArtSprite.Padlock:
                     return PaintPadlock(recipe);
                 case ArtSprite.KeyBody:
@@ -272,8 +339,58 @@ namespace GateRush.Editor
                     return PaintGateGlow(recipe);
                 case ArtSprite.Sparkle:
                     return PaintSparkle(recipe);
+                case ArtSprite.IceStreaks:
+                    return PaintIceStreaks(recipe, 1);
+                case ArtSprite.IceStreaksWide:
+                    return PaintIceStreaks(recipe, 2);
+                case ArtSprite.BadgeRim:
+                    return PaintBadge(recipe, BadgeLayer.Rim);
+                case ArtSprite.BadgeFace:
+                    return PaintBadge(recipe, BadgeLayer.Face);
+                case ArtSprite.BadgeHighlight:
+                    return PaintBadge(recipe, BadgeLayer.Highlight);
+                case ArtSprite.Lock:
+                    return PaintLock(recipe, palette);
+                case ArtSprite.GoldKey:
+                    return PaintGoldKey(recipe, palette);
+                case ArtSprite.Gem:
+                    return PaintGem(recipe, isHighlight: false);
+                case ArtSprite.GemHighlight:
+                    return PaintGem(recipe, isHighlight: true);
+                case ArtSprite.BonusCoin:
+                    return PaintCoin(recipe, palette);
+                case ArtSprite.OneWayArrow:
+                    return PaintOneWayArrow(recipe, isVertical: false, isHighlight: false);
+                case ArtSprite.OneWayArrowHighlight:
+                    return PaintOneWayArrow(recipe, isVertical: false, isHighlight: true);
+                case ArtSprite.OneWayArrowVertical:
+                    return PaintOneWayArrow(recipe, isVertical: true, isHighlight: false);
+                case ArtSprite.OneWayArrowVerticalHighlight:
+                    return PaintOneWayArrow(recipe, isVertical: true, isHighlight: true);
+                case ArtSprite.ShutterRim:
+                    return PaintShutterRim(recipe, palette);
+                case ArtSprite.ShutterCylinders:
+                    return PaintShutterCylinders(recipe, palette);
+                case ArtSprite.MachineBody:
+                    return PaintMachineBody(recipe, palette);
+                case ArtSprite.MachineScreen:
+                    return PaintMachineScreen(recipe, palette);
+                case ArtSprite.MachineVent:
+                    return PaintMachineVent(recipe);
+                case ArtSprite.MachineButton:
+                    return PaintMachineButton(recipe, palette);
+                case ArtSprite.ElevatorRim:
+                    return PaintElevatorRim(recipe, palette);
+                case ArtSprite.ElevatorHazardLeft:
+                    return PaintElevatorHazard(recipe, palette, isLeft: true);
+                case ArtSprite.ElevatorHazardRight:
+                    return PaintElevatorHazard(recipe, palette, isLeft: false);
+                case ArtSprite.ElevatorDoor:
+                    return PaintElevatorDoor(recipe, palette);
+                case ArtSprite.ElevatorHandle:
+                    return PaintElevatorHandle(recipe, palette);
                 default:
-                    return PaintDoorPanel(recipe);
+                    throw new ArgumentOutOfRangeException(nameof(sprite), sprite, "Not a generated sprite.");
             }
         }
 
@@ -542,38 +659,6 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Frost for one cell of ice: pale streaks on the diagonal, side by
-        /// side, clipped to a box inset from every side so frost never leaves a
-        /// block's rounded face. The clip also shortens the outer streaks.
-        /// White; its colour and strength come from the runtime.
-        /// </summary>
-        private static ArtImage PaintFrost(ArtRecipe recipe)
-        {
-            var center = recipe.CellPixels / 2.0;
-            var clipHalf = center - recipe.FrostInsetPixels;
-            var halfWidth = recipe.FrostStreakWidthPixels / 2.0;
-            var halfLength = recipe.FrostStreakLengthPixels / 2.0;
-            var count = recipe.FrostStreakCount;
-            var diagonal = 1.0 / Math.Sqrt(2.0);
-
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var along = (x - center + (y - center)) * diagonal;
-                var across = (y - center - (x - center)) * diagonal;
-                var nearest = double.MaxValue;
-                for (var i = 0; i < count; i++)
-                {
-                    var offset = (i - (count - 1) / 2.0) * recipe.FrostStreakSpacingPixels;
-                    var sd = Length(Math.Max(Math.Abs(along) - halfLength, 0.0), across - offset) - halfWidth;
-                    nearest = Math.Min(nearest, sd);
-                }
-
-                var clip = SdBox(x - center, y - center, clipHalf, clipHalf);
-                return (1.0, recipe.FrostAlpha * Coverage(recipe, nearest) * Coverage(recipe, clip));
-            });
-        }
-
-        /// <summary>
         /// A rounded box shaded like a block's face — outline, then a rim
         /// highlight easing into the face — reaching the sprite's edges. It is
         /// 9-sliced at <see cref="ArtRecipe.PanelBorderPixels"/> on every side,
@@ -590,57 +675,6 @@ namespace GateRush.Editor
             {
                 var sd = SdRoundedBox(x - half, y - half, half, half, radius);
                 return (FaceTone(recipe, -sd), Coverage(recipe, sd));
-            });
-        }
-
-        /// <summary>
-        /// A white outline around the sprite's edges, as wide as its 9-slice
-        /// border, with its outer corners rounded by that width. The runtime
-        /// scales it so the border draws at the thickness it asks for.
-        /// </summary>
-        private static ArtImage PaintRing(ArtRecipe recipe)
-        {
-            var half = recipe.RingPixels / 2.0;
-            double width = recipe.RingWidthPixels;
-            float border = recipe.RingWidthPixels;
-
-            return Paint(recipe.RingPixels, recipe.RingPixels, new Vector4(border, border, border, border), (x, y) =>
-            {
-                var outer = SdRoundedBox(x - half, y - half, half, half, width);
-                var inner = SdBox(x - half, y - half, half - width, half - width);
-                return (1.0, Coverage(recipe, outer) * (1.0 - Coverage(recipe, inner)));
-            });
-        }
-
-        /// <summary>
-        /// One period of chain along x: a link seen face-on — an open oval — in
-        /// the middle, and a link seen edge-on — a short bar — straddling both
-        /// ends, drawn over it. The pattern is symmetric about the period's
-        /// ends, so tiles meet without a seam.
-        /// </summary>
-        private static ArtImage PaintChain(ArtRecipe recipe)
-        {
-            double period = recipe.ChainPeriodPixels;
-            var middle = recipe.ChainThicknessPixels / 2.0;
-            double wall = recipe.ChainLinkWallPixels;
-            var halfWall = wall / 2.0;
-            var linkHalfLength = recipe.ChainLinkLengthPixels / 2.0;
-            var edgeHalfLength = recipe.ChainEdgeLinkLengthPixels / 2.0;
-
-            (double tone, double alpha) Metal(double sd) =>
-                (Lerp(recipe.ChainShadeTone, recipe.ChainTone, Clamp01(-sd / halfWall)), Coverage(recipe, sd));
-
-            return Paint(recipe.ChainPeriodPixels, recipe.ChainThicknessPixels, Vector4.zero, (x, y) =>
-            {
-                var v = y - middle;
-                var outline = SdRoundedBox(x - period / 2.0, v, linkHalfLength, middle, middle);
-                var faceOn = Math.Abs(outline + halfWall) - halfWall;
-
-                var edgeOn = Math.Min(
-                    SdRoundedBox(x, v, edgeHalfLength, halfWall, halfWall),
-                    SdRoundedBox(x - period, v, edgeHalfLength, halfWall, halfWall));
-
-                return Over(Metal(edgeOn), Metal(faceOn));
             });
         }
 
@@ -745,25 +779,6 @@ namespace GateRush.Editor
                 var groove = Clamp01(halfGap - toGroove + 0.5);
                 var slat = Lerp(recipe.SlatShadeTone, recipe.SlatTone, inSlat / pitch);
                 return (Lerp(slat, recipe.SlatGapTone, groove), 1.0);
-            });
-        }
-
-        /// <summary>
-        /// One opaque cell of lift door: a flat panel with faint vertical lines,
-        /// one on each side edge and the rest evenly between, so tiles meet
-        /// without a seam.
-        /// </summary>
-        private static ArtImage PaintDoorPanel(ArtRecipe recipe)
-        {
-            var pitch = (double)recipe.CellPixels / recipe.DoorLinesPerCell;
-            var halfLine = recipe.DoorLineWidthPixels / 2.0;
-
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var inPanel = x - pitch * Math.Floor(x / pitch);
-                var toLine = Math.Min(inPanel, pitch - inPanel);
-                var line = Clamp01(halfLine - toLine + 0.5);
-                return (Lerp(recipe.DoorTone, recipe.DoorLineTone, line), 1.0);
             });
         }
 

@@ -41,15 +41,17 @@ namespace GateRush.Runtime
     /// silhouettes the face pieces sit inside — and an untinted shine over
     /// the face along their top and bottom edges
     /// (<see cref="QuarterLayers"/>).</para>
-    /// <para><b>State (Module 16, D48).</b> A frozen block and a closed gate are
-    /// ice with frost and a count; a locked block carries a chain along each
-    /// row of its cells and a gold padlock with the keys still required; a
+    /// <para><b>State (Module 16, D48; lit in Module 46's second pass).</b> A
+    /// frozen block and a closed gate lie under ice, with frost on a block,
+    /// and a count; a locked block carries tube chains along each row of its
+    /// cells and a gold padlock with the keys still required on it; a
     /// key-carrying block carries a gold key whose gem is its lock's colour
-    /// (D47); a closed shutter is slats with a border and a count; a generator
-    /// is a machine outside the frame whose screen shows its next block; an
-    /// elevator is a pair of lift doors under its blocks. Every count sits on
-    /// one badge (<see cref="BoardRecipes{TGroup, TPiece}.Badge"/>), recorded
-    /// by its owner so it can pop.</para>
+    /// (D47); a closed shutter is cylinder slats in a gold rim with a count; a
+    /// generator is a metal machine outside the frame whose screen shows its
+    /// next block and its count; an elevator is a rim with hazard strips and
+    /// a pair of doors under its blocks. Counts on blocks, gates and shutters
+    /// sit on one badge (<see cref="BoardRecipes{TGroup, TPiece}.Badge"/>);
+    /// each count is recorded by its owner so it can pop.</para>
     /// <para><b>Shared recipes (Module 28).</b> How a block, a mark, a gate,
     /// a shutter's panel, an elevator's doors and a generator's machine are
     /// composed is <see cref="BoardRecipes{TGroup, TPiece}"/>', which the
@@ -61,8 +63,9 @@ namespace GateRush.Runtime
     /// <para><b>Blocks.</b> Each shown block gets a root at its origin's corner
     /// and, under it, a <c>Body</c> holding everything it draws: a
     /// <c>Contour</c> group, a <c>Lip</c> group, a <c>Face</c> group
-    /// (quarters, the shine, then studs and gloss, frost, or the axis arrow,
-    /// and a layered block's <c>Inner</c> window), then chains, padlock
+    /// (quarters, the shine, then studs and gloss or the axis arrow, a
+    /// layered block's <c>Inner</c> window, and a frozen block's ice and
+    /// frost), then chains, padlock
     /// or key, badges and labels. The drag, the settle and the exit move the root; the lift,
     /// a spawn and a rise scale the body about the footprint's centre, so the
     /// two never overwrite each other.</para>
@@ -531,10 +534,10 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A gate is its own segment of the frame, with a lip and a face. Open,
-        /// it is in the gate's colour with a white arrow pointing out of the
-        /// board. Closed (M2), it is ice with frost on each of its cells and the
-        /// clears still needed on a badge at its middle, and no arrow.
+        /// A gate is its own segment of the frame, a lit body. Open, it is in
+        /// the gate's colour with a white arrow pointing out of the board.
+        /// Closed (M2), it lies under ice with the clears still needed on a
+        /// badge at its middle, and no arrow.
         /// </summary>
         private void DrawGates(BoardState state)
         {
@@ -542,14 +545,12 @@ namespace GateRush.Runtime
             {
                 var gate = ctx.Gates[g];
                 var visual = visibility.Gate(state, g);
-                var gateIndex = g;
 
                 var root = AddGroup(board, $"Gate {gate.Id}", Vector2.zero);
                 var badge = recipes.Gate(
                     root, gate, gateTiles[g], gateQuarterCells,
                     GridRectToViewCells(FrameTiling.EdgeSpanRect(
                         ctx.Width, ctx.Height, gate.Edge, gate.Offset, gate.Width, layout.FrameThicknessCells)),
-                    i => GridRectToViewCells(GateCellGridRect(gateIndex, i)),
                     visual.IsOpen ? visual.Color.Value : (BlockColor?)null, visual.OpensInClears);
 
                 if (badge != null)
@@ -561,10 +562,10 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A generator with blocks still queued is a machine outside the frame
-        /// (D48): a body with a lip, a dark screen showing the next block in
-        /// miniature — in ice when it would spawn frozen (M3) — and the queued
-        /// count on a badge at its outer end. An exhausted one is destroyed
-        /// (M6) and draws nothing.
+        /// (D48): a raised metal body, a recessed glass screen showing the next
+        /// block in miniature — in ice when it would spawn frozen (M3) — and the
+        /// queued count at the screen's end. An exhausted one is destroyed (M6)
+        /// and draws nothing.
         /// </summary>
         private void DrawGenerators(BoardState state)
         {
@@ -581,9 +582,59 @@ namespace GateRush.Runtime
                 var fill = visual.IsNextFrozen ? config.IceColor : config.BlockFill(visual.NextColor.Value);
 
                 badges[new CountPop(CountKind.Generator, g)] = recipes.Machine(
-                    root, GridRectToViewCells(placement.Body), GridRectToViewCells(placement.Screen),
-                    GridToViewCells(placement.BadgeCenter), visual.NextCells, fill, visual.Queued);
+                    root, GridRectToViewCells(placement.Body), GridRectToViewCells(placement.Screen), visual.NextCells, fill,
+                    visual.Queued);
             }
+        }
+
+        /// <summary>
+        /// A machine's <paramref name="screen"/> split along its longer side
+        /// (Module 46, pass 2): the area the next block is shown in — its part
+        /// of the screen shrunk about its centre to
+        /// <paramref name="fillShare"/> — and at the screen's end, the right,
+        /// or the bottom on an upright screen, the
+        /// <paramref name="countShare"/> that holds the queued count. The one
+        /// split for the drawn machine and for a spawned block growing out of
+        /// it.
+        /// </summary>
+        public static (Rect block, Rect count) SplitScreen(Rect screen, float countShare, float fillShare)
+        {
+            Rect part;
+            Rect count;
+            if (screen.width >= screen.height)
+            {
+                var split = screen.xMax - screen.width * countShare;
+                part = Rect.MinMaxRect(screen.xMin, screen.yMin, split, screen.yMax);
+                count = Rect.MinMaxRect(split, screen.yMin, screen.xMax, screen.yMax);
+            }
+            else
+            {
+                var line = screen.yMin + screen.height * countShare;
+                part = Rect.MinMaxRect(screen.xMin, line, screen.xMax, screen.yMax);
+                count = Rect.MinMaxRect(screen.xMin, screen.yMin, screen.xMax, line);
+            }
+
+            var size = part.size * fillShare;
+            return (new Rect(part.center - size * 0.5f, size), count);
+        }
+
+        /// <summary>
+        /// Where an elevator's two doors stand in <paramref name="region"/>
+        /// (Module 46, pass 2): each half of the recess inside the rim
+        /// (<see cref="RuntimeConfig.ElevatorInnerInsetCells"/>), less the gap
+        /// round it (<see cref="RuntimeConfig.ElevatorDoorGapCells"/>). The one
+        /// rule for the drawn doors and for those that slide as a wave rises.
+        /// </summary>
+        public static (Rect left, Rect right) ElevatorDoorRects(RuntimeConfig config, Rect region)
+        {
+            var inset = config.ElevatorInnerInsetCells;
+            var gap = config.ElevatorDoorGapCells;
+            var inner = new Rect(region.x + inset.x, region.y + inset.y, region.width - 2f * inset.x, region.height - 2f * inset.y);
+            var width = Mathf.Max(0f, inner.width * 0.5f - 2f * gap);
+            var height = Mathf.Max(0f, inner.height - 2f * gap);
+            return (
+                new Rect(inner.xMin + gap, inner.yMin + gap, width, height),
+                new Rect(inner.center.x + gap, inner.yMin + gap, width, height));
         }
 
         /// <summary>
@@ -698,7 +749,7 @@ namespace GateRush.Runtime
             if (visual.IsFrozen)
             {
                 badges[new CountPop(CountKind.Frozen, blockIndex)] =
-                    recipes.Badge(body, corner, visual.FrozenRemaining, config.BadgeRimColor);
+                    recipes.Badge(body, corner, visual.FrozenRemaining, config.CountBadgeRimColor);
             }
 
             var marks = MarksOf(cells, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds > 0);
@@ -721,7 +772,7 @@ namespace GateRush.Runtime
 
             if (visual.LayerNumeral.HasValue)
             {
-                var badge = recipes.Badge(body, corner, visual.LayerNumeral.Value, config.BadgeRimColor);
+                var badge = recipes.Badge(body, corner, visual.LayerNumeral.Value, config.CountBadgeRimColor);
                 badge.name = "Layer count";
             }
         }
@@ -793,19 +844,19 @@ namespace GateRush.Runtime
             var region = RegionViewCells(shutter.Min, shutter.Max);
             if (!badgeVisual.HasValue)
             {
-                return recipes.ShutterPanel(parent, region, null, config.BadgeRimColor);
+                return recipes.ShutterPanel(parent, region, null, config.CountBadgeRimColor);
             }
 
             var visual = badgeVisual.Value;
-            var rim = visual.CountsColor.HasValue ? config.BlockFill(visual.CountsColor.Value) : config.BadgeRimColor;
+            var rim = visual.CountsColor.HasValue ? config.BlockFill(visual.CountsColor.Value) : config.CountBadgeRimColor;
             return recipes.ShutterPanel(parent, region, visual.OpensInClears, rim);
         }
 
         /// <summary>
-        /// An elevator (M9), until its final wave has been cleared: lift doors
-        /// over its region with a divider down the middle and a border, above
-        /// the floor and below the blocks, so a wave stands on the doors. How
-        /// many waves remain is never shown (D48).
+        /// An elevator (M9), until its final wave has been cleared: its rim
+        /// with hazard strips round its region, and two doors in the recess
+        /// inside it, above the floor and below the blocks, so a wave stands
+        /// on the doors. How many waves remain is never shown (D48).
         /// </summary>
         private void DrawElevators(BoardState state)
         {
@@ -820,9 +871,7 @@ namespace GateRush.Runtime
                 var root = AddGroup(board, $"Elevator {elevator.Id}", Vector2.zero);
                 var parts = recipes.Elevator(root, RegionViewCells(elevator.Min, elevator.Max));
 
-                elevatorDoors[e] = parts.Divider != null
-                    ? new[] { parts.Doors.gameObject, parts.Divider.gameObject }
-                    : new[] { parts.Doors.gameObject };
+                elevatorDoors[e] = new[] { parts.Doors.gameObject };
             }
         }
 
@@ -846,47 +895,74 @@ namespace GateRush.Runtime
 
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Sprite(
             Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
-            float rotationDegrees) =>
-            AddSprite(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, color, order, rotationDegrees);
-
-        SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.LitSprite(
-            Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order) =>
-            AddLitSprite(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, color, order);
+            float rotationDegrees, SpriteLook look)
+        {
+            var renderer = AddSprite(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, color, order, rotationDegrees);
+            renderer.sharedMaterial = MaterialOf(look);
+            return renderer;
+        }
 
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Sliced(
-            Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order) =>
-            AddSliced(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, CellsToWorld(border), color, order);
+            Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order,
+            SpriteLook look)
+        {
+            var renderer = AddSliced(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, CellsToWorld(border), color, order);
+            if (renderer != null)
+            {
+                renderer.sharedMaterial = MaterialOf(look);
+            }
+
+            return renderer;
+        }
 
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Tiled(
             Transform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float tileCells,
-            bool tileIsMeasuredByHeight, Color color, int order)
+            bool tileIsMeasuredByHeight, Color color, int order, SpriteLook look)
         {
             var bounds = sprite.bounds.size;
             var scale = CellsToWorld(tileCells) / (tileIsMeasuredByHeight ? bounds.y : bounds.x);
-            return AddTiled(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, scale, color, order);
+            var renderer = AddTiled(parent, name, sprite, center * layout.CellSize, size * layout.CellSize, scale, color, order);
+            renderer.sharedMaterial = MaterialOf(look);
+            return renderer;
         }
 
         /// <summary>
         /// The strip is scaled uniformly to its thickness and stretched only
-        /// in its sliced middle.
+        /// in its sliced middle, along x or along y; never turned.
         /// </summary>
         SpriteRenderer IRecipeSurface<Transform, SpriteRenderer>.Strip(
-            Transform parent, string name, Sprite sprite, Vector2 center, float length, float thickness, Color color,
-            int order, float rotationDegrees)
+            Transform parent, string name, Sprite sprite, Vector2 center, float length, float thickness, bool isAlongY,
+            Color color, int order, SpriteLook look)
         {
             var spriteSize = sprite.bounds.size;
-            var scale = CellsToWorld(thickness) / spriteSize.y;
+            var scale = CellsToWorld(thickness) / (isAlongY ? spriteSize.x : spriteSize.y);
 
-            var renderer = AddRenderer(parent, name, sprite, center * layout.CellSize, color, order, rotationDegrees);
+            var renderer = AddRenderer(parent, name, sprite, center * layout.CellSize, color, order, 0f);
+            renderer.sharedMaterial = MaterialOf(look);
             renderer.transform.localScale = new Vector3(scale, scale, 1f);
             renderer.drawMode = SpriteDrawMode.Sliced;
-            renderer.size = new Vector2(CellsToWorld(length) / scale, spriteSize.y);
+            var along = CellsToWorld(length) / scale;
+            renderer.size = isAlongY ? new Vector2(spriteSize.x, along) : new Vector2(along, spriteSize.y);
             return renderer;
         }
 
         void IRecipeSurface<Transform, SpriteRenderer>.Label(
-            Transform parent, string name, Vector2 center, string text, float boardFontSize, Color color) =>
-            AddLabel(parent, name, center * layout.CellSize, text, boardFontSize, color);
+            Transform parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed) =>
+            AddLabel(parent, name, center * layout.CellSize, text, boardFontSize, color, isShadowed);
+
+        /// <summary>The material a SpriteRenderer drawing a sprite as <paramref name="look"/> uses.</summary>
+        private Material MaterialOf(SpriteLook look)
+        {
+            switch (look)
+            {
+                case SpriteLook.Lit:
+                    return config.LitMaterial;
+                case SpriteLook.Highlight:
+                    return config.QuarterMaterial(QuarterLayer.Body);
+                default:
+                    return config.SpriteMaterial;
+            }
+        }
 
         /// <summary>
         /// Draws <paramref name="tiles"/> under <paramref name="parent"/>, one
@@ -990,15 +1066,6 @@ namespace GateRush.Runtime
 
         private float CellsToWorld(float cells) => cells * layout.CellSize;
 
-        private Vector2 RegionCenter(Coord min, Coord max) =>
-            GridToLocal(new Vector2((min.X + max.X + 1) * 0.5f, (min.Y + max.Y + 1) * 0.5f));
-
-        private Vector2 RegionSize(Coord min, Coord max) =>
-            new Vector2(CellsToWorld(max.X - min.X + 1), CellsToWorld(max.Y - min.Y + 1));
-
-        /// <summary>The uniform scale at which one tile of a cell-sized sprite covers one cell.</summary>
-        private float CellTileScale(Sprite sprite) => layout.CellSize / sprite.bounds.size.x;
-
         /// <summary>A tinted copy of the config's plain square: the floor's backing.</summary>
         private SpriteRenderer AddSquare(Transform parent, string name, Vector2 localCenter, Vector2 size, Color color, int order) =>
             AddSprite(parent, name, config.CellSprite, localCenter, size, color, order);
@@ -1017,19 +1084,6 @@ namespace GateRush.Runtime
             var renderer = AddRenderer(parent, name, sprite, localCenter, color, order, rotationDegrees);
             var bounds = sprite.bounds.size;
             renderer.transform.localScale = new Vector3(size.x / bounds.x, size.y / bounds.y, 1f);
-            return renderer;
-        }
-
-        /// <summary>
-        /// <see cref="AddSprite"/> drawn with the lit material, which
-        /// multiplies a stud's stored colour back by the art recipe's headroom
-        /// (Module 46).
-        /// </summary>
-        private SpriteRenderer AddLitSprite(
-            Transform parent, string name, Sprite sprite, Vector2 localCenter, Vector2 size, Color color, int order)
-        {
-            var renderer = AddSprite(parent, name, sprite, localCenter, size, color, order);
-            renderer.sharedMaterial = config.LitMaterial;
             return renderer;
         }
 
@@ -1091,7 +1145,13 @@ namespace GateRush.Runtime
             return renderer;
         }
 
-        private void AddLabel(Transform parent, string name, Vector2 localCenter, string text, float fontSize, Color color)
+        /// <summary>
+        /// A label in the label font centred on <paramref name="localCenter"/>,
+        /// with the digits' soft drop shadow when <paramref name="isShadowed"/>
+        /// (Module 46, pass 2): the label shadow material, the font's own with
+        /// its underlay on, which every shadowed label shares.
+        /// </summary>
+        private void AddLabel(Transform parent, string name, Vector2 localCenter, string text, float fontSize, Color color, bool isShadowed)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
@@ -1099,6 +1159,11 @@ namespace GateRush.Runtime
 
             var label = go.AddComponent<TextMeshPro>();
             label.font = config.LabelFont;
+            if (isShadowed && config.LabelShadowMaterial != null)
+            {
+                label.fontSharedMaterial = config.LabelShadowMaterial;
+            }
+
             label.text = text;
             label.fontSize = fontSize;
             label.color = color;
@@ -1175,7 +1240,7 @@ namespace GateRush.Runtime
             /// <summary>The block's movement axis: a restricted one shows an arrow instead of studs.</summary>
             public MovementAxis Axis { get; }
 
-            /// <summary>True for a frozen block (M3): its face is ice with frost, without studs.</summary>
+            /// <summary>True for a frozen block (M3): its body is in the ice colour, under the ice and its frost.</summary>
             public bool IsIce { get; }
 
             /// <summary>

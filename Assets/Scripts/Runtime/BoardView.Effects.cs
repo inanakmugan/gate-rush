@@ -1469,12 +1469,12 @@ namespace GateRush.Runtime
             {
                 var cell = block.Cells[c];
                 var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
-                var stud = surface.LitSprite(
+                var stud = surface.Sprite(
                     block.Body, $"Peel studs {cell}", config.StudsSprite, center, Vector2.one, WithOpacity(exposedFill, 0f),
-                    config.LayerStudOrder);
+                    config.LayerStudOrder, 0f, SpriteLook.Lit);
                 var gloss = surface.Sprite(
                     block.Body, $"Peel gloss {cell}", config.StudGlossSprite, center, Vector2.one,
-                    WithOpacity(config.GlossColor, 0f), config.LayerGlossOrder, 0f);
+                    WithOpacity(config.GlossColor, 0f), config.LayerGlossOrder, 0f, SpriteLook.Plain);
                 stud.maskInteraction = mask;
                 gloss.maskInteraction = mask;
                 studs.Add((stud, exposedFill));
@@ -1559,12 +1559,14 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A generated block starts at its machine's screen, at the size the
-        /// screen showed it, and grows while moving to its cells.
+        /// A generated block starts on its machine's screen, where and at the
+        /// size the screen showed it (<see cref="SplitScreen"/>), and grows
+        /// while moving to its cells.
         /// </summary>
         private Tween ArriveFromGenerator(DrawnBlock block, int generatorIndex)
         {
-            var screen = GridRectToLocal(machines[generatorIndex].Screen);
+            var screen = SplitScreen(
+                GridRectToLocal(machines[generatorIndex].Screen), config.MachineScreenCountShare, config.MachineMiniatureFillShare).block;
             var startScale = MiniatureFit(block.Cells, screen, out _) / layout.CellSize;
             Vector2 target = block.Root.localPosition;
             var start = screen.center - block.FootprintCenter;
@@ -1581,15 +1583,13 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// An elevator delivers a wave: its doors, drawn again as two temporary
-        /// halves over the hidden doors, slide apart into the region's sides;
-        /// the wave's blocks rise from slightly small and low to their cells;
-        /// and the halves close again beneath them.
+        /// doors with their handles over the hidden ones, slide apart into the
+        /// recess's sides; the wave's blocks rise from slightly small and low
+        /// to their cells; and the doors close again beneath them.
         /// </summary>
         private void RiseFromElevator(Sequence arrive, int elevatorIndex, List<DrawnBlock> wave)
         {
             var elevator = ctx.Elevators[elevatorIndex];
-            var center = RegionCenter(elevator.Min, elevator.Max);
-            var size = RegionSize(elevator.Min, elevator.Max);
 
             if (elevatorDoors.TryGetValue(elevatorIndex, out var doors))
             {
@@ -1600,22 +1600,29 @@ namespace GateRush.Runtime
                 }
             }
 
-            var sprite = config.DoorPanelSprite;
-            var scale = CellTileScale(sprite);
-            var halfWidth = size.x * 0.5f;
-            var leftEdge = center.x - halfWidth;
-            var rightEdge = center.x + halfWidth;
-            var left = AddTiled(stage, "Left door", sprite, center, size, scale, config.ElevatorDoorColor, config.ElevatorDoorOrder);
-            var right = AddTiled(stage, "Right door", sprite, center, size, scale, config.ElevatorDoorColor, config.ElevatorDoorOrder);
+            var region = RegionViewCells(elevator.Min, elevator.Max);
+            var (leftDoor, rightDoor) = ElevatorDoorRects(config, region);
+            var offset = config.ElevatorHandleOffsetCells;
+            var left = recipes.Door(stage, "Left door", leftDoor);
+            var right = recipes.Door(stage, "Right door", rightDoor);
+            var leftHandle = recipes.Handle(stage, "Left handle", new Vector2(region.center.x - offset, region.center.y));
+            var rightHandle = recipes.Handle(stage, "Right handle", new Vector2(region.center.x + offset, region.center.y));
 
-            // Each half keeps its outer side against the region's side and
-            // narrows toward it, so the doors slide under the sides unmasked.
+            // A handle sits this far in from its door's inner edge, and rides
+            // with it while it is on the door.
+            var handleIn = offset - config.ElevatorDoorGapCells;
+            var halfWidth = leftDoor.width;
+
+            // Each door keeps its outer side against the recess's side and
+            // narrows toward it, so the doors slide under the rim unmasked.
             void SetDoors(float width)
             {
-                left.size = new Vector2(width / scale, size.y / scale);
-                left.transform.localPosition = new Vector2(leftEdge + width * 0.5f, center.y);
-                right.size = new Vector2(width / scale, size.y / scale);
-                right.transform.localPosition = new Vector2(rightEdge - width * 0.5f, center.y);
+                PlaceDoor(left, new Rect(leftDoor.xMin, leftDoor.yMin, width, leftDoor.height));
+                PlaceDoor(right, new Rect(rightDoor.xMax - width, rightDoor.yMin, width, rightDoor.height));
+                leftHandle.transform.localPosition = new Vector2(CellsToWorld(leftDoor.xMin + width - handleIn), CellsToWorld(region.center.y));
+                rightHandle.transform.localPosition = new Vector2(CellsToWorld(rightDoor.xMax - width + handleIn), CellsToWorld(region.center.y));
+                leftHandle.enabled = width > handleIn;
+                rightHandle.enabled = width > handleIn;
             }
 
             SetDoors(halfWidth);
@@ -1654,6 +1661,26 @@ namespace GateRush.Runtime
             arrive.Insert(
                 open + rise,
                 DOVirtual.Float(0f, 1f, config.DoorsCloseSeconds, t => SetDoors(halfWidth * t)).SetEase(config.DoorsEase));
+        }
+
+        /// <summary>
+        /// Lays a sliced door, drawn by <see cref="BoardRecipes{TGroup, TPiece}.Door"/>,
+        /// over <paramref name="door"/>, in cells in the view's frame: its
+        /// sprite reaches past it for its shadow, at the scale it was drawn at.
+        /// </summary>
+        private void PlaceDoor(SpriteRenderer renderer, Rect door)
+        {
+            // Null only when the door's sprite has no slice border, which
+            // Generate Art never paints; nothing is drawn to place then.
+            if (renderer == null)
+            {
+                return;
+            }
+
+            var scale = renderer.transform.localScale.x;
+            var reach = 2f * config.ElevatorDoorShadowMarginCells;
+            renderer.transform.localPosition = door.center * layout.CellSize;
+            renderer.size = new Vector2(CellsToWorld(door.width + reach) / scale, CellsToWorld(door.height + reach) / scale);
         }
     }
 }

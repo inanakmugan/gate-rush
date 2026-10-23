@@ -168,15 +168,16 @@ namespace GateRush.Editor
         }
 
         /// <summary>The sets a placed sprite comes from.</summary>
-        private enum PlacedLayer
+        internal enum PlacedLayer
         {
             Face,
             Body,
-            Shadow
+            Shadow,
+            Ice
         }
 
         /// <summary>The sprite the runtime draws <paramref name="tile"/> with in <paramref name="layer"/>: by its piece and its place.</summary>
-        private static ArtSprite Placed(PlacedLayer layer, QuarterTile tile)
+        internal static ArtSprite Placed(PlacedLayer layer, QuarterTile tile)
         {
             var isRight = tile.SignX > 0;
             var isTop = tile.SignY > 0;
@@ -191,6 +192,7 @@ namespace GateRush.Editor
 
             var first = layer == PlacedLayer.Face ? ArtSprite.FaceOuterTopLeft
                 : layer == PlacedLayer.Body ? ArtSprite.BodyOuterTopLeft
+                : layer == PlacedLayer.Ice ? ArtSprite.IceOuterTopLeft
                 : ArtSprite.ShadowOuterTopLeft;
             return first + index;
         }
@@ -202,9 +204,19 @@ namespace GateRush.Editor
         /// through <paramref name="blend"/>, given what is under, the texel's
         /// tone decoded to linear, and its alpha.
         /// </summary>
-        private static void Draw(
+        internal static void Draw(
             Vector3[] image, int width, int height, ArtImage sprite, QuarterTile? tile, Vector2 origin, Rect cellRect, int cell,
-            Func<Vector3, double, float, Vector3> blend)
+            Func<Vector3, double, float, Vector3> blend) =>
+            DrawTexels(image, width, height, sprite, tile, origin, cellRect, cell,
+                (under, texel) => blend(under, Decode(texel.r), texel.a / 255f));
+
+        /// <summary>
+        /// <see cref="Draw"/> with the whole texel given to
+        /// <paramref name="blend"/>: for a sprite painted in colour.
+        /// </summary>
+        internal static void DrawTexels(
+            Vector3[] image, int width, int height, ArtImage sprite, QuarterTile? tile, Vector2 origin, Rect cellRect, int cell,
+            Func<Vector3, Color32, Vector3> blend)
         {
             var xMin = (int)Math.Round(origin.x + cellRect.xMin * cell);
             var xMax = (int)Math.Round(origin.x + cellRect.xMax * cell);
@@ -241,7 +253,7 @@ namespace GateRush.Editor
 
                     var texel = sprite.Pixels[sy * sprite.Width + sx];
                     var index = y * width + x;
-                    image[index] = blend(image[index], Decode(texel.r), texel.a / 255f);
+                    image[index] = blend(image[index], texel);
                 }
             }
         }
@@ -258,21 +270,26 @@ namespace GateRush.Editor
             return (x * cos - y * sin, x * sin + y * cos);
         }
 
-        private static Vector3 Linear(string hex)
+        /// <summary>A hex colour as linear light.</summary>
+        internal static Vector3 Linear(string hex)
         {
             ColorUtility.TryParseHtmlString(hex, out var color);
             return new Vector3((float)Decode(color.r * 255f), (float)Decode(color.g * 255f), (float)Decode(color.b * 255f));
         }
 
+        /// <summary>A texel's colour as linear light.</summary>
+        internal static Vector3 Linear(Color32 texel) =>
+            new Vector3((float)Decode(texel.r), (float)Decode(texel.g), (float)Decode(texel.b));
+
         /// <summary>An sRGB byte as linear light.</summary>
-        private static double Decode(double srgbByte)
+        internal static double Decode(double srgbByte)
         {
             var c = srgbByte / 255.0;
             return c <= 0.04045 ? c / 12.92 : Math.Pow((c + 0.055) / 1.055, 2.4);
         }
 
         /// <summary>Linear light as an sRGB byte, clipped.</summary>
-        private static byte Byte(float linear)
+        internal static byte Byte(float linear)
         {
             var c = Math.Min(1.0, Math.Max(0.0, linear));
             var srgb = c <= 0.0031308 ? c * 12.92 : 1.055 * Math.Pow(c, 1.0 / 2.4) - 0.055;
