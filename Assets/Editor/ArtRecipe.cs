@@ -8,7 +8,7 @@ namespace GateRush.Editor
     /// Every parameter of the generated art (D46): the board and blocks of
     /// Module 15, the state visuals of Module 16, the HUD icons of Module 17,
     /// the exit cube, ice shard and gate glow of Module 18 and the sparkle of
-    /// Module 19 — sizes, radii, stud size and spacing, tones, arrow shapes. The look is
+    /// Module 19, restyled by Module 46 — sizes, radii, outline, shine, stud, tones, arrow shapes. The look is
     /// tuned here, never in code; <see cref="ArtGenerator"/> reads nothing
     /// else. All sizes are in pixels of the generated textures, and tones are
     /// greyscale values from 0 (black) to 1 (white) that the runtime tints.
@@ -20,10 +20,10 @@ namespace GateRush.Editor
     /// <para><b>Seams.</b> Four quarter pieces meet at every seam of a block,
     /// the frame and a gate, each drawn without knowing its neighbours. They
     /// meet cleanly only while the rounding stays inside the piece that owns
-    /// it, which is what <see cref="Problems"/> checks: the corner radius and
-    /// the bevel must fit inside the face, and an inside corner's radius
-    /// inside half the gap between blocks — so inside corners stay nearly
-    /// sharp.</para>
+    /// it, which is what <see cref="Problems"/> checks: the corner radius, the
+    /// outline, the face's bevel and the shine must fit inside the face, and
+    /// an inside corner's radius inside half the gap between blocks — so
+    /// inside corners stay nearly sharp.</para>
     /// </remarks>
     [CreateAssetMenu(fileName = "ArtRecipe", menuName = "Gate Rush/Art Recipe")]
     public sealed class ArtRecipe : ScriptableObject
@@ -38,16 +38,32 @@ namespace GateRush.Editor
         [Tooltip("Width of the anti-aliased edge, in pixels.")]
         [SerializeField] private float antiAliasPixels = 1f;
 
-        [Header("Face (blocks, frame, gates)")]
+        [Header("Pieces (blocks, frame, gates)")]
         [Tooltip("Gap between two neighbouring blocks, in pixels: half of it is inset on each block's outline.")]
-        [SerializeField] private float blockGapPixels = 10f;
+        [SerializeField] private float blockGapPixels = 3f;
 
-        [Tooltip("Radius of an outer corner, in pixels. At most half a cell less half the gap, less half a pixel.")]
-        [SerializeField] private float cornerRadiusPixels = 24f;
+        [Tooltip("Radius of an outer corner of the outline, in pixels. At most half a cell less half the gap, less half a pixel.")]
+        [SerializeField] private float cornerRadiusPixels = 26f;
 
         [Tooltip("Radius of an inside (concave) corner, in pixels. At most half the gap less half a pixel, or the pieces stop meeting at their seams.")]
-        [SerializeField] private float concaveRadiusPixels = 4f;
+        [SerializeField] private float concaveRadiusPixels = 1f;
 
+        [Tooltip("Width of the dark outline round every block, the frame and every gate (D79), in pixels. The contour pieces draw the whole shape; the face pieces are the same shape pulled in by this, so the contour shows as a ring of this width. Above 0 and at most Corner Radius Pixels.")]
+        [SerializeField] private float pieceOutlinePixels = 5f;
+
+        [Tooltip("Width of the darker band of the block's own colour along a face piece's edge, in pixels (Module 46): the tone eases smoothly from Face Edge Band Tone at the edge to white at this depth, with no step; deeper the face is white, so the tint shows exactly.")]
+        [SerializeField] private float faceEdgeBandPixels = 6f;
+
+        [Tooltip("Tone of the face's edge band at the very edge: the block's colour darkened to this share.")]
+        [SerializeField, Range(0f, 1f)] private float faceEdgeBandTone = 0.6f;
+
+        [Tooltip("Width of the shine's full-strength band just inside a face's edge, in pixels. The board draws it untinted: a gloss band along the top, a thin light line above the lip.")]
+        [SerializeField] private float shineWidthPixels = 4f;
+
+        [Tooltip("How far past its band the shine fades out, in pixels. Band and fade together stay within the face's corner radius (Corner Radius Pixels less Piece Outline Pixels), so the shine turns smoothly round a corner.")]
+        [SerializeField] private float shineSoftnessPixels = 3f;
+
+        [Header("Bevel (rounded box, padlock, key)")]
         [Tooltip("Width of the darker line along the outline, in pixels.")]
         [SerializeField] private float outlineWidthPixels = 2f;
 
@@ -61,24 +77,36 @@ namespace GateRush.Editor
         [Tooltip("Tone of the face. Below 1 so the rim can read lighter: a runtime tint can only darken.")]
         [SerializeField, Range(0f, 1f)] private float faceTone = 0.84f;
 
-        [Header("Studs")]
-        [SerializeField] private float studDiameterPixels = 36f;
+        [Header("Studs (a grid per cell, centred)")]
+        [Tooltip("How many studs a cell carries along each side: 2 gives a 2×2 grid. The cell is divided evenly among them, so neighbouring cells continue one grid across a block. At least 1.")]
+        [SerializeField] private int studsPerCellSide = 2;
 
-        [Tooltip("Distance between the centres of neighbouring studs, in pixels; a cell carries a 2×2 grid of them.")]
-        [SerializeField] private float studSpacingPixels = 64f;
+        [Tooltip("Diameter of a stud's top disc, in pixels. A block's face is also shortened by its lip (Runtime Config's Block Lip Cells), which this recipe cannot see: StudFitTests checks the grid fits a single cell with both.")]
+        [SerializeField] private float studDiameterPixels = 32f;
 
-        [SerializeField, Range(0f, 1f)] private float studTone = 0.92f;
+        [SerializeField, Range(0f, 1f)] private float studTone = 1f;
 
-        [Tooltip("Width of the darker ring at each stud's edge, in pixels.")]
-        [SerializeField] private float studRingWidthPixels = 4f;
+        [Tooltip("Width of the thin dark rim along the top of each stud's disc, in pixels; it fades out by the disc's middle.")]
+        [SerializeField] private float studRingWidthPixels = 1.5f;
 
-        [SerializeField, Range(0f, 1f)] private float studRingTone = 0.66f;
+        [SerializeField, Range(0f, 1f)] private float studRingTone = 0.6f;
+
+        [Tooltip("How deep the darker crescent below each stud's disc is, in pixels: the stud's side, so it reads as a short cylinder. At least 0.")]
+        [SerializeField] private float studFootDropPixels = 7f;
+
+        [SerializeField, Range(0f, 1f)] private float studFootTone = 0.6f;
+
+        [Tooltip("How far each stud's disc sits above its point on the grid, in pixels, from 0 to Stud Foot Drop Pixels; the crescent hangs the rest of its depth below the point. Half the crescent centres disc and crescent on the point; a little less sits them on a face the lip shortens.")]
+        [SerializeField] private float studDiscRaisePixels = 3f;
 
         [Header("Stud gloss (never tinted by the block)")]
-        [SerializeField] private float glossDiameterPixels = 12f;
+        [SerializeField] private float glossDiameterPixels = 6f;
 
-        [Tooltip("Where the highlight sits relative to its stud's centre, in pixels.")]
+        [Tooltip("Where each highlight sits relative to its stud's disc's centre, in pixels.")]
         [SerializeField] private Vector2 glossOffsetPixels = new Vector2(-7f, 7f);
+
+        [Tooltip("Strength of the white light across the top of each stud's disc, fading out by its middle, so the top reads lighter than the face.")]
+        [SerializeField, Range(0f, 1f)] private float studTopLightAlpha = 0.3f;
 
         [Tooltip("How far the highlight's edge fades out, in pixels.")]
         [SerializeField] private float glossSoftnessPixels = 3f;
@@ -106,6 +134,9 @@ namespace GateRush.Editor
 
         [Tooltip("Width of the shaft, as a fraction of the sprite.")]
         [SerializeField, Range(0f, 1f)] private float gateArrowShaftWidth = 0.32f;
+
+        [Tooltip("Width of the dark outline round the gate arrow, in pixels: the outline sprite is the arrow grown by this. Arrow and outline must fit inside the sprite.")]
+        [SerializeField] private float gateArrowOutlinePixels = 5f;
 
         [Header("Axis arrow (double-headed, horizontal; 9-sliced)")]
         [SerializeField] private int axisArrowLengthPixels = 192;
@@ -312,7 +343,22 @@ namespace GateRush.Editor
         /// <summary>Radius of an inside corner, in pixels.</summary>
         public float ConcaveRadiusPixels => concaveRadiusPixels;
 
-        /// <summary>Width of the outline, in pixels.</summary>
+        /// <summary>Width of the dark outline round a block, the frame and a gate, in pixels: how far a face piece sits inside its contour piece.</summary>
+        public float PieceOutlinePixels => pieceOutlinePixels;
+
+        /// <summary>Width of the darker own-colour band along a face piece's edge, in pixels.</summary>
+        public float FaceEdgeBandPixels => faceEdgeBandPixels;
+
+        /// <summary>Tone of a face piece's edge band.</summary>
+        public float FaceEdgeBandTone => faceEdgeBandTone;
+
+        /// <summary>Width of the shine's full-strength band, in pixels.</summary>
+        public float ShineWidthPixels => shineWidthPixels;
+
+        /// <summary>How far past its band the shine fades out, in pixels.</summary>
+        public float ShineSoftnessPixels => shineSoftnessPixels;
+
+        /// <summary>Width of the rounded box's, padlock's and key's darker outline line, in pixels.</summary>
         public float OutlineWidthPixels => outlineWidthPixels;
 
         /// <summary>Tone of the outline.</summary>
@@ -327,25 +373,40 @@ namespace GateRush.Editor
         /// <summary>Tone of the face inside the rim.</summary>
         public float FaceTone => faceTone;
 
-        /// <summary>Stud diameter, in pixels.</summary>
+        /// <summary>Diameter of a stud's top disc, in pixels.</summary>
         public float StudDiameterPixels => studDiameterPixels;
 
-        /// <summary>Distance between neighbouring stud centres, in pixels.</summary>
-        public float StudSpacingPixels => studSpacingPixels;
+        /// <summary>How far a stud's disc sits above its grid point, in pixels.</summary>
+        public float StudDiscRaisePixels => studDiscRaisePixels;
+
+        /// <summary>Strength of the white light across the top of a stud's disc.</summary>
+        public float StudTopLightAlpha => studTopLightAlpha;
+
+        /// <summary>How many studs a cell carries along each side.</summary>
+        public int StudsPerCellSide => studsPerCellSide;
+
+        /// <summary>Distance between neighbouring stud centres, in pixels: the cell divided evenly, so the grid continues across cells.</summary>
+        public float StudSpacingPixels => studsPerCellSide > 0 ? (float)cellPixels / studsPerCellSide : 0f;
 
         /// <summary>Tone of a stud.</summary>
         public float StudTone => studTone;
 
-        /// <summary>Width of a stud's edge ring, in pixels.</summary>
+        /// <summary>Width of the dark rim along the top of a stud's disc, in pixels.</summary>
         public float StudRingWidthPixels => studRingWidthPixels;
 
-        /// <summary>Tone of a stud's edge ring.</summary>
+        /// <summary>Tone of a stud's top rim.</summary>
         public float StudRingTone => studRingTone;
+
+        /// <summary>Depth of the darker crescent below a stud's disc, in pixels.</summary>
+        public float StudFootDropPixels => studFootDropPixels;
+
+        /// <summary>Tone of a stud's crescent.</summary>
+        public float StudFootTone => studFootTone;
 
         /// <summary>Diameter of a stud's highlight, in pixels.</summary>
         public float GlossDiameterPixels => glossDiameterPixels;
 
-        /// <summary>Offset of a highlight from its stud's centre, in pixels.</summary>
+        /// <summary>Offset of the highlight from the stud's centre, in pixels.</summary>
         public Vector2 GlossOffsetPixels => glossOffsetPixels;
 
         /// <summary>How far a highlight's edge fades, in pixels.</summary>
@@ -377,6 +438,9 @@ namespace GateRush.Editor
 
         /// <summary>Shaft width, as a fraction of the sprite.</summary>
         public float GateArrowShaftWidth => gateArrowShaftWidth;
+
+        /// <summary>Width of the gate arrow's outline, in pixels.</summary>
+        public float GateArrowOutlinePixels => gateArrowOutlinePixels;
 
         /// <summary>Width of the axis arrow sprite, in pixels.</summary>
         public int AxisArrowLengthPixels => axisArrowLengthPixels;
@@ -626,11 +690,13 @@ namespace GateRush.Editor
 
         /// <summary>
         /// Where frost may not reach from a cell's side, in pixels, for it to
-        /// stay on a block's face: half the gap, plus how far an outer corner's
-        /// rounding cuts in along the cell's diagonal, plus the anti-aliased edge.
+        /// stay on a block's face: half the gap, plus how far the face's
+        /// corner — the outline's, pulled in by the outline and sharing its
+        /// centre — cuts in along the cell's diagonal, plus the anti-aliased edge.
         /// </summary>
         private float MinFrostInsetPixels =>
-            blockGapPixels / 2f + cornerRadiusPixels * (1f - (float)(1.0 / Math.Sqrt(2.0))) + antiAliasPixels;
+            blockGapPixels / 2f + cornerRadiusPixels
+            - (cornerRadiusPixels - pieceOutlinePixels) * (float)(1.0 / Math.Sqrt(2.0)) + antiAliasPixels;
 
         /// <summary>
         /// Every reason this recipe cannot generate the art, as messages naming
@@ -671,20 +737,14 @@ namespace GateRush.Editor
                 problems.Add($"{name}: Concave Radius Pixels must be at least 0 and at most half the Block Gap Pixels less half a pixel ({halfGap - HalfPixel}).");
             }
 
-            if (!(outlineWidthPixels >= 0f && rimWidthPixels >= 0f && outlineWidthPixels + rimWidthPixels <= faceExtent))
+            AddPieceProblems(problems, faceExtent);
+
+            if (!(outlineWidthPixels >= 0f && rimWidthPixels >= 0f && outlineWidthPixels + rimWidthPixels < panelPixels / 2f))
             {
-                problems.Add($"{name}: Outline Width Pixels and Rim Width Pixels may not be negative, and together must fit inside the face ({faceExtent}).");
+                problems.Add($"{name}: Outline Width Pixels and Rim Width Pixels may not be negative, and together must fit inside half of Panel Pixels.");
             }
 
-            if (!(studDiameterPixels > 0f && studDiameterPixels < studSpacingPixels))
-            {
-                problems.Add($"{name}: Stud Diameter Pixels must be positive and below Stud Spacing Pixels.");
-            }
-
-            if (!((studSpacingPixels + studDiameterPixels) / 2f <= faceExtent))
-            {
-                problems.Add($"{name}: Stud Spacing Pixels and Stud Diameter Pixels put the studs outside the face.");
-            }
+            AddStudProblems(problems, faceExtent);
 
             if (!(studRingWidthPixels >= 0f && studRingWidthPixels * 2f <= studDiameterPixels))
             {
@@ -694,6 +754,11 @@ namespace GateRush.Editor
             if (!(glossDiameterPixels > 0f && glossSoftnessPixels >= 0f))
             {
                 problems.Add($"{name}: Gloss Diameter Pixels must be positive and Gloss Softness Pixels at least 0.");
+            }
+
+            if (!(glossOffsetPixels.magnitude + glossDiameterPixels / 2f <= studDiameterPixels / 2f))
+            {
+                problems.Add($"{name}: Gloss Offset Pixels and Gloss Diameter Pixels must keep the highlight inside the stud.");
             }
 
             if (!(gridLinePixels >= 0f && gridLinePixels <= quarter))
@@ -710,6 +775,14 @@ namespace GateRush.Editor
                   && gateArrowShaftWidth > 0f && gateArrowShaftWidth <= gateArrowHeadWidth))
             {
                 problems.Add($"{name}: the gate arrow's head must be shorter than the arrow, and its shaft positive and no wider than its head.");
+            }
+
+            // The arrow is centred, so its longest extent, along or across,
+            // leaves this margin at each side of the sprite.
+            var arrowMargin = (1f - Math.Max(gateArrowLength, gateArrowHeadWidth)) * gateArrowPixels / 2f;
+            if (!(gateArrowOutlinePixels > 0f && gateArrowOutlinePixels + antiAliasPixels <= arrowMargin))
+            {
+                problems.Add($"{name}: Gate Arrow Outline Pixels must be above 0, and with the anti-aliased edge fit in the arrow's margin inside Gate Arrow Pixels ({arrowMargin}).");
             }
 
             if (axisArrowLengthPixels < 8 || axisArrowThicknessPixels < 8)
@@ -742,6 +815,81 @@ namespace GateRush.Editor
             AddFeedbackProblems(problems);
             AddIntroductionProblems(problems);
             return problems;
+        }
+
+        /// <summary>
+        /// The constraints on Module 46's outline, face and shine, each message
+        /// naming its field. Like the rounding, every bevel and band must end
+        /// half a pixel before the seams toward the cell's centre, where the
+        /// neighbouring piece is plain face; and the shine must end before the
+        /// face's straight sides meet inside its corner, where the way an edge
+        /// faces would jump instead of turning.
+        /// </summary>
+        /// <param name="faceExtent">From the cell's centre to the outline's outer edge, in pixels.</param>
+        private void AddPieceProblems(List<string> problems, float faceExtent)
+        {
+            var inside = faceExtent - HalfPixel;
+
+            if (!(pieceOutlinePixels > 0f && pieceOutlinePixels <= cornerRadiusPixels))
+            {
+                problems.Add($"{name}: Piece Outline Pixels must be above 0 and at most Corner Radius Pixels, so the face inside the outline keeps a rounded corner.");
+            }
+
+            if (!(faceEdgeBandPixels >= 0f && pieceOutlinePixels + faceEdgeBandPixels <= inside))
+            {
+                problems.Add($"{name}: Face Edge Band Pixels must be at least 0, and with Piece Outline Pixels fit inside the face ({inside}).");
+            }
+
+            var faceCorner = cornerRadiusPixels - pieceOutlinePixels;
+            if (!(shineWidthPixels > 0f && shineSoftnessPixels >= 0f && shineWidthPixels + shineSoftnessPixels <= faceCorner))
+            {
+                problems.Add($"{name}: Shine Width Pixels must be above 0 and Shine Softness Pixels at least 0, and the two together at most the face's corner radius, Corner Radius Pixels less Piece Outline Pixels ({faceCorner}).");
+            }
+        }
+
+        /// <summary>
+        /// The constraints on the studs' grid, each message naming its field.
+        /// The grid sits on the face, the cell less half the gap and the
+        /// outline on every side; the lip shortening the face from below is
+        /// the runtime's and cannot be checked here.
+        /// </summary>
+        /// <param name="faceExtent">From the cell's centre to the outline's outer edge, in pixels.</param>
+        private void AddStudProblems(List<string> problems, float faceExtent)
+        {
+            if (studsPerCellSide < 1)
+            {
+                problems.Add($"{name}: Studs Per Cell Side must be at least 1.");
+                return;
+            }
+
+            if (!(studDiameterPixels > 0f && studFootDropPixels >= 0f))
+            {
+                problems.Add($"{name}: Stud Diameter Pixels must be positive and Stud Foot Drop Pixels at least 0.");
+            }
+
+            // Face shows between neighbours, and a foot stays nearer its own
+            // stud than the one below. Across cells the spacing is the same.
+            var spacing = StudSpacingPixels;
+            if (!(spacing > studDiameterPixels + studFootDropPixels))
+            {
+                problems.Add($"{name}: Stud Diameter Pixels plus Stud Foot Drop Pixels must be below the stud spacing, Cell Pixels divided by Studs Per Cell Side ({spacing}), so the face shows between the studs.");
+            }
+
+            if (!(studDiscRaisePixels >= 0f && studDiscRaisePixels <= studFootDropPixels))
+            {
+                problems.Add($"{name}: Stud Disc Raise Pixels must be from 0 to Stud Foot Drop Pixels, so the disc and its crescent stay on their grid point.");
+            }
+
+            // From a grid point the disc reaches its raise and its radius up,
+            // the crescent the rest of its depth and the radius down.
+            var studRoom = faceExtent - pieceOutlinePixels;
+            var radius = studDiameterPixels / 2f;
+            var unitReach = Math.Max(studDiscRaisePixels + radius, studFootDropPixels - studDiscRaisePixels + radius);
+            var reach = (studsPerCellSide - 1) * spacing / 2f + unitReach;
+            if (!(reach <= studRoom))
+            {
+                problems.Add($"{name}: Studs Per Cell Side, Stud Diameter Pixels, Stud Foot Drop Pixels and Stud Disc Raise Pixels put the studs outside the face ({reach} of {studRoom} from the cell's centre).");
+            }
         }
 
         /// <summary>The constraints on Module 19's sparkle, each message naming its field.</summary>

@@ -15,20 +15,29 @@ MonoBehaviour:
   cellPixels: 128
   antiAliasPixels: 1
   blockGapPixels: 3
-  cornerRadiusPixels: 24
+  cornerRadiusPixels: 26
   concaveRadiusPixels: 1
+  pieceOutlinePixels: 5
+  faceEdgeBandPixels: 6
+  faceEdgeBandTone: 0.6
+  shineWidthPixels: 4
+  shineSoftnessPixels: 3
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10
   rimTone: 1
   faceTone: 0.84
-  studDiameterPixels: 36
-  studSpacingPixels: 64
-  studTone: 0.92
-  studRingWidthPixels: 4
-  studRingTone: 0.66
-  glossDiameterPixels: 12
+  studsPerCellSide: 2
+  studDiameterPixels: 32
+  studTone: 1
+  studRingWidthPixels: 1.5
+  studRingTone: 0.6
+  studFootDropPixels: 7
+  studFootTone: 0.6
+  studDiscRaisePixels: 3
+  glossDiameterPixels: 6
   glossOffsetPixels: {x: -7, y: 7}
+  studTopLightAlpha: 0.3
   glossSoftnessPixels: 3
   glossAlpha: 0.85
   floorTone: 0.85
@@ -39,6 +48,7 @@ MonoBehaviour:
   gateArrowHeadWidth: 0.8
   gateArrowHeadLength: 0.45
   gateArrowShaftWidth: 0.32
+  gateArrowOutlinePixels: 5
   axisArrowLengthPixels: 192
   axisArrowThicknessPixels: 64
   axisArrowHeadLengthPixels: 30

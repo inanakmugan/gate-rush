@@ -2,15 +2,17 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using GateRush.Runtime;
 using UnityEditor;
 using UnityEngine;
 
 namespace GateRush.Editor
 {
     /// <summary>
-    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15, 16, 17, 18 and 19 from
+    /// <i>Gate Rush → Generate Art</i>: paints every sprite of Modules 15, 16, 17, 18, 19 and 46 from
     /// the project's <see cref="ArtRecipe"/> and writes it as a PNG under
-    /// <see cref="OutputFolder"/>, with its import settings (D46). The PNGs are
+    /// <see cref="OutputFolder"/>, with its import settings (D46), then sets
+    /// each into its <see cref="RuntimeConfig"/> field. The PNGs are
     /// committed; the build never runs this.
     /// </summary>
     /// <remarks>
@@ -81,6 +83,98 @@ namespace GateRush.Editor
                 $"{report.Written} PNG(s) written, {report.Reimported} reimported with new settings, " +
                 $"{report.Unchanged} unchanged.",
                 recipe);
+
+            AssignToRuntimeConfig();
+        }
+
+        /// <summary>
+        /// The <see cref="RuntimeConfig"/> field that holds <paramref name="sprite"/>:
+        /// the sprite's name in camel case followed by <c>Sprite</c>. Null for
+        /// <see cref="ArtSprite.Restart"/>, which the interface's prefabs use
+        /// and the board's config does not hold.
+        /// </summary>
+        public static string RuntimeConfigField(ArtSprite sprite)
+        {
+            if (sprite == ArtSprite.Restart)
+            {
+                return null;
+            }
+
+            var name = sprite.ToString();
+            return char.ToLowerInvariant(name[0]) + name.Substring(1) + "Sprite";
+        }
+
+        /// <summary>Where <paramref name="sprite"/>'s PNG is written.</summary>
+        public static string PathOf(ArtSprite sprite) => $"{OutputFolder}/{sprite}.png";
+
+        /// <summary>
+        /// Sets every generated sprite into its field of the project's only
+        /// <see cref="RuntimeConfig"/> (<see cref="RuntimeConfigField"/>), so the
+        /// config always holds what the generator wrote. Saves only when a
+        /// field changed, and logs one line per field it set; logs an error
+        /// and sets nothing it cannot resolve.
+        /// </summary>
+        private static void AssignToRuntimeConfig()
+        {
+            var guids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
+            if (guids.Length != 1)
+            {
+                Debug.LogError(
+                    $"Generate Art: the project has {guids.Length} Runtime Configs, not one; no sprite was assigned.");
+                return;
+            }
+
+            var configPath = AssetDatabase.GUIDToAssetPath(guids[0]);
+            var config = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(configPath);
+            if (config == null)
+            {
+                Debug.LogError($"Generate Art: the Runtime Config at {configPath} could not be loaded; no sprite was assigned.");
+                return;
+            }
+
+            var serialized = new SerializedObject(config);
+            var set = new List<string>();
+            foreach (var sprite in ArtPainter.All)
+            {
+                var field = RuntimeConfigField(sprite);
+                if (field == null)
+                {
+                    continue;
+                }
+
+                var property = serialized.FindProperty(field);
+                if (property == null || property.propertyType != SerializedPropertyType.ObjectReference)
+                {
+                    Debug.LogError($"Generate Art: {config.name} has no sprite field '{field}' for {sprite}.", config);
+                    continue;
+                }
+
+                var path = PathOf(sprite);
+                var loaded = AssetDatabase.LoadAssetAtPath<Sprite>(path);
+                if (loaded == null)
+                {
+                    Debug.LogError($"Generate Art: no sprite could be loaded from {path} for '{field}'.", config);
+                    continue;
+                }
+
+                if (property.objectReferenceValue != loaded)
+                {
+                    property.objectReferenceValue = loaded;
+                    set.Add($"{field} = {path}");
+                }
+            }
+
+            if (set.Count == 0)
+            {
+                return;
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            AssetDatabase.SaveAssetIfDirty(config);
+            foreach (var line in set)
+            {
+                Debug.Log($"Generate Art: {config.name}.{line}", config);
+            }
         }
 
         /// <summary>
@@ -103,7 +197,7 @@ namespace GateRush.Editor
             {
                 var image = ArtPainter.Paint(recipe, sprite);
                 var bytes = ArtPainter.EncodePng(image);
-                var path = $"{OutputFolder}/{sprite}.png";
+                var path = PathOf(sprite);
 
                 var isWritten = !File.Exists(path) || !File.ReadAllBytes(path).SequenceEqual(bytes);
                 if (isWritten)

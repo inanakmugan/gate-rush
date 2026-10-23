@@ -36,10 +36,24 @@ namespace GateRush.Tests
         }
 
         [TestCase("concaveRadiusPixels", 6f, "Concave Radius Pixels")]
-        [TestCase("cornerRadiusPixels", 60f, "Corner Radius Pixels")]
+        [TestCase("cornerRadiusPixels", 63f, "Corner Radius Pixels")]
         [TestCase("rimWidthPixels", 60f, "Rim Width Pixels")]
-        [TestCase("studDiameterPixels", 60f, "Stud Diameter Pixels")]
-        [TestCase("studSpacingPixels", 100f, "Stud Spacing Pixels")]
+        [TestCase("pieceOutlinePixels", 0f, "Piece Outline Pixels")]
+        [TestCase("pieceOutlinePixels", 30f, "Piece Outline Pixels")]
+        [TestCase("faceEdgeBandPixels", -1f, "Face Edge Band Pixels")]
+        [TestCase("faceEdgeBandPixels", 60f, "Face Edge Band Pixels")]
+        [TestCase("studDiscRaisePixels", -1f, "Stud Disc Raise Pixels")]
+        [TestCase("studDiscRaisePixels", 8f, "Stud Disc Raise Pixels")]
+        [TestCase("shineWidthPixels", 0f, "Shine Width Pixels")]
+        [TestCase("shineWidthPixels", 20f, "Shine Width Pixels")]
+        [TestCase("shineSoftnessPixels", -1f, "Shine Softness Pixels")]
+        [TestCase("studDiameterPixels", 130f, "Stud Diameter Pixels")]
+        [TestCase("studDiameterPixels", 62f, "Stud Diameter Pixels")]
+        [TestCase("studFootDropPixels", -1f, "Stud Foot Drop Pixels")]
+        [TestCase("studFootDropPixels", 30f, "Stud Foot Drop Pixels")]
+        [TestCase("glossDiameterPixels", 50f, "Gloss Diameter Pixels")]
+        [TestCase("gateArrowOutlinePixels", 0f, "Gate Arrow Outline Pixels")]
+        [TestCase("gateArrowOutlinePixels", 6f, "Gate Arrow Outline Pixels")]
         [TestCase("axisArrowHeadLengthPixels", 96f, "Axis Arrow Head Length Pixels")]
         [TestCase("vignetteInner", 1f, "Vignette Inner")]
         [TestCase("frostInsetPixels", 5f, "Frost Inset Pixels")]
@@ -132,6 +146,32 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains("Shard Points"), string.Join(" | ", problems));
+        }
+
+        [TestCase(0, TestName = "Problems_StudsPerCellSideZero_IsReported")]
+        [TestCase(3, TestName = "Problems_ThreeStudsPerCellSideAtTheDefaultDiameter_IsReported")]
+        [TestCase(4, TestName = "Problems_FourStudsPerCellSideCloserThanTheDefaultDiameter_IsReported")]
+        public void Problems_StudsPerCellSideOutOfRange_IsReported(int perSide)
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("studsPerCellSide").intValue = perSide;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Studs Per Cell Side"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_GlossOffsetOutsideTheStud_IsReported()
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("glossOffsetPixels").vector2Value = new Vector2(-14f, 14f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Gloss Offset Pixels"), string.Join(" | ", problems));
         }
 
         private void SetFloat(string field, float value)
