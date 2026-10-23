@@ -27,6 +27,18 @@ namespace GateRush.Editor
         LightEdgeBottom,
         LightEdgeLeft,
         LightEdgeRight,
+        BodyOuterTopLeft,
+        BodyOuterTopRight,
+        BodyOuterBottomLeft,
+        BodyOuterBottomRight,
+        BodyConcaveTopLeft,
+        BodyConcaveTopRight,
+        BodyConcaveBottomLeft,
+        BodyConcaveBottomRight,
+        BodyEdgeTop,
+        BodyEdgeBottom,
+        BodyEdgeLeft,
+        BodyEdgeRight,
         Studs,
         StudGloss,
         SingleStud,
@@ -187,6 +199,30 @@ namespace GateRush.Editor
                     return PaintLightEdge(recipe, -1, 0);
                 case ArtSprite.LightEdgeRight:
                     return PaintLightEdge(recipe, 1, 0);
+                case ArtSprite.BodyOuterTopLeft:
+                    return PaintBody(recipe, QuarterShape.Outer, -1, 1, hasStreak: true);
+                case ArtSprite.BodyOuterTopRight:
+                    return PaintBody(recipe, QuarterShape.Outer, 1, 1, hasStreak: false);
+                case ArtSprite.BodyOuterBottomLeft:
+                    return PaintBody(recipe, QuarterShape.Outer, -1, -1, hasStreak: false);
+                case ArtSprite.BodyOuterBottomRight:
+                    return PaintBody(recipe, QuarterShape.Outer, 1, -1, hasStreak: false);
+                case ArtSprite.BodyConcaveTopLeft:
+                    return PaintBody(recipe, QuarterShape.Concave, -1, 1, hasStreak: false);
+                case ArtSprite.BodyConcaveTopRight:
+                    return PaintBody(recipe, QuarterShape.Concave, 1, 1, hasStreak: false);
+                case ArtSprite.BodyConcaveBottomLeft:
+                    return PaintBody(recipe, QuarterShape.Concave, -1, -1, hasStreak: false);
+                case ArtSprite.BodyConcaveBottomRight:
+                    return PaintBody(recipe, QuarterShape.Concave, 1, -1, hasStreak: false);
+                case ArtSprite.BodyEdgeTop:
+                    return PaintBodyEdge(recipe, 0, 1);
+                case ArtSprite.BodyEdgeBottom:
+                    return PaintBodyEdge(recipe, 0, -1);
+                case ArtSprite.BodyEdgeLeft:
+                    return PaintBodyEdge(recipe, -1, 0);
+                case ArtSprite.BodyEdgeRight:
+                    return PaintBodyEdge(recipe, 1, 0);
                 case ArtSprite.Studs:
                     return PaintStuds(recipe, recipe.StudsPerCellSide);
                 case ArtSprite.StudGloss:
@@ -332,6 +368,99 @@ namespace GateRush.Editor
             double strength = isLit ? recipe.LightAlpha : recipe.ShadeAlpha;
             var fade = 1.0 - Smooth(Clamp01(depth / band));
             return (isLit ? 1.0 : 0.0, Coverage(recipe, sd) * strength * Math.Abs(facing) * fade);
+        }
+
+        /// <summary>
+        /// A body piece over a face piece of the same kind, for the quarter at
+        /// corner <c>(sx, sy)</c> of its cell: what makes a block's face read
+        /// as a glossy, puffy button (Module 46). Drawn for the top-right
+        /// quarter and mirrored onto its corner, so, like a light piece, the
+        /// way its edge faces is worked out after that mirroring. The top-left
+        /// outer corner alone carries the gloss streak
+        /// (<paramref name="hasStreak"/>), so a block shows one at each of its
+        /// top-left corners.
+        /// </summary>
+        private static ArtImage PaintBody(ArtRecipe recipe, QuarterShape shape, int sx, int sy, bool hasStreak)
+        {
+            var toward = TowardLight(recipe);
+            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
+            {
+                var (nx, ny) = OutwardNormal(recipe, shape, x, y);
+                var streak = hasStreak ? StreakAlpha(recipe, x, y) : 0.0;
+                return BodyPixel(recipe, FaceSd(recipe, shape, x, y), sx * nx, sy * ny, toward, streak);
+            });
+        }
+
+        /// <summary>
+        /// A body piece over an edge piece whose boundary faces
+        /// <c>(wx, wy)</c> once posed: of one strength along the whole edge.
+        /// </summary>
+        private static ArtImage PaintBodyEdge(ArtRecipe recipe, int wx, int wy)
+        {
+            var toward = TowardLight(recipe);
+            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
+                BodyPixel(recipe, FaceSd(recipe, QuarterShape.Edge, x, y), wx, wy, toward, 0.0));
+        }
+
+        /// <summary>
+        /// One body-piece pixel <c>−sd</c> inside the face's edge, whose
+        /// nearest edge faces <c>(nx, ny)</c> on the board. Untinted layers,
+        /// bottom to top:
+        /// <list type="bullet">
+        /// <item>the bevel ring, easing from the edge into the flat middle:
+        /// black along the side away from the light and the bottom, white
+        /// along tops, turning with the edge;</item>
+        /// <item>a faint white in the ring along edges facing the light's
+        /// side;</item>
+        /// <item>the top band, white along edges facing up, full to its depth
+        /// and then softly fading;</item>
+        /// <item>the reflection line, a thin white along edges facing down,
+        /// just above the lip;</item>
+        /// <item>the gloss streak, where the caller puts one.</item>
+        /// </list>
+        /// </summary>
+        private static (double tone, double alpha) BodyPixel(
+            ArtRecipe recipe, double sd, double nx, double ny, (double x, double y) toward, double streak)
+        {
+            var depth = -sd;
+            var up = Clamp01(ny);
+            var down = Clamp01(-ny);
+            var ring = 1.0 - Smooth(Clamp01(depth / recipe.BodyBevelPixels));
+            var lightSide = toward.x > 0.0 ? Clamp01(nx) : toward.x < 0.0 ? Clamp01(-nx) : 0.0;
+
+            double bandDepth = recipe.BodyTopBandPixels;
+            var band = depth <= bandDepth ? 1.0 : 1.0 - Smooth(Clamp01((depth - bandDepth) / recipe.BodyTopBandSoftnessPixels));
+            var line = 1.0 - Clamp01(depth - recipe.BodyReflectionPixels + 0.5);
+
+            // The edge on the light's side is lightened, never shaded.
+            var layer = (tone: 0.0, alpha: recipe.BodyBevelShadeAlpha * (1.0 - up) * (1.0 - lightSide) * ring);
+            layer = Over((1.0, recipe.BodyBevelLightAlpha * up * ring), layer);
+            layer = Over((1.0, recipe.BodySideLightAlpha * lightSide * ring), layer);
+            layer = Over((1.0, recipe.BodyTopBandAlpha * Smooth(up) * band), layer);
+            layer = Over((1.0, recipe.BodyReflectionAlpha * down * line), layer);
+            layer = Over((1.0, streak), layer);
+            return (layer.tone, layer.alpha * Coverage(recipe, sd));
+        }
+
+        /// <summary>
+        /// The gloss streak's alpha at <c>(x, y)</c> of a top-right-quarter
+        /// sprite: a capsule along the face's straight top, its middle
+        /// <see cref="ArtRecipe.BodyStreakDepthPixels"/> below the edge, from
+        /// <see cref="ArtRecipe.BodyStreakGapPixels"/> short of the corner's
+        /// curve toward the cell's middle. Mirrored onto the top-left corner
+        /// it starts just right of that corner's curve.
+        /// </summary>
+        private static double StreakAlpha(ArtRecipe recipe, double x, double y)
+        {
+            double q = recipe.QuarterPixels;
+            var e = q - recipe.BlockGapPixels / 2.0;
+            var curveStart = e - recipe.CornerRadiusPixels;
+            var near = curveStart - recipe.BodyStreakGapPixels;
+            var far = near - recipe.BodyStreakLengthPixels;
+            var middle = e - recipe.PieceOutlinePixels - recipe.BodyStreakDepthPixels;
+            var along = Clamp(x, far, near);
+            var d = Length(x - along, y - middle) - recipe.BodyStreakThicknessPixels / 2.0;
+            return recipe.BodyStreakAlpha * Coverage(recipe, d);
         }
 
         /// <summary>

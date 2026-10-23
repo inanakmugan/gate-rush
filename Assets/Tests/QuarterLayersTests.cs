@@ -9,8 +9,9 @@ namespace GateRush.Tests
 {
     /// <summary>
     /// Covers <see cref="QuarterLayers"/> (Module 46): every quarter but a fill
-    /// carries the contour and the light, in the tiles' order, and a quarter
-    /// overlaps its neighbours only while it is opaque and not a light piece.
+    /// carries the contour and the body or light, in the tiles' order, and a
+    /// quarter overlaps its neighbours only while it is opaque and neither a
+    /// body nor a light piece.
     /// </summary>
     public class QuarterLayersTests
     {
@@ -65,9 +66,9 @@ namespace GateRush.Tests
             Assert.AreEqual(0f, translucent);
         }
 
-        [TestCase(QuarterLayer.Light)]
+        [TestCase(QuarterLayer.Body)]
         [TestCase(QuarterLayer.ReversedLight)]
-        public void SeamOverlap_LightPieceInOpaqueWhite_IsNone(QuarterLayer layer)
+        public void SeamOverlap_BodyOrLightPieceInOpaqueWhite_IsNone(QuarterLayer layer)
         {
             var light = QuarterLayers.SeamOverlap(layer, Color.white, 0.002f);
 

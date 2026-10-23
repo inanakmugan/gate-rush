@@ -67,6 +67,47 @@ namespace GateRush.Editor
         [Tooltip("Strength of the shaded band at an edge facing away squarely: its black's alpha, 0.3 darkening the colour to 0.7 of itself.")]
         [SerializeField, Range(0f, 1f)] private float shadeAlpha = 0.3f;
 
+        [Header("Block body (blocks, gates and the frame; untinted over the face)")]
+        [Tooltip("Width of the soft bevel ring all round a block's face, in pixels: darker along the side away from the light and the bottom, lighter along its top, easing smoothly into the flat middle, so the face reads as a raised cushion. Above 0 and at most the face's corner radius.")]
+        [SerializeField] private float bodyBevelPixels = 13f;
+
+        [Tooltip("Black's alpha at the very edge of the bevel ring along the side away from the light or the bottom.")]
+        [SerializeField, Range(0f, 1f)] private float bodyBevelShadeAlpha = 0.18f;
+
+        [Tooltip("White's alpha at the very edge of the bevel ring along the top.")]
+        [SerializeField, Range(0f, 1f)] private float bodyBevelLightAlpha = 0.1f;
+
+        [Tooltip("White's alpha of the faint lightening in the bevel ring along edges facing the light (Light Angle Degrees): the left, from the top left.")]
+        [SerializeField, Range(0f, 1f)] private float bodySideLightAlpha = 0.08f;
+
+        [Tooltip("Depth of the full-strength white band along a face's top edges, in pixels.")]
+        [SerializeField] private float bodyTopBandPixels = 7f;
+
+        [Tooltip("How far below its full depth the top band fades out, in pixels: its soft lower edge. Band and softness together at most the face's corner radius.")]
+        [SerializeField] private float bodyTopBandSoftnessPixels = 6f;
+
+        [Tooltip("White's alpha of the top band: the body's main highlight.")]
+        [SerializeField, Range(0f, 1f)] private float bodyTopBandAlpha = 0.45f;
+
+        [Tooltip("Length of the gloss streak near a block's top-left outer corner, in pixels, along the top edge.")]
+        [SerializeField] private float bodyStreakLengthPixels = 22f;
+
+        [Tooltip("Thickness of the gloss streak, in pixels; its ends are rounded.")]
+        [SerializeField] private float bodyStreakThicknessPixels = 3.5f;
+
+        [Tooltip("How far below the face's top edge the streak's middle runs, in pixels.")]
+        [SerializeField] private float bodyStreakDepthPixels = 4f;
+
+        [Tooltip("How far the streak's near end starts from the corner's curve, toward the cell's middle, in pixels.")]
+        [SerializeField] private float bodyStreakGapPixels = 2.5f;
+
+        [SerializeField, Range(0f, 1f)] private float bodyStreakAlpha = 0.7f;
+
+        [Tooltip("Width of the thin light line along a face's bottom edges, just above the lip, in pixels.")]
+        [SerializeField] private float bodyReflectionPixels = 2f;
+
+        [SerializeField, Range(0f, 1f)] private float bodyReflectionAlpha = 0.35f;
+
         [Header("Bevel (rounded box, padlock, key)")]
         [Tooltip("Width of the darker line along the outline, in pixels.")]
         [SerializeField] private float outlineWidthPixels = 2f;
@@ -372,6 +413,48 @@ namespace GateRush.Editor
 
         /// <summary>Alpha of the shaded band's black at an edge facing away squarely.</summary>
         public float ShadeAlpha => shadeAlpha;
+
+        /// <summary>Width of the body's bevel ring, in pixels.</summary>
+        public float BodyBevelPixels => bodyBevelPixels;
+
+        /// <summary>Black's alpha at the edge of the bevel ring along a side or the bottom.</summary>
+        public float BodyBevelShadeAlpha => bodyBevelShadeAlpha;
+
+        /// <summary>White's alpha at the edge of the bevel ring along the top.</summary>
+        public float BodyBevelLightAlpha => bodyBevelLightAlpha;
+
+        /// <summary>White's alpha of the faint lightening along edges facing the light.</summary>
+        public float BodySideLightAlpha => bodySideLightAlpha;
+
+        /// <summary>Depth of the top band's full strength, in pixels.</summary>
+        public float BodyTopBandPixels => bodyTopBandPixels;
+
+        /// <summary>Depth of the top band's soft lower edge, in pixels.</summary>
+        public float BodyTopBandSoftnessPixels => bodyTopBandSoftnessPixels;
+
+        /// <summary>White's alpha of the top band.</summary>
+        public float BodyTopBandAlpha => bodyTopBandAlpha;
+
+        /// <summary>Length of the gloss streak, in pixels.</summary>
+        public float BodyStreakLengthPixels => bodyStreakLengthPixels;
+
+        /// <summary>Thickness of the gloss streak, in pixels.</summary>
+        public float BodyStreakThicknessPixels => bodyStreakThicknessPixels;
+
+        /// <summary>Depth of the streak's middle below the face's top edge, in pixels.</summary>
+        public float BodyStreakDepthPixels => bodyStreakDepthPixels;
+
+        /// <summary>Gap between the corner's curve and the streak's near end, in pixels.</summary>
+        public float BodyStreakGapPixels => bodyStreakGapPixels;
+
+        /// <summary>White's alpha of the gloss streak.</summary>
+        public float BodyStreakAlpha => bodyStreakAlpha;
+
+        /// <summary>Width of the light line along a face's bottom edges, in pixels.</summary>
+        public float BodyReflectionPixels => bodyReflectionPixels;
+
+        /// <summary>White's alpha of that line.</summary>
+        public float BodyReflectionAlpha => bodyReflectionAlpha;
 
         /// <summary>Width of the rounded box's, padlock's and key's darker outline line, in pixels.</summary>
         public float OutlineWidthPixels => outlineWidthPixels;
@@ -859,6 +942,43 @@ namespace GateRush.Editor
             if (!(Math.Max(lightBandPixels, shadeBandPixels) + pieceOutlinePixels <= inside))
             {
                 problems.Add($"{name}: Light Band Pixels and Shade Band Pixels must fit inside the face with Piece Outline Pixels ({inside}).");
+            }
+
+            AddBodyProblems(problems, faceCorner);
+        }
+
+        /// <summary>
+        /// The constraints on the body pieces, each message naming its field.
+        /// Like the light pieces' bands, every band ends within the face's
+        /// corner radius, where the way an edge faces turns smoothly; the
+        /// streak lies wholly inside the face's straight top, short of the
+        /// corner's curve and of the quarter's seam toward the cell's middle.
+        /// </summary>
+        /// <param name="faceCorner">The face's corner radius, in pixels.</param>
+        private void AddBodyProblems(List<string> problems, float faceCorner)
+        {
+            if (!(bodyBevelPixels > 0f && bodyBevelPixels <= faceCorner))
+            {
+                problems.Add($"{name}: Body Bevel Pixels must be above 0 and at most the face's corner radius ({faceCorner}).");
+            }
+
+            if (!(bodyTopBandPixels >= 0f && bodyTopBandSoftnessPixels > 0f && bodyTopBandPixels + bodyTopBandSoftnessPixels <= faceCorner))
+            {
+                problems.Add($"{name}: Body Top Band Pixels must be at least 0 and Body Top Band Softness Pixels above 0, and the two together at most the face's corner radius ({faceCorner}).");
+            }
+
+            if (!(bodyReflectionPixels > 0f && bodyReflectionPixels <= faceCorner))
+            {
+                problems.Add($"{name}: Body Reflection Pixels must be above 0 and at most the face's corner radius ({faceCorner}).");
+            }
+
+            var halfThickness = bodyStreakThicknessPixels / 2f;
+            var curveStart = QuarterPixels - blockGapPixels / 2f - cornerRadiusPixels;
+            var farEnd = curveStart - bodyStreakGapPixels - bodyStreakLengthPixels - halfThickness;
+            if (!(bodyStreakLengthPixels > 0f && bodyStreakThicknessPixels > 0f && bodyStreakGapPixels >= halfThickness
+                  && bodyStreakDepthPixels >= halfThickness + HalfPixel && farEnd >= 1f))
+            {
+                problems.Add($"{name}: Body Streak Length, Thickness, Depth and Gap Pixels must keep the streak inside the face's straight top: positive, its round ends past the corner's curve by the gap and at least a pixel short of the quarter's inner seam ({farEnd}), and its depth at least half its thickness.");
             }
         }
 

@@ -19,16 +19,18 @@ namespace GateRush.Runtime
         Contour,
 
         /// <summary>
-        /// The light over the face: a white band along the edges facing the
-        /// light and a black one along those facing away, untinted, one sprite
-        /// per corner of a cell and per side of an edge.
+        /// The body over a block's, a gate's or the frame's face, untinted:
+        /// its bevel ring, its top band and gloss streak, and the reflection
+        /// line above its lip, one sprite per corner of a cell and per side of
+        /// an edge.
         /// </summary>
-        Light,
+        Body,
 
         /// <summary>
-        /// The light the other way round, for a recess — a layered block's
-        /// window: each quarter takes the light piece of the opposite corner,
-        /// or of the opposite side, which reverses the light exactly.
+        /// The matte light the other way round, for a recess — a layered
+        /// block's window: each quarter takes the light piece of the opposite
+        /// corner, or of the opposite side, so the bands along the edges
+        /// facing the light are shaded and the others lit.
         /// </summary>
         ReversedLight
     }
@@ -78,6 +80,6 @@ namespace GateRush.Runtime
         /// and show as a line along every seam.
         /// </summary>
         public static float SeamOverlap(QuarterLayer layer, Color color, float overlapCells) =>
-            layer != QuarterLayer.Light && layer != QuarterLayer.ReversedLight && color.a >= 1f ? overlapCells : 0f;
+            layer != QuarterLayer.Body && layer != QuarterLayer.ReversedLight && color.a >= 1f ? overlapCells : 0f;
     }
 }

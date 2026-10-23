@@ -55,8 +55,9 @@ namespace GateRush.Runtime
         /// colour, and a <c>Face</c> group with the quarters in
         /// <paramref name="fill"/>, raised on their downward sides by
         /// <see cref="RuntimeConfig.BlockLipCells"/> so the lip shows beneath
-        /// (<see cref="FaceShape"/>); the untinted light along every edge of
-        /// the face, lit toward the light and shaded away from it; then frost on every cell when it is ice, the cell's studs
+        /// (<see cref="FaceShape"/>); the untinted body pieces along every
+        /// edge of the face — its bevel ring, top band, gloss streak and the
+        /// reflection line above the lip; then frost on every cell when it is ice, the cell's studs
         /// with their gloss when it is not, and — for an axis-restricted block
         /// (M7), ice or not — one double-headed arrow along its axis instead of
         /// studs. Studs and the arrow are raised by
@@ -103,7 +104,7 @@ namespace GateRush.Runtime
             var faceQuarters = surface.Quarters(face, tiles, faceRect, QuarterLayer.Face, outerFill, config.BlockOrder);
             Func<QuarterTile, Rect> faceLightRect = tile => FaceShape.LightQuarterRect(tile, tiles, 0f, lipCells);
             var shineQuarters = Light(
-                face, tiles, faceLightRect, QuarterLayer.Light, config.BlockLightColor, config.BlockShineOrder);
+                face, tiles, faceLightRect, QuarterLayer.Body, config.BlockLightColor, config.BlockShineOrder);
 
             var studs = new List<TPiece>();
             var rise = new Vector2(0f, FaceShape.ContentRise(lipCells));
@@ -188,13 +189,13 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A <c>Shine</c> group under <paramref name="parent"/>: the light
-        /// pieces of <paramref name="layer"/> over the face pieces at
+        /// A <c>Shine</c> group under <paramref name="parent"/>: the body or
+        /// light pieces of <paramref name="layer"/> over the face pieces at
         /// <paramref name="rectOf"/>, in <paramref name="color"/>, on every
         /// quarter with an edge (<see cref="QuarterLayers.Contour"/>). The
         /// group keeps its name: effects find the drawing by it.
         /// </summary>
-        /// <returns>The light pieces, in the order of <see cref="QuarterLayers.Contour"/>.</returns>
+        /// <returns>The pieces, in the order of <see cref="QuarterLayers.Contour"/>.</returns>
         private List<TPiece> Light(
             TGroup parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
             int order)
@@ -333,7 +334,7 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A gate under <paramref name="root"/>: its own segment of the frame,
-        /// with an outline, a lip hanging below its face and a block's light
+        /// with an outline, a lip hanging below its face and a block's body
         /// (Module 46). Open, it is in <paramref name="openColor"/> with a
         /// white arrow outlined in the outline colour, pointing out of the
         /// board. Closed (M2) — <paramref name="openColor"/> null — it is ice
@@ -366,7 +367,7 @@ namespace GateRush.Runtime
             var lip = surface.Group(root, "Lip", lipOffset, 1f);
             surface.Quarters(lip, tiles, rectOf, QuarterLayer.Face, config.LipFill(fill), config.FrameLipOrder);
             surface.Quarters(root, tiles, rectOf, QuarterLayer.Face, fill, config.FrameOrder);
-            Light(root, tiles, rectOf, QuarterLayer.Light, config.BlockLightColor, config.FrameShineOrder);
+            Light(root, tiles, rectOf, QuarterLayer.Body, config.BlockLightColor, config.FrameShineOrder);
 
             if (openColor.HasValue)
             {
@@ -507,7 +508,7 @@ namespace GateRush.Runtime
         /// <summary>The face's quarters, in the block's colour (darkened when layered), in the tiles' order.</summary>
         public List<TPiece> Face { get; }
 
-        /// <summary>The face's light pieces, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
+        /// <summary>The face's body pieces, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
         public List<TPiece> Shine { get; }
 
         /// <summary>The tinted per-cell stud sprites, without their gloss; empty for an ice or axis-restricted block.</summary>

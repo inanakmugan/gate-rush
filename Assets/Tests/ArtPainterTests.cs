@@ -19,6 +19,11 @@ namespace GateRush.Tests
     /// and is plain white, the light pieces are white bands along edges that
     /// face the light and black ones along edges that face away, meeting the
     /// edge piece of their place at every seam, faint enough to read matte;
+    /// the body pieces meet theirs the same way, with the top band over a
+    /// lighter bevel along the top, a darker bevel easing into the middle
+    /// along the bottom and the side away from the light, a faint lightening
+    /// on the light's side, the reflection line above the lip, and the gloss
+    /// streak in the top-left outer corner alone;
     /// the studs are a grid of Studs Per Cell Side a side, Stud Spacing
     /// Pixels apart, each a flat top inside a crisp rim, with a darker
     /// crescent and a soft shadow falling to the bottom right and a faint arc
@@ -70,7 +75,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(44, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(56, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -223,6 +228,120 @@ namespace GateRush.Tests
             Assert.AreEqual(0, besideSide.r, "black beside the side");
             Assert.Greater(besideSide.a, 0, "shaded beside the side");
             Assert.LessOrEqual(halfWay.a, RoundingTolerance, "clear where the arc faces across the light");
+        }
+
+        [TestCase(ArtSprite.BodyOuterTopLeft, ArtSprite.BodyEdgeTop, ArtSprite.BodyEdgeLeft)]
+        [TestCase(ArtSprite.BodyOuterTopRight, ArtSprite.BodyEdgeTop, ArtSprite.BodyEdgeRight)]
+        [TestCase(ArtSprite.BodyOuterBottomLeft, ArtSprite.BodyEdgeBottom, ArtSprite.BodyEdgeLeft)]
+        [TestCase(ArtSprite.BodyOuterBottomRight, ArtSprite.BodyEdgeBottom, ArtSprite.BodyEdgeRight)]
+        public void Paint_BodyOuter_MeetsTheEdgesOfItsPlaceAtItsSeams(ArtSprite corner, ArtSprite alongX, ArtSprite alongY)
+        {
+            // As a light piece: the left column meets the edge along x that
+            // continues its top, the bottom row the edge along y that
+            // continues its side. The top-left's streak stays off both.
+            var outer = ArtPainter.Paint(recipe, corner);
+
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongX), 0), Column(outer, 0), "left column, beside the edge along x");
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongY), 0), Row(outer, 0), "bottom row, beside the edge along y");
+        }
+
+        [TestCase(ArtSprite.BodyConcaveTopLeft, ArtSprite.BodyEdgeTop, ArtSprite.BodyEdgeLeft)]
+        [TestCase(ArtSprite.BodyConcaveTopRight, ArtSprite.BodyEdgeTop, ArtSprite.BodyEdgeRight)]
+        [TestCase(ArtSprite.BodyConcaveBottomLeft, ArtSprite.BodyEdgeBottom, ArtSprite.BodyEdgeLeft)]
+        [TestCase(ArtSprite.BodyConcaveBottomRight, ArtSprite.BodyEdgeBottom, ArtSprite.BodyEdgeRight)]
+        public void Paint_BodyConcave_MeetsTheEdgesOfItsPlaceAndIsClearInsideTheShape(ArtSprite corner, ArtSprite alongX, ArtSprite alongY)
+        {
+            var concave = ArtPainter.Paint(recipe, corner);
+
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongX), 0), Column(concave, concave.Width - 1), "right column, beside the edge along x");
+            AssertSameProfile(Column(ArtPainter.Paint(recipe, alongY), 0), Row(concave, concave.Height - 1), "top row, beside the edge along y");
+            Assert.IsTrue(Column(concave, 0).All(p => p.a == 0), "left column, inside the shape");
+            Assert.IsTrue(Row(concave, 0).All(p => p.a == 0), "bottom row, inside the shape");
+        }
+
+        [Test]
+        public void Paint_BodyEdgeTop_IsTheTopBandOverALighterBevelAndClearInTheMiddle()
+        {
+            var edge = ArtPainter.Paint(recipe, ArtSprite.BodyEdgeTop);
+            var column = Column(edge, 0);
+            var faceEdge = FaceEdgeHeight();
+
+            var inBand = column[(int)(faceEdge - 3.0)];
+            var middle = column[(int)(faceEdge - recipe.BodyTopBandPixels - recipe.BodyTopBandSoftnessPixels - recipe.BodyBevelPixels)];
+
+            Assert.IsTrue(edge.Pixels.All(p => p.r == 255), "white: the top's bevel lightens, never shades");
+            Assert.That(
+                inBand.a,
+                Is.GreaterThanOrEqualTo(recipe.BodyTopBandAlpha * 255f - RoundingTolerance)
+                    .And.LessThanOrEqualTo((recipe.BodyTopBandAlpha + recipe.BodyBevelLightAlpha) * 255f + RoundingTolerance),
+                "the band, over the bevel's light");
+            Assert.AreEqual(0, middle.a, "the flat middle");
+        }
+
+        [Test]
+        public void Paint_BodyEdgeBottom_IsADarkerBevelUnderAReflectionLineAtItsEdge()
+        {
+            var column = Column(ArtPainter.Paint(recipe, ArtSprite.BodyEdgeBottom), 0);
+            var faceEdge = FaceEdgeHeight();
+
+            var line = column[(int)(faceEdge - recipe.BodyReflectionPixels / 2.0)];
+            var bevel = column[(int)(faceEdge - recipe.BodyReflectionPixels - 4.0)];
+            var middle = column[(int)(faceEdge - recipe.BodyBevelPixels - 2.0)];
+
+            Assert.Greater(line.r, 128, "the reflection line reads light, over the bevel");
+            Assert.Greater(line.a, 0, "the reflection line shows");
+            Assert.AreEqual(0, bevel.r, "the bevel above it is black");
+            Assert.Greater(bevel.a, 0, "and shows");
+            Assert.AreEqual(0, middle.a, "the flat middle");
+        }
+
+        [Test]
+        public void Paint_BodySides_TheLightsSideIsAFaintLighteningTheOtherADarkerBevel()
+        {
+            // From the top left: the left edge only lightens, faintly; the
+            // right one only darkens.
+            var left = ArtPainter.Paint(recipe, ArtSprite.BodyEdgeLeft);
+            var right = ArtPainter.Paint(recipe, ArtSprite.BodyEdgeRight);
+
+            Assert.IsTrue(left.Pixels.All(p => p.r == 255), "the left is white");
+            Assert.That(left.Pixels.Max(p => p.a), Is.GreaterThan(0).And.LessThanOrEqualTo(recipe.BodySideLightAlpha * 255f + RoundingTolerance), "faint");
+            Assert.IsTrue(right.Pixels.Where(p => p.a > 0).All(p => p.r == 0), "the right is black");
+            Assert.That(right.Pixels.Max(p => p.a), Is.GreaterThan(0).And.LessThanOrEqualTo(recipe.BodyBevelShadeAlpha * 255f + RoundingTolerance), "as dark as the bevel");
+        }
+
+        [Test]
+        public void Paint_BodyBevel_EasesIntoTheMiddleWithNoStep()
+        {
+            // Down the right edge's band from just inside the face's edge
+            // toward the cell's centre, row by row.
+            var column = Column(ArtPainter.Paint(recipe, ArtSprite.BodyEdgeRight), 0);
+            var edgeRow = column.FindLastIndex(p => p.a > 0);
+            var maxStep = recipe.BodyBevelShadeAlpha * 255f * 2f / recipe.BodyBevelPixels;
+
+            for (var row = edgeRow - 1; row > 0; row--)
+            {
+                var step = column[row].a - column[row - 1].a;
+                Assert.That(step, Is.GreaterThanOrEqualTo(0), $"row {row - 1} is no darker than the row outside it");
+                Assert.That(step, Is.LessThanOrEqualTo(maxStep), $"no step between rows {row} and {row - 1}");
+            }
+
+            Assert.AreEqual(0, column[edgeRow - (int)System.Math.Ceiling(recipe.BodyBevelPixels) - 1].a, "gone by the bevel's width");
+        }
+
+        [Test]
+        public void Paint_BodyStreak_IsOnlyInTheTopLeftOuterCorner()
+        {
+            // The streak's middle, in the sprites' own frame.
+            var curveStart = recipe.QuarterPixels - recipe.BlockGapPixels / 2.0 - recipe.CornerRadiusPixels;
+            var x = curveStart - recipe.BodyStreakGapPixels - recipe.BodyStreakLengthPixels / 2.0;
+            var y = FaceEdgeHeight() - recipe.BodyStreakDepthPixels;
+
+            var topLeft = Pixel(ArtPainter.Paint(recipe, ArtSprite.BodyOuterTopLeft), x, y);
+            var topRight = Pixel(ArtPainter.Paint(recipe, ArtSprite.BodyOuterTopRight), x, y);
+
+            Assert.AreEqual(255, topLeft.r, "white");
+            Assert.GreaterOrEqual(topLeft.a, recipe.BodyStreakAlpha * 255f - RoundingTolerance, "the streak, at its strength or more");
+            Assert.Less(topRight.a, recipe.BodyStreakAlpha * 255f, "no streak on the top-right corner, only the band");
         }
 
         [TestCase(1, 35f, 59f)]
@@ -674,6 +793,14 @@ namespace GateRush.Tests
 
             Assert.IsEmpty(recipe.Problems(), "the grid is a valid recipe");
         }
+
+        /// <summary>
+        /// Where a face piece's straight top edge runs in a quarter sprite,
+        /// from its bottom, in pixels: the outline's outer edge less the
+        /// outline.
+        /// </summary>
+        private double FaceEdgeHeight() =>
+            recipe.QuarterPixels - recipe.BlockGapPixels / 2.0 - recipe.PieceOutlinePixels;
 
         /// <summary>
         /// The pixel on the rim of the stud top centred at

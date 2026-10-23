@@ -147,6 +147,18 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite lightEdgeBottomSprite;
         [SerializeField] private Sprite lightEdgeLeftSprite;
         [SerializeField] private Sprite lightEdgeRightSprite;
+        [SerializeField] private Sprite bodyOuterTopLeftSprite;
+        [SerializeField] private Sprite bodyOuterTopRightSprite;
+        [SerializeField] private Sprite bodyOuterBottomLeftSprite;
+        [SerializeField] private Sprite bodyOuterBottomRightSprite;
+        [SerializeField] private Sprite bodyConcaveTopLeftSprite;
+        [SerializeField] private Sprite bodyConcaveTopRightSprite;
+        [SerializeField] private Sprite bodyConcaveBottomLeftSprite;
+        [SerializeField] private Sprite bodyConcaveBottomRightSprite;
+        [SerializeField] private Sprite bodyEdgeTopSprite;
+        [SerializeField] private Sprite bodyEdgeBottomSprite;
+        [SerializeField] private Sprite bodyEdgeLeftSprite;
+        [SerializeField] private Sprite bodyEdgeRightSprite;
         [SerializeField] private Sprite studsSprite;
         [SerializeField] private Sprite studGlossSprite;
         [SerializeField] private Sprite singleStudSprite;
@@ -192,10 +204,10 @@ namespace GateRush.Runtime
         [SerializeField] private float floorUnderlayCells = 0.2f;
 
         [Tooltip("How far the frame's, a gate's and a machine's darker copy (the lip) hangs below its face, in cells. It reads as thickness. At least 0.")]
-        [SerializeField] private float lipOffsetCells = 0.09f;
+        [SerializeField] private float lipOffsetCells = 0.1f;
 
-        [Tooltip("How much of a block's footprint its lip takes along the bottom, in cells (Module 46). The lip stays inside the block's cells and the face is shortened by this from below. At least 0, and with Layer Inset Cells below 0.5.")]
-        [SerializeField] private float blockLipCells = 0.08f;
+        [Tooltip("How much of a block's footprint its lip takes along the bottom, in cells (Module 46). The lip stays inside the block's cells and the face is shortened by this from below; the studs rise with it, so StudFitTests bounds it. At least 0, and with Layer Inset Cells below 0.5.")]
+        [SerializeField] private float blockLipCells = 0.1f;
 
         [Tooltip("The lip's colour is the face colour with RGB multiplied by this, from 0 (black) to 1 (no darkening).")]
         [SerializeField] private float lipDarken = 0.5f;
@@ -736,10 +748,10 @@ namespace GateRush.Runtime
         [Tooltip("The dark outline round every block, the frame, every gate and the gate arrow (D79). Never tinted by a block's colour. Opaque.")]
         [SerializeField] private Color contourColor = new Color32(0x1C, 0x0B, 0x3A, 0xFF);
 
-        [Tooltip("The tint of a block's and a gate's light pieces (Module 46): white, so their lit bands stay white and their shaded ones black; its alpha scales both, as the art recipe paints them.")]
+        [Tooltip("The tint of a block's and a gate's body pieces, and of a layered block's window light (Module 46): white, so their light stays white and their shade black; its alpha scales both, as the art recipe paints them.")]
         [SerializeField] private Color blockLightColor = Color.white;
 
-        [Tooltip("The tint of the frame's light pieces: white, its alpha scaling the frame's lit and shaded edges against the blocks'.")]
+        [Tooltip("The tint of the frame's body pieces: white, its alpha scaling the frame's highlight and bevel against the blocks'.")]
         [SerializeField] private Color frameLightColor = new Color(1f, 1f, 1f, 0.7f);
 
         [Tooltip("The highlight on each stud. Not tinted by the block's colour.")]
@@ -1605,18 +1617,31 @@ namespace GateRush.Runtime
         /// The generated sprite <paramref name="tile"/> is drawn with in
         /// <paramref name="layer"/>'s set. Face and contour pieces depend on
         /// the piece alone; a fill's contour would be the opaque white face
-        /// fill, which is returned. A light piece depends on the quarter's
-        /// place too — its corner of the cell, or the side an edge faces — and
-        /// <see cref="QuarterLayer.ReversedLight"/> takes the opposite one; a
-        /// fill has no edge and carries no light (<see cref="QuarterLayers"/>),
-        /// so null is returned for it.
+        /// fill, which is returned. A body or light piece depends on the
+        /// quarter's place too — its corner of the cell, or the side an edge
+        /// faces: <see cref="QuarterLayer.Body"/> takes the body piece of that
+        /// place, <see cref="QuarterLayer.ReversedLight"/> the light piece of
+        /// the opposite one. A fill has no edge and carries neither
+        /// (<see cref="QuarterLayers"/>), so null is returned for it.
         /// </summary>
         public Sprite QuarterSprite(QuarterLayer layer, QuarterTile tile)
         {
-            if (layer == QuarterLayer.Light || layer == QuarterLayer.ReversedLight)
+            if (layer == QuarterLayer.Body)
             {
-                var flip = layer == QuarterLayer.ReversedLight ? -1 : 1;
-                return LightSprite(tile.Piece, tile.SignX * flip, tile.SignY * flip);
+                return PlaceSprite(
+                    tile.Piece, tile.SignX, tile.SignY,
+                    bodyOuterTopLeftSprite, bodyOuterTopRightSprite, bodyOuterBottomLeftSprite, bodyOuterBottomRightSprite,
+                    bodyConcaveTopLeftSprite, bodyConcaveTopRightSprite, bodyConcaveBottomLeftSprite, bodyConcaveBottomRightSprite,
+                    bodyEdgeTopSprite, bodyEdgeBottomSprite, bodyEdgeLeftSprite, bodyEdgeRightSprite);
+            }
+
+            if (layer == QuarterLayer.ReversedLight)
+            {
+                return PlaceSprite(
+                    tile.Piece, -tile.SignX, -tile.SignY,
+                    lightOuterTopLeftSprite, lightOuterTopRightSprite, lightOuterBottomLeftSprite, lightOuterBottomRightSprite,
+                    lightConcaveTopLeftSprite, lightConcaveTopRightSprite, lightConcaveBottomLeftSprite, lightConcaveBottomRightSprite,
+                    lightEdgeTopSprite, lightEdgeBottomSprite, lightEdgeLeftSprite, lightEdgeRightSprite);
             }
 
             switch (tile.SpriteKind)
@@ -1633,12 +1658,17 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The light piece for <paramref name="piece"/> lit as if at corner
-        /// <c>(signX, signY)</c> of its cell: a corner piece's by that corner,
-        /// an edge along x's by the side it faces up or down, an edge along y's
-        /// by the side it faces left or right. Null for a fill.
+        /// Of one set of twelve place-dependent pieces, the one for
+        /// <paramref name="piece"/> as if at corner <c>(signX, signY)</c> of
+        /// its cell: a corner piece's by that corner, an edge along x's by the
+        /// side it faces up or down, an edge along y's by the side it faces
+        /// left or right. Null for a fill.
         /// </summary>
-        private Sprite LightSprite(QuarterPiece piece, int signX, int signY)
+        private static Sprite PlaceSprite(
+            QuarterPiece piece, int signX, int signY,
+            Sprite outerTopLeft, Sprite outerTopRight, Sprite outerBottomLeft, Sprite outerBottomRight,
+            Sprite concaveTopLeft, Sprite concaveTopRight, Sprite concaveBottomLeft, Sprite concaveBottomRight,
+            Sprite edgeTop, Sprite edgeBottom, Sprite edgeLeft, Sprite edgeRight)
         {
             var isRight = signX > 0;
             var isTop = signY > 0;
@@ -1646,16 +1676,16 @@ namespace GateRush.Runtime
             {
                 case QuarterPiece.OuterCorner:
                     return isTop
-                        ? isRight ? lightOuterTopRightSprite : lightOuterTopLeftSprite
-                        : isRight ? lightOuterBottomRightSprite : lightOuterBottomLeftSprite;
+                        ? isRight ? outerTopRight : outerTopLeft
+                        : isRight ? outerBottomRight : outerBottomLeft;
                 case QuarterPiece.ConcaveCorner:
                     return isTop
-                        ? isRight ? lightConcaveTopRightSprite : lightConcaveTopLeftSprite
-                        : isRight ? lightConcaveBottomRightSprite : lightConcaveBottomLeftSprite;
+                        ? isRight ? concaveTopRight : concaveTopLeft
+                        : isRight ? concaveBottomRight : concaveBottomLeft;
                 case QuarterPiece.EdgeAlongX:
-                    return isTop ? lightEdgeTopSprite : lightEdgeBottomSprite;
+                    return isTop ? edgeTop : edgeBottom;
                 case QuarterPiece.EdgeAlongY:
-                    return isRight ? lightEdgeRightSprite : lightEdgeLeftSprite;
+                    return isRight ? edgeRight : edgeLeft;
                 default:
                     return null;
             }
@@ -1865,6 +1895,18 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, lightEdgeBottomSprite, "Light Edge Bottom Sprite");
             AddIfUnassigned(problems, lightEdgeLeftSprite, "Light Edge Left Sprite");
             AddIfUnassigned(problems, lightEdgeRightSprite, "Light Edge Right Sprite");
+            AddIfUnassigned(problems, bodyOuterTopLeftSprite, "Body Outer Top Left Sprite");
+            AddIfUnassigned(problems, bodyOuterTopRightSprite, "Body Outer Top Right Sprite");
+            AddIfUnassigned(problems, bodyOuterBottomLeftSprite, "Body Outer Bottom Left Sprite");
+            AddIfUnassigned(problems, bodyOuterBottomRightSprite, "Body Outer Bottom Right Sprite");
+            AddIfUnassigned(problems, bodyConcaveTopLeftSprite, "Body Concave Top Left Sprite");
+            AddIfUnassigned(problems, bodyConcaveTopRightSprite, "Body Concave Top Right Sprite");
+            AddIfUnassigned(problems, bodyConcaveBottomLeftSprite, "Body Concave Bottom Left Sprite");
+            AddIfUnassigned(problems, bodyConcaveBottomRightSprite, "Body Concave Bottom Right Sprite");
+            AddIfUnassigned(problems, bodyEdgeTopSprite, "Body Edge Top Sprite");
+            AddIfUnassigned(problems, bodyEdgeBottomSprite, "Body Edge Bottom Sprite");
+            AddIfUnassigned(problems, bodyEdgeLeftSprite, "Body Edge Left Sprite");
+            AddIfUnassigned(problems, bodyEdgeRightSprite, "Body Edge Right Sprite");
             AddIfUnassigned(problems, studsSprite, "Studs Sprite");
             AddIfUnassigned(problems, studGlossSprite, "Stud Gloss Sprite");
             AddIfUnassigned(problems, singleStudSprite, "Single Stud Sprite");

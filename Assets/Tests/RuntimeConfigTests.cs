@@ -27,8 +27,8 @@ namespace GateRush.Tests
     /// board colours are the measured ones; translucent faces and backdrops,
     /// light alphas past 1, outline and light orders out of place, a negative
     /// block lip and unassigned outline and light sprites are each reported
-    /// by name; each quarter layer resolves to its own sprite, a light layer
-    /// by the quarter's place and the reversed one by the opposite place.
+    /// by name; each quarter layer resolves to its own sprite, the body layer
+    /// by the quarter's place and the reversed light by the opposite place.
     /// </summary>
     /// <remarks>
     /// A freshly created config has no sprites assigned, so
@@ -946,6 +946,10 @@ namespace GateRush.Tests
                          "Light Outer Bottom Right Sprite", "Light Concave Top Left Sprite", "Light Concave Top Right Sprite",
                          "Light Concave Bottom Left Sprite", "Light Concave Bottom Right Sprite", "Light Edge Top Sprite",
                          "Light Edge Bottom Sprite", "Light Edge Left Sprite", "Light Edge Right Sprite",
+                         "Body Outer Top Left Sprite", "Body Outer Top Right Sprite", "Body Outer Bottom Left Sprite",
+                         "Body Outer Bottom Right Sprite", "Body Concave Top Left Sprite", "Body Concave Top Right Sprite",
+                         "Body Concave Bottom Left Sprite", "Body Concave Bottom Right Sprite", "Body Edge Top Sprite",
+                         "Body Edge Bottom Sprite", "Body Edge Left Sprite", "Body Edge Right Sprite",
                          "Gate Arrow Outline Sprite", "Single Stud Sprite", "Single Stud Gloss Sprite"
                      })
             {
@@ -976,31 +980,31 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void QuarterSprite_Light_IsTheSpriteForTheQuartersPlace()
+        public void QuarterSprite_Body_IsTheSpriteForTheQuartersPlace()
         {
             var sprites = AssignQuarterSprites();
 
             try
             {
-                Assert.AreSame(sprites["lightOuterTopLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.OuterCorner)));
-                Assert.AreSame(sprites["lightOuterTopRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.OuterCorner)));
-                Assert.AreSame(sprites["lightOuterBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.OuterCorner)));
-                Assert.AreSame(sprites["lightOuterBottomRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.OuterCorner)));
-                Assert.AreSame(sprites["lightConcaveTopLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.ConcaveCorner)));
-                Assert.AreSame(sprites["lightConcaveTopRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.ConcaveCorner)));
-                Assert.AreSame(sprites["lightConcaveBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.ConcaveCorner)));
-                Assert.AreSame(sprites["lightConcaveBottomRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["bodyOuterTopLeftSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["bodyOuterTopRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["bodyOuterBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomLeft, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["bodyOuterBottomRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomRight, QuarterPiece.OuterCorner)));
+                Assert.AreSame(sprites["bodyConcaveTopLeftSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopLeft, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["bodyConcaveTopRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopRight, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["bodyConcaveBottomLeftSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomLeft, QuarterPiece.ConcaveCorner)));
+                Assert.AreSame(sprites["bodyConcaveBottomRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomRight, QuarterPiece.ConcaveCorner)));
 
                 // An edge along x faces up or down whichever side of its cell
                 // it lies on along x; an edge along y faces left or right.
-                Assert.AreSame(sprites["lightEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopLeft, QuarterPiece.EdgeAlongX)));
-                Assert.AreSame(sprites["lightEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongX)));
-                Assert.AreSame(sprites["lightEdgeBottomSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongX)));
-                Assert.AreSame(sprites["lightEdgeLeftSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomLeft, QuarterPiece.EdgeAlongY)));
-                Assert.AreSame(sprites["lightEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongY)));
-                Assert.AreSame(sprites["lightEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["bodyEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopLeft, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["bodyEdgeTopSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["bodyEdgeBottomSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongX)));
+                Assert.AreSame(sprites["bodyEdgeLeftSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomLeft, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["bodyEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopRight, QuarterPiece.EdgeAlongY)));
+                Assert.AreSame(sprites["bodyEdgeRightSprite"], config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.BottomRight, QuarterPiece.EdgeAlongY)));
 
-                Assert.IsNull(config.QuarterSprite(QuarterLayer.Light, Tile(Quarter.TopRight, QuarterPiece.Fill)), "a fill carries no light");
+                Assert.IsNull(config.QuarterSprite(QuarterLayer.Body, Tile(Quarter.TopRight, QuarterPiece.Fill)), "a fill carries no body piece");
             }
             finally
             {
@@ -1044,7 +1048,11 @@ namespace GateRush.Tests
                          "lightOuterTopLeftSprite", "lightOuterTopRightSprite", "lightOuterBottomLeftSprite",
                          "lightOuterBottomRightSprite", "lightConcaveTopLeftSprite", "lightConcaveTopRightSprite",
                          "lightConcaveBottomLeftSprite", "lightConcaveBottomRightSprite", "lightEdgeTopSprite",
-                         "lightEdgeBottomSprite", "lightEdgeLeftSprite", "lightEdgeRightSprite"
+                         "lightEdgeBottomSprite", "lightEdgeLeftSprite", "lightEdgeRightSprite",
+                         "bodyOuterTopLeftSprite", "bodyOuterTopRightSprite", "bodyOuterBottomLeftSprite",
+                         "bodyOuterBottomRightSprite", "bodyConcaveTopLeftSprite", "bodyConcaveTopRightSprite",
+                         "bodyConcaveBottomLeftSprite", "bodyConcaveBottomRightSprite", "bodyEdgeTopSprite",
+                         "bodyEdgeBottomSprite", "bodyEdgeLeftSprite", "bodyEdgeRightSprite"
                      })
             {
                 sprites[field] = Sprite.Create(texture, new Rect(0f, 0f, 4f, 4f), Vector2.one * 0.5f);

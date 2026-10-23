@@ -17,9 +17,9 @@ namespace GateRush.Tests
     public class LayerStudsTests
     {
         // The config's defaults: the window 0.31 and its rim 0.02, the lip
-        // 0.08, the inner grid and the clearance.
+        // 0.1, the inner grid and the clearance.
         private const float InnerInset = 0.33f;
-        private const float Lip = 0.08f;
+        private const float Lip = 0.1f;
         private const float Spacing = 0.42f;
         private const float Clearance = 0.18f;
         private const float Tolerance = 1e-4f;

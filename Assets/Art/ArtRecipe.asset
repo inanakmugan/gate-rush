@@ -23,6 +23,20 @@ MonoBehaviour:
   lightAlpha: 0.12
   shadeBandPixels: 8
   shadeAlpha: 0.3
+  bodyBevelPixels: 13
+  bodyBevelShadeAlpha: 0.18
+  bodyBevelLightAlpha: 0.1
+  bodySideLightAlpha: 0.08
+  bodyTopBandPixels: 7
+  bodyTopBandSoftnessPixels: 6
+  bodyTopBandAlpha: 0.45
+  bodyStreakLengthPixels: 22
+  bodyStreakThicknessPixels: 3.5
+  bodyStreakDepthPixels: 4
+  bodyStreakGapPixels: 2.5
+  bodyStreakAlpha: 0.7
+  bodyReflectionPixels: 2
+  bodyReflectionAlpha: 0.35
   outlineWidthPixels: 2
   outlineTone: 0.55
   rimWidthPixels: 10

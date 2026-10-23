@@ -511,8 +511,8 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The frame ring and every wall cell: its outline, lip and face, and
-        /// its light — lit along the edges facing the light, shaded along the
-        /// others (Module 46). The lip
+        /// its body — the blocks' bevel ring and top band, faded by the frame's
+        /// tint (Module 46). The lip
         /// hangs below the outline: dark purple on dark, it reads as part of it.
         /// </summary>
         private void DrawFrame()
@@ -530,7 +530,7 @@ namespace GateRush.Runtime
 
             var shine = AddGroup(board, "Frame shine", Vector2.zero);
             AddQuarters(
-                shine, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Light, config.FrameLightColor,
+                shine, QuarterLayers.Contour(frameTiles), frameQuarterRect, QuarterLayer.Body, config.FrameLightColor,
                 config.FrameShineOrder);
         }
 
@@ -1166,7 +1166,7 @@ namespace GateRush.Runtime
             /// <summary>The face's quarter renderers, in the block's colour (darkened when layered), in <see cref="Tiles"/> order.</summary>
             public List<SpriteRenderer> FaceQuarters { get; set; }
 
-            /// <summary>The face's light renderers, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
+            /// <summary>The face's body renderers, in the order of <see cref="QuarterLayers.Contour"/>.</summary>
             public List<SpriteRenderer> ShineQuarters { get; set; }
 
             /// <summary>A layered block's window (M4, Module 46); null when it shows no colour beneath.</summary>
