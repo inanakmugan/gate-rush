@@ -109,7 +109,8 @@ namespace GateRush.Editor
         ElevatorHazardLeft,
         ElevatorHazardRight,
         ElevatorDoor,
-        ElevatorHandle
+        ElevatorHandle,
+        RoundGlow
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -389,6 +390,8 @@ namespace GateRush.Editor
                     return PaintElevatorDoor(recipe, palette);
                 case ArtSprite.ElevatorHandle:
                     return PaintElevatorHandle(recipe, palette);
+                case ArtSprite.RoundGlow:
+                    return PaintRoundGlow(recipe);
                 default:
                     throw new ArgumentOutOfRangeException(nameof(sprite), sprite, "Not a generated sprite.");
             }
@@ -916,6 +919,25 @@ namespace GateRush.Editor
             return Paint(RampWidthPixels, recipe.GateGlowPixels, Vector4.zero, (x, y) =>
             {
                 var intoFade = Clamp01((y / height - hold) / (1.0 - hold));
+                return (1.0, 1.0 - Smooth(intoFade));
+            });
+        }
+
+        /// <summary>
+        /// The interface's round glow, behind a marked joker button: white,
+        /// opaque out to the held fraction of its radius, then easing to
+        /// nothing at the circle, which ends the anti-aliasing width inside
+        /// the sprite, so its rim and corners are fully transparent. The
+        /// interface tints it.
+        /// </summary>
+        private static ArtImage PaintRoundGlow(ArtRecipe recipe)
+        {
+            var center = recipe.RoundGlowPixels / 2.0;
+            var radius = center - recipe.AntiAliasPixels;
+            double hold = recipe.RoundGlowHold;
+            return Paint(recipe.RoundGlowPixels, recipe.RoundGlowPixels, Vector4.zero, (x, y) =>
+            {
+                var intoFade = Clamp01((Length(x - center, y - center) / radius - hold) / (1.0 - hold));
                 return (1.0, 1.0 - Smooth(intoFade));
             });
         }

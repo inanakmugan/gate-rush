@@ -21,6 +21,11 @@ namespace GateRush.UI
     /// <remarks>
     /// <para>It holds no rules: which buttons show is the bootstrap's,
     /// decided in the result it is given.</para>
+    /// <para><b>Size.</b> The panel takes the size the UI builder wrote for
+    /// the result's <see cref="ResultPanelShape"/> (the UI polish pass): the
+    /// middle sits the same gap under the title and over the buttons, and a
+    /// win with nothing in its middle has a short panel wide enough for all
+    /// three buttons.</para>
     /// <para><b>Open and closed.</b> <see cref="Show"/> and <see cref="Hide"/>
     /// switch this overlay's own GameObject; it opens with a short fade and
     /// scale pop on unscaled time (<see cref="OverlayPop"/>), carrying this
@@ -72,6 +77,18 @@ namespace GateRush.UI
         [Tooltip("The blue Button Round with the home icon: always shown.")]
         [SerializeField] private Button menuButton;
 
+        [Tooltip("The panel's size for a win with the gold row or the closing message, in canvas units; written by the UI builder.")]
+        [SerializeField] private Vector2 rewardPanelSize;
+
+        [Tooltip("The panel's size for a win with nothing in the middle, wide enough for Next, Restart and Menu; written by the UI builder.")]
+        [SerializeField] private Vector2 compactPanelSize;
+
+        [Tooltip("The panel's size for a loss that cost nothing, the hourglass in the middle; written by the UI builder.")]
+        [SerializeField] private Vector2 lossPanelSize;
+
+        [Tooltip("The panel's size for a loss that cost a life, the hourglass and the heart in the middle; written by the UI builder.")]
+        [SerializeField] private Vector2 lifeLostPanelSize;
+
         /// <summary>Raised when Next is pressed.</summary>
         public event Action NextRequested;
 
@@ -84,9 +101,10 @@ namespace GateRush.UI
         /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
         public bool IsOpen => gameObject.activeSelf;
 
-        /// <summary>Opens the panel showing <paramref name="result"/>, with the pop.</summary>
+        /// <summary>Opens the panel showing <paramref name="result"/>, at its shape's size, with the pop.</summary>
         public void Show(LevelResult result, UiConfig config)
         {
+            panel.sizeDelta = SizeOf(ResultPanelShapes.ShapeOf(result));
             titleLabel.text = LevelPanelTexts.ResultTitle(result, config);
 
             goldRow.SetActive(result.GoldEarned.HasValue);
@@ -139,6 +157,37 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, lossRestartButton, nameof(ResultOverlay), nameof(lossRestartButton));
             UiParts.AddIfMissing(missing, lossRestartLabel, nameof(ResultOverlay), nameof(lossRestartLabel));
             UiParts.AddIfMissing(missing, menuButton, nameof(ResultOverlay), nameof(menuButton));
+            AddIfUnsized(missing, rewardPanelSize, nameof(rewardPanelSize));
+            AddIfUnsized(missing, compactPanelSize, nameof(compactPanelSize));
+            AddIfUnsized(missing, lossPanelSize, nameof(lossPanelSize));
+            AddIfUnsized(missing, lifeLostPanelSize, nameof(lifeLostPanelSize));
+        }
+
+        // A size the builder has not written yet: a prefab built before the
+        // sizes existed would otherwise open as an empty panel.
+        private static void AddIfUnsized(List<string> missing, Vector2 size, string field)
+        {
+            if (!(size.x > 0f && size.y > 0f))
+            {
+                missing.Add($"{nameof(ResultOverlay)}.{field}");
+            }
+        }
+
+        private Vector2 SizeOf(ResultPanelShape shape)
+        {
+            switch (shape)
+            {
+                case ResultPanelShape.Reward:
+                    return rewardPanelSize;
+                case ResultPanelShape.Compact:
+                    return compactPanelSize;
+                case ResultPanelShape.Loss:
+                    return lossPanelSize;
+                case ResultPanelShape.LifeLost:
+                    return lifeLostPanelSize;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(shape), shape, "Not a result panel shape.");
+            }
         }
 
         private void OnEnable()

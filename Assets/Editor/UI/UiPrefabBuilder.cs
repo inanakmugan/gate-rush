@@ -103,9 +103,13 @@ namespace GateRush.UI.Editor
         private const string MarkerBaseSpritePath = "Assets/Art/Sprites/UI/button_round_blue.png";
 
         // The game's own white rounded rectangle (D46), sliced: the plain
-        // shape behind a tinted highlight, ring, glow or selection, which
+        // shape behind a tinted highlight, ring or selection, which
         // none of the outlined pieces can be.
         private const string PlainSpritePath = "Assets/Art/Generated/RoundedRect.png";
+
+        // The game's own round glow (Gate Rush > Generate Art), white, opaque
+        // in its middle and clear at its rim: behind a marked joker button.
+        private const string RoundGlowSpritePath = "Assets/Art/Generated/RoundGlow.png";
 
         // The white Kenney glyphs that stay on the new buttons (Module 45):
         // the sound looks, the phone and its cross, the marker's check, and
@@ -832,21 +836,22 @@ namespace GateRush.UI.Editor
         // buttons grouped in the centre a quarter of a button apart, each
         // carrying its count, price or unlock level on a dark pill centred
         // under it, overlapping its foot by half the pill's height, and its
-        // icon a little larger, standing JokerIconOverhang past its top. The
-        // row is as tall as its parts from the foot up: the clearance under
-        // the pill, the pill's lower half, the button, the selected raise and
-        // the glow above it (92 + 36 + 235 + 20 + 16 = 399), so its foot is
-        // the band's and the clearance is the margin under the pill. The
-        // bottom band (0.145 of the screen's height) holds it at about 0.77
-        // on a 1080 by 2340 phone — buttons about 18.5% of the screen's width,
-        // the pill's foot about 3.3% of its height up — and at about 0.70 in
-        // a 9:16 window.
+        // icon centred on the raised face (the UI polish pass). The row is as
+        // tall as its parts from the foot up: the clearance under the pill,
+        // the pill's lower half, the button, the selected raise and the room
+        // above it (92 + 36 + 235 + 20 + 16 = 399), so its foot is the
+        // band's and the clearance is the margin under the pill. The bottom
+        // band (0.145 of the screen's height) holds it at about 0.77 on a
+        // 1080 by 2340 phone — buttons about 18.5% of the screen's width, the
+        // pill's foot about 3.3% of its height up — and at about 0.70 in a
+        // 9:16 window.
         //
         // Each slot's centre is -199.5 + 92 + 36 + 117.5 = 46. The raised
-        // glow's top reaches 46 + 117.5 + 20 + 16 = 199.5, the row's half
-        // height; the raised icon's 46 + 33 + 92.5 + 20 = 191.5, and at the UI
-        // Config's default pulse of 1.06 about the button's centre
-        // 46 + 125.5 · 1.06 + 20 = 199.
+        // button's top reaches 46 + 117.5 + 20 = 183.5, and at the UI Config's
+        // default pulse of 1.06 about its centre 46 + 117.5 · 1.06 + 20 =
+        // 190.6, inside the row's half height of 199.5; the raised icon's
+        // 46 + 6.9 + 92.5 + 20 = 165.4. The round glow is not counted: its
+        // soft edge may reach past the row's top while it pulses.
         private const float JokerButtonSize = 235f;
         private const float JokerGapShare = 0.25f;
         private const float JokerSlotGap = JokerButtonSize * JokerGapShare;
@@ -855,8 +860,16 @@ namespace GateRush.UI.Editor
         private const float JokerRaise = 20f;
         private const float JokerRingOutset = 13f;
         private const float JokerIconSize = 185f;
-        private const float JokerIconOverhang = 8f;
-        private const float JokerIconRaise = JokerButtonSize / 2f + JokerIconOverhang - JokerIconSize / 2f;
+
+        // The raised face of button_square_green.png, measured on its 249
+        // pixel rows: its outline above the face is 15 pixels, and its lip and
+        // outline below it 30. Both lie inside the 77-pixel slice borders, so
+        // they draw at the face's multiplier whatever the button's size, and
+        // the face's centre stands half their difference above the button's.
+        private const float JokerFaceTopInsetPixels = 15f;
+        private const float JokerFaceBottomInsetPixels = 30f;
+        private const float JokerIconRaise =
+            (JokerFaceBottomInsetPixels - JokerFaceTopInsetPixels) / 2f / JokerButtonPixelsPerUnitMultiplier;
         private const float JokerPillWidthShare = 0.9f;
         private const float JokerPillWidth = JokerButtonSize * JokerPillWidthShare;
         private const float JokerPillHeight = 72f;
@@ -872,13 +885,23 @@ namespace GateRush.UI.Editor
         private const float JokerRowWidth =
             2f * (JokerButtonSize + JokerSlotGap + JokerButtonSize / 2f + JokerCoinOverhang + JokerRowSideMargin);
 
-        private const float JokerRowHeight = JokerFootClearance + JokerPillHeight / 2f + JokerButtonSize + JokerRaise + JokerGlowOutset;
+        private const float JokerRowHeight = JokerFootClearance + JokerPillHeight / 2f + JokerButtonSize + JokerRaise + JokerTopClearance;
+
+        // The room the row keeps above a raised button, for the marked pulse;
+        // the height the square glow's outset once took, kept so the row and
+        // the band's fit stay as they were.
+        private const float JokerTopClearance = 16f;
 
         // Module 43: a locked joker's lock, centred on its icon — about half
         // the button since the interface review — and a marked joker's glow
-        // behind the button (the extents above include it).
+        // behind the button: the round glow, centred, its diameter this share
+        // of the button so its soft edge clears the button's corners (the
+        // corners stand at 0.71 of the button from its centre, the circle at
+        // 0.75). Raised, its rim reaches 46 + 20 + 176.25 = 242.25, about 43
+        // units past the row's top, where it is already near clear.
         private const float JokerLockSize = 118f;
-        private const float JokerGlowOutset = 16f;
+        private const float JokerGlowDiameterShare = 1.5f;
+        private const float JokerGlowSize = JokerButtonSize * JokerGlowDiameterShare;
 
         // Module 43: a locked joker's lock on its Store card, centred on the
         // 140-unit card icon.
@@ -906,12 +929,37 @@ namespace GateRush.UI.Editor
         // and after a loss, between the title and the buttons, the large
         // hourglass and, under it, the heart with "-1".
         private const float ResultMenuButtonSize = 130f;
-        private const float LossHourglassTop = 165f;
         private const float LossHourglassSize = 180f;
-        private const float LifeLostRowTop = 355f;
+        private const float LifeLostGap = 10f;
         private const float LifeLostRowHeight = 90f;
         private const float LifeLostSpacing = 16f;
         private const float LifeLostFontSize = 64f;
+
+        // The UI polish pass: the panel's size follows what it shows
+        // (ResultPanelShape). The middle — the hourglass, and the heart under
+        // it — sits ResultMiddleGap under the title's foot and over the
+        // buttons' top, the gap the buttons keep from the panel's foot, and a
+        // win with nothing in its middle keeps that gap between the title and
+        // the buttons, its sides as far from the widest row. The campaign's
+        // win keeps the panel it always had. The title's foot is 30 + 110 =
+        // 140 down and the buttons' top 70 + 140 = 210 up, so a compact win
+        // is 970 by 140 + 70 + 210 = 420, a loss 900 by 210 + 180 + 70 + 210
+        // = 670 and a lost life 900 by 400 + 90 + 70 + 210 = 770. The panel's
+        // slice borders, 54 + 54 by 51 + 58 pixels drawn at 0.8, take 135 by
+        // 136 units, inside every one of them.
+        private const float ResultMiddleGap = PanelButtonPosY;
+        private const float ResultTitleFoot = -OverlayTitlePosY + OverlayTitleHeight;
+        private const float ResultButtonsTop = PanelButtonPosY + ResultButtonHeight;
+        private const float ResultWidestRow = 2f * ResultButtonWidth + ResultMenuButtonSize + 2f * ResultButtonGap;
+        private const float LossHourglassTop = ResultTitleFoot + ResultMiddleGap;
+        private const float LifeLostRowTop = LossHourglassTop + LossHourglassSize + LifeLostGap;
+        private static readonly Vector2 RewardPanelSize = new Vector2(ResultPanelWidth, ResultPanelHeight);
+        private static readonly Vector2 CompactPanelSize =
+            new Vector2(ResultWidestRow + 2f * PanelButtonPosY, ResultTitleFoot + ResultMiddleGap + ResultButtonsTop);
+        private static readonly Vector2 LossPanelSize =
+            new Vector2(ResultPanelWidth, LossHourglassTop + LossHourglassSize + ResultMiddleGap + ResultButtonsTop);
+        private static readonly Vector2 LifeLostPanelSize =
+            new Vector2(ResultPanelWidth, LifeLostRowTop + LifeLostRowHeight + ResultMiddleGap + ResultButtonsTop);
 
         // Module 41: the confirmation. The line under the title; Keep playing
         // at the foot and Lose a life above it, both at Button Primary's own
@@ -1063,6 +1111,10 @@ namespace GateRush.UI.Editor
         private const string SelectedRaiseField = "selectedRaise";
         private const string LabelInsetField = "labelInset";
         private const string PriceLabelLeftField = "priceLabelLeft";
+        private const string RewardPanelSizeField = "rewardPanelSize";
+        private const string CompactPanelSizeField = "compactPanelSize";
+        private const string LossPanelSizeField = "lossPanelSize";
+        private const string LifeLostPanelSizeField = "lifeLostPanelSize";
         private const string ClockField = "clock";
         private const string RocketField = "rocket";
         private const string BroomField = "broom";
@@ -2515,8 +2567,9 @@ namespace GateRush.UI.Editor
         /// a loss, the large hourglass and the heart with "-1" (the Module 45
         /// follow-up). Written as a campaign win with gold and the
         /// closing message, the texts from the UI Config; the overlay sets
-        /// them all again when it opens. A CanvasGroup on the root carries the
-        /// pop's fade.
+        /// them all again when it opens, and sizes the panel by the result's
+        /// shape from the four sizes written here (the UI polish pass). A
+        /// CanvasGroup on the root carries the pop's fade.
         /// </summary>
         private static GameObject BuildResultOverlay(Scene scene, Sources sources)
         {
@@ -2630,6 +2683,10 @@ namespace GateRush.UI.Editor
                 (LossRestartButtonField, Single<Button>(lossRestart.gameObject, ButtonPrimaryName)),
                 (LossRestartLabelField, lossRestartLabel),
                 (MenuButtonField, Single<Button>(menu.gameObject, ButtonRoundName)));
+            SetVector2(overlay, RewardPanelSizeField, RewardPanelSize);
+            SetVector2(overlay, CompactPanelSizeField, CompactPanelSize);
+            SetVector2(overlay, LossPanelSizeField, LossPanelSize);
+            SetVector2(overlay, LifeLostPanelSizeField, LifeLostPanelSize);
             return frame.Root;
         }
 
@@ -2725,12 +2782,12 @@ namespace GateRush.UI.Editor
         /// <summary>
         /// One joker's slot, <paramref name="x"/> from the row's centre and
         /// raised off the row's foot by the clearance under its pill and the
-        /// pill's lower half: the lift, raised while selected, holding the glow
-        /// (hidden; shown while marked, Module 43) and the ring (hidden) behind
-        /// a Button Primary instance made square on this instance — the green
-        /// square face and its grey disabled look, with no pressed look — with
-        /// its own label switched off; on the button, the joker's icon from
-        /// the Joker Icons asset, standing a little past the button's top, with
+        /// pill's lower half: the lift, raised while selected, holding the round
+        /// glow (hidden; shown while marked, Module 43) and the ring (hidden)
+        /// behind a Button Primary instance made square on this instance — the
+        /// green square face and its grey disabled look, with no pressed look —
+        /// with its own label switched off; on the button, the joker's icon
+        /// from the Joker Icons asset, centred on the raised face, with
         /// the lock (hidden; Module 43) centred on it, and the dark pill
         /// centred under the button, over its foot, with the coin (hidden)
         /// hanging off its left end and the count (Module 46). The pill is on
@@ -2748,13 +2805,12 @@ namespace GateRush.UI.Editor
             UiBuilder.Stretch(lift);
 
             // First under the lift, so it draws behind the ring and the
-            // button; JokerBarButton sets its colour while it pulses.
+            // button; JokerBarButton sets its colour while it pulses. Wider
+            // than the slot, so it is no raycast target: a press beside the
+            // button stays the neighbour's.
             var glow = UiBuilder.CreateRect(GlowName, lift);
-            UiBuilder.Stretch(glow);
-            glow.offsetMin = new Vector2(-JokerGlowOutset, -JokerGlowOutset);
-            glow.offsetMax = new Vector2(JokerGlowOutset, JokerGlowOutset);
-            var glowImage = AddSliced(glow, sources.Plain, PanelColorHex, PlainPixelsPerUnitMultiplier);
-            glowImage.color = config.MarkedGlowColor;
+            UiBuilder.PlaceCentered(glow, new Vector2(JokerGlowSize, JokerGlowSize));
+            var glowImage = UiBuilder.AddIcon(glow, sources.RoundGlow, config.MarkedGlowColor);
             glow.gameObject.SetActive(false);
 
             var ring = UiBuilder.CreateRect(RingName, lift);
@@ -2918,6 +2974,16 @@ namespace GateRush.UI.Editor
             using (var serialized = new SerializedObject(component))
             {
                 Property(serialized, field).floatValue = value;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+        }
+
+        /// <summary>Assigns the serialized Vector2 <paramref name="field"/> by name; a missing field throws.</summary>
+        private static void SetVector2(Object component, string field, Vector2 value)
+        {
+            using (var serialized = new SerializedObject(component))
+            {
+                Property(serialized, field).vector2Value = value;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
             }
         }
@@ -3714,6 +3780,9 @@ namespace GateRush.UI.Editor
             /// <summary>The game's own white rounded rectangle, 9-sliced: every tinted plain shape.</summary>
             public Sprite Plain { get; private set; }
 
+            /// <summary>The game's own round glow, white, clear at its rim: a marked joker's glow (Module 43).</summary>
+            public Sprite RoundGlow { get; private set; }
+
             public Sprite Ribbon { get; private set; }
             public Sprite BarTrack { get; private set; }
             public Sprite BarFill { get; private set; }
@@ -3801,6 +3870,7 @@ namespace GateRush.UI.Editor
                     Panel = LoadSlicedSprite(PanelSpritePath),
                     Pill = LoadSlicedSprite(PillSpritePath),
                     Plain = LoadSlicedSprite(PlainSpritePath),
+                    RoundGlow = LoadSprite(RoundGlowSpritePath),
                     Ribbon = LoadSlicedSprite(RibbonSpritePath),
                     BarTrack = LoadSlicedSprite(BarTrackSpritePath),
                     BarFill = LoadSlicedSprite(BarFillSpritePath),

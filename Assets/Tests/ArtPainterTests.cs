@@ -81,7 +81,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(102, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(103, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -537,6 +537,37 @@ namespace GateRush.Tests
             for (var y = 1; y < column.Count; y++)
             {
                 Assert.LessOrEqual(column[y].a, column[y - 1].a, $"row {y}: fades away from the gate, never back");
+            }
+        }
+
+        [Test]
+        public void Paint_RoundGlow_IsOpaqueInTheMiddleClearAtItsRimAndRound()
+        {
+            var glow = ArtPainter.Paint(recipe, ArtSprite.RoundGlow);
+            var size = glow.Width;
+            var last = size - 1;
+            var middleRow = Row(glow, size / 2);
+
+            Assert.AreEqual(Vector4.zero, glow.Border);
+            Assert.AreEqual(size, glow.Height, "square");
+            Assert.IsTrue(glow.Pixels.All(p => p.r == 255 && p.g == 255 && p.b == 255), "tinted where placed, so painted white");
+            Assert.AreEqual(255, Pixel(glow, size / 2.0, size / 2.0).a, "full strength in the middle");
+            Assert.AreEqual(0, middleRow[0].a, "nothing at the left rim");
+            Assert.AreEqual(0, middleRow[last].a, "nothing at the right rim");
+            Assert.AreEqual(0, glow.Pixels[0].a, "nothing in a corner");
+            for (var x = size / 2 + 1; x < size; x++)
+            {
+                Assert.LessOrEqual(middleRow[x].a, middleRow[x - 1].a, $"column {x}: fades away from the middle, never back");
+            }
+
+            for (var j = 0; j < size; j++)
+            {
+                for (var i = 0; i < size; i++)
+                {
+                    var pixel = glow.Pixels[j * size + i].a;
+                    Assert.AreEqual(pixel, glow.Pixels[j * size + (last - i)].a, $"({i}, {j}) mirrors across");
+                    Assert.AreEqual(pixel, glow.Pixels[i * size + j].a, $"({i}, {j}) mirrors about the diagonal");
+                }
             }
         }
 

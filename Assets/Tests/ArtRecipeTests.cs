@@ -79,6 +79,8 @@ namespace GateRush.Tests
         [TestCase("shardStreakWidthPixels", 0f, "Shard Streak Width Pixels")]
         [TestCase("gateGlowHold", 1f, "Gate Glow Hold")]
         [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
+        [TestCase("roundGlowHold", 1f, "Round Glow Hold")]
+        [TestCase("roundGlowHold", -0.1f, "Round Glow Hold")]
         [TestCase("sparkleWaist", 0f, "Sparkle Waist")]
         [TestCase("sparkleWaist", 0.25f, "Sparkle Waist")]
         [TestCase("iceInsetPixels", 3f, "Ice Inset Pixels")]
@@ -139,6 +141,7 @@ namespace GateRush.Tests
         [TestCase("shardPixels", "Shard Pixels")]
         [TestCase("gateGlowPixels", "Gate Glow Pixels")]
         [TestCase("sparklePixels", "Sparkle Pixels")]
+        [TestCase("roundGlowPixels", "Round Glow Pixels")]
         public void Problems_EffectPixelsTooSmall_IsReported(string field, string label)
         {
             var serialized = new SerializedObject(recipe);

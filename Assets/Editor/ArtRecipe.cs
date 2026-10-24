@@ -327,6 +327,13 @@ namespace GateRush.Editor
         [Tooltip("The fraction of the height, from the gate, held at full strength before the glow fades: at least 0, below 1.")]
         [SerializeField] private float gateGlowHold = 0.1f;
 
+        [Header("Round glow (white, opaque in its middle, clear at its rim; the interface tints it)")]
+        [Tooltip("Side of the round glow sprite, behind a marked joker button. At least 8.")]
+        [SerializeField] private int roundGlowPixels = 256;
+
+        [Tooltip("The fraction of the radius, from the centre, held at full strength before the glow fades: at least 0, below 1.")]
+        [SerializeField] private float roundGlowHold = 0.35f;
+
         [Header("Sparkle (white four-point star; tinted where placed)")]
         [Tooltip("Side of the sparkle sprite. At least 8.")]
         [SerializeField] private int sparklePixels = 64;
@@ -678,6 +685,12 @@ namespace GateRush.Editor
         /// <summary>The fraction of the gate glow held at full strength before it fades.</summary>
         public float GateGlowHold => gateGlowHold;
 
+        /// <summary>Side of the round glow sprite, in pixels.</summary>
+        public int RoundGlowPixels => roundGlowPixels;
+
+        /// <summary>The fraction of the round glow's radius held at full strength before it fades.</summary>
+        public float RoundGlowHold => roundGlowHold;
+
         /// <summary>Side of the sparkle sprite, in pixels.</summary>
         public int SparklePixels => sparklePixels;
 
@@ -986,6 +999,16 @@ namespace GateRush.Editor
             if (!(gateGlowHold >= 0f && gateGlowHold < 1f))
             {
                 problems.Add($"{name}: Gate Glow Hold must be at least 0 and below 1, so the glow fades.");
+            }
+
+            if (roundGlowPixels < 8)
+            {
+                problems.Add($"{name}: Round Glow Pixels must be at least 8.");
+            }
+
+            if (!(roundGlowHold >= 0f && roundGlowHold < 1f))
+            {
+                problems.Add($"{name}: Round Glow Hold must be at least 0 and below 1, so the glow fades.");
             }
         }
 
