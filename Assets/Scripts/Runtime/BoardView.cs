@@ -21,7 +21,8 @@ namespace GateRush.Runtime
     /// </summary>
     /// <remarks>
     /// <para><b>Hierarchy.</b> Under this transform sit two groups: <c>Board</c>,
-    /// the drawn state, rebuilt from scratch on every redraw, and
+    /// the drawn state — its floor and frame drawn once per drawing of the
+    /// level and kept, everything else redrawn on every move (pass 3) — and
     /// <c>Effects</c>, holding <c>Debris</c> — cubes and ice shards still in
     /// flight — <c>Stage</c>, the temporary pieces of a presentation, and
     /// <c>Preview</c>, the generator preview of a drag (Module 26).
@@ -121,6 +122,16 @@ namespace GateRush.Runtime
         private Func<QuarterTile, Rect> gateQuarterCells;
 
         private Transform board;
+
+        // The floor's and the frame's groups under Board, in drawing order:
+        // drawn once per drawing of the level and kept by every Redraw, as
+        // nothing a move does changes them (pass 3). Empty until drawn.
+        private readonly List<Transform> floorAndFrame = new List<Transform>();
+
+        // The first of the frame's groups, before which elevators sit among
+        // Board's children.
+        private Transform frameContour;
+
         private Transform debris;
         private Transform stage;
         private Transform preview;
@@ -148,6 +159,10 @@ namespace GateRush.Runtime
             RuntimeConfig config, LevelContext ctx, BoardLayout layout, VisibilityLayer visibility, GeneratorMachine machine)
         {
             StopAnimations();
+
+            // Another level, layout or config: the floor and frame drawn for
+            // the last one no longer fit, whatever draws next.
+            DiscardFloorAndFrame();
             this.config = config;
             this.ctx = ctx;
             this.layout = layout;
@@ -305,6 +320,8 @@ namespace GateRush.Runtime
             // lands in a group that is about to go.
             DestroyChildren(transform);
             board = null;
+            floorAndFrame.Clear();
+            frameContour = null;
             debris = null;
             stage = null;
             preview = null;
@@ -404,17 +421,35 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// Draws <paramref name="state"/> into a fresh <c>Board</c> group,
-        /// creating the view's groups first when they do not exist.
+        /// Draws <paramref name="state"/> into the <c>Board</c> group, creating
+        /// the view's groups first when they do not exist. The floor and the
+        /// frame are drawn only when the group has none yet; the rest — what a
+        /// move can change — every time. Board's children always end in the
+        /// same order: floor underlay, floor, elevators, the frame's three
+        /// groups, gates, generators, blocks, shutters.
         /// </summary>
         private void Draw(BoardState state)
         {
             EnsureGroups();
             drawnState = state;
 
-            DrawFloor();
-            DrawElevators(state);
-            DrawFrame();
+            if (floorAndFrame.Count == 0)
+            {
+                DrawFloor();
+                DrawElevators(state);
+                DrawFrame();
+            }
+            else
+            {
+                // Drawn after the kept frame, so moved back before it.
+                var firstElevator = board.childCount;
+                DrawElevators(state);
+                for (var i = firstElevator; i < board.childCount; i++)
+                {
+                    board.GetChild(i).SetSiblingIndex(frameContour.GetSiblingIndex());
+                }
+            }
+
             DrawGates(state);
             DrawGenerators(state);
             DrawBlocks(state);
@@ -422,14 +457,16 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The view's own redraw between the two stages of a presentation:
-        /// stops the presentation's and the lift's tweens, which may still move
-        /// parts of the old drawing, and replaces the <c>Board</c> group. Debris
-        /// — another id, another group — flies on, and a generator preview
-        /// still fading out, whose tween went with the others, fades on
+        /// The view's own redraw between the two stages of a presentation —
+        /// what every move runs: stops the presentation's and the lift's
+        /// tweens, which may still move parts of the old drawing, and replaces
+        /// everything under <c>Board</c> but the floor and the frame, which no
+        /// move changes and stay the same objects (pass 3). Debris — another
+        /// id, another group — flies on, and a generator preview still fading
+        /// out, whose tween went with the others, fades on
         /// (<see cref="ResumeGeneratorPreviewFade"/>).
         /// </summary>
-        private void Redraw(BoardState state)
+        internal void Redraw(BoardState state)
         {
             DOTween.Kill(this);
             settleTween = null;
@@ -439,11 +476,36 @@ namespace GateRush.Runtime
 
             if (board != null)
             {
-                Destroy(board.gameObject);
-                board = null;
+                for (var i = board.childCount - 1; i >= 0; i--)
+                {
+                    var child = board.GetChild(i);
+                    if (!floorAndFrame.Contains(child))
+                    {
+                        DestroyDrawn(child.gameObject);
+                    }
+                }
             }
 
             Draw(state);
+        }
+
+        /// <summary>
+        /// Destroys the floor and the frame, if drawn, so the next drawing
+        /// draws them afresh: for <see cref="Initialize"/>, which may bind
+        /// another level.
+        /// </summary>
+        private void DiscardFloorAndFrame()
+        {
+            for (var i = 0; i < floorAndFrame.Count; i++)
+            {
+                if (floorAndFrame[i] != null)
+                {
+                    DestroyDrawn(floorAndFrame[i].gameObject);
+                }
+            }
+
+            floorAndFrame.Clear();
+            frameContour = null;
         }
 
         /// <summary>Forgets every lookup into the current drawing.</summary>
@@ -482,7 +544,24 @@ namespace GateRush.Runtime
             // hierarchy changes while a parent is being deactivated.
             for (var i = parent.childCount - 1; i >= 0; i--)
             {
-                Destroy(parent.GetChild(i).gameObject);
+                DestroyDrawn(parent.GetChild(i).gameObject);
+            }
+        }
+
+        /// <summary>
+        /// Destroys a drawn object: at the end of the frame in Play Mode, as
+        /// always; at once outside it, where <see cref="UnityEngine.Object.Destroy(UnityEngine.Object)"/> does
+        /// nothing — the Edit Mode tests that draw and redraw a board.
+        /// </summary>
+        private static void DestroyDrawn(GameObject drawn)
+        {
+            if (Application.isPlaying)
+            {
+                Destroy(drawn);
+            }
+            else
+            {
+                DestroyImmediate(drawn);
             }
         }
 
@@ -494,7 +573,7 @@ namespace GateRush.Runtime
         private void DrawFloor()
         {
             var underlay = config.FloorUnderlayCells;
-            AddSquare(
+            var square = AddSquare(
                 board, "Floor underlay",
                 GridToLocal(new Vector2(ctx.Width * 0.5f, ctx.Height * 0.5f)),
                 new Vector2(CellsToWorld(ctx.Width + 2f * underlay), CellsToWorld(ctx.Height + 2f * underlay)),
@@ -510,6 +589,9 @@ namespace GateRush.Runtime
                     AddSprite(floor, $"Floor {cell}", config.FloorSprite, layout.CellCenter(cell), tile, config.FloorColor, config.FloorOrder);
                 }
             }
+
+            floorAndFrame.Add(square.transform);
+            floorAndFrame.Add(floor);
         }
 
         /// <summary>
@@ -531,6 +613,11 @@ namespace GateRush.Runtime
 
             var shine = AddGroup(board, "Frame shine", Vector2.zero);
             AddQuarters(shine, frameTiles, frameQuarterRect, QuarterLayer.Body, config.FrameLightColor, config.FrameShineOrder);
+
+            frameContour = contour;
+            floorAndFrame.Add(contour);
+            floorAndFrame.Add(face);
+            floorAndFrame.Add(shine);
         }
 
         /// <summary>
