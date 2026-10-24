@@ -370,7 +370,7 @@ sounds. Each spec is written when the module before it is merged.
 | 7.5 | Board art: the blocks, gates, frame and mechanics shaded by a lit model in the new interface's style; the floor and frame kept across moves (D79, D80) | `Modules/46-board-art.md` | Done |
 | 7.6 | Effects and transitions: the board's debris in the lit model from one pool, joker clears and a finished elevator's exit, gold flying to its counter, button presses, the screen fade, tab and overlay transitions; the win is the panel and the gold (D81) | `Modules/47-effects.md` | Done |
 | 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
-| 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | `Modules/49-privacy-and-end-of-content.md` for the privacy text and the end of content; the rest as follow-ups below | In progress |
+| 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | `Modules/49-privacy-and-end-of-content.md` for the privacy text and the end of content; the rest as follow-ups below | Done |
 
 Between 7.5 and 7.6 two small jobs landed on their own. Levels 28 and 29
 each had a lock with one more key carrier than it required; the extra key
@@ -399,12 +399,15 @@ introduction card's size, so with one icon in its 720-unit illustration
 area it reads large; the fix, if needed, is a shorter illustration area
 for joker cards only (about 480 units).
 
-Still open: `RefreshLevelUi` and the front end's `RefreshMeta` rewrite
-every view whenever any field changes, once a second while a life
-regenerates, and format their strings each time; Build UI Prefabs
+Deferred to a phone build: the optimisation on a phone is set aside
+while the web build is the only target and no phone build is planned. If
+one is made, it starts by measuring the frame rate on a phone and takes
+these with it: `RefreshLevelUi` and the front end's `RefreshMeta`
+rewrite every view whenever any field changes, once a second while a
+life regenerates, and format their strings each time; Build UI Prefabs
 rewrites prefabs it did not change, which makes every rebuild noisy in
-review. Both go with the optimisation on a phone, with the frame rate
-measured in the web build.
+review; a generated sprite sheet with edge-extended padding if draw
+calls matter.
 
 ---
 
