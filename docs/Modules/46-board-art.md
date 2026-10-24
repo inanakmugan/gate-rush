@@ -261,3 +261,79 @@ screenshots beside the target before the next:
 - Every mechanic's state is as clear as before in play and in its
   introduction card.
 - The board is not slower on a phone in the web build.
+
+---
+
+## Resolved during implementation
+
+- **The method.** The first pass drew the target's look from hand-placed
+  bands (an outline, a lighter top, a lip, a gloss band); in play it
+  read as artificial. The board is now shaded from a height field
+  instead (D80), ported from a small Python reference render the owner
+  approved before any code, and every later look was first mocked the
+  same way.
+- **The lit model.** A block's edge rises as a quarter circle over 16
+  pixels to a height of 11 (at 128 pixels a cell). It is lit by one
+  light from the top left, (-0.45, -0.55, 0.70), with ambient 0.60,
+  diffuse 0.55 and a Blinn-Phong specular (shininess 30, strength 0.30),
+  in linear space, with an analytic ambient occlusion. The face sprites
+  carry the grey shade at half value; the `Gate Rush/Board Sprite` and
+  `Gate Rush/Board UI Sprite` shaders double it and add the specular, so
+  the tint still sets the colour. A comparison with the reference
+  matched within 4 of 255 on 98.7 percent of pixels.
+- **What the measured targets lost.** No outline, no lip and no gloss
+  band: the light draws the edge. The gap between blocks is 6 pixels and
+  the corner radius 24. A soft floor shadow sits under every raised body
+  (blocks, frame, gates) in the slot the outline had.
+- **Studs.** Two by two per cell after all, not the target's one: 35
+  pixels across, 59 apart, flat-topped cylinders with a contact shadow
+  and a specular rim.
+- **Layered blocks.** The outer block is drawn darker (0.85) with a
+  recessed window, inset 0.31 of a cell, that shows the colour beneath
+  as a smaller lit body with its own studs.
+- **Palette.** Measured from the reference look and kept: Red #F02A1E,
+  Orange #F6660C, Yellow #F6BA00, Green #07A515, Cyan #06A8F6, Blue
+  #0054F6, Purple #A236F6, Pink #F63CA2.
+- **Frame and background.** The frame is #483CA8 on a background of
+  #2A2460 to #161236, so it stands out from the level behind it.
+- **Mechanics (pass 2).** Mocked in the same lit model and approved
+  first. Parts of a fixed colour are baked in colour by Generate Art
+  from the colours in `RuntimeConfig`; parts whose colour varies stay
+  grey, tinted at runtime under a highlight. A frozen block's body is
+  drawn in the ice colour, so its colour stays hidden until it thaws
+  (M3). The board paints its own count badge (gold rim, red face) rather
+  than using the interface's sprite. The key's gem is a smooth dome, not
+  faceted. One-way blocks lose their studs and carry a raised arrow. The
+  old Frost, Ring and DoorPanel sprites are gone.
+- **The time bonus.** Redrawn after play: a clock coin with a green rim
+  (#2BC23A) and dark green hands, then a white +N at the count digits'
+  size with a 3-pixel dark outline, a 4-pixel gap between them. Coin and
+  label are one group centred on the mark's anchor, so the coin moves
+  with the text, and on a narrow block (a vertical 1x2, an L) the group
+  shrinks to fit within the key's margin. The label uses its own outline
+  font asset (padding 17, digits and plus only) and `LabelOutline.mat`,
+  so the shared label font and its shadow are untouched. The first
+  version drew the outline twice as wide: TMP's distance field spans two
+  gradient scales per unit, not one.
+- **Keys.** Drawn at 1/1.2 of their painted size by
+  `RuntimeConfig.keyScale`, gem included.
+- **Marks on L and T blocks.** They sit on the cell where the arms meet
+  (`MarkLayout.TryJunction`), not on an end cell. Other shapes keep the
+  old rule, and the corner badges keep their own.
+- **Comparison commands.** *Gate Rush → Render Lighting Comparison*,
+  *Render Mechanics Comparison* and *Render Time Bonus Comparison*
+  render the generated art beside the references, written to a
+  git-ignored folder.
+- **Pass 3 became performance.** A move used to destroy and redraw the
+  whole board. The floor and the frame are now drawn once per level and
+  kept; a move redraws only what it can change, about a quarter fewer
+  renderers per move on level 29. A Unity Sprite Atlas is not used: its
+  padding is transparent, which would bring back seams on the quarter
+  tiles; a generated sheet with edge-extended padding is the seam-safe
+  route, left for the optimisation in 7.8. The board's effects (exit
+  cubes, shards, the gate glow), and a fade for an elevator that has
+  finished its waves, move to 7.6 (Module 47).
+- **The joker bar.** Reworked here: a tight group in the centre with a
+  quarter button between buttons, a dark pill under each button for its
+  count, price or level, and the icon at 185 units.
+- **Tests.** 2,882 after pass 1, 3,012 at the end.

@@ -2462,3 +2462,40 @@ board's sprites: D46's reasons stand. Leaving the board as it is: the
 mentor's point about polish applies to it most.
 
 ---
+
+## D80 — The board is shaded by a lit model, not drawn with outlines
+
+**Decision.** The board's art keeps D79's aim and D46's method but not
+D79's drawing: blocks, the frame, gates and every mechanic are shaded
+from a height field lit by one light, with ambient, diffuse and specular
+terms and ambient occlusion, instead of a dark outline, a darker lip and
+a white gloss band. A block's edge rises as a quarter circle; its face
+sprite holds the grey shade and two board shaders add the specular, so a
+block is still one greyscale sprite set tinted per colour. Each look is
+first rendered by a small reference script and approved, and the recipe
+is ported to match it.
+
+**Why.** Built from hand-placed bands, the target's look read as flat
+and artificial in play, however the bands were tuned. A lit height field
+gives the soft, plastic toy-brick look of the reference games from a few
+physical values, keeps every shape seamless because each pixel depends
+only on its distance to its own piece's edge, and can be checked pixel
+by pixel against the reference.
+
+**Consequences.**
+- No outline, lip or gloss band on the board; the measured targets of
+  Module 46 for them no longer apply. A soft floor shadow sits under
+  every raised body instead.
+- Parts of a fixed colour (ice, gold, metal, the frame) are baked in
+  colour from `RuntimeConfig`; parts whose colour varies stay grey and
+  are tinted at runtime.
+- The board paints its own count badge rather than using the interface's
+  sprite, which D79 allowed.
+- Rules, sizes, layout and timings are unchanged, as D79 required.
+
+**Rejected.** Tuning the outlined look further: several rounds did not
+lift it. Hand-painted or generated block sprites: D46's and D79's
+reasons stand. A real 3D board: it would change the rendering, the board
+fit and the WebGL cost for a look the 2D model already reaches.
+
+---

@@ -367,8 +367,8 @@ sounds. Each spec is written when the module before it is merged.
 | 7.2 | Joker unlocks: the Clock, Rocket and Broom open at levels 5, 10 and 15 with a New Joker card; locked buttons and Store cards (D76) | `Modules/43-joker-unlocks.md` | Done |
 | 7.3 | A campaign of thirty levels: the existing fifteen re-ordered and fifteen new ones (D75) | `Modules/44-campaign-thirty.md` | Done |
 | 7.4 | Interface art: a style guide and generated sprites, thirty avatars, the town backgrounds, the larger joker bar (D77, D78) | `Modules/45-interface-art.md` | Done |
-| 7.5 | Board art: the blocks, gates, frame and mechanics brought to the new interface's style, matched to a target image (D46) | `Modules/46-board-art.md` | Planned |
-| 7.6 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes | `Modules/47-effects.md` | Planned |
+| 7.5 | Board art: the blocks, gates, frame and mechanics shaded by a lit model in the new interface's style; the floor and frame kept across moves (D79, D80) | `Modules/46-board-art.md` | Done |
+| 7.6 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes, the board's exit cubes, shards and gate glow, an elevator's exit | `Modules/47-effects.md` | Planned |
 | 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
 | 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | to be decided | Planned |
 
