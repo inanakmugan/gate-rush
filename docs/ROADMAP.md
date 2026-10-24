@@ -390,16 +390,21 @@ third-party art no longer shown is removed by a reference-checking
 editor command, Lilita One sits in `Assets/ThirdParty/Fonts/LilitaOne`
 with its OFL licence, and the Top Bar's leftover cog override is gone.
 
-Also done: the privacy text and the end of content (Module 49).
+Also done: the privacy text and the end of content (Module 49); the
+joker's icon on the New Joker card back to 360 units with a size check;
+the unused Home notice removed from the code and from Home Page.
 
-Still open: the joker's icon on the New Joker card is a little large and
-crowds the card between its title and its line; `IFrontEnd.ShowNotice`
-and Home's notice label are unused since Module 49; `RefreshLevelUi` and
-the front end's `RefreshMeta` rewrite every view whenever any field
-changes, once a second while a life regenerates, and format their
-strings each time; Build UI Prefabs rewrites prefabs it did not change,
-which makes every rebuild noisy in review. The last two go with the
-optimisation on a phone, with the frame rate measured in the web build.
+Kept as is unless players say otherwise: the New Joker card shares the
+introduction card's size, so with one icon in its 720-unit illustration
+area it reads large; the fix, if needed, is a shorter illustration area
+for joker cards only (about 480 units).
+
+Still open: `RefreshLevelUi` and the front end's `RefreshMeta` rewrite
+every view whenever any field changes, once a second while a life
+regenerates, and format their strings each time; Build UI Prefabs
+rewrites prefabs it did not change, which makes every rebuild noisy in
+review. Both go with the optimisation on a phone, with the frame rate
+measured in the web build.
 
 ---
 
