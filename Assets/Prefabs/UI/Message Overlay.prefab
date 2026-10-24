@@ -95,9 +95,9 @@ MonoBehaviour:
   m_fontSize: 48
   m_fontSizeBase: 48
   m_fontWeight: 400
-  m_enableAutoSizing: 0
-  m_fontSizeMin: 18
-  m_fontSizeMax: 72
+  m_enableAutoSizing: 1
+  m_fontSizeMin: 40
+  m_fontSizeMax: 48
   m_fontStyle: 0
   m_HorizontalAlignment: 2
   m_VerticalAlignment: 512
@@ -218,6 +218,11 @@ MonoBehaviour:
   titleLabel: {fileID: 1039750756005757250}
   textLabel: {fileID: 3764236302201361749}
   okButton: {fileID: 3037364074162749438}
+  panel: {fileID: 1586921851678231207}
+  shortPanelSize: {x: 820, y: 620}
+  shortTextHeight: 240
+  longPanelSize: {x: 820, y: 1260}
+  longTextHeight: 880
 --- !u!1 &2513083361248665560
 GameObject:
   m_ObjectHideFlags: 0

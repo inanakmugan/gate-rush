@@ -395,7 +395,7 @@ MonoBehaviour:
   messageLabel: {fileID: 49734944462910513}
   lossArt: {fileID: 8077134623777780703}
   lifeLost: {fileID: 5072141319577722218}
-  lifeLostLabel: {fileID: 6352062164800018193}
+  lifeLostLabel: {fileID: 4791412557318823962}
   nextButton: {fileID: 8540178138690822321}
   nextLabel: {fileID: 4808730171188148400}
   winRestartButton: {fileID: 6185552756096253016}
@@ -696,7 +696,7 @@ RectTransform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 5759861449622231622}
-  - {fileID: 4909496489830996940}
+  - {fileID: 8060853060364213870}
   m_Father: {fileID: 3833180948219470935}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
@@ -960,7 +960,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.ContentSizeFitter
   m_HorizontalFit: 2
   m_VerticalFit: 0
---- !u!1 &7382035890691129295
+--- !u!1 &7249030895245838265
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -968,9 +968,9 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 4909496489830996940}
-  - component: {fileID: 5365283580989219899}
-  - component: {fileID: 6352062164800018193}
+  - component: {fileID: 8060853060364213870}
+  - component: {fileID: 6361443704378146791}
+  - component: {fileID: 4791412557318823962}
   m_Layer: 5
   m_Name: Amount
   m_TagString: Untagged
@@ -978,13 +978,13 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!224 &4909496489830996940
+--- !u!224 &8060853060364213870
 RectTransform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7382035890691129295}
+  m_GameObject: {fileID: 7249030895245838265}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
@@ -997,21 +997,21 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 200, y: 50}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!222 &5365283580989219899
+--- !u!222 &6361443704378146791
 CanvasRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7382035890691129295}
+  m_GameObject: {fileID: 7249030895245838265}
   m_CullTransparentMesh: 1
---- !u!114 &6352062164800018193
+--- !u!114 &4791412557318823962
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 7382035890691129295}
+  m_GameObject: {fileID: 7249030895245838265}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
