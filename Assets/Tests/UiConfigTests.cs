@@ -535,6 +535,77 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
         }
 
+        // ----- Module 47, pass 3: presses, tabs, overlay close, screen fade ----
+
+        [Test]
+        public void Problems_DefaultMotion_ReportsNothingAboutIt()
+        {
+            var problems = config.Problems();
+
+            foreach (var shownName in new[] { "Press Scale", "Press Seconds", "Release", "Tab Fade", "Tab Pop", "Overlay Close", "Screen Fade" })
+            {
+                Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
+            }
+        }
+
+        [TestCase("pressScale", 1f, "Press Scale")]
+        [TestCase("pressScale", 0.7f, "Press Scale")]
+        [TestCase("pressSeconds", 0f, "Press Seconds")]
+        [TestCase("pressSeconds", 0.5f, "Press Seconds")]
+        [TestCase("releaseSeconds", 0f, "Release Seconds")]
+        [TestCase("releaseSeconds", 0.6f, "Release Seconds")]
+        [TestCase("releaseOvershoot", -0.1f, "Release Overshoot")]
+        [TestCase("releaseOvershoot", 4f, "Release Overshoot")]
+        [TestCase("tabFadeSeconds", 0f, "Tab Fade Seconds")]
+        [TestCase("tabPopScale", 0.9f, "Tab Pop Scale")]
+        [TestCase("tabPopScale", 1.5f, "Tab Pop Scale")]
+        [TestCase("tabPopSeconds", 0f, "Tab Pop Seconds")]
+        [TestCase("overlayCloseSeconds", 0f, "Overlay Close Seconds")]
+        [TestCase("overlayCloseSeconds", 0.6f, "Overlay Close Seconds")]
+        [TestCase("overlayCloseScale", 0.7f, "Overlay Close Scale")]
+        [TestCase("overlayCloseScale", 1.1f, "Overlay Close Scale")]
+        [TestCase("screenFadeInSeconds", 0f, "Screen Fade In Seconds")]
+        [TestCase("screenFadeInSeconds", 1.5f, "Screen Fade In Seconds")]
+        [TestCase("screenFadeOutSeconds", 0f, "Screen Fade Out Seconds")]
+        [TestCase("screenFadeOutSeconds", float.NaN, "Screen Fade Out Seconds")]
+        public void Problems_MotionFloatOutOfRange_IsReportedByName(string field, float value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase(11)]
+        [TestCase(1001)]
+        public void Problems_ScreenFadeSortingOffsetOutOfRange_IsReportedByName(int offset)
+        {
+            // The default coin flight offset is 11: the fade must sort above it.
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("screenFadeSortingOffset").intValue = offset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Screen Fade Sorting Offset"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ScreenFadeAtOrBelowTheCoins_IsReportedEvenWhenTheCoinsMove()
+        {
+            var serialized = new SerializedObject(config);
+            var fadeOffset = serialized.FindProperty("screenFadeSortingOffset").intValue;
+            serialized.FindProperty("coinFlightSortingOffset").intValue = fadeOffset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Screen Fade Sorting Offset"), string.Join(" | ", problems));
+        }
+
         [Test]
         public void CreateCoinFlightSettings_Default_IsTheConfigsValues()
         {

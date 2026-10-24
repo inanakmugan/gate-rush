@@ -335,6 +335,21 @@ namespace GateRush.Runtime
         // held at until the gold flies from the result panel; null when no
         // win's gold is waiting to fly.
         private int? winHeldGold;
+
+        // The fade between the front end and a level (Module 47), built in
+        // Awake under the screen's canvas and destroyed with this component.
+        // While it plays, the board, R, Back and every press are held.
+        private ScreenFade screenFade;
+
+        // True while the level being entered under the fade waits for the
+        // fade to lift before its run starts.
+        private bool isRunWaitingForFade;
+
+        // True from the start of a fade out of a level until the level is
+        // left at its midpoint: the level is frozen and a presentation that
+        // ends meanwhile opens no panel.
+        private bool isLeaving;
+
         private BoardLayout layout;
         private string levelName;
         private int fittedScreenWidth;
@@ -363,6 +378,13 @@ namespace GateRush.Runtime
             // card draws over the HUD, the joker bar and the level's panels,
             // none of which can be open together with it.
             introductionCard.Initialize(config);
+
+            // The fade sorts above every canvas, so its place among the
+            // canvas's children does not matter (Module 47).
+            screenFade = ScreenFade.Create(
+                introductionCard.GetComponentInParent<Canvas>(), config.BackgroundBottom, frontEndView.ScreenFadeSettings);
+            frontEndView.HoldInput(IsFading);
+            levelUiView.HoldInput(IsFading);
 
             boardCamera.orthographic = true;
             boardCamera.clearFlags = CameraClearFlags.SolidColor;
@@ -927,11 +949,15 @@ namespace GateRush.Runtime
         /// the level being played: the one query that draws the joker buttons
         /// and decides what a press on one does (<see cref="OnJokerPressed"/>).
         /// A joker is usable while the level is being played and nothing holds
-        /// it; the Clock also needs a countdown.
+        /// it; the Clock also needs a countdown. The screen fade is left out
+        /// of the buttons' look (Module 47): it takes every press itself, and
+        /// <see cref="OnJokerPressed"/> refuses one while it plays, but greying
+        /// the jokers under it would show them turning green as it lifts.
         /// </summary>
         private LevelUiState LevelUiStateAt(DateTime nowUtc) =>
             LevelUiState.Of(
-                mode, levelNumber, metaGame, metaRules, nowUtc, freePlayJokers, jokerMarks, IsBeingPlayed() && !IsHeld(),
+                mode, levelNumber, metaGame, metaRules, nowUtc, freePlayJokers, jokerMarks,
+                IsBeingPlayed() && !introductionCard.IsOpen && !IsPaused(),
                 run.Countdown != null, jokerSelection.Selected, goldOffers);
 
         /// <summary>Makes the next <see cref="RefreshMeta"/> show everything again, for a new screen, level or setting.</summary>
@@ -981,14 +1007,54 @@ namespace GateRush.Runtime
         /// Abandons the level being played and opens Home (Module 35): what
         /// Menu on the HUD and on the result panel does. Reports nothing: the
         /// callers that cost a life have reported it. Does nothing while no
-        /// level is loaded.
+        /// level is loaded. Home opens under the screen fade
+        /// (<see cref="LeaveToFrontEnd"/>) and announces the streak rewards
+        /// once the fade has lifted.
         /// </summary>
         private void GoToMenu()
         {
-            if (LeaveLevel())
+            if (run != null)
             {
-                ShowHome();
+                LeaveToFrontEnd(OpenHome, AnnounceStreakRewards);
             }
+        }
+
+        /// <summary>
+        /// Leaves the level being played for the front end under the screen
+        /// fade (Module 47): at once the level is frozen — the drag cancelled,
+        /// the selection cleared, the countdown stopped, and a presentation
+        /// that ends meanwhile opens no panel (<see cref="isLeaving"/>); at the
+        /// fade's midpoint the level is left (<see cref="LeaveLevel"/>) and
+        /// <paramref name="atFrontEnd"/> opens the front end; once the fade has
+        /// lifted, <paramref name="afterFade"/> runs, so what it opens is seen
+        /// opening. With no level loaded both run at once. Does nothing while
+        /// a fade already plays.
+        /// </summary>
+        private void LeaveToFrontEnd(Action atFrontEnd, Action afterFade)
+        {
+            if (run == null)
+            {
+                atFrontEnd();
+                afterFade();
+                return;
+            }
+
+            if (IsFading())
+            {
+                return;
+            }
+
+            inputController.CancelDrag();
+            ClearJokerSelection();
+            run.Countdown?.Stop();
+            isLeaving = true;
+            screenFade.Play(
+                () =>
+                {
+                    LeaveLevel();
+                    atFrontEnd();
+                },
+                afterFade);
         }
 
         /// <summary>
@@ -1020,6 +1086,8 @@ namespace GateRush.Runtime
             levelName = null;
             moveNumber = 0;
             winHeldGold = null;
+            isLeaving = false;
+            isRunWaitingForFade = false;
 
             boardView.Clear();
             introductionCard.Hide();
@@ -1065,11 +1133,12 @@ namespace GateRush.Runtime
             if (!CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out var campaignName))
             {
                 // The notice selects Home, which closes every overlay, so the
-                // streak rewards are announced after it.
+                // streak rewards are announced after it. From a level (Next),
+                // Home and the notice come under the screen fade.
                 if (!frontEndView.IsOpen)
                 {
-                    LeaveLevel();
-                    OpenHome();
+                    LeaveToFrontEnd(OpenHomeWithCampaignDone, AnnounceStreakRewards);
+                    return;
                 }
 
                 frontEndView.ShowNotice(config.CampaignDoneNotice);
@@ -1097,12 +1166,34 @@ namespace GateRush.Runtime
         /// </summary>
         private void ShowLivesOverlay()
         {
-            if (LeaveLevel() || !frontEndView.IsOpen)
+            // From a level, Home comes under the screen fade and the overlays
+            // open once it has lifted, in the order they always opened.
+            if (run != null)
+            {
+                LeaveToFrontEnd(OpenHome, AnnounceRewardsThenLives);
+                return;
+            }
+
+            if (!frontEndView.IsOpen)
             {
                 ShowHome();
             }
 
             frontEndView.ShowLives();
+        }
+
+        /// <summary>The streak rewards, then the Lives overlay over them: what Home shows after a level left for want of a life.</summary>
+        private void AnnounceRewardsThenLives()
+        {
+            AnnounceStreakRewards();
+            frontEndView.ShowLives();
+        }
+
+        /// <summary>Opens Home with the campaign-done notice: a campaign finished by Next.</summary>
+        private void OpenHomeWithCampaignDone()
+        {
+            OpenHome();
+            frontEndView.ShowNotice(config.CampaignDoneNotice);
         }
 
         /// <summary>
@@ -1413,6 +1504,14 @@ namespace GateRush.Runtime
             StopListeningForTimeBonus();
         }
 
+        private void OnDestroy()
+        {
+            if (screenFade != null)
+            {
+                Destroy(screenFade.gameObject);
+            }
+        }
+
         private void Update()
         {
             if (run == null)
@@ -1472,7 +1571,10 @@ namespace GateRush.Runtime
         /// in-level overlay included: only the development tools
         /// replace a level being played. A level that fails to load logs the
         /// reason, changes nothing — a front end that was showing stays — and
-        /// answers false.
+        /// answers false. From the front end the switch happens under the
+        /// screen fade (Module 47), at its midpoint (<see cref="Enter"/>); a
+        /// level replaced by Next or the development tools switches at once.
+        /// While a fade plays, nothing changes and the answer is false.
         /// </summary>
         private bool Load(TextAsset asset, PlayMode playMode)
         {
@@ -1482,6 +1584,24 @@ namespace GateRush.Runtime
                 return false;
             }
 
+            if (!frontEndView.IsOpen)
+            {
+                Enter(asset, ctx, playMode);
+                return true;
+            }
+
+            return screenFade.Play(() => Enter(asset, ctx, playMode), OnEnterFadeLifted);
+        }
+
+        /// <summary>
+        /// Builds the parsed level <paramref name="ctx"/> of
+        /// <paramref name="asset"/> and shows it, as <see cref="Load"/>
+        /// describes. Its run starts here, or when the last introduction card
+        /// closes, or — under a fade — once the fade has lifted
+        /// (<see cref="StartRun"/>).
+        /// </summary>
+        private void Enter(TextAsset asset, LevelContext ctx, PlayMode playMode)
+        {
             frontEndView.Hide();
             levelUiView.HideConfirm();
             inputController.CancelDrag();
@@ -1515,6 +1635,7 @@ namespace GateRush.Runtime
             moveNumber = 0;
             attemptNumber++;
             winHeldGold = null;
+            isRunWaitingForFade = false;
             if (isActiveAndEnabled)
             {
                 ListenForTimeBonus();
@@ -1571,8 +1692,6 @@ namespace GateRush.Runtime
             {
                 StartRun();
             }
-
-            return true;
         }
 
         /// <summary>
@@ -1580,12 +1699,33 @@ namespace GateRush.Runtime
         /// level with no cards, otherwise by the last card closing — and only
         /// then: <see cref="Load"/> hides the card, dropping this callback,
         /// before it replaces <see cref="run"/>, so the run started is always
-        /// the one the cards were shown for.
+        /// the one the cards were shown for. While the screen fade plays the
+        /// start waits for it to lift (<see cref="OnEnterFadeLifted"/>), so no
+        /// second counts down while the player cannot move.
         /// </summary>
         private void StartRun()
         {
+            if (IsFading())
+            {
+                isRunWaitingForFade = true;
+                return;
+            }
+
             run.Start();
             ShowRemainingTime();
+        }
+
+        /// <summary>
+        /// The fade into a level has lifted: the run that waited for it starts.
+        /// A level left meanwhile cleared the wait (<see cref="LeaveLevel"/>).
+        /// </summary>
+        private void OnEnterFadeLifted()
+        {
+            if (isRunWaitingForFade && run != null)
+            {
+                isRunWaitingForFade = false;
+                StartRun();
+            }
         }
 
         /// <summary>
@@ -1622,9 +1762,18 @@ namespace GateRush.Runtime
         /// buttons (<see cref="OnRestartRequested"/>,
         /// <see cref="OnMenuRequested"/>) and the jokers. None opens during a
         /// drag: a card opens as a level loads, which cancels any drag first,
-        /// and <see cref="PauseLevel"/> cancels it before a pause.
+        /// and <see cref="PauseLevel"/> cancels it before a pause. The screen
+        /// fade holds them too while it plays (<see cref="IsFading"/>); a fade
+        /// out of a level cancels the drag as it starts.
         /// </summary>
-        private bool IsHeld() => introductionCard.IsOpen || IsPaused();
+        private bool IsHeld() => introductionCard.IsOpen || IsPaused() || IsFading();
+
+        /// <summary>
+        /// True while the screen fade plays (Module 47): the one query that
+        /// holds the board, <b>R</b>, the development keys and, through
+        /// <c>HoldInput</c>, Back in the front end and the level's interface.
+        /// </summary>
+        private bool IsFading() => screenFade != null && screenFade.IsBusy;
 
         /// <summary>
         /// True while the confirmation or any in-level overlay is open (D64,
@@ -1861,7 +2010,9 @@ namespace GateRush.Runtime
         /// </summary>
         private void OnDevLevelStep(int step)
         {
-            if (run == null)
+            // The development keys bypass the input hold, so the fade is
+            // checked here (Module 47).
+            if (run == null || IsFading())
             {
                 return;
             }
@@ -2280,8 +2431,9 @@ namespace GateRush.Runtime
         {
             // GoToMenu clears the board, which drops this callback; the null
             // check only keeps a report that slipped through from opening a
-            // panel over the front end.
-            if (run == null || run.Outcome != LevelOutcome.Won)
+            // panel over the front end. A level being left under the fade
+            // opens nothing, and plays no Win cue.
+            if (run == null || isLeaving || run.Outcome != LevelOutcome.Won)
             {
                 return;
             }

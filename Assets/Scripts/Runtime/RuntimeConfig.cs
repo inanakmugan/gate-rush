@@ -879,6 +879,9 @@ namespace GateRush.Runtime
 
         [SerializeField] private Ease introCloseEase = Ease.OutQuad;
 
+        [Tooltip("The scale a closing card shrinks to while it fades, as every overlay's close does (Module 47): from 0.8 to 1.")]
+        [SerializeField] private float introCloseScale = 0.95f;
+
         [Header("New Joker card (Module 43; the introduction card's theme, after any mechanic cards)")]
         [Tooltip("The joker icons the New Joker card draws in place of an illustration: Assets/Config/JokerIcons.asset, the one the UI prefabs are built from.")]
         [SerializeField] private JokerIcons jokerIcons;
@@ -1915,6 +1918,9 @@ namespace GateRush.Runtime
         /// <summary>Easing of a closing card's fade.</summary>
         public Ease IntroCloseEase => introCloseEase;
 
+        /// <summary>The scale a closing card shrinks to while it fades.</summary>
+        public float IntroCloseScale => introCloseScale;
+
         /// <summary>The sparkles around a card's illustration.</summary>
         public IReadOnlyList<SparklePlacement> IntroSparkles => introSparkles;
 
@@ -2579,6 +2585,10 @@ namespace GateRush.Runtime
         // count and the caps are.
         private const int SparklesPerCell = 1;
         private const float SparkleSpinDegrees = 0f;
+
+        // The least a closing introduction card may shrink to: the bound of
+        // Intro Close Scale, not a tunable.
+        private const float MinIntroCloseScale = 0.8f;
 
         /// <summary>The layout of the ice shards of a thaw or a gate opening.</summary>
         /// <exception cref="ArgumentOutOfRangeException">A shard value is out of range; see <see cref="Problems"/>.</exception>
@@ -3291,6 +3301,11 @@ namespace GateRush.Runtime
             }
 
             AddIfNotPositive(problems, introCloseSeconds, "Intro Close Seconds");
+            if (!(introCloseScale >= MinIntroCloseScale && introCloseScale <= 1f))
+            {
+                problems.Add($"{name}: Intro Close Scale must be from {MinIntroCloseScale} to 1.");
+            }
+
             AddIfNotPositive(problems, sparkleTwinkleSeconds, "Sparkle Twinkle Seconds");
 
             if (!(sparkleMinScale >= 0f && sparkleMinScale <= 1f && sparkleMinAlpha >= 0f && sparkleMinAlpha <= 1f))

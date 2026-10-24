@@ -26,18 +26,19 @@ namespace GateRush.UI
     /// middle sits the same gap under the title and over the buttons, and a
     /// win with nothing in its middle has a short panel wide enough for all
     /// three buttons.</para>
-    /// <para><b>Open and closed.</b> <see cref="Show"/> and <see cref="Hide"/>
-    /// switch this overlay's own GameObject; it opens with a short fade and
-    /// scale pop on unscaled time (<see cref="OverlayPop"/>), carrying this
-    /// view as its id, which <see cref="Hide"/>, a disable and a destroy stop,
-    /// leaving the panel at rest.</para>
+    /// <para><b>Open and closed.</b> It opens and closes with every overlay's
+    /// motion (<see cref="OverlayMotion"/>, Module 47): <see cref="Show"/> pops
+    /// it in, <see cref="Hide"/> closes it with the short reverse, taking no
+    /// input from the start, and <see cref="HideNow"/> closes it at once. A
+    /// win's own pops carry this view as their id; a hide, a disable and a
+    /// destroy stop them at rest.</para>
     /// </remarks>
     public sealed class ResultOverlay : MonoBehaviour
     {
-        [Tooltip("On the overlay's root: the pop fades it in.")]
-        [SerializeField] private CanvasGroup group;
+        [Tooltip("On the overlay's root: its shared open and close (Module 47).")]
+        [SerializeField] private OverlayMotion motion;
 
-        [Tooltip("The grey panel: the pop grows it.")]
+        [Tooltip("The grey panel, sized by the result's shape.")]
         [SerializeField] private RectTransform panel;
 
         [SerializeField] private TMP_Text titleLabel;
@@ -101,8 +102,8 @@ namespace GateRush.UI
         /// <summary>Raised when Menu is pressed.</summary>
         public event Action MenuRequested;
 
-        /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
-        public bool IsOpen => gameObject.activeSelf;
+        /// <summary>True from <see cref="Show"/> until <see cref="Hide"/> or <see cref="HideNow"/>; false from the start of a close.</summary>
+        public bool IsOpen => motion != null && motion.IsOpen;
 
         /// <summary>The gold row's coin: where a campaign win's coins fly from.</summary>
         public RectTransform GoldCoin => goldCoin;
@@ -133,21 +134,38 @@ namespace GateRush.UI
             winRestartButton.gameObject.SetActive(result.IsWin && result.HasRestart);
             lossRestartButton.gameObject.SetActive(!result.IsWin && result.HasRestart);
 
-            gameObject.SetActive(true);
-            RestWinPops();
-            OverlayPop.Play(this, group, panel, config);
+            StopWinPops();
+            motion.Open(config);
             if (result.IsWin)
             {
                 PlayWinPops(result.GoldEarned.HasValue, config);
             }
         }
 
-        /// <summary>Closes the panel, stopping its pop.</summary>
-        public void Hide()
+        /// <summary>Closes the panel with the overlays' short close, stopping its pops. Does nothing when it is not open.</summary>
+        public void Hide(UiConfig config)
         {
-            OverlayPop.Rest(this, group, panel);
+            if (!IsOpen)
+            {
+                return;
+            }
+
+            StopWinPops();
+            motion.Close(config);
+        }
+
+        /// <summary>Closes the panel at once, stopping its pops: the level's interface is being shown afresh or hidden.</summary>
+        public void HideNow()
+        {
+            StopWinPops();
+            motion.ShowAt(false);
+        }
+
+        /// <summary>Stops a win's pops and leaves the title and the coin at rest.</summary>
+        private void StopWinPops()
+        {
+            DOTween.Kill(this);
             RestWinPops();
-            gameObject.SetActive(false);
         }
 
         /// <summary>
@@ -208,7 +226,12 @@ namespace GateRush.UI
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
         public void AddMissing(List<string> missing)
         {
-            UiParts.AddIfMissing(missing, group, nameof(ResultOverlay), nameof(group));
+            UiParts.AddIfMissing(missing, motion, nameof(ResultOverlay), nameof(motion));
+            if (motion != null)
+            {
+                motion.AddMissing(missing);
+            }
+
             UiParts.AddIfMissing(missing, panel, nameof(ResultOverlay), nameof(panel));
             UiParts.AddIfMissing(missing, titleLabel, nameof(ResultOverlay), nameof(titleLabel));
             UiParts.AddIfMissing(missing, goldRow, nameof(ResultOverlay), nameof(goldRow));
@@ -268,8 +291,7 @@ namespace GateRush.UI
 
         private void OnDisable()
         {
-            OverlayPop.Rest(this, group, panel);
-            RestWinPops();
+            StopWinPops();
             UiParts.Unlisten(nextButton, OnNextClicked);
             UiParts.Unlisten(winRestartButton, OnRestartClicked);
             UiParts.Unlisten(lossRestartButton, OnRestartClicked);

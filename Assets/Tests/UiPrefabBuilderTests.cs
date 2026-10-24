@@ -777,7 +777,7 @@ namespace GateRush.Tests
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(MessageOverlay), 3)]
         [TestCase(typeof(ResultOverlay), 17)]
-        [TestCase(typeof(ConfirmOverlay), 8)]
+        [TestCase(typeof(ConfirmOverlay), 7)]
         public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(LevelUiName).GetComponentInChildren(viewType, true);
@@ -794,7 +794,7 @@ namespace GateRush.Tests
             Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
             foreach (var button in buttons)
             {
-                AssertEveryReferenceAssigned(button, 8);
+                AssertEveryReferenceAssigned(button, 9);
                 using (var serialized = new SerializedObject(button))
                 {
                     Assert.That(serialized.FindProperty("selectedRaise").floatValue, Is.GreaterThan(0f), $"{button.name} rises when selected");
@@ -873,12 +873,14 @@ namespace GateRush.Tests
                     var glow = Reference<Image>(serialized, "glow").transform;
                     var lift = Reference<RectTransform>(serialized, "lift");
                     var ring = Reference<GameObject>(serialized, "ring").transform;
-                    var button = Reference<Button>(serialized, "button").transform;
+                    // The button sits in the pulse rect (Module 47), which is
+                    // the lift's child the glow is drawn behind.
+                    var pulse = Reference<RectTransform>(serialized, "pulse");
 
                     Assert.AreEqual(lift, glow.parent, $"{view.name}'s glow rises with the button");
                     Assert.IsFalse(glow.gameObject.activeSelf, $"{view.name}'s glow is saved hidden");
                     Assert.That(glow.GetSiblingIndex(), Is.LessThan(ring.GetSiblingIndex()), $"{view.name}'s glow draws behind the ring");
-                    Assert.That(glow.GetSiblingIndex(), Is.LessThan(button.GetSiblingIndex()), $"{view.name}'s glow draws behind the button");
+                    Assert.That(glow.GetSiblingIndex(), Is.LessThan(pulse.GetSiblingIndex()), $"{view.name}'s glow draws behind the button");
                 }
             }
         }
@@ -2032,6 +2034,146 @@ namespace GateRush.Tests
 
                 Assert.AreEqual(rewards * rowHeight + (rewards - 1) * spacing, ladder, Tolerance, "the ladder shows the shipped table's rows, no more");
                 Assert.That(gap, Is.InRange(0f, RuleMaxGap), "the rule right under the ladder");
+            }
+        }
+
+        // ----- Module 47, pass 3: presses, overlay motion, page fades --------
+
+        [TestCaseSource(nameof(OutputNames))]
+        public void Build_EveryButton_HasAPressOnItsOwnObjectReadingTheUiConfig(string name)
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            var prefab = LoadBuilt(name);
+
+            foreach (var button in prefab.GetComponentsInChildren<Button>(true))
+            {
+                var press = button.GetComponent<PressFeedback>();
+
+                Assert.IsNotNull(press, $"{name}: '{button.name}' answers a press");
+                Assert.AreEqual(config, press.Config, $"{name}: '{button.name}''s press reads the UI Config");
+            }
+        }
+
+        [Test]
+        public void Build_StreakBarAndAvatarButton_CarryTheirOwnPress()
+        {
+            foreach (var name in new[] { StreakBarName, AvatarButtonName })
+            {
+                var root = LoadBuilt(name);
+
+                Assert.IsNotNull(root.GetComponent<Button>(), $"{name} is a button on its root");
+                Assert.IsNotNull(root.GetComponent<PressFeedback>(), $"{name}'s root answers a press");
+            }
+        }
+
+        [TestCaseSource(nameof(ScrimmedOverlayNames))]
+        public void Build_Overlay_HasAMotionWiredToItsRootGroupAndPanel(string name)
+        {
+            var root = LoadBuilt(name);
+            var motion = root.GetComponent<OverlayMotion>();
+            Assert.IsNotNull(motion, $"{name} has an OverlayMotion on its root");
+
+            using (var serialized = new SerializedObject(motion))
+            {
+                var group = Reference<CanvasGroup>(serialized, "group");
+                var panel = Reference<RectTransform>(serialized, "panel");
+
+                Assert.AreEqual(root, group.gameObject, $"{name}: the group is the root's, so the whole overlay fades");
+                Assert.AreEqual(root.transform, panel.parent, $"{name}: the panel is the root's child");
+                Assert.IsNotNull(panel.GetComponent<Image>(), $"{name}: the panel is the drawn panel");
+            }
+        }
+
+        [TestCase(ResultOverlayName)]
+        [TestCase(ConfirmOverlayName)]
+        public void Build_LevelPanel_OpensAndClosesThroughItsRootsMotion(string name)
+        {
+            var root = LoadBuilt(name);
+            var view = name == ResultOverlayName ? (Component)root.GetComponent<ResultOverlay>() : root.GetComponent<ConfirmOverlay>();
+            Assert.IsNotNull(view, name);
+
+            using (var serialized = new SerializedObject(view))
+            {
+                Assert.AreEqual(root.GetComponent<OverlayMotion>(), Reference<OverlayMotion>(serialized, "motion"), name);
+            }
+
+            Assert.AreEqual(1, root.GetComponents<CanvasGroup>().Length, $"{name}: one group, the motion's");
+        }
+
+        [Test]
+        public void Build_FrontEnd_EveryPageInstanceHasAGroupForItsFade()
+        {
+            var frontEnd = LoadBuilt(FrontEndName).GetComponent<FrontEnd>();
+            Assert.IsNotNull(frontEnd, nameof(FrontEnd));
+
+            using (var serialized = new SerializedObject(frontEnd))
+            {
+                foreach (var field in new[] { "store", "home", "leaderboard" })
+                {
+                    var page = Reference<Component>(serialized, field);
+
+                    Assert.IsNotNull(page.GetComponent<CanvasGroup>(), $"the {field} page fades in through a group on its root");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_FrontEnd_ReportsNoMissingPart()
+        {
+            var frontEnd = LoadBuilt(FrontEndName).GetComponent<FrontEnd>();
+            Assert.IsNotNull(frontEnd, nameof(FrontEnd));
+
+            var missing = frontEnd.MissingSetup();
+
+            Assert.That(missing ?? string.Empty, Does.Not.Contain("OverlayMotion").And.Not.Contain("CanvasGroup"), missing);
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_ButtonSitsInThePulseRectStretchedInTheLift()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var lift = Reference<RectTransform>(serialized, "lift");
+                    var pulse = Reference<RectTransform>(serialized, "pulse");
+                    var button = (RectTransform)Reference<Button>(serialized, "button").transform;
+
+                    Assert.AreEqual(lift, pulse.parent, $"{view.name}'s pulse rises with the lift");
+                    Assert.AreEqual(pulse, button.parent, $"{view.name}'s button pulses with the pulse rect");
+                    Assert.AreNotEqual(button, pulse, $"{view.name}'s press and pulse scale different transforms");
+                    Assert.AreEqual(Vector2.zero, pulse.anchorMin, $"{view.name}'s pulse is stretched over the slot");
+                    Assert.AreEqual(Vector2.one, pulse.anchorMax, $"{view.name}'s pulse is stretched over the slot");
+                    Assert.AreEqual(Vector2.zero, pulse.offsetMin, $"{view.name}'s pulse has no offsets");
+                    Assert.AreEqual(Vector2.zero, pulse.offsetMax, $"{view.name}'s pulse has no offsets");
+                    Assert.AreEqual(new Vector2(0.5f, 0.5f), pulse.pivot, $"{view.name}'s pulse scales about the slot's centre, as the button did");
+                    Assert.AreEqual(Vector3.one, pulse.localScale, $"{view.name}'s pulse is saved at rest");
+                    Assert.IsNotNull(button.GetComponent<PressFeedback>(), $"{view.name}'s face answers a press");
+                }
+            }
+        }
+
+        [Test]
+        public void ButtonsWithoutPress_ButtonWithNoPress_NamesItsPath()
+        {
+            var root = new GameObject("Root", typeof(RectTransform));
+            try
+            {
+                var child = new GameObject("Row", typeof(RectTransform));
+                child.transform.SetParent(root.transform, false);
+                var bare = new GameObject("Bare", typeof(RectTransform), typeof(Image), typeof(Button));
+                bare.transform.SetParent(child.transform, false);
+
+                var missing = UiPrefabBuilder.ButtonsWithoutPress(root);
+
+                CollectionAssert.AreEqual(new[] { "Root/Row/Bare" }, missing);
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
             }
         }
 

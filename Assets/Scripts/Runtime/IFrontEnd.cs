@@ -89,6 +89,21 @@ namespace GateRush.Runtime
         /// </summary>
         string MissingSetup();
 
+        /// <summary>
+        /// The fade between the front end and a level (Module 47), from the
+        /// interface's configuration, which the bootstrap cannot read. Read
+        /// once the setup is known to be complete.
+        /// </summary>
+        ScreenFadeSettings ScreenFadeSettings { get; }
+
+        /// <summary>
+        /// Makes the front end ignore its keys, Back among them, whenever
+        /// <paramref name="isHeld"/> answers true: the screen fade's one query,
+        /// set once by the bootstrap. Pointer input is held by the fade itself.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
+        void HoldInput(Func<bool> isHeld);
+
         /// <summary>Opens the front end on the Home tab with no overlay and no notice, showing <paramref name="state"/>.</summary>
         void Show(FrontEndState state);
 

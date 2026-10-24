@@ -102,6 +102,15 @@ namespace GateRush.Runtime
         string MissingSetup();
 
         /// <summary>
+        /// Makes the level's interface ignore its keys, Back among them,
+        /// whenever <paramref name="isHeld"/> answers true: the screen fade's
+        /// one query (Module 47), set once by the bootstrap. Pointer input is
+        /// held by the fade itself.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
+        void HoldInput(Func<bool> isHeld);
+
+        /// <summary>
         /// Opens the HUD and the joker bar for a level, with no overlay, no
         /// panel and no time bonus, showing <paramref name="state"/>.
         /// </summary>
@@ -168,9 +177,10 @@ namespace GateRush.Runtime
         void ShowLoss(LevelResult result);
 
         /// <summary>
-        /// Hides the result panel, stopping its pop. Does nothing when it is
-        /// not open. A gold flight from it stops, and the HUD's gold shows the
-        /// wallet's value at once.
+        /// Closes the result panel with the overlays' short close (Module 47),
+        /// stopping its pop; it takes no input from the start of the close.
+        /// Does nothing when it is not open. A gold flight from it stops, and
+        /// the HUD's gold shows the wallet's value at once.
         /// </summary>
         void HideResult();
 
@@ -208,7 +218,11 @@ namespace GateRush.Runtime
         /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
         void ShowConfirm(ConfirmKind kind, int streakAtRisk);
 
-        /// <summary>Hides the confirmation, stopping its pop. Does nothing when it is not open.</summary>
+        /// <summary>
+        /// Closes the confirmation with the overlays' short close (Module 47),
+        /// stopping its pop; <see cref="IsConfirmOpen"/> is false from the start
+        /// of the close. Does nothing when it is not open.
+        /// </summary>
         void HideConfirm();
 
         /// <summary>

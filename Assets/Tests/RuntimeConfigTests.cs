@@ -718,6 +718,27 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
         }
 
+        // Module 47, pass 3: the card shrinks a little as it closes, as every
+        // overlay's close does.
+        [TestCase(0.7f)]
+        [TestCase(1.1f)]
+        public void Problems_IntroCloseScaleOutOfRange_IsReportedByName(float value)
+        {
+            SetFloat("introCloseScale", value);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Intro Close Scale"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_DefaultIntroCloseScale_ReportsNothingAboutIt()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("Intro Close Scale"), string.Join(" | ", problems));
+        }
+
         // ----- Module 34: the joker break ---------------------------------------
         // The joker bar's values left with the bar in Module 40.
 

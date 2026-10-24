@@ -1,4 +1,5 @@
 using System.Linq;
+using GateRush.UI;
 using GateRush.UI.Editor;
 using NUnit.Framework;
 using TMPro;
@@ -211,6 +212,46 @@ namespace GateRush.Tests
                 HandMadePrefabSettings.PlayButtonBottomGap + play.sizeDelta.y + HandMadePrefabSettings.NoticeGap, notice.anchoredPosition.y,
                 "the notice just above the button");
             Assert.AreEqual(0f, notice.anchoredPosition.x);
+        }
+
+        // ----- Module 47, pass 3: every hand-made button answers a press -----
+
+        [TestCase(HandMadePrefabSettings.ButtonPrimaryPath, HandMadePrefabSettings.ButtonPrimaryRootPath)]
+        [TestCase(HandMadePrefabSettings.ButtonRoundPath, HandMadePrefabSettings.ButtonRoundRootPath)]
+        [TestCase(HandMadePrefabSettings.LevelButtonPath, HandMadePrefabSettings.LevelButtonRootPath)]
+        [TestCase(HandMadePrefabSettings.TabBarPath, HandMadePrefabSettings.HomeTabPath)]
+        [TestCase(HandMadePrefabSettings.TabBarPath, HandMadePrefabSettings.StoreTabPath)]
+        [TestCase(HandMadePrefabSettings.TabBarPath, HandMadePrefabSettings.LeaderboardTabPath)]
+        [TestCase(HandMadePrefabSettings.TopBarPath, HandMadePrefabSettings.AvatarPath)]
+        public void Button_AtItsPath_HasAPressOnItsOwnObjectReadingTheUiConfig(string prefabPath, string path)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            Assert.IsNotNull(prefab, prefabPath);
+            var target = HandMadePrefabSettings.FindByPath(prefab, path);
+            Assert.IsNotNull(target, path);
+
+            var press = target.GetComponent<PressFeedback>();
+
+            Assert.IsNotNull(target.GetComponent<Button>(), $"{path} is a button");
+            Assert.IsNotNull(press, $"{path} answers a press");
+            Assert.AreEqual(AssetDatabase.LoadAssetAtPath<UiConfig>(UiPrefabBuilder.UiConfigPath), press.Config, $"{path}'s press reads the UI Config");
+        }
+
+        [TestCase("Assets/Prefabs/UI/Button Secondary.prefab")]
+        [TestCase("Assets/Prefabs/UI/Button Close.prefab")]
+        [TestCase(HandMadePrefabSettings.HomePagePath)]
+        public void Prefab_ThatFollowsAnotherButton_InheritsItsPress(string prefabPath)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(prefabPath);
+            Assert.IsNotNull(prefab, prefabPath);
+
+            var buttons = prefab.GetComponentsInChildren<Button>(true);
+
+            Assert.That(buttons, Is.Not.Empty, $"{prefabPath} holds a button");
+            foreach (var button in buttons)
+            {
+                Assert.IsNotNull(button.GetComponent<PressFeedback>(), $"{prefabPath}: '{button.name}' answers a press");
+            }
         }
 
         private static RectTransform Rect(GameObject root, string path)

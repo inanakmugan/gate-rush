@@ -909,6 +909,7 @@ namespace GateRush.UI
             AddIfTransparent(problems, shortPriceColor, "Short Price Color");
             AddBackgroundProblems(problems);
             AddGoldFlightProblems(problems);
+            AddMotionProblems(problems);
 
             return problems;
         }

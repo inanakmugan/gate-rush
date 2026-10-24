@@ -6,8 +6,9 @@ namespace GateRush.UI
     /// <summary>
     /// The level panels' opening pop (Module 41): the whole overlay fades in
     /// while its panel grows to its size, on unscaled time, from
-    /// <see cref="UiConfig"/>'s timing. The one path the result panel and the
-    /// confirmation share; it keeps no state of its own.
+    /// <see cref="UiConfig"/>'s timing. The one opening every overlay shares,
+    /// through <see cref="OverlayMotion"/> (Module 47); it keeps no state of
+    /// its own.
     /// </summary>
     internal static class OverlayPop
     {
