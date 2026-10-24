@@ -856,8 +856,15 @@ namespace GateRush.UI.Editor
         // button's top reaches 46 + 117.5 + 20 = 183.5, and at the UI Config's
         // default pulse of 1.06 about its centre 46 + 117.5 · 1.06 + 20 =
         // 190.6, inside the row's half height of 199.5; the raised icon's
-        // 46 + 6.9 + 92.5 + 20 = 165.4. The round glow is not counted: its
+        // 46 + 6.9 + 72.5 + 20 = 145.4. The round glow is not counted: its
         // soft edge may reach past the row's top while it pulses.
+        //
+        // The icon is 145 units, not the 185 Module 46 gave it, whose foot
+        // touched the pill and whose sides nearly met the face's edges: on
+        // the button, the icon's top stands at 6.9 + 72.5 = 79.4 and its foot
+        // at 6.9 - 72.5 = -65.6, and the pill's top at -117.5 + 36 = -81.5,
+        // about 15.9 units clear. The pill is on the button, so the gap scales
+        // with the pulse and moves with the raise.
         private const float JokerButtonSize = 235f;
         private const float JokerGapShare = 0.25f;
         private const float JokerSlotGap = JokerButtonSize * JokerGapShare;
@@ -865,7 +872,7 @@ namespace GateRush.UI.Editor
         private const float JokerFootClearance = 92f;
         private const float JokerRaise = 20f;
         private const float JokerRingOutset = 13f;
-        private const float JokerIconSize = 185f;
+        private const float JokerIconSize = 145f;
 
         // The raised face of button_square_green.png, measured on its 249
         // pixel rows: its outline above the face is 15 pixels, and its lip and

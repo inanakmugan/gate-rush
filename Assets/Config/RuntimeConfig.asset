@@ -155,7 +155,6 @@ MonoBehaviour:
   axisArrowEndInsetCells: 0.14
   layerInsetCells: 0.31
   layerEdgeCells: 0.02
-  layeredOuterDarken: 0.85
   layerEdgeDarken: 0.35
   layerStudSpacingCells: 0.42
   layerStudClearanceCells: 0.18

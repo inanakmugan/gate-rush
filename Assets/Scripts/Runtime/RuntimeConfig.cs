@@ -361,14 +361,11 @@ namespace GateRush.Runtime
         [SerializeField] private float axisArrowEndInsetCells = 0.14f;
 
         [Header("Layered blocks (M4)")]
-        [Tooltip("How far a layered block's window sits inside its footprint, in cells, on every side (Module 46): the darker outer block, with its studs, shows around it. Above 0; with Layer Edge Cells below 0.5.")]
+        [Tooltip("How far a layered block's window sits inside its footprint, in cells, on every side (Module 46): the outer block, with its studs, shows around it in the same colour as a plain block's. Above 0; with Layer Edge Cells below 0.5.")]
         [SerializeField] private float layerInsetCells = 0.31f;
 
         [Tooltip("Width of the window's dark rim, in cells, in the outer colour darkened by Layer Edge Darken. At least 0.")]
         [SerializeField] private float layerEdgeCells = 0.02f;
-
-        [Tooltip("A layered block's outer block, around the window, is its colour with RGB multiplied by this, from 0 to 1, so it reads as a recessed surround.")]
-        [SerializeField] private float layeredOuterDarken = 0.85f;
 
         [Tooltip("The window's rim is the outer colour with RGB multiplied by this, from 0 to 1: a very dark shade of it, never the outline colour.")]
         [SerializeField] private float layerEdgeDarken = 0.35f;
@@ -2366,9 +2363,6 @@ namespace GateRush.Runtime
             return blockPalette[index];
         }
 
-        /// <summary>A layered block's outer block around its window, for an outer colour of <paramref name="outer"/>: its RGB darkened, its alpha kept.</summary>
-        public Color LayeredOuterFill(Color outer) => Darken(outer, layeredOuterDarken);
-
         /// <summary>The window's dark rim, for an outer colour of <paramref name="outer"/>: its RGB darkened, its alpha kept.</summary>
         public Color LayerEdgeFill(Color outer) => Darken(outer, layerEdgeDarken);
 
@@ -3057,9 +3051,9 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Layer Inset Cells and Layer Edge Cells together must be below 0.5, so a layered block's inner block keeps a height.");
             }
 
-            if (!(layeredOuterDarken >= 0f && layeredOuterDarken <= 1f && layerEdgeDarken >= 0f && layerEdgeDarken <= 1f))
+            if (!(layerEdgeDarken >= 0f && layerEdgeDarken <= 1f))
             {
-                problems.Add($"{name}: Layered Outer Darken and Layer Edge Darken must be from 0 to 1.");
+                problems.Add($"{name}: Layer Edge Darken must be from 0 to 1.");
             }
 
             if (!(layerStudSpacingCells > 0f && layerStudClearanceCells > 0f))

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GateRush.Core;
 using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEditor;
@@ -14,7 +15,8 @@ namespace GateRush.Tests
     /// it is asked to draw: the group holds the coin and the outlined seconds
     /// and nothing else — no plate, panel or backing behind them — centred on
     /// the anchor together for every value (revision B), so the coin moves
-    /// with the text. The mark sorts above a layered block's window.
+    /// with the text. The mark sorts above a layered block's window. A
+    /// layered block's outer face and studs are a plain block's colour.
     /// </summary>
     public class BoardRecipesTests
     {
@@ -137,6 +139,38 @@ namespace GateRush.Tests
             Assert.Greater(config.LabelOrder, config.IconOrder, "the seconds over the coin");
         }
 
+        [Test]
+        public void Block_Layered_DrawsTheOuterFaceAndStudsInThePlainBlocksColour()
+        {
+            // The 7.8 follow-up: the outer colour once read darker than a plain
+            // block's. Compared with a plain block drawn by the same recipe, so
+            // any darkening fails here however it is added.
+            var cells = new[] { new Coord(0, 0), new Coord(1, 0) };
+            var tiles = BlockTiling.Compute(cells);
+            var red = new Color(0.94f, 0.16f, 0.12f, 1f);
+            var orange = new Color(0.96f, 0.4f, 0.05f, 1f);
+            recipes.Block(new RecordedGroup("Plain", null, Vector2.zero, 1f), cells, tiles, red, null, false, MovementAxis.Free);
+            var plainFaces = OuterFaceColors();
+            var plainStuds = OuterStudColors();
+            surface.Clear();
+
+            recipes.Block(new RecordedGroup("Layered", null, Vector2.zero, 1f), cells, tiles, red, orange, false, MovementAxis.Free);
+
+            var layeredFaces = OuterFaceColors();
+            var layeredStuds = OuterStudColors();
+            Assert.IsNotEmpty(plainFaces, "the plain block's face is drawn");
+            Assert.AreEqual(cells.Length, plainStuds.Count, "the plain block's studs, one set a cell");
+            CollectionAssert.AreEqual(plainFaces, layeredFaces, "the outer face is the plain block's colour");
+            CollectionAssert.AreEqual(plainStuds, layeredStuds, "the outer studs are the plain block's colour");
+            Assert.That(surface.QuarterCalls.Exists(q => q.Order == config.LayerOrder && q.Color == orange), "the window shows the colour beneath");
+        }
+
+        private List<Color> OuterFaceColors() =>
+            surface.QuarterCalls.FindAll(q => q.Layer == QuarterLayer.Lit && q.Order == config.BlockOrder).ConvertAll(q => q.Color);
+
+        private List<Color> OuterStudColors() =>
+            surface.Pieces.FindAll(p => p.Name.StartsWith("Studs ", StringComparison.Ordinal)).ConvertAll(p => p.Color);
+
         /// <summary>A recorded group.</summary>
         private sealed class RecordedGroup
         {
@@ -160,11 +194,12 @@ namespace GateRush.Tests
         /// <summary>A recorded sprite.</summary>
         private sealed class RecordedPiece
         {
-            public RecordedPiece(string name, Sprite sprite, Vector2 center, int order)
+            public RecordedPiece(string name, Sprite sprite, Vector2 center, Color color, int order)
             {
                 Name = name;
                 Sprite = sprite;
                 Center = center;
+                Color = color;
                 Order = order;
             }
 
@@ -173,6 +208,25 @@ namespace GateRush.Tests
             public Sprite Sprite { get; }
 
             public Vector2 Center { get; }
+
+            public Color Color { get; }
+
+            public int Order { get; }
+        }
+
+        /// <summary>A recorded call for a set of quarters.</summary>
+        private sealed class RecordedQuarters
+        {
+            public RecordedQuarters(QuarterLayer layer, Color color, int order)
+            {
+                Layer = layer;
+                Color = color;
+                Order = order;
+            }
+
+            public QuarterLayer Layer { get; }
+
+            public Color Color { get; }
 
             public int Order { get; }
         }
@@ -211,6 +265,17 @@ namespace GateRush.Tests
 
             public List<RecordedLabel> Labels { get; } = new List<RecordedLabel>();
 
+            public List<RecordedQuarters> QuarterCalls { get; } = new List<RecordedQuarters>();
+
+            public void Clear()
+            {
+                Calls.Clear();
+                Groups.Clear();
+                Pieces.Clear();
+                Labels.Clear();
+                QuarterCalls.Clear();
+            }
+
             public RecordedGroup Group(RecordedGroup parent, string name, Vector2 center, float scale)
             {
                 var group = new RecordedGroup(name, parent, center, scale);
@@ -223,28 +288,29 @@ namespace GateRush.Tests
                 int order)
             {
                 Calls.Add($"Quarters {layer}");
+                QuarterCalls.Add(new RecordedQuarters(layer, color, order));
                 return new List<RecordedPiece>();
             }
 
             public RecordedPiece Sprite(
                 RecordedGroup parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
                 float rotationDegrees, SpriteLook look) =>
-                Record("Sprite", name, sprite, center, order);
+                Record("Sprite", name, sprite, center, color, order);
 
             public RecordedPiece Sliced(
                 RecordedGroup parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order,
                 SpriteLook look) =>
-                Record("Sliced", name, sprite, center, order);
+                Record("Sliced", name, sprite, center, color, order);
 
             public RecordedPiece Tiled(
                 RecordedGroup parent, string name, Sprite sprite, Vector2 center, Vector2 size, float tileCells,
                 bool tileIsMeasuredByHeight, Color color, int order, SpriteLook look) =>
-                Record("Tiled", name, sprite, center, order);
+                Record("Tiled", name, sprite, center, color, order);
 
             public RecordedPiece Strip(
                 RecordedGroup parent, string name, Sprite sprite, Vector2 center, float length, float thickness, bool isAlongY,
                 Color color, int order, SpriteLook look) =>
-                Record("Strip", name, sprite, center, order);
+                Record("Strip", name, sprite, center, color, order);
 
             public void Label(
                 RecordedGroup parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed)
@@ -259,10 +325,10 @@ namespace GateRush.Tests
                 Labels.Add(new RecordedLabel(name, start, text, boardFontSize, color));
             }
 
-            private RecordedPiece Record(string method, string name, Sprite sprite, Vector2 center, int order)
+            private RecordedPiece Record(string method, string name, Sprite sprite, Vector2 center, Color color, int order)
             {
                 Calls.Add($"{method} {name}");
-                var piece = new RecordedPiece(name, sprite, center, order);
+                var piece = new RecordedPiece(name, sprite, center, color, order);
                 Pieces.Add(piece);
                 return piece;
             }
