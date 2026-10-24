@@ -97,6 +97,9 @@ namespace GateRush.UI
         [Tooltip("Envelops the screen with the painting, cropped and centred, never stretched; its ratio follows the painting's sprite.")]
         [SerializeField] private AspectRatioFitter paintingFit;
 
+        [Tooltip("The coins bought gold flies to the Top Bar's gold in (Module 47), on their own canvas above every overlay.")]
+        [SerializeField] private CoinFlightView coinFlight;
+
         private readonly UiNavigation navigation = new UiNavigation();
 
         // The tab the notice belongs to: the notice goes when the tab changes.
@@ -146,6 +149,9 @@ namespace GateRush.UI
         public event Action ButtonPressed;
 
         /// <inheritdoc />
+        public event Action CoinLanded;
+
+        /// <inheritdoc />
         public bool IsOpen => gameObject.activeSelf;
 
         /// <inheritdoc />
@@ -172,6 +178,11 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, avatarCatalog, nameof(FrontEnd), nameof(avatarCatalog));
             UiParts.AddIfMissing(missing, painting, nameof(FrontEnd), nameof(painting));
             UiParts.AddIfMissing(missing, paintingFit, nameof(FrontEnd), nameof(paintingFit));
+            UiParts.AddIfMissing(missing, coinFlight, nameof(FrontEnd), nameof(coinFlight));
+            if (coinFlight != null)
+            {
+                coinFlight.AddMissing(missing);
+            }
 
             if (store != null)
             {
@@ -290,6 +301,7 @@ namespace GateRush.UI
         {
             gameObject.SetActive(true);
             UiTint.ApplyAll(this, config);
+            EndGoldFlight();
             navigation.Reset();
             shownTab = navigation.Tab;
             ApplyNavigation();
@@ -415,10 +427,39 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void FlyPackGold(string productId, int amount, int shownGold, int seed)
+        {
+            if (!store.TryGetShownPackCard(productId, out var card))
+            {
+                EndGoldFlight();
+                return;
+            }
+
+            coinFlight.Fly(
+                card, topBar.GoldTarget, CoinFlight.Layout(amount, config.CreateCoinFlightSettings(), seed), 0f, topBar.GoldCounter,
+                shownGold, topBar.GoldCanvas);
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
+            EndGoldFlight();
             gameObject.SetActive(false);
             AnswerPending(false);
+        }
+
+        /// <summary>Ends a gold flight, if any, so the Top Bar shows the wallet's value at once.</summary>
+        private void EndGoldFlight()
+        {
+            if (coinFlight != null)
+            {
+                coinFlight.Stop();
+            }
+
+            if (topBar != null)
+            {
+                topBar.GoldCounter.Release();
+            }
         }
 
         private void OnEnable()
@@ -575,11 +616,12 @@ namespace GateRush.UI
             if (isSubscribed || store == null || home == null || leaderboard == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
                 || notEnoughGold == null || message == null || testPurchase == null
-                || winStreak == null || streakReward == null || profile == null || streakBar == null)
+                || winStreak == null || streakReward == null || profile == null || streakBar == null || coinFlight == null)
             {
                 return;
             }
 
+            coinFlight.CoinLanded += OnCoinLanded;
             navigation.Changed += OnNavigationChanged;
             home.PlayRequested += OnPlayRequested;
             store.GoldPackRequested += OnGoldPackRequested;
@@ -622,6 +664,7 @@ namespace GateRush.UI
 
             // Unsubscribing from a C# event of a destroyed view is safe, so
             // this runs during teardown as well.
+            coinFlight.CoinLanded -= OnCoinLanded;
             navigation.Changed -= OnNavigationChanged;
             home.PlayRequested -= OnPlayRequested;
             store.GoldPackRequested -= OnGoldPackRequested;
@@ -668,6 +711,7 @@ namespace GateRush.UI
             if (navigation.Tab != shownTab)
             {
                 shownTab = navigation.Tab;
+                EndGoldFlight();
                 home.ClearNotice();
                 if (shownTab == UiTab.Leaderboard)
                 {
@@ -717,6 +761,8 @@ namespace GateRush.UI
             RequestLeaderboard();
             ButtonPressed?.Invoke();
         }
+
+        private void OnCoinLanded() => CoinLanded?.Invoke();
 
         private void OnPlayRequested()
         {

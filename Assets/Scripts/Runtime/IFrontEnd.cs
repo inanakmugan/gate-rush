@@ -72,6 +72,13 @@ namespace GateRush.Runtime
         /// </summary>
         event Action ButtonPressed;
 
+        /// <summary>
+        /// Raised when a coin of a gold flight lands on the Top Bar's gold, at
+        /// most once per the UI Config's tap interval: the moment for the tap
+        /// sound (Module 47).
+        /// </summary>
+        event Action CoinLanded;
+
         /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
         bool IsOpen { get; }
 
@@ -111,6 +118,17 @@ namespace GateRush.Runtime
         /// <summary>Opens the message prompt saying that a purchase failed and nothing was charged.</summary>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowPurchaseFailed();
+
+        /// <summary>
+        /// Flies <paramref name="amount"/> gold from the Store's card of the
+        /// gold pack <paramref name="productId"/> to the Top Bar's gold, the
+        /// gold held at <paramref name="shownGold"/> until the coins land and
+        /// lifted over any scrim meanwhile (Module 47). With the card not
+        /// shown, the gold shows at once. A tab change, <see cref="Show"/>,
+        /// <see cref="Hide"/> and a disable end the flight and show the
+        /// wallet's value.
+        /// </summary>
+        void FlyPackGold(string productId, int amount, int shownGold, int seed);
 
         /// <summary>
         /// Opens the test purchase sheet for <paramref name="offer"/> over

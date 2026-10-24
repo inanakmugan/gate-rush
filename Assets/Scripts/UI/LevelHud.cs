@@ -64,6 +64,23 @@ namespace GateRush.UI
         private bool hasBonusRest;
         private int shownSeconds = -1;
 
+        // The gold pill a coin flight lands on (Module 47).
+        private GoldPill goldPill;
+
+        /// <summary>
+        /// The gold label's counter (Module 47): what <see cref="Show"/> feeds,
+        /// and what a coin flight holds and adds to.
+        /// </summary>
+        public GoldCounter GoldCounter => Gold.Counter;
+
+        /// <summary>The gold pill's own canvas, which a coin flight lifts over a scrim.</summary>
+        public Canvas GoldCanvas => Gold.Canvas;
+
+        /// <summary>Where coins land: the gold pill.</summary>
+        public RectTransform GoldTarget => Gold.Rect;
+
+        private GoldPill Gold => goldPill ?? (goldPill = new GoldPill(goldLabel));
+
         /// <summary>Raised when Menu is pressed.</summary>
         public event Action MenuRequested;
 
@@ -74,7 +91,7 @@ namespace GateRush.UI
         public void Show(LevelUiState state, UiConfig config)
         {
             levelLabel.text = LevelHudTexts.LevelLabel(state.IsFreePlay, state.LevelNumber, config);
-            goldLabel.text = HomeTexts.Gold(state.Gold, config);
+            Gold.Show(state.Gold, config);
             livesPill.SetActive(!state.IsFreePlay);
             livesCountLabel.text = HomeTexts.LivesCount(state.Lives, config);
             livesStatusLabel.text = LevelHudTexts.LivesStatus(state.NextLifeSeconds, config);
@@ -187,6 +204,7 @@ namespace GateRush.UI
         private void OnDisable()
         {
             CancelTimeBonus();
+            goldPill?.Rest();
             UiParts.Unlisten(menuButton, OnMenuClicked);
             UiParts.Unlisten(restartButton, OnRestartClicked);
         }
@@ -194,6 +212,7 @@ namespace GateRush.UI
         private void OnDestroy()
         {
             DOTween.Kill(this);
+            goldPill?.Kill();
         }
 
         /// <summary>Where the time bonus rests: its place on the prefab, taken the first time it is needed, before any tween moves it.</summary>

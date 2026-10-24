@@ -19,7 +19,8 @@ namespace GateRush.UI.Editor
     /// <para>So far: Button Round's icon sits in a smaller, centred glyph box;
     /// in Top Bar the plus buttons' icons follow it, the lives count takes
     /// the HUD's font size, the heart sits close to the coin's size and the
-    /// avatar fills its frame inside a thin rim (Module 45 follow-ups); in
+    /// avatar fills its frame inside a thin rim (Module 45 follow-ups), and
+    /// the gold has a canvas and a raycaster of its own (Module 47); in
     /// Tab Bar the selected tabs' labels share the largest size at which
     /// "Leaderboard" fits its tile; in Home Page the Play button sits just
     /// above the tab bar with the notice above it (the interface review).
@@ -113,6 +114,9 @@ namespace GateRush.UI.Editor
         public const string HeartPath = "Top Bar/Lives/Heart";
 
         /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string TopBarGoldPath = "Top Bar/Gold";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string LivesCountPath = "Top Bar/Lives/Heart/Lives Count";
 
         /// <inheritdoc cref="ButtonRoundIconPath"/>
@@ -146,6 +150,10 @@ namespace GateRush.UI.Editor
         private const float FontSizeStep = 1f;
 
         private const string LogPrefix = "Apply Hand-Made Prefab Settings";
+
+        // A Canvas's saved Override Sorting flag, read and written directly
+        // where the canvas is a root one in the prefab's contents.
+        private const string CanvasOverrideSortingProperty = "m_OverrideSorting";
         private const char PathSeparator = '/';
 
         /// <summary>Applies the settings to Button Round, then to Top Bar, and logs one line for each.</summary>
@@ -277,6 +285,7 @@ namespace GateRush.UI.Editor
             var livesCount = FindByPath(root, LivesCountPath);
             var frame = FindByPath(root, AvatarFramePath);
             var avatar = FindByPath(root, AvatarPath) as RectTransform;
+            var goldPill = FindByPath(root, TopBarGoldPath);
 
             var heartLayout = heart == null ? null : heart.GetComponent<LayoutElement>();
             var countText = livesCount == null ? null : livesCount.GetComponent<TMP_Text>();
@@ -289,6 +298,7 @@ namespace GateRush.UI.Editor
             AddIfMissing(missing, countText, $"a TextMeshPro text at '{LivesCountPath}'");
             AddIfMissing(missing, frameLayout, $"a Layout Element at '{AvatarFramePath}'");
             AddIfMissing(missing, avatar, $"a RectTransform at '{AvatarPath}'");
+            AddIfMissing(missing, goldPill, $"an object at '{TopBarGoldPath}'");
             if (goldPlusIcon != null && !PrefabUtility.IsPartOfPrefabInstance(goldPlusIcon))
             {
                 missing.Add($"'{GoldPlusIconPath}' to be part of a Button Round instance");
@@ -329,7 +339,47 @@ namespace GateRush.UI.Editor
                 changes.Add($"{AvatarPath} Layout Element removed");
             }
 
+            SetGoldPillCanvas(goldPill.gameObject, changes);
             return null;
+        }
+
+        /// <summary>
+        /// The Top Bar's gold gets a canvas of its own (Module 47), sorting with
+        /// its parent until a coin flight lifts it over a scrim, so its count
+        /// and its pop rebuild only the pill; and a raycaster, since a nested
+        /// canvas's graphics are raycast by its own and the gold's "+" must
+        /// stay pressable. Noting each change.
+        /// </summary>
+        private static void SetGoldPillCanvas(GameObject goldPill, List<string> changes)
+        {
+            var canvas = goldPill.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                goldPill.AddComponent<Canvas>();
+                changes.Add($"{TopBarGoldPath} Canvas added, sorting with its parent");
+            }
+            else
+            {
+                // The saved flag, not the getter: in the prefab's contents this
+                // is a root canvas, whose overrideSorting reads false and
+                // ignores a write whatever is saved.
+                using (var serialized = new SerializedObject(canvas))
+                {
+                    var overrideSorting = serialized.FindProperty(CanvasOverrideSortingProperty);
+                    if (overrideSorting.boolValue)
+                    {
+                        overrideSorting.boolValue = false;
+                        serialized.ApplyModifiedPropertiesWithoutUndo();
+                        changes.Add($"{TopBarGoldPath} Canvas sorting with its parent");
+                    }
+                }
+            }
+
+            if (goldPill.GetComponent<GraphicRaycaster>() == null)
+            {
+                goldPill.AddComponent<GraphicRaycaster>();
+                changes.Add($"{TopBarGoldPath} Graphic Raycaster added");
+            }
         }
 
         /// <summary>

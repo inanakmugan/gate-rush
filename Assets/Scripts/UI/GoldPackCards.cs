@@ -51,6 +51,28 @@ namespace GateRush.UI
             }
         }
 
+        /// <summary>
+        /// The card showing <paramref name="productId"/>, while it is shown on
+        /// screen: where that pack's coins fly from (Module 47). False when no
+        /// such card exists or it is not active in the hierarchy.
+        /// </summary>
+        public bool TryGetShown(string productId, out RectTransform card)
+        {
+            for (var i = 0; i < cards.Count; i++)
+            {
+                var candidate = cards[i];
+                if (candidate != null && candidate.gameObject.activeInHierarchy
+                    && string.Equals(candidate.ProductId, productId, StringComparison.Ordinal))
+                {
+                    card = (RectTransform)candidate.transform;
+                    return true;
+                }
+            }
+
+            card = null;
+            return false;
+        }
+
         /// <summary>Unsubscribes from every card and destroys those that still exist.</summary>
         public void DestroyAll()
         {

@@ -389,7 +389,7 @@ namespace GateRush.Tests
         [TestCase(typeof(StreakBar), 6)]
         [TestCase(typeof(ProfileOverlay), 16)]
         [TestCase(typeof(LeaderboardScreen), 7)]
-        [TestCase(typeof(FrontEnd), 20)]
+        [TestCase(typeof(FrontEnd), 21)]
         public void Build_View_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(FrontEndName).GetComponentInChildren(viewType, true);
@@ -768,14 +768,15 @@ namespace GateRush.Tests
             }
         }
 
-        [TestCase(typeof(LevelUi), 9)]
+        [TestCase(typeof(LevelUi), 10)]
         [TestCase(typeof(LevelHud), 11)]
+        [TestCase(typeof(CoinFlightView), 3)]
         [TestCase(typeof(JokerBarView), 3)]
         [TestCase(typeof(GoldPacksOverlay), 5)]
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(MessageOverlay), 3)]
-        [TestCase(typeof(ResultOverlay), 16)]
+        [TestCase(typeof(ResultOverlay), 17)]
         [TestCase(typeof(ConfirmOverlay), 8)]
         public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
@@ -1544,6 +1545,92 @@ namespace GateRush.Tests
                 Assert.IsFalse(lifeLost.gameObject.activeSelf, "saved hidden");
                 Assert.That(ExtentBelowTop(lossArt).bottom, Is.LessThanOrEqualTo(ExtentBelowTop(lifeLost).top + Tolerance), "the heart is under the hourglass");
                 Assert.That(ExtentBelowTop(lifeLost).bottom, Is.LessThanOrEqualTo(buttonsTop + Tolerance), "both clear of the buttons");
+            }
+        }
+
+        // ----- Module 47, pass 2: gold flying to its counter --------------
+
+        [Test]
+        public void Build_LevelHud_GoldPillHasItsOwnCanvasSortingWithItsParent()
+        {
+            var hud = LoadBuilt(LevelHudName).GetComponent<LevelHud>();
+            Assert.IsNotNull(hud, nameof(LevelHud));
+
+            using (var serialized = new SerializedObject(hud))
+            {
+                var label = Label(serialized, "goldLabel");
+                var canvas = label.GetComponentInParent<Canvas>(true);
+
+                Assert.IsNotNull(canvas, "the gold label sits under a canvas of the pill's own");
+                Assert.AreEqual("Gold Pill", canvas.name, "the pill's own canvas, not one further up");
+                Assert.IsFalse(SerializedOverrideSorting(canvas), "at rest it sorts with the HUD");
+                Assert.IsNull(canvas.GetComponent<UnityEngine.UI.GraphicRaycaster>(), "the pill takes no input");
+            }
+        }
+
+        /// <summary>
+        /// The Override Sorting flag <paramref name="canvas"/> was saved with.
+        /// A built prefab has no canvas above its own, so each of its canvases
+        /// loads as a root canvas, whose <c>overrideSorting</c> getter reads
+        /// false whatever was saved; the saved flag is what applies once the
+        /// prefab sits under the screen's canvas.
+        /// </summary>
+        private static bool SerializedOverrideSorting(Canvas canvas)
+        {
+            using (var serialized = new SerializedObject(canvas))
+            {
+                return serialized.FindProperty("m_OverrideSorting").boolValue;
+            }
+        }
+
+        /// <summary>The sorting order <paramref name="canvas"/> was saved with (see <see cref="SerializedOverrideSorting"/>).</summary>
+        private static int SerializedSortingOrder(Canvas canvas)
+        {
+            using (var serialized = new SerializedObject(canvas))
+            {
+                return serialized.FindProperty("m_SortingOrder").intValue;
+            }
+        }
+
+        [TestCase(LevelUiName)]
+        [TestCase(FrontEndName)]
+        public void Build_View_CoinFlightLayerIsLastStretchedOnItsOwnSortingCanvasWithNoRaycaster(string viewName)
+        {
+            var root = LoadBuilt(viewName);
+            var views = root.GetComponentsInChildren<CoinFlightView>(true);
+            Assert.AreEqual(1, views.Length, "one coin flight layer");
+            var layer = (RectTransform)views[0].transform;
+            var canvas = layer.GetComponent<Canvas>();
+
+            Assert.AreEqual(root.transform, layer.parent, "directly under the view's root");
+            Assert.AreEqual(root.transform.childCount - 1, layer.GetSiblingIndex(), "last, over every overlay");
+            Assert.AreEqual(Vector2.zero, layer.anchorMin, "stretched");
+            Assert.AreEqual(Vector2.one, layer.anchorMax, "stretched");
+            Assert.IsNotNull(canvas, "a canvas of its own: moving coins rebuild only it");
+
+            // The saved values, not the getters: loaded on its own, this is a
+            // root canvas, whose overrideSorting getter always reads false.
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            Assert.IsTrue(SerializedOverrideSorting(canvas), "it sorts above every overlay once under the screen's canvas");
+            Assert.AreEqual(config.CoinFlightSortingOffset, SerializedSortingOrder(canvas), "by the UI Config's offset");
+            Assert.IsNull(layer.GetComponent<UnityEngine.UI.GraphicRaycaster>(), "the coins take no input");
+            Assert.AreEqual(0, layer.childCount, "the coins are made at runtime, once");
+        }
+
+        [Test]
+        public void Build_ResultOverlay_GoldCoinIsTheGoldRowsCoin()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var coin = Reference<RectTransform>(serialized, "goldCoin");
+                var row = Reference<GameObject>(serialized, "goldRow").transform;
+
+                Assert.AreEqual(row, coin.parent, "in the gold row");
+                Assert.AreEqual(CoinSpritePath, AssetDatabase.GetAssetPath(coin.GetComponent<Image>().sprite));
             }
         }
 

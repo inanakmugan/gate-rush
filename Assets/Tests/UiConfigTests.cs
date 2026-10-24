@@ -482,6 +482,72 @@ namespace GateRush.Tests
             Assert.IsNull(unknown);
         }
 
+        // ----- Module 47, pass 2: gold flying to its counter --------------
+
+        [TestCase("Coin Flight")]
+        [TestCase("Coin Tap")]
+        [TestCase("Gold Pop")]
+        [TestCase("Gold Lift")]
+        [TestCase("Result Title Pop")]
+        [TestCase("Result Coin Spin")]
+        public void Problems_DefaultGoldFlightValues_ReportNothingAboutThem(string shownName)
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("coinFlightStartSpreadUnits", -1f, "Coin Flight Start Spread Units")]
+        [TestCase("coinFlightMaxDelaySeconds", 2f, "Coin Flight Max Delay Seconds")]
+        [TestCase("coinFlightSizeUnits", 0f, "Coin Flight Size Units")]
+        [TestCase("coinFlightEndScale", 0f, "Coin Flight End Scale")]
+        [TestCase("coinFlightWinDelaySeconds", 3f, "Coin Flight Win Delay Seconds")]
+        [TestCase("coinTapMinIntervalSeconds", -0.1f, "Coin Tap Min Interval Seconds")]
+        [TestCase("goldPopScale", 0.9f, "Gold Pop Scale")]
+        [TestCase("goldPopSeconds", 0f, "Gold Pop Seconds")]
+        [TestCase("resultTitlePopScale", 2f, "Result Title Pop Scale")]
+        [TestCase("resultTitlePopSeconds", 0f, "Result Title Pop Seconds")]
+        [TestCase("resultCoinSpinSeconds", 0f, "Result Coin Spin Seconds")]
+        [TestCase("resultCoinSpinDegrees", -1f, "Result Coin Spin Degrees")]
+        public void Problems_GoldFlightFloatOutOfRange_IsReportedByName(string field, float value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("coinFlightCap", 0, "Coin Flight Cap")]
+        [TestCase("coinFlightGoldPerCoin", 0, "Coin Flight Gold Per Coin")]
+        [TestCase("goldLiftSortingOffset", 0, "Gold Lift Sorting Offset")]
+        [TestCase("coinFlightSortingOffset", 10, "Coin Flight Sorting Offset")]
+        public void Problems_GoldFlightCountOutOfRange_IsReportedByName(string field, int value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void CreateCoinFlightSettings_Default_IsTheConfigsValues()
+        {
+            var serialized = new SerializedObject(config);
+
+            var settings = config.CreateCoinFlightSettings();
+
+            Assert.AreEqual(serialized.FindProperty("coinFlightCap").intValue, settings.Cap);
+            Assert.AreEqual(serialized.FindProperty("coinFlightGoldPerCoin").intValue, settings.GoldPerCoin);
+            Assert.AreEqual(serialized.FindProperty("coinFlightSeconds").vector2Value.x, settings.SecondsMin);
+            Assert.AreEqual(serialized.FindProperty("coinFlightArcUnits").vector2Value.y, settings.ArcMaxUnits);
+        }
+
         private void SetRibbons(params (string id, string text)[] ribbons)
         {
             var serialized = new SerializedObject(config);

@@ -27,7 +27,7 @@ namespace GateRush.UI
     /// (<see cref="FrontEnd.MissingSetup"/>, <see cref="LevelUi.MissingSetup"/>).
     /// </remarks>
     [CreateAssetMenu(fileName = "UiConfig", menuName = "Gate Rush/UI Config")]
-    public sealed class UiConfig : ScriptableObject
+    public sealed partial class UiConfig : ScriptableObject
     {
         // The campaign's first level, counted from 1: where the first
         // painting must start. Fixed by the numbering, not tuned.
@@ -908,6 +908,7 @@ namespace GateRush.UI
             AddIfTransparent(problems, jokerBadgeTextColor, "Joker Badge Text Color");
             AddIfTransparent(problems, shortPriceColor, "Short Price Color");
             AddBackgroundProblems(problems);
+            AddGoldFlightProblems(problems);
 
             return problems;
         }

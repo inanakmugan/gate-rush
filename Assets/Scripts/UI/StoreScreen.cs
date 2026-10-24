@@ -156,6 +156,9 @@ namespace GateRush.UI
                 config);
         }
 
+        /// <summary>The card of <paramref name="productId"/> while the Store shows it: where its coins fly from (Module 47).</summary>
+        public bool TryGetShownPackCard(string productId, out RectTransform card) => PackCards.TryGetShown(productId, out card);
+
         // Made on first use, so its buy handler is this instance's.
         private GoldPackCards PackCards => packCards ?? (packCards = new GoldPackCards(OnGoldPackPressed));
 

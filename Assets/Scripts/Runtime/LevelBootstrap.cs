@@ -323,6 +323,18 @@ namespace GateRush.Runtime
 
         // Moves and jokers applied in this attempt at the level; seeds the bursts.
         private int moveNumber;
+
+        // Module 47's seeds: the attempts at a level started this session
+        // (each start and restart), which seeds a campaign win's coins, and
+        // the gold packs bought this session, which seeds theirs. Neither
+        // needs to persist.
+        private int attemptNumber;
+        private int goldPurchaseCount;
+
+        // The balance before a campaign win's gold, which the HUD's gold is
+        // held at until the gold flies from the result panel; null when no
+        // win's gold is waiting to fly.
+        private int? winHeldGold;
         private BoardLayout layout;
         private string levelName;
         private int fittedScreenWidth;
@@ -776,9 +788,18 @@ namespace GateRush.Runtime
             {
                 try
                 {
+                    var balanceBefore = metaGame.Save.Wallet.Balance;
                     var win = metaGame.ReportCampaignWin(ctx.GoldReward);
                     campaignGoldEarned = win.GoldEarned;
                     KeepUnannouncedRewards(win);
+
+                    // The HUD keeps the old balance until the gold flies from
+                    // the result panel (Module 47), though the wallet has it now.
+                    if (win.GoldEarned > 0)
+                    {
+                        winHeldGold = balanceBefore;
+                        levelUiView.HoldGold(balanceBefore);
+                    }
                 }
                 catch (ArgumentOutOfRangeException e)
                 {
@@ -998,6 +1019,7 @@ namespace GateRush.Runtime
             run = null;
             levelName = null;
             moveNumber = 0;
+            winHeldGold = null;
 
             boardView.Clear();
             introductionCard.Hide();
@@ -1233,7 +1255,21 @@ namespace GateRush.Runtime
             {
                 case PurchaseOutcome.Succeeded:
                     // Paid for, so credited even if the front end has closed.
+                    var balanceBefore = metaGame.Save.Wallet.Balance;
                     var gold = metaGame.ReportGoldPurchase(productId);
+
+                    // The coins fly to the counter on screen, which shows the
+                    // old balance until they land (Module 47).
+                    goldPurchaseCount++;
+                    if (frontEndView.IsOpen)
+                    {
+                        frontEndView.FlyPackGold(productId, gold, balanceBefore, goldPurchaseCount);
+                    }
+                    else if (levelUiView.IsOpen)
+                    {
+                        levelUiView.FlyPackGold(productId, gold, balanceBefore, goldPurchaseCount);
+                    }
+
                     SaveOrWarn($"{gold} gold was bought, but saving it failed; it is kept until the game is closed.");
                     ForgetShownMeta();
                     RefreshMeta();
@@ -1252,6 +1288,12 @@ namespace GateRush.Runtime
 
                     break;
             }
+        }
+
+        /// <summary>A coin of a gold flight landed: the tap cue, which the view already spaces out (Module 47). No new cue.</summary>
+        private void OnCoinLanded()
+        {
+            PlayCue(SoundCue.UiTap);
         }
 
         private bool TryGetOffer(string productId, out GoldOffer offer)
@@ -1293,6 +1335,7 @@ namespace GateRush.Runtime
             levelUiView.RestartRequested += OnRestartRequested;
             levelUiView.MenuRequested += OnMenuRequested;
             levelUiView.GoldPackRequested += OnGoldPackRequested;
+            levelUiView.CoinLanded += OnCoinLanded;
             levelUiView.OverlaysClosed += OnLevelOverlaysClosed;
             levelUiView.ResultRestartRequested += OnRestartRequested;
             levelUiView.NextRequested += Next;
@@ -1307,6 +1350,7 @@ namespace GateRush.Runtime
             frontEndView.AvatarChangeRequested += OnAvatarChangeRequested;
             frontEndView.RefillRequested += OnRefillRequested;
             frontEndView.GoldPackRequested += OnGoldPackRequested;
+            frontEndView.CoinLanded += OnCoinLanded;
             frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested += OnLeaderboardRequested;
             boardView.LeaveStarted += OnLeaveStarted;
@@ -1336,6 +1380,7 @@ namespace GateRush.Runtime
             levelUiView.RestartRequested -= OnRestartRequested;
             levelUiView.MenuRequested -= OnMenuRequested;
             levelUiView.GoldPackRequested -= OnGoldPackRequested;
+            levelUiView.CoinLanded -= OnCoinLanded;
             levelUiView.OverlaysClosed -= OnLevelOverlaysClosed;
             levelUiView.ResultRestartRequested -= OnRestartRequested;
             levelUiView.NextRequested -= Next;
@@ -1350,6 +1395,7 @@ namespace GateRush.Runtime
             frontEndView.AvatarChangeRequested -= OnAvatarChangeRequested;
             frontEndView.RefillRequested -= OnRefillRequested;
             frontEndView.GoldPackRequested -= OnGoldPackRequested;
+            frontEndView.CoinLanded -= OnCoinLanded;
             frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested -= OnLeaderboardRequested;
             boardView.LeaveStarted -= OnLeaveStarted;
@@ -1467,6 +1513,8 @@ namespace GateRush.Runtime
             mode = playMode;
             campaignGoldEarned = null;
             moveNumber = 0;
+            attemptNumber++;
+            winHeldGold = null;
             if (isActiveAndEnabled)
             {
                 ListenForTimeBonus();
@@ -1771,6 +1819,8 @@ namespace GateRush.Runtime
             StopSounds();
             run.Restart();
             moveNumber = 0;
+            attemptNumber++;
+            winHeldGold = null;
             freePlayJokers.Refill();
             levelUiView.CancelTimeBonus();
             boardView.Rebuild(run.Session.State);
@@ -2221,8 +2271,10 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The board now shows the state a move produced. A win was decided —
-        /// and the countdown stopped — the moment that state was applied; the
-        /// panel waits until the player has seen the block leave.
+        /// and the countdown stopped — the moment that state was applied, so
+        /// no time-out can follow it; the panel waits until the player has
+        /// seen the block leave, then opens at once with the Win cue and haptic
+        /// (<see cref="ShowWinPanel"/>).
         /// </summary>
         private void OnPresentationDone()
         {
@@ -2235,7 +2287,19 @@ namespace GateRush.Runtime
             }
 
             Debug.Log($"Level '{levelName}' solved.", this);
+            PlayCue(SoundCue.Win);
+            Pulse(HapticMoment.Win);
+            ShowWinPanel();
+        }
 
+        /// <summary>
+        /// Opens the result panel on a win, and a campaign win's gold flies
+        /// from the panel's coin to the HUD's gold (Module 47), which has held
+        /// the old balance since the win; the coins wait for the panel's
+        /// entrance (<c>UiConfig.CoinFlightWinDelaySeconds</c>).
+        /// </summary>
+        private void ShowWinPanel()
+        {
             // One query decides Next and, in the campaign, the closing message
             // together: whether the position the win advanced to holds a
             // level (the campaign's one source of truth). In free play, Next
@@ -2246,8 +2310,13 @@ namespace GateRush.Runtime
                 ? LevelResult.CampaignWin(campaignGoldEarned, CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out _))
                 : LevelResult.FreePlayWin(TryGetNextLevel(out _));
             levelUiView.ShowWin(result);
-            PlayCue(SoundCue.Win);
-            Pulse(HapticMoment.Win);
+
+            if (winHeldGold.HasValue && campaignGoldEarned.HasValue)
+            {
+                levelUiView.FlyWinGold(campaignGoldEarned.Value, winHeldGold.Value, attemptNumber);
+            }
+
+            winHeldGold = null;
         }
 
         /// <summary>The HUD skips the work when the displayed second has not changed, so this runs every frame.</summary>

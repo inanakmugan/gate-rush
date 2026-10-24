@@ -185,6 +185,10 @@ namespace GateRush.UI.Editor
         private const string SafeName = "Safe";
         private const string PagesName = "Pages";
         private const string OverlaysName = "Overlays";
+
+        // Module 47: the layer gold flies to its counter in, last under Level
+        // UI's and Front End's roots.
+        private const string CoinFlightName = "Coin Flight";
         private const string IconName = "Icon";
         private const string CoinName = "Coin";
         private const string CoinStackName = "Coin Stack";
@@ -1081,6 +1085,15 @@ namespace GateRush.UI.Editor
         private const string BackgroundField = "background";
         private const string PaintingField = "painting";
         private const string PaintingFitField = "paintingFit";
+        private const string CoinFlightField = "coinFlight";
+        private const string CoinSpriteField = "coinSprite";
+        private const string CoinLayerField = "layer";
+        private const string GoldCoinField = "goldCoin";
+
+        // A Canvas's serialized sorting fields, written directly where the
+        // canvas is a root one while it is built (AddCoinFlight).
+        private const string CanvasOverrideSortingProperty = "m_OverrideSorting";
+        private const string CanvasSortingOrderProperty = "m_SortingOrder";
         private const string GoldMedalField = "goldMedal";
         private const string SilverMedalField = "silverMedal";
         private const string BronzeMedalField = "bronzeMedal";
@@ -2331,6 +2344,7 @@ namespace GateRush.UI.Editor
             var winStreak = NestStretched(overlayAssets.WinStreak, overlays, false);
             var streakReward = NestStretched(overlayAssets.StreakReward, overlays, false);
             var profile = NestStretched(overlayAssets.Profile, overlays, false);
+            var coinFlight = AddCoinFlight(root.transform, sources);
 
             var frontEnd = root.AddComponent<FrontEnd>();
             SetReferences(
@@ -2354,7 +2368,8 @@ namespace GateRush.UI.Editor
                 (JokerIconsField, sources.JokerIcons),
                 (AvatarCatalogField, sources.AvatarCatalog),
                 (PaintingField, paintingImage),
-                (PaintingFitField, paintingFit));
+                (PaintingFitField, paintingFit),
+                (CoinFlightField, coinFlight));
 
             root.SetActive(false);
             return root;
@@ -2461,6 +2476,7 @@ namespace GateRush.UI.Editor
             var pillSize = new Vector2(HudPillWidth, HudPillHeight);
             var goldPill = UiBuilder.CreateRect(GoldPillName, pills);
             goldPill.sizeDelta = pillSize;
+            AddPillCanvas(goldPill);
             AddSliced(goldPill, sources.Pill, OwnColorsHex, HudPillPixelsPerUnitMultiplier);
             var coinRight = AddPillIcon(goldPill, CoinName, sources.Coin, PillIconHeightShare);
             var gold = UiBuilder.CreateRect(GoldLabelName, goldPill);
@@ -2671,6 +2687,7 @@ namespace GateRush.UI.Editor
                 (PanelField, frame.Panel),
                 (TitleLabelField, frame.Title),
                 (GoldRowField, gold.gameObject),
+                (GoldCoinField, coin),
                 (GoldLabelField, goldLabel),
                 (MessageLabelField, messageLabel),
                 (LossArtField, lossArt.gameObject),
@@ -2918,6 +2935,8 @@ namespace GateRush.UI.Editor
             var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
             var message = NestStretched(overlayAssets.Message, overlays, false);
 
+            var coinFlight = AddCoinFlight(root.transform, sources);
+
             var levelUi = root.AddComponent<LevelUi>();
             SetReferences(
                 levelUi,
@@ -2929,7 +2948,8 @@ namespace GateRush.UI.Editor
                 (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
                 (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)),
                 (ResultOverlayField, Single<ResultOverlay>(result.gameObject, ResultOverlayName)),
-                (ConfirmOverlayField, Single<ConfirmOverlay>(confirm.gameObject, ConfirmOverlayName)));
+                (ConfirmOverlayField, Single<ConfirmOverlay>(confirm.gameObject, ConfirmOverlayName)),
+                (CoinFlightField, coinFlight));
 
             root.SetActive(false);
             return root;
@@ -3099,6 +3119,48 @@ namespace GateRush.UI.Editor
         {
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
             return (RectTransform)instance.transform;
+        }
+
+        /// <summary>
+        /// The layer gold flies to its counter in (Module 47), stretched over
+        /// <paramref name="root"/> and last under it: its own canvas, sorting
+        /// above every overlay — <see cref="CoinFlightView"/> sets the order
+        /// from the screen's canvas at runtime — with no raycaster, so its
+        /// coins take no input; and the view, with the interface's coin.
+        /// </summary>
+        private static CoinFlightView AddCoinFlight(Transform root, Sources sources)
+        {
+            var layer = UiBuilder.CreateRect(CoinFlightName, root);
+            UiBuilder.Stretch(layer);
+            layer.SetAsLastSibling();
+            var canvas = layer.gameObject.AddComponent<Canvas>();
+
+            // Built with no canvas above it, this canvas is a root one, whose
+            // overrideSorting setter does nothing, so the flag is written to
+            // its serialized property: it takes effect once the view sits
+            // under the screen's canvas. CoinFlightView sets both again there.
+            using (var serialized = new SerializedObject(canvas))
+            {
+                Property(serialized, CanvasOverrideSortingProperty).boolValue = true;
+                Property(serialized, CanvasSortingOrderProperty).intValue = sources.Config.CoinFlightSortingOffset;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            var view = layer.gameObject.AddComponent<CoinFlightView>();
+            SetReferences(view, (ConfigField, sources.Config), (CoinSpriteField, sources.Coin), (CoinLayerField, canvas));
+            return view;
+        }
+
+        /// <summary>
+        /// A canvas of its own on a gold pill (Module 47), sorting with its
+        /// parent until a coin flight lifts it over a scrim: its count and its
+        /// pop rebuild only the pill. The level HUD's pill takes no input, so
+        /// it needs no raycaster.
+        /// </summary>
+        private static void AddPillCanvas(RectTransform pill)
+        {
+            var canvas = pill.gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = false;
         }
 
         private static RectTransform NestStretched(GameObject prefab, Transform parent, bool isActive)

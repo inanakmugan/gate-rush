@@ -117,7 +117,6 @@ namespace GateRush.Runtime
         private BurstSettings shardBurst;
         private BurstSettings breakCubeBurst;
         private BurstSettings breakSparkleBurst;
-
         // The recipes the introduction cards share (Module 28), drawing on
         // this view as their surface.
         private BoardRecipes<Transform, SpriteRenderer> recipes;
@@ -181,8 +180,7 @@ namespace GateRush.Runtime
             cubeBurst = config.CreateCubeBurst();
             shardBurst = config.CreateShardBurst();
             breakCubeBurst = config.CreateBreakCubeBurst();
-            breakSparkleBurst = config.CreateBreakSparkleBurst();
-            recipes = new BoardRecipes<Transform, SpriteRenderer>(config, this);
+            breakSparkleBurst = config.CreateBreakSparkleBurst();            recipes = new BoardRecipes<Transform, SpriteRenderer>(config, this);
             EnsurePool();
 
             frameTiles = FrameTiling.Compute(ctx);

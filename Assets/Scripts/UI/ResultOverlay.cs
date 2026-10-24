@@ -47,6 +47,9 @@ namespace GateRush.UI
 
         [SerializeField] private TMP_Text goldLabel;
 
+        [Tooltip("The gold row's coin: spins in on a win, and is where a campaign win's coins fly from (Module 47).")]
+        [SerializeField] private RectTransform goldCoin;
+
         [Tooltip("The closing message: shown after the last campaign level.")]
         [SerializeField] private TMP_Text messageLabel;
 
@@ -101,6 +104,9 @@ namespace GateRush.UI
         /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
         public bool IsOpen => gameObject.activeSelf;
 
+        /// <summary>The gold row's coin: where a campaign win's coins fly from.</summary>
+        public RectTransform GoldCoin => goldCoin;
+
         /// <summary>Opens the panel showing <paramref name="result"/>, at its shape's size, with the pop.</summary>
         public void Show(LevelResult result, UiConfig config)
         {
@@ -128,14 +134,75 @@ namespace GateRush.UI
             lossRestartButton.gameObject.SetActive(!result.IsWin && result.HasRestart);
 
             gameObject.SetActive(true);
+            RestWinPops();
             OverlayPop.Play(this, group, panel, config);
+            if (result.IsWin)
+            {
+                PlayWinPops(result.GoldEarned.HasValue, config);
+            }
         }
 
         /// <summary>Closes the panel, stopping its pop.</summary>
         public void Hide()
         {
             OverlayPop.Rest(this, group, panel);
+            RestWinPops();
             gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// A win's pops once the panel's own has played (Module 47): the title
+        /// grows and shrinks back once, and, when the gold row shows, its coin
+        /// spins in from nothing. On unscaled time, carrying this view as its
+        /// id, so <see cref="Hide"/>, a disable and a destroy stop them.
+        /// </summary>
+        private void PlayWinPops(bool hasGold, UiConfig config)
+        {
+            var title = titleLabel.rectTransform;
+            var grow = config.ResultTitlePopScale - 1f;
+            var after = config.OverlayPopSeconds;
+            DOVirtual.Float(0f, 1f, config.ResultTitlePopSeconds, t =>
+                {
+                    var scale = 1f + grow * Mathf.Sin(Mathf.PI * t);
+                    title.localScale = new Vector3(scale, scale, 1f);
+                })
+                .SetDelay(after)
+                .SetEase(Ease.Linear)
+                .SetUpdate(true)
+                .SetId(this);
+
+            if (!hasGold)
+            {
+                return;
+            }
+
+            var coin = goldCoin;
+            var turn = config.ResultCoinSpinDegrees;
+            coin.localScale = Vector3.zero;
+            DOVirtual.Float(0f, 1f, config.ResultCoinSpinSeconds, t =>
+                {
+                    coin.localScale = new Vector3(t, t, 1f);
+                    coin.localRotation = Quaternion.Euler(0f, 0f, turn * (1f - t));
+                })
+                .SetDelay(after)
+                .SetEase(config.ResultCoinSpinEase)
+                .SetUpdate(true)
+                .SetId(this);
+        }
+
+        /// <summary>Leaves the title and the coin at rest. Either may be missing during teardown.</summary>
+        private void RestWinPops()
+        {
+            if (titleLabel != null)
+            {
+                titleLabel.rectTransform.localScale = Vector3.one;
+            }
+
+            if (goldCoin != null)
+            {
+                goldCoin.localScale = Vector3.one;
+                goldCoin.localRotation = Quaternion.identity;
+            }
         }
 
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
@@ -146,6 +213,7 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, titleLabel, nameof(ResultOverlay), nameof(titleLabel));
             UiParts.AddIfMissing(missing, goldRow, nameof(ResultOverlay), nameof(goldRow));
             UiParts.AddIfMissing(missing, goldLabel, nameof(ResultOverlay), nameof(goldLabel));
+            UiParts.AddIfMissing(missing, goldCoin, nameof(ResultOverlay), nameof(goldCoin));
             UiParts.AddIfMissing(missing, messageLabel, nameof(ResultOverlay), nameof(messageLabel));
             UiParts.AddIfMissing(missing, lossArt, nameof(ResultOverlay), nameof(lossArt));
             UiParts.AddIfMissing(missing, lifeLost, nameof(ResultOverlay), nameof(lifeLost));
@@ -201,6 +269,7 @@ namespace GateRush.UI
         private void OnDisable()
         {
             OverlayPop.Rest(this, group, panel);
+            RestWinPops();
             UiParts.Unlisten(nextButton, OnNextClicked);
             UiParts.Unlisten(winRestartButton, OnRestartClicked);
             UiParts.Unlisten(lossRestartButton, OnRestartClicked);

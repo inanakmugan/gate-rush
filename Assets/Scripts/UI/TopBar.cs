@@ -42,8 +42,22 @@ namespace GateRush.UI
         [Tooltip("The gear: opens Settings.")]
         [SerializeField] private Button settingsButton;
 
+        // The gold pill a coin flight lands on (Module 47).
+        private GoldPill goldPill;
+
         /// <summary>Raised when the gold's "+" is pressed.</summary>
         public event Action StoreRequested;
+
+        /// <summary>The gold label's counter (Module 47): what <see cref="Show"/> feeds, and what a coin flight holds and adds to.</summary>
+        public GoldCounter GoldCounter => Gold.Counter;
+
+        /// <summary>The gold pill's own canvas, which a coin flight lifts over a scrim.</summary>
+        public Canvas GoldCanvas => Gold.Canvas;
+
+        /// <summary>Where coins land: the gold pill.</summary>
+        public RectTransform GoldTarget => Gold.Rect;
+
+        private GoldPill Gold => goldPill ?? (goldPill = new GoldPill(goldLabel));
 
         /// <summary>Raised when the lives' "+" is pressed.</summary>
         public event Action LivesRequested;
@@ -66,7 +80,7 @@ namespace GateRush.UI
 
             // Only a default state has no name; the name rule gives every save one.
             nameLabel.text = state.PlayerName ?? string.Empty;
-            goldLabel.text = HomeTexts.Gold(state.Gold, config);
+            Gold.Show(state.Gold, config);
             livesCountLabel.text = HomeTexts.LivesCount(state.Lives, config);
             livesStatusLabel.text = HomeTexts.LivesStatus(state.UntilNextLife, config);
         }
@@ -99,6 +113,12 @@ namespace GateRush.UI
             UiParts.Unlisten(goldPlusButton, OnGoldPlusClicked);
             UiParts.Unlisten(livesPlusButton, OnLivesPlusClicked);
             UiParts.Unlisten(settingsButton, OnSettingsClicked);
+            goldPill?.Rest();
+        }
+
+        private void OnDestroy()
+        {
+            goldPill?.Kill();
         }
 
         private void OnAvatarClicked() => ProfileRequested?.Invoke();

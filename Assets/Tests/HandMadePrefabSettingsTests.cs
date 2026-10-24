@@ -16,7 +16,8 @@ namespace GateRush.Tests
     /// heart is 86 square with Preserve Aspect and the count stretched in it;
     /// the avatar fills its 120-unit frame inside a thin rim with no Layout
     /// Element of its own; the Name Tag stays centred on the frame's bottom
-    /// edge; the selected tabs' labels share the largest fixed size at which
+    /// edge; the gold has a canvas and a raycaster of its own (Module 47);
+    /// the selected tabs' labels share the largest fixed size at which
     /// "Leaderboard" fits its tile; and Home's Play button sits just above
     /// the tab bar, its size kept, with the notice just above it.
     /// </summary>
@@ -119,6 +120,28 @@ namespace GateRush.Tests
             Assert.AreEqual(Vector2.zero, avatar.anchoredPosition, "no offset");
             Assert.AreEqual(Vector2.zero, avatar.sizeDelta, "no offset");
             Assert.IsNull(avatar.GetComponent<LayoutElement>(), "the anchors size the avatar; no Layout Element");
+        }
+
+        [Test]
+        public void TopBar_Gold_HasItsOwnCanvasSortingWithItsParentAndARaycasterForItsPlus()
+        {
+            // Module 47: a coin flight lifts this canvas over a scrim; at rest
+            // it sorts with the bar, and its raycaster keeps the "+" pressable.
+            var gold = Rect(topBar, HandMadePrefabSettings.TopBarGoldPath);
+            var canvas = gold.GetComponent<Canvas>();
+
+            Assert.IsNotNull(canvas, $"{HandMadePrefabSettings.TopBarGoldPath} has a Canvas");
+
+            // The saved flag, not the getter: Top Bar has no canvas above this
+            // one, so loaded on its own it is a root canvas, whose
+            // overrideSorting getter reads false whatever was saved.
+            using (var serialized = new SerializedObject(canvas))
+            {
+                Assert.IsFalse(serialized.FindProperty("m_OverrideSorting").boolValue, "it sorts with its parent at rest");
+            }
+
+            Assert.IsNotNull(gold.GetComponent<GraphicRaycaster>(), "the gold's '+' stays pressable");
+            Assert.AreEqual(canvas, Rect(topBar, HandMadePrefabSettings.GoldPlusIconPath).GetComponentInParent<Canvas>(true), "the '+' is on it");
         }
 
         [Test]

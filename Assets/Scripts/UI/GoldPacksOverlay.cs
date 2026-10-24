@@ -50,6 +50,9 @@ namespace GateRush.UI
             Cards.Show(offers ?? Array.Empty<GoldOffer>(), goldPackCardPrefab, packs, config);
         }
 
+        /// <summary>The card of <paramref name="productId"/> while the overlay shows it: where its coins fly from (Module 47).</summary>
+        public bool TryGetShownCard(string productId, out RectTransform card) => Cards.TryGetShown(productId, out card);
+
         /// <summary>Adds each unassigned part, the card prefab's own included, to <paramref name="missing"/>.</summary>
         public void AddMissing(List<string> missing)
         {

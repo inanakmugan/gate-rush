@@ -40,6 +40,12 @@ namespace GateRush.UI
     /// one and nothing else; with none open and the confirmation open it
     /// answers Keep playing; over the result panel, or with nothing open, it
     /// does nothing, and nothing else in a level reads it.</para>
+    /// <para><b>Gold flights (Module 47).</b> Gold a campaign win pays flies
+    /// from the result panel's coin, and gold a pack adds from its card, to
+    /// the HUD's gold pill (<see cref="CoinFlightView"/>), which shows the
+    /// held value until the coins land. <see cref="Show"/>, <see cref="Hide"/>
+    /// and <see cref="HideResult"/> — Next, Restart, Menu and every way out —
+    /// end a flight and show the wallet's value at once.</para>
     /// <para><b>Bands.</b> The HUD and the bar are anchored to the bands the
     /// bootstrap gives (<see cref="PlaceBands"/>); each one's row fits its
     /// band (<see cref="BandFit"/>).</para>
@@ -72,6 +78,9 @@ namespace GateRush.UI
         [Tooltip("The confirmation before a lost life (Module 41), under the overlays' parent; not in the overlay stack.")]
         [SerializeField] private ConfirmOverlay confirmOverlay;
 
+        [Tooltip("The coins gold flies to the HUD's gold pill in (Module 47), on their own canvas above every overlay.")]
+        [SerializeField] private CoinFlightView coinFlight;
+
         private readonly LevelOverlayStack overlays = new LevelOverlayStack();
         private bool isSubscribed;
 
@@ -92,6 +101,9 @@ namespace GateRush.UI
 
         /// <inheritdoc />
         public event Action ButtonPressed;
+
+        /// <inheritdoc />
+        public event Action CoinLanded;
 
         /// <inheritdoc />
         public event Action NextRequested;
@@ -130,6 +142,12 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, message, nameof(LevelUi), nameof(message));
             UiParts.AddIfMissing(missing, resultOverlay, nameof(LevelUi), nameof(resultOverlay));
             UiParts.AddIfMissing(missing, confirmOverlay, nameof(LevelUi), nameof(confirmOverlay));
+            UiParts.AddIfMissing(missing, coinFlight, nameof(LevelUi), nameof(coinFlight));
+
+            if (coinFlight != null)
+            {
+                coinFlight.AddMissing(missing);
+            }
 
             if (resultOverlay != null)
             {
@@ -199,6 +217,7 @@ namespace GateRush.UI
         {
             gameObject.SetActive(true);
             UiTint.ApplyAll(this, config);
+            EndGoldFlight();
             overlays.Clear();
             ApplyOverlays();
             HideResult();
@@ -308,9 +327,62 @@ namespace GateRush.UI
         /// <inheritdoc />
         public void HideResult()
         {
+            EndGoldFlight();
             if (resultOverlay != null)
             {
                 resultOverlay.Hide();
+            }
+        }
+
+        /// <inheritdoc />
+        public void HoldGold(int shownGold)
+        {
+            hud.GoldCounter.Hold(shownGold);
+        }
+
+        /// <inheritdoc />
+        public void FlyWinGold(int amount, int shownGold, int seed)
+        {
+            if (!resultOverlay.IsOpen)
+            {
+                EndGoldFlight();
+                return;
+            }
+
+            coinFlight.Fly(
+                resultOverlay.GoldCoin, hud.GoldTarget, CoinFlight.Layout(amount, config.CreateCoinFlightSettings(), seed),
+                config.CoinFlightWinDelaySeconds, hud.GoldCounter, shownGold, hud.GoldCanvas);
+        }
+
+        /// <inheritdoc />
+        public void FlyPackGold(string productId, int amount, int shownGold, int seed)
+        {
+            if (!goldPacks.TryGetShownCard(productId, out var card))
+            {
+                EndGoldFlight();
+                return;
+            }
+
+            coinFlight.Fly(
+                card, hud.GoldTarget, CoinFlight.Layout(amount, config.CreateCoinFlightSettings(), seed), 0f, hud.GoldCounter,
+                shownGold, hud.GoldCanvas);
+        }
+
+        /// <summary>
+        /// Ends a gold flight, if any, and a hold with no flight yet — a
+        /// campaign win's gold before its panel — so the HUD shows the
+        /// wallet's value at once.
+        /// </summary>
+        private void EndGoldFlight()
+        {
+            if (coinFlight != null)
+            {
+                coinFlight.Stop();
+            }
+
+            if (hud != null)
+            {
+                hud.GoldCounter.Release();
             }
         }
 
@@ -333,6 +405,7 @@ namespace GateRush.UI
         /// <inheritdoc />
         public void Hide()
         {
+            EndGoldFlight();
             overlays.Clear();
             ApplyOverlays();
             HideResult();
@@ -457,11 +530,12 @@ namespace GateRush.UI
         private void Subscribe()
         {
             if (isSubscribed || hud == null || jokerBar == null || notEnoughGold == null || goldPacks == null
-                || testPurchase == null || message == null || resultOverlay == null || confirmOverlay == null)
+                || testPurchase == null || message == null || resultOverlay == null || confirmOverlay == null || coinFlight == null)
             {
                 return;
             }
 
+            coinFlight.CoinLanded += OnCoinLanded;
             overlays.Changed += ApplyOverlays;
             overlays.AllClosed += OnAllClosed;
             hud.MenuRequested += OnMenuRequested;
@@ -491,6 +565,7 @@ namespace GateRush.UI
 
             // Unsubscribing from a C# event of a destroyed view is safe, so
             // this runs during teardown as well.
+            coinFlight.CoinLanded -= OnCoinLanded;
             overlays.Changed -= ApplyOverlays;
             overlays.AllClosed -= OnAllClosed;
             hud.MenuRequested -= OnMenuRequested;
@@ -512,6 +587,8 @@ namespace GateRush.UI
         }
 
         private void OnAllClosed() => OverlaysClosed?.Invoke();
+
+        private void OnCoinLanded() => CoinLanded?.Invoke();
 
         /// <summary>A close button: closes its overlay if it is on top, and sounds the press.</summary>
         private void OnCloseClicked(UiOverlay overlay)
