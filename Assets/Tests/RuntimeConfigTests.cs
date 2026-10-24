@@ -22,8 +22,9 @@ namespace GateRush.Tests
     /// Module 43: the New Joker card's titles, sentences (the Clock's with
     /// the rules' seconds) and subtitle are the specified ones; a missing,
     /// blank, duplicated or unusable entry, an empty subtitle, unassigned
-    /// Joker Icons, an icon size that is not positive and a transparent icon
-    /// colour are each reported by name. Module 46: the default palette and
+    /// Joker Icons, an icon size that is not positive or larger than the
+    /// illustration area, and a transparent icon colour are each reported by
+    /// name; the icon is 360 units, leaving 216 clear above and below it. Module 46: the default palette and
     /// board colours are the measured ones; translucent faces and backdrops,
     /// highlight alphas past 1, shadow and highlight orders out of place, and
     /// unassigned lit-body sprites and materials are each reported by name;
@@ -262,6 +263,39 @@ namespace GateRush.Tests
             var problems = config.Problems();
 
             Assert.That(problems, Has.Some.Contains("New Joker Icon Size Units must be positive"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void NewJokerIcon_Default_Is360WithA216UnitGapAboveAndBelow()
+        {
+            var size = config.NewJokerIconSizeUnits;
+            var gap = config.NewJokerIconGapUnits;
+
+            Assert.AreEqual(360f, size);
+            Assert.AreEqual((config.IntroIllustrationSizeUnits.y - size) * 0.5f + config.IntroSpacingUnits, gap, "the area's margin around the centred icon plus the row spacing");
+            Assert.AreEqual(216f, gap);
+        }
+
+        [Test]
+        public void Problems_NewJokerIconLargerThanTheIllustrationArea_IsReportedByName()
+        {
+            var area = config.IntroIllustrationSizeUnits;
+            SetFloat("newJokerIconSizeUnits", Mathf.Min(area.x, area.y) + 1f);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("New Joker Icon Size Units must be at most the shorter side"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_NewJokerIconFillingTheIllustrationArea_IsNotReported()
+        {
+            var area = config.IntroIllustrationSizeUnits;
+            SetFloat("newJokerIconSizeUnits", Mathf.Min(area.x, area.y));
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("New Joker Icon Size Units"), string.Join(" | ", problems));
         }
 
         [Test]
