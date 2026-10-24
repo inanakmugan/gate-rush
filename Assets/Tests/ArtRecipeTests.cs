@@ -73,16 +73,26 @@ namespace GateRush.Tests
         [TestCase("restartRadius", 0.45f, "Restart Radius")]
         [TestCase("restartHeadWidth", 0.05f, "Restart Head Width")]
         [TestCase("restartHeadLength", 0.4f, "Restart Head Length")]
-        [TestCase("cubeCornerPixels", 30f, "Cube Corner Pixels")]
-        [TestCase("cubeRimPixels", -1f, "Cube Rim Pixels")]
-        [TestCase("cubeHighlightDiameterPixels", 40f, "Cube Highlight Diameter Pixels")]
+        [TestCase("cubeCornerRadiusPixels", 31f, "Cube Corner Radius Pixels")]
+        [TestCase("cubeInsetPixels", -1f, "Cube Inset Pixels")]
+        [TestCase("cubeBevelPixels", 0f, "Cube Bevel Pixels")]
+        [TestCase("cubeHeightPixels", 0f, "Cube Height Pixels")]
+        [TestCase("cubeInsetPixels", 8f, "the stud reaches")]
+        [TestCase("shardBevelPixels", 0f, "Shard Bevel Pixels")]
+        [TestCase("shardRidgeHeightPixels", -1f, "Shard Ridge Height Pixels")]
+        [TestCase("shardAmbient", -0.1f, "Shard Ambient")]
+        [TestCase("shardFinish.shininess", 0.5f, "Shard Finish")]
+        [TestCase("shardRimHalfWidthPixels", 0f, "Shard Rim Half Width Pixels")]
         [TestCase("shardStreakWidthPixels", 0f, "Shard Streak Width Pixels")]
-        [TestCase("gateGlowHold", 1f, "Gate Glow Hold")]
-        [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
+        [TestCase("shardHighlightOpacity", -1f, "Shard Highlight Opacity")]
+        [TestCase("gateGlowHalfDepth", 0f, "Gate Glow Half Depth")]
+        [TestCase("gateGlowFadeFrom", 1f, "Gate Glow Fade From")]
         [TestCase("roundGlowHold", 1f, "Round Glow Hold")]
         [TestCase("roundGlowHold", -0.1f, "Round Glow Hold")]
-        [TestCase("sparkleWaist", 0f, "Sparkle Waist")]
-        [TestCase("sparkleWaist", 0.25f, "Sparkle Waist")]
+        [TestCase("sparkleArmWidth", 0f, "Sparkle Arm Width")]
+        [TestCase("sparkleArmWidth", 0.6f, "Sparkle Arm Width")]
+        [TestCase("sparkleHaloSigma", 0f, "Sparkle Halo Sigma")]
+        [TestCase("sparkleCoreRadius", 0f, "Sparkle Core Radius")]
         [TestCase("iceInsetPixels", 3f, "Ice Inset Pixels")]
         [TestCase("iceBevelPixels", 30f, "Ice Bevel Pixels")]
         [TestCase("badgeDigitWidthPixels", 0f, "Badge Size Pixels")]
@@ -154,10 +164,11 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Problems_ShardPointsClockwise_IsReported()
+        public void Problems_ShardOutlineNotConvex_IsReported()
         {
+            // Swapping two corners of a convex outline crosses its edges.
             var serialized = new SerializedObject(recipe);
-            var points = serialized.FindProperty("shardPoints");
+            var points = serialized.FindProperty("shardOutlines").GetArrayElementAtIndex(1).FindPropertyRelative("points");
             var first = points.GetArrayElementAtIndex(1).vector2Value;
             points.GetArrayElementAtIndex(1).vector2Value = points.GetArrayElementAtIndex(3).vector2Value;
             points.GetArrayElementAtIndex(3).vector2Value = first;
@@ -165,7 +176,57 @@ namespace GateRush.Tests
 
             var problems = recipe.Problems();
 
-            Assert.That(problems, Has.Some.Contains("Shard Points"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Shard Outlines element 1"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ShardOutlineReversed_IsNotReported()
+        {
+            // Either winding is a convex outline; the painter settles which
+            // side is inside.
+            var serialized = new SerializedObject(recipe);
+            var points = serialized.FindProperty("shardOutlines").GetArrayElementAtIndex(0).FindPropertyRelative("points");
+            var corners = new Vector2[points.arraySize];
+            for (var i = 0; i < corners.Length; i++)
+            {
+                corners[i] = points.GetArrayElementAtIndex(i).vector2Value;
+            }
+
+            for (var i = 0; i < corners.Length; i++)
+            {
+                points.GetArrayElementAtIndex(i).vector2Value = corners[corners.Length - 1 - i];
+            }
+
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.IsEmpty(problems);
+        }
+
+        [Test]
+        public void Problems_TwoShardOutlines_IsReported()
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("shardOutlines").arraySize = 2;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Shard Outlines must hold 3"), string.Join(" | ", problems));
+        }
+
+        [TestCase("cubePaintPixels", 40, "Cube Pixels at most Cube Paint Pixels")]
+        [TestCase("shardPaintPixels", 40, "Shard Pixels at most Shard Paint Pixels")]
+        public void Problems_PaintCanvasSmallerThanTheSprite_IsReported(string field, int value, string label)
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty(field).intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains(label), string.Join(" | ", problems));
         }
 
         [TestCase(0, TestName = "Problems_StudsPerCellSideZero_IsReported")]

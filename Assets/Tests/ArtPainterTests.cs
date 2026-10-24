@@ -81,7 +81,7 @@ namespace GateRush.Tests
                 checkedSprites++;
             }
 
-            Assert.AreEqual(103, checkedSprites, "every generated sprite is checked");
+            Assert.AreEqual(106, checkedSprites, "every generated sprite is checked");
         }
 
         [Test]
@@ -486,14 +486,16 @@ namespace GateRush.Tests
             Assert.AreEqual(255, head.a, "the head");
         }
 
-        [Test]
-        public void Paint_Cube_IsOpaqueAtTheCentreAndClearAtTheCorners()
+        [TestCase(ArtSprite.Cube)]
+        [TestCase(ArtSprite.CubeHighlight)]
+        public void Paint_CubeLayer_IsTheRecipesSizeUnslicedAndClearAtTheCorners(ArtSprite sprite)
         {
-            var cube = ArtPainter.Paint(recipe, ArtSprite.Cube);
+            var cube = ArtPainter.Paint(recipe, sprite);
             var last = cube.Width - 1;
 
+            Assert.AreEqual(recipe.CubePixels, cube.Width);
+            Assert.AreEqual(recipe.CubePixels, cube.Height);
             Assert.AreEqual(Vector4.zero, cube.Border);
-            Assert.AreEqual(255, Pixel(cube, cube.Width / 2.0, cube.Height / 2.0).a, "the centre");
             Assert.AreEqual(0, cube.Pixels[0].a, "bottom-left corner");
             Assert.AreEqual(0, cube.Pixels[last].a, "bottom-right corner");
             Assert.AreEqual(0, cube.Pixels[last * cube.Width].a, "top-left corner");
@@ -501,23 +503,35 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Paint_Shard_IsClearOutsideItsPointsAndOpaqueInside()
+        public void Paint_Cube_IsAGreyShadeToTintOpaqueInTheMiddleAndItsHighlightWhite()
         {
-            var shard = ArtPainter.Paint(recipe, ArtSprite.Shard);
-            var points = recipe.ShardPoints;
-            var size = recipe.ShardPixels;
-            var centreX = 0.0;
-            var centreY = 0.0;
-            for (var i = 0; i < points.Count; i++)
-            {
-                centreX += points[i].x * size / points.Count;
-                centreY += points[i].y * size / points.Count;
-            }
+            // Split as a block face is (D80): the shade is grey, for the lit
+            // material to tint the block's colour; the highlight is white, for
+            // the specular material to add.
+            var cube = ArtPainter.Paint(recipe, ArtSprite.Cube);
+            var highlight = ArtPainter.Paint(recipe, ArtSprite.CubeHighlight);
 
-            // The default shard reaches none of the sprite's four corners.
+            Assert.AreEqual(255, Pixel(cube, cube.Width / 2.0, cube.Height / 2.0).a, "the middle");
+            Assert.IsTrue(cube.Pixels.Where(p => p.a > 0).All(p => p.r == p.g && p.g == p.b), "the shade is grey");
+            Assert.IsTrue(highlight.Pixels.Where(p => p.a > 0).All(p => p.r == 255 && p.g == 255 && p.b == 255), "the highlight is white");
+            Assert.IsTrue(highlight.Pixels.Any(p => p.a > 0), "and lies somewhere");
+        }
+
+        [TestCase(ArtSprite.Shard, 0)]
+        [TestCase(ArtSprite.Shard2, 1)]
+        [TestCase(ArtSprite.Shard3, 2)]
+        public void Paint_Shard_IsTheRecipesSizeOpaqueEnoughInsideItsOutlineAndClearAtTheCorners(ArtSprite sprite, int outline)
+        {
+            var shard = ArtPainter.Paint(recipe, palette, sprite);
+            var corners = recipe.ShardOutlines[outline].Points;
+            var size = recipe.ShardPixels;
+            var centre = new Vector2(corners.Average(p => p.x), corners.Average(p => p.y)) * size;
             var last = shard.Width - 1;
 
-            Assert.AreEqual(255, Pixel(shard, centreX, centreY).a, "the middle of its corners");
+            Assert.AreEqual(size, shard.Width);
+            Assert.AreEqual(size, shard.Height);
+            Assert.AreEqual(Vector4.zero, shard.Border);
+            Assert.That(Pixel(shard, centre.x, centre.y).a, Is.GreaterThanOrEqualTo((int)(recipe.ShardBaseAlpha * 255) - RoundingTolerance), "glassy inside, at least the base opacity");
             Assert.AreEqual(0, shard.Pixels[0].a, "bottom-left corner");
             Assert.AreEqual(0, shard.Pixels[last].a, "bottom-right corner");
             Assert.AreEqual(0, shard.Pixels[last * shard.Width].a, "top-left corner");
@@ -525,19 +539,56 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Paint_GateGlow_IsOpaqueAtTheGateAndClearAtTheFarEnd()
+        public void Paint_Shard_IsBakedInThePalettesShardColour()
+        {
+            // Baked, not tinted: the colour is the Runtime Config's, painted in.
+            var corners = recipe.ShardOutlines[0].Points;
+            var centre = new Vector2(corners.Average(p => p.x), corners.Average(p => p.y)) * recipe.ShardPixels;
+            var blue = Pixel(ArtPainter.Paint(recipe, palette, ArtSprite.Shard), centre.x, centre.y);
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("shardColor").colorValue = new Color(1f, 0.2f, 0.2f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var red = Pixel(ArtPainter.Paint(recipe, ArtPalette.From(config), ArtSprite.Shard), centre.x, centre.y);
+
+            Assert.Greater(blue.b, blue.r, "the default ice is blue");
+            Assert.Greater(red.r, red.b, "a red shard colour paints it red");
+        }
+
+        [Test]
+        public void Paint_GateGlow_IsABumpAcrossTheGateHalvingAtItsHalfDepthAndClearAtTheFarEnd()
         {
             var glow = ArtPainter.Paint(recipe, ArtSprite.GateGlow);
-            var column = Column(glow, 0);
+            var size = recipe.GateGlowPixels;
+            var middle = Column(glow, size / 2);
+            var gateRow = Row(glow, 0);
 
+            // The row whose centre lies nearest the half depth, and how far
+            // that is from the gate row's centre, in shares of the sprite.
+            var halfRow = (int)System.Math.Round(recipe.GateGlowHalfDepth * size - 0.5);
+            var depth = (double)(halfRow - 0) / size;
+
+            Assert.AreEqual(size, glow.Width);
+            Assert.AreEqual(size, glow.Height);
             Assert.AreEqual(Vector4.zero, glow.Border);
             Assert.IsTrue(glow.Pixels.All(p => p.r == 255 && p.g == 255 && p.b == 255), "tinted where placed, so painted white");
-            Assert.AreEqual(255, column[0].a, "full strength at the gate");
-            Assert.AreEqual(0, column[column.Count - 1].a, "nothing at the far end");
-            for (var y = 1; y < column.Count; y++)
+            Assert.That(gateRow[0].a, Is.LessThanOrEqualTo(RoundingTolerance), "nothing at one end of the gate");
+            Assert.That(gateRow[size - 1].a, Is.LessThanOrEqualTo(RoundingTolerance), "nor at the other");
+            Assert.AreEqual(gateRow.Max(p => p.a), gateRow[size / 2].a, "strongest at the gate's middle");
+            for (var x = 0; x < size; x++)
             {
-                Assert.LessOrEqual(column[y].a, column[y - 1].a, $"row {y}: fades away from the gate, never back");
+                Assert.That(System.Math.Abs(gateRow[x].a - gateRow[size - 1 - x].a), Is.LessThanOrEqualTo(RoundingTolerance), $"column {x}: the bump is symmetric");
             }
+
+            for (var y = 1; y < size; y++)
+            {
+                Assert.LessOrEqual(middle[y].a, middle[y - 1].a, $"row {y}: fades away from the gate, never back");
+            }
+
+            Assert.AreEqual(0, middle[size - 1].a, "nothing at the far end");
+            Assert.AreEqual(
+                middle[0].a * System.Math.Pow(0.5, depth / recipe.GateGlowHalfDepth), middle[halfRow].a, 2 * RoundingTolerance,
+                "halved over each Gate Glow Half Depth");
         }
 
         [Test]
@@ -572,25 +623,27 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Paint_Sparkle_HasTipsOnTheAxesAndIsClearOnTheDiagonals()
+        public void Paint_Sparkle_IsAStarOnTheAxesOverASoftHaloWithABrightCore()
         {
             var sparkle = ArtPainter.Paint(recipe, ArtSprite.Sparkle);
             var center = sparkle.Width / 2.0;
+            var last = sparkle.Width - 1;
 
-            // Most of the way to a tip along each axis, and as far out along
-            // each diagonal, where a four-point star has drawn in its sides.
-            var reach = 0.7 * center;
+            // Halfway to a tip along each axis, and as far out along each
+            // diagonal, where only the halo reaches.
+            var reach = 0.5 * center;
             var diagonal = reach / System.Math.Sqrt(2.0);
+            var onDiagonal = Pixel(sparkle, center + diagonal, center + diagonal).a;
 
-            Assert.AreEqual(255, Pixel(sparkle, center, center).a, "the centre");
-            Assert.AreEqual(255, Pixel(sparkle, center + reach, center).a, "toward the right tip");
-            Assert.AreEqual(255, Pixel(sparkle, center - reach, center).a, "toward the left tip");
-            Assert.AreEqual(255, Pixel(sparkle, center, center + reach).a, "toward the top tip");
-            Assert.AreEqual(255, Pixel(sparkle, center, center - reach).a, "toward the bottom tip");
-            Assert.AreEqual(0, Pixel(sparkle, center + diagonal, center + diagonal).a, "between the top and right tips");
-            Assert.AreEqual(0, Pixel(sparkle, center - diagonal, center + diagonal).a, "between the top and left tips");
-            Assert.AreEqual(0, Pixel(sparkle, center + diagonal, center - diagonal).a, "between the bottom and right tips");
-            Assert.AreEqual(0, Pixel(sparkle, center - diagonal, center - diagonal).a, "between the bottom and left tips");
+            Assert.AreEqual(recipe.SparklePixels, sparkle.Width);
+            Assert.AreEqual(255, Pixel(sparkle, center, center).a, "the core");
+            Assert.Greater(Pixel(sparkle, center + reach, center).a, onDiagonal, "an arm toward the right tip, brighter than the halo beside it");
+            Assert.Greater(Pixel(sparkle, center - reach, center).a, onDiagonal, "toward the left tip");
+            Assert.Greater(Pixel(sparkle, center, center + reach).a, onDiagonal, "toward the top tip");
+            Assert.Greater(Pixel(sparkle, center, center - reach).a, onDiagonal, "toward the bottom tip");
+            Assert.Greater(onDiagonal, 0, "the halo between the tips");
+            Assert.AreEqual(0, sparkle.Pixels[0].a, "nothing in a corner");
+            Assert.AreEqual(0, sparkle.Pixels[last * sparkle.Width + last].a, "nor in the opposite one");
         }
 
         /// <summary>
