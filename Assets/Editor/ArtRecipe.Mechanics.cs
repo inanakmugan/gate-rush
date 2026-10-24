@@ -303,14 +303,16 @@ namespace GateRush.Editor
         [SerializeField] private float gemHeightPixels = 7f;
         [SerializeField] private LitFinish gemFinish = new LitFinish(60f, 0.8f);
 
-        [Header("Time-bonus coin (gold, cream face, dark hands)")]
-        [SerializeField] private float coinRadiusPixels = 24f;
+        [Header("Time-bonus coin (green rim, cream face, dark green hands: time_bonus_reference.py, option D)")]
+        [SerializeField] private float coinRadiusPixels = 34f;
 
         [Tooltip("How far in from its edge the coin rises, in pixels. Above 0.")]
         [SerializeField] private float coinRimPixels = 7f;
 
         [SerializeField] private float coinHeightPixels = 8f;
-        [SerializeField] private float coinFaceRadiusPixels = 16f;
+
+        [Tooltip("The face's radius, in pixels: the coin's less 8.")]
+        [SerializeField] private float coinFaceRadiusPixels = 26f;
 
         [Tooltip("How deep the face is set into the coin, in pixels.")]
         [SerializeField] private float coinFaceDepthPixels = 2f;
@@ -320,15 +322,19 @@ namespace GateRush.Editor
 
         [SerializeField] private LitFinish coinFinish = new LitFinish(40f, 0.5f);
         [SerializeField] private SoftShadow coinShadow = new SoftShadow(new Vector2(2f, -4f), 3f, 0.5f);
+        [Tooltip("The coin radius the hands' widths and lengths are given for, in pixels: the hands scale with Coin Radius Pixels over it, as the script's do with R / 24. Above 0.")]
+        [SerializeField] private float coinHandDesignRadiusPixels = 24f;
+
+        [Tooltip("Half a hand's width on a coin of Coin Hand Design Radius Pixels, in pixels.")]
         [SerializeField] private float coinHandHalfWidthPixels = 2.2f;
 
-        [Tooltip("The minute hand's length, up from the centre, in pixels.")]
+        [Tooltip("The minute hand's length, up from the centre, on a coin of Coin Hand Design Radius Pixels, in pixels.")]
         [SerializeField] private float coinMinuteHandPixels = 12f;
 
-        [Tooltip("The hour hand's length, right from the centre, in pixels.")]
+        [Tooltip("The hour hand's length, right from the centre, on a coin of Coin Hand Design Radius Pixels, in pixels.")]
         [SerializeField] private float coinHourHandPixels = 9f;
 
-        [Tooltip("How far the hour hand starts left of the centre, in pixels.")]
+        [Tooltip("How far the hour hand starts left of the centre, in pixels; not scaled, as in the script.")]
         [SerializeField] private float coinHourHandTailPixels = 1f;
 
         [Header("One-way arrow (raised, in the block's colour; 9-sliced along its length)")]
@@ -773,14 +779,17 @@ namespace GateRush.Editor
         /// <summary>The coin's shadow.</summary>
         public SoftShadow CoinShadow => coinShadow;
 
-        /// <summary>Half a hand's width, in pixels.</summary>
-        public float CoinHandHalfWidthPixels => coinHandHalfWidthPixels;
+        /// <summary>Half a hand's width on this coin, in pixels: scaled from the design radius.</summary>
+        public float CoinHandHalfWidthPixels => coinHandHalfWidthPixels * CoinHandScale;
 
-        /// <summary>The minute hand's length, in pixels.</summary>
-        public float CoinMinuteHandPixels => coinMinuteHandPixels;
+        /// <summary>The minute hand's length on this coin, in pixels: scaled from the design radius.</summary>
+        public float CoinMinuteHandPixels => coinMinuteHandPixels * CoinHandScale;
 
-        /// <summary>The hour hand's length, in pixels.</summary>
-        public float CoinHourHandPixels => coinHourHandPixels;
+        /// <summary>The hour hand's length on this coin, in pixels: scaled from the design radius.</summary>
+        public float CoinHourHandPixels => coinHourHandPixels * CoinHandScale;
+
+        /// <summary>How much larger the hands are than at the design radius: the script's R / 24.</summary>
+        private float CoinHandScale => coinRadiusPixels / coinHandDesignRadiusPixels;
 
         /// <summary>How far the hour hand starts left of the centre, in pixels.</summary>
         public float CoinHourHandTailPixels => coinHourHandTailPixels;
@@ -1172,11 +1181,15 @@ namespace GateRush.Editor
                 problems.Add($"{name}: the key needs Gold Key Bow Radius Pixels above its shaft's half, a shaft ending right of the bow, positive heights and blurs, and the gem inside its seat inside the bow (Gem Radius Pixels below Gem Seat Radius Pixels below Gold Key Bow Radius Pixels).");
             }
 
-            if (!(coinRadiusPixels > coinFaceRadiusPixels && coinFaceRadiusPixels > 0f && coinRimPixels > 0f && coinHeightPixels > 0f
-                  && coinFaceDepthPixels >= 0f && coinHandHalfWidthPixels > 0f
-                  && coinMinuteHandPixels < coinFaceRadiusPixels && coinHourHandPixels < coinFaceRadiusPixels))
+            if (!(coinHandDesignRadiusPixels > 0f))
             {
-                problems.Add($"{name}: Coin Radius Pixels must exceed Coin Face Radius Pixels, the rim, height and hands be positive, and both hands (Coin Minute Hand Pixels, Coin Hour Hand Pixels) stay on the face.");
+                problems.Add($"{name}: Coin Hand Design Radius Pixels must be above 0.");
+            }
+            else if (!(coinRadiusPixels > coinFaceRadiusPixels && coinFaceRadiusPixels > 0f && coinRimPixels > 0f && coinHeightPixels > 0f
+                       && coinFaceDepthPixels >= 0f && CoinHandHalfWidthPixels > 0f
+                       && CoinMinuteHandPixels < coinFaceRadiusPixels && CoinHourHandPixels < coinFaceRadiusPixels))
+            {
+                problems.Add($"{name}: Coin Radius Pixels must exceed Coin Face Radius Pixels, the rim, height and hands be positive, and both hands (Coin Minute Hand Pixels, Coin Hour Hand Pixels, scaled to the coin) stay on the face.");
             }
 
             var oneWayHalfBlock = oneWayPaintedCells * cellPixels / 2f;

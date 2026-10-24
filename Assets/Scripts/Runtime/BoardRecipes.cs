@@ -364,26 +364,27 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A time-bonus block's mark (M10) under a block's body, centred on
+        /// A time-bonus block's mark (M10) under a block's body, on
         /// <paramref name="center"/> at <paramref name="scale"/> (Module 46,
-        /// pass 2): the gold clock coin on the left and the seconds through
-        /// <see cref="RuntimeConfig.TimeBonusMarkText"/> beside it, in white
-        /// with their soft shadow, with no plate. It widens with the text
-        /// (<see cref="RuntimeConfig.TimeBonusMarkWidthCells"/>).
+        /// pass 2, option D, revision B): the green-rimmed clock coin and,
+        /// past a small gap, the seconds through
+        /// <see cref="RuntimeConfig.TimeBonusMarkText"/> at the count digits'
+        /// size, white with their dark outline and soft shadow — together
+        /// centred on the anchor, so the coin moves with the text
+        /// (<see cref="RuntimeConfig.TimeBonusCoinCenterCells"/>). Nothing is
+        /// drawn behind either; the caller fits the whole group with
+        /// <paramref name="scale"/> (<see cref="RuntimeConfig.TimeBonusMarkScale"/>).
         /// </summary>
         public void TimeBonusMark(TGroup parent, Vector2 center, float scale, int seconds)
         {
             var text = config.TimeBonusMarkText(seconds);
-            var width = config.TimeBonusMarkWidthCells(text);
-            var coin = config.BonusCoinCells;
-            var coinCenter = -width * 0.5f + coin * 0.5f;
-            var textCenter = -width * 0.5f + coin + config.TimeBonusMarkGapCells + config.TimeBonusMarkTextWidthCells(text) * 0.5f;
-
             var mark = surface.Group(parent, "Time bonus", center, scale);
             surface.Sprite(
-                mark, "Coin", config.BonusCoinSprite, new Vector2(coinCenter, 0f), NaturalSize(config.BonusCoinSprite), Color.white,
-                config.IconOrder, 0f, SpriteLook.Lit);
-            surface.Label(mark, "Seconds", new Vector2(textCenter, 0f), text, config.CountFontSize, config.CountTextColor, true);
+                mark, "Coin", config.BonusCoinSprite, new Vector2(config.TimeBonusCoinCenterCells(text), 0f),
+                NaturalSize(config.BonusCoinSprite), Color.white, config.IconOrder, 0f, SpriteLook.Lit);
+            surface.OutlinedLabel(
+                mark, "Seconds", new Vector2(config.TimeBonusLabelStartCells(text), -config.TimeBonusLabelDropCells),
+                text, config.CountFontSize, config.CountTextColor);
         }
 
         /// <summary>

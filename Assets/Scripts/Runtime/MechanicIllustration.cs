@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Core;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -149,8 +150,13 @@ namespace GateRush.Runtime
 
                 default:
                 {
+                    // Fitted by the board's rule, so the card shows the mark
+                    // at the size a 2×1 on the board has: its full size.
                     var body = DrawBlock(root, "Time-bonus block", Vector2.zero, Horizontal2, block);
-                    recipes.TimeBonusMark(body, MarkLayout.Anchor(Horizontal2), 1f, config.IntroBonusSeconds);
+                    var scale = config.TimeBonusMarkScale(
+                        MarkLayout.BonusRoomCells(Horizontal2, false), MarkCrowding.Roomy,
+                        config.TimeBonusMarkText(config.IntroBonusSeconds));
+                    recipes.TimeBonusMark(body, MarkLayout.Anchor(Horizontal2), scale, config.IntroBonusSeconds);
                     return BlockBounds(Vector2.zero, Horizontal2);
                 }
             }
@@ -373,7 +379,18 @@ namespace GateRush.Runtime
 
         void IRecipeSurface<RectTransform, Image>.Label(
             RectTransform parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed) =>
-            AddLabel(parent, name, center, text, boardFontSize, color, isShadowed);
+            AddLabel(
+                parent, name, center, text, boardFontSize, color, config.LabelFont, isShadowed ? config.LabelShadowMaterial : null,
+                false);
+
+        void IRecipeSurface<RectTransform, Image>.OutlinedLabel(
+            RectTransform parent, string name, Vector2 start, string text, float boardFontSize, Color color)
+        {
+            var hasOutline = config.HasLabelOutline;
+            AddLabel(
+                parent, name, start, text, boardFontSize, color, hasOutline ? config.LabelOutlineFont : config.LabelFont,
+                hasOutline ? config.LabelOutlineMaterial : config.LabelShadowMaterial, true);
+        }
 
         /// <summary>The material a UI Image drawing a sprite as <paramref name="look"/> uses: the board's UI twins, or the UI default.</summary>
         private Material MaterialOf(SpriteLook look)
@@ -483,18 +500,32 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A label in the label font, sized as the board's world-space label of
-        /// <paramref name="boardFontSize"/> reads on a cell, with the board's
-        /// label shadow when <paramref name="isShadowed"/>.
+        /// A label in <paramref name="font"/>, sized as the board's world-space
+        /// label of <paramref name="boardFontSize"/> reads on a cell: centred on
+        /// <paramref name="position"/>, or starting at it — its left edge, at
+        /// its middle height — when <paramref name="isFromLeft"/>. Drawn with
+        /// <paramref name="material"/> when one is given, made from that font:
+        /// the board's label shadow, or a time-bonus mark's outline. The font is
+        /// set first, as setting it replaces a material made from another
+        /// font's atlas.
         /// </summary>
-        private void AddLabel(RectTransform parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed)
+        private void AddLabel(
+            RectTransform parent, string name, Vector2 position, string text, float boardFontSize, Color color, TMP_FontAsset font,
+            Material material, bool isFromLeft)
         {
-            var rect = AddRect(parent, name, center, Vector2.one, 0f);
+            var rect = AddRect(parent, name, position, Vector2.one, 0f);
             var fontSize = boardFontSize * WorldFontUnitsPerCanvasFontUnit / config.CellSize * unitsPerCell;
-            var label = UiBuilder.AddLabel(rect, config.LabelFont, fontSize, color, false);
-            if (isShadowed && config.LabelShadowMaterial != null)
+            var label = UiBuilder.AddLabel(rect, font, fontSize, color, false);
+            if (material != null)
             {
-                label.fontSharedMaterial = config.LabelShadowMaterial;
+                label.fontSharedMaterial = material;
+            }
+
+            if (isFromLeft)
+            {
+                // The pivot moves to the left edge and stays on the position.
+                rect.pivot = new Vector2(0f, rect.pivot.y);
+                label.alignment = TextAlignmentOptions.Left;
             }
 
             label.text = text;

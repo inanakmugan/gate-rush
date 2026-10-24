@@ -370,9 +370,12 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// The time-bonus coin — the script's: a raised gold coin, its face
-        /// set in and cream, two dark hands at twelve and three, and its soft
-        /// shadow, centred on its canvas. The bonus beside it is a label.
+        /// The time-bonus coin — <c>time_bonus_reference.py</c>'s <c>coin()</c>,
+        /// option D: a raised coin in the config's coin colour (green), its
+        /// face set in and in the face colour (cream), two hands in the hand
+        /// colour (dark green) at twelve and three, scaled with the coin
+        /// (<see cref="ArtRecipe.CoinMinuteHandPixels"/>), and its soft shadow,
+        /// centred on its canvas. The bonus beside it is a label.
         /// </summary>
         private static ArtImage PaintCoin(ArtRecipe recipe, ArtPalette palette)
         {

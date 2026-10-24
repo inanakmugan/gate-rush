@@ -110,5 +110,17 @@ namespace GateRush.Runtime
         /// shadow's soft drop shadow when <paramref name="isShadowed"/>.
         /// </summary>
         void Label(TGroup parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed);
+
+        /// <summary>
+        /// <paramref name="text"/> in <paramref name="color"/> in the outline font
+        /// (<see cref="RuntimeConfig.LabelOutlineFont"/>), starting at
+        /// <paramref name="start"/> — its left edge, at its middle height — at
+        /// the size the board's label of <paramref name="boardFontSize"/> has
+        /// on a cell, with the dark outline and the soft drop shadow of
+        /// <see cref="RuntimeConfig.LabelOutlineMaterial"/>: a time-bonus
+        /// mark's seconds (Module 46, pass 2). Before Generate Art has made
+        /// that font, the label font with the drop shadow alone.
+        /// </summary>
+        void OutlinedLabel(TGroup parent, string name, Vector2 start, string text, float boardFontSize, Color color);
     }
 }

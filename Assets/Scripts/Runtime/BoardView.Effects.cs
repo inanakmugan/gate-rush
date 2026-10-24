@@ -1530,7 +1530,7 @@ namespace GateRush.Runtime
             // The marks as the old drawing had them: the block was locked, so
             // it had its padlock, beside a time-bonus mark if it carried one.
             var shown = before != null ? visibility.Block(before, blockIndex) : default;
-            var marks = MarksOf(cells, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0);
+            var marks = MarksOf(cells, hasIcon: true, bonusSeconds: shown.TimeBonusSeconds);
             var icon = marks.Icon * layout.CellSize;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);

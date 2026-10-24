@@ -734,8 +734,9 @@ namespace GateRush.Runtime
         /// (<see cref="DrawLock"/>);</item>
         /// <item>carrying a key: a gold key whose gem is its lock's colour
         /// (D47);</item>
-        /// <item>carrying a time bonus (M10): the clock and "+N" on a badge in
-        /// the bonus colours (<see cref="BoardRecipes{TGroup, TPiece}.TimeBonusMark"/>);</item>
+        /// <item>carrying a time bonus (M10): the clock coin and the outlined
+        /// "+N", with nothing behind them, fitted to the block
+        /// (<see cref="BoardRecipes{TGroup, TPiece}.TimeBonusMark"/>);</item>
         /// <item>layered deeper than two (M4): the colours left on a badge at
         /// the footprint's bottom-right corner, which a frozen block never
         /// shows, so the two corner badges never meet.</item>
@@ -752,7 +753,7 @@ namespace GateRush.Runtime
                     recipes.Badge(body, corner, visual.FrozenRemaining, config.CountBadgeRimColor);
             }
 
-            var marks = MarksOf(cells, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds > 0);
+            var marks = MarksOf(cells, visual.IsLocked || visual.KeyMarkColor.HasValue, visual.TimeBonusSeconds);
 
             if (visual.IsLocked)
             {
@@ -767,7 +768,7 @@ namespace GateRush.Runtime
 
             if (visual.TimeBonusSeconds > 0)
             {
-                recipes.TimeBonusMark(body, marks.Bonus, marks.Scale, visual.TimeBonusSeconds);
+                recipes.TimeBonusMark(body, marks.Bonus, marks.BonusScale, visual.TimeBonusSeconds);
             }
 
             if (visual.LayerNumeral.HasValue)
@@ -786,14 +787,23 @@ namespace GateRush.Runtime
         /// sit in the bottom-right corner (Module 46), so they neither take a
         /// slot nor raise the marks, as the Level Editor's layout still does.
         /// The decision is <see cref="MarkLayout.Slots"/>'; this only adds the
-        /// scale. The one rule for a block's drawing and for the lock that
-        /// fades away when it opens, so the fading padlock is where the drawn
-        /// one was.
+        /// scales. The time-bonus mark of <paramref name="bonusSeconds"/>, when
+        /// above 0, has its own: wider than a cell at full size (Module 46,
+        /// pass 2), it is fitted to the width it has on the block
+        /// (<see cref="MarkLayout.BonusRoomCells"/>,
+        /// <see cref="RuntimeConfig.TimeBonusMarkScale"/>). The one rule for a
+        /// block's drawing and for the lock that fades away when it opens, so
+        /// the fading padlock is where the drawn one was.
         /// </summary>
-        private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool hasIcon, bool hasBonus)
+        private BlockMarks MarksOf(IReadOnlyList<Coord> cells, bool hasIcon, int bonusSeconds)
         {
+            var hasBonus = bonusSeconds > 0;
             var slots = MarkLayout.Slots(cells, false, hasIcon, false, hasBonus, config.FrozenMarkRaiseCells);
-            return new BlockMarks(slots.Icon, slots.Layers, slots.Bonus, config.MarkScale(slots.Crowding));
+            var bonusScale = hasBonus
+                ? config.TimeBonusMarkScale(
+                    MarkLayout.BonusRoomCells(cells, hasIcon), slots.Crowding, config.TimeBonusMarkText(bonusSeconds))
+                : 0f;
+            return new BlockMarks(slots.Icon, slots.Layers, slots.Bonus, config.MarkScale(slots.Crowding), bonusScale);
         }
 
         /// <summary>
@@ -948,7 +958,19 @@ namespace GateRush.Runtime
 
         void IRecipeSurface<Transform, SpriteRenderer>.Label(
             Transform parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed) =>
-            AddLabel(parent, name, center * layout.CellSize, text, boardFontSize, color, isShadowed);
+            AddLabel(
+                parent, name, center * layout.CellSize, text, boardFontSize, color, config.LabelFont,
+                isShadowed ? config.LabelShadowMaterial : null, false);
+
+        void IRecipeSurface<Transform, SpriteRenderer>.OutlinedLabel(
+            Transform parent, string name, Vector2 start, string text, float boardFontSize, Color color)
+        {
+            var hasOutline = config.HasLabelOutline;
+            AddLabel(
+                parent, name, start * layout.CellSize, text, boardFontSize, color,
+                hasOutline ? config.LabelOutlineFont : config.LabelFont,
+                hasOutline ? config.LabelOutlineMaterial : config.LabelShadowMaterial, true);
+        }
 
         /// <summary>The material a SpriteRenderer drawing a sprite as <paramref name="look"/> uses.</summary>
         private Material MaterialOf(SpriteLook look)
@@ -1146,42 +1168,51 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A label in the label font centred on <paramref name="localCenter"/>,
-        /// with the digits' soft drop shadow when <paramref name="isShadowed"/>
-        /// (Module 46, pass 2): the label shadow material, the font's own with
-        /// its underlay on, which every shadowed label shares.
+        /// A label in <paramref name="font"/> at <paramref name="localPosition"/>:
+        /// centred on it, or starting at it — its left edge, at its middle
+        /// height — when <paramref name="isFromLeft"/>. Drawn with
+        /// <paramref name="material"/> when one is given, made from that font:
+        /// the label shadow material, the font's own with its underlay on,
+        /// which every shadowed label shares (Module 46, pass 2), or the
+        /// outline material of a time-bonus mark's seconds. The font is set
+        /// first, as setting it replaces a material made from another font's
+        /// atlas.
         /// </summary>
-        private void AddLabel(Transform parent, string name, Vector2 localCenter, string text, float fontSize, Color color, bool isShadowed)
+        private void AddLabel(
+            Transform parent, string name, Vector2 localPosition, string text, float fontSize, Color color, TMP_FontAsset font,
+            Material material, bool isFromLeft)
         {
             var go = new GameObject(name, typeof(RectTransform));
             go.transform.SetParent(parent, false);
-            go.transform.localPosition = localCenter;
 
             var label = go.AddComponent<TextMeshPro>();
-            label.font = config.LabelFont;
-            if (isShadowed && config.LabelShadowMaterial != null)
+            label.font = font;
+            if (material != null)
             {
-                label.fontSharedMaterial = config.LabelShadowMaterial;
+                label.fontSharedMaterial = material;
             }
 
             label.text = text;
             label.fontSize = fontSize;
             label.color = color;
-            label.alignment = TextAlignmentOptions.Center;
+            label.alignment = isFromLeft ? TextAlignmentOptions.Left : TextAlignmentOptions.Center;
             label.overflowMode = TextOverflowModes.Overflow;
+            label.rectTransform.pivot = new Vector2(isFromLeft ? 0f : 0.5f, 0.5f);
             label.rectTransform.sizeDelta = new Vector2(layout.CellSize, layout.CellSize);
+            label.rectTransform.localPosition = localPosition;
             label.sortingOrder = config.LabelOrder;
         }
 
         /// <summary>Where a block's padlock or key, its layer badge and its time-bonus mark sit, in cells relative to its body, and their scale.</summary>
         private readonly struct BlockMarks
         {
-            public BlockMarks(Vector2 icon, Vector2 layers, Vector2 bonus, float scale)
+            public BlockMarks(Vector2 icon, Vector2 layers, Vector2 bonus, float scale, float bonusScale)
             {
                 Icon = icon;
                 Layers = layers;
                 Bonus = bonus;
                 Scale = scale;
+                BonusScale = bonusScale;
             }
 
             /// <summary>The centre of the padlock or key.</summary>
@@ -1195,6 +1226,9 @@ namespace GateRush.Runtime
 
             /// <summary>1, or a crowded scale when the marks share a block without room for each.</summary>
             public float Scale { get; }
+
+            /// <summary>The time-bonus mark's scale, fitted to its width on the block; 0 on a block without one.</summary>
+            public float BonusScale { get; }
         }
 
         /// <summary>A drawn block: its root, its body, and the parts its effects animate.</summary>

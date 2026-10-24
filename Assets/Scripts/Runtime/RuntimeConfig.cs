@@ -112,6 +112,13 @@ namespace GateRush.Runtime
         public const int WidestBonusSecondsChecked = 99;
 
         /// <summary>
+        /// World units to the em of a world-space TextMeshPro label of font
+        /// size 1: a tenth. TextMeshPro's, not a tunable; the time-bonus
+        /// seconds' advance and Generate Art's outline are measured with it.
+        /// </summary>
+        public const float WorldUnitsPerFontSize = 0.1f;
+
+        /// <summary>
         /// The deepest layer count <see cref="Problems"/> sizes a layer badge
         /// for when it checks that marks sharing a block cannot overlap: two
         /// digits. Not a tunable; a deeper stack widens its badge past what
@@ -155,6 +162,12 @@ namespace GateRush.Runtime
 
         [Tooltip("The label font's material with a soft drop shadow (its underlay): the white digits on badges, padlocks and time-bonus marks (Module 46, pass 2). Gate Rush → Generate Art makes it from Label Font and the Label Shadow values, and assigns it.")]
         [SerializeField] private Material labelShadowMaterial;
+
+        [Tooltip("Lilita One again, with room in its atlas for a wide outline, holding only the time-bonus mark's characters: a second font asset, so the shared one and Label Shadow Material stay as they are. Gate Rush → Generate Art makes it and assigns it.")]
+        [SerializeField] private TMP_FontAsset labelOutlineFont;
+
+        [Tooltip("Label Outline Font's material with the dark outline and the soft drop shadow: a time-bonus mark's seconds. Gate Rush → Generate Art makes it and assigns it.")]
+        [SerializeField] private Material labelOutlineMaterial;
 
         [Header("Generated art (Assets/Art/Generated; Gate Rush → Generate Art assigns these)")]
         [SerializeField] private Sprite quarterOuterSprite;
@@ -307,8 +320,8 @@ namespace GateRush.Runtime
         [Tooltip("How far below a padlock's centre the keys still needed are written.")]
         [SerializeField] private float padlockCountDropCells = 20f / 128f;
 
-        [Tooltip("The diameter of a time-bonus mark's coin.")]
-        [SerializeField] private float bonusCoinCells = 48f / 128f;
+        [Tooltip("The diameter of a time-bonus mark's coin: the reference's 68 pixels of 128.")]
+        [SerializeField] private float bonusCoinCells = 68f / 128f;
 
         [Header("Board")]
         [Tooltip("World units per cell.")]
@@ -383,15 +396,33 @@ namespace GateRush.Runtime
         [Tooltip("How far a frozen block's padlock or key is raised above its frozen count, in cells, so the two do not overlap.")]
         [SerializeField] private float frozenMarkRaiseCells = 0.3f;
 
-        [Header("Time-bonus mark (M10: the gold coin and the seconds beside it)")]
+        [Header("Time-bonus mark (M10: the green clock coin and the outlined seconds beside it)")]
         [Tooltip("Text on a time-bonus block's mark; {0} is the seconds it adds.")]
         [SerializeField] private string timeBonusMarkFormat = "+{0}";
 
-        [Tooltip("Space between the coin and the text, in cells (Module 46): none, as the reference has the text's edge on the coin's.")]
-        [SerializeField] private float timeBonusMarkGapCells = 0f;
+        [Tooltip("Space between the coin's right edge and the start of the seconds' advance, in cells, for every value: the reference's 4 pixels of 128 (time_bonus_reference_b.py). The coin and the seconds are centred on the anchor together. At least 0.")]
+        [SerializeField] private float timeBonusLabelGapCells = 4f / 128f;
 
-        [Tooltip("Width each character of the text takes, in cells, at Count Font Size: the reference's 16 pixels of 128 per character of Lilita One. Above 0.")]
-        [SerializeField] private float timeBonusMarkCharacterWidthCells = 16f / 128f;
+        [Tooltip("How far below the mark's anchor the seconds' middle sits, in cells: the reference's 2 pixels of 128.")]
+        [SerializeField] private float timeBonusLabelDropCells = 2f / 128f;
+
+        [Tooltip("Width each character of the seconds takes, in cells, at Count Font Size, used only when neither Label Outline Font nor Label Font is assigned: Lilita One's \"+10\" and \"+99\" average about 19 pixels of 128 at 34 pixels. With a font, the glyphs' own advances are used. Above 0.")]
+        [SerializeField] private float timeBonusMarkCharacterWidthCells = 19f / 128f;
+
+        [Tooltip("The seconds' dark outline, standing this far outside the glyphs, in cells: the reference's 3-pixel stroke of 128. Generate Art writes it into Label Outline Material. Above 0.")]
+        [SerializeField] private float labelOutlineStrokeCells = 3f / 128f;
+
+        [Tooltip("The seconds' dark outline's colour. Written into Label Outline Material by Generate Art.")]
+        [SerializeField] private Color labelOutlineColor = new Color32(0x2A, 0x16, 0x50, 0xFF);
+
+        [Tooltip("The atlas padding, in pixels, of the font asset Generate Art makes for the seconds (Label Outline Font). An outline reaches at most about half of it outside a glyph, so a wider stroke needs more; Generate Art warns when it falls short. At least 1.")]
+        [SerializeField] private int labelOutlineAtlasPadding = 17;
+
+        [Tooltip("The characters Generate Art puts in Label Outline Font: every character a time-bonus mark can show.")]
+        [SerializeField] private string labelOutlineCharacters = "+0123456789";
+
+        [Tooltip("The room a mark keeps from each side of the width it has on its block, in cells, when a time-bonus mark is scaled down to fit: the key's, (1 - 0.72) / 2. At least 0, below half a cell.")]
+        [SerializeField] private float markFitMarginCells = 0.14f;
 
         [Tooltip("The Level Editor's time-bonus plate's fill; the board's mark has no plate (Module 46).")]
         [SerializeField] private Color timeBonusMarkColor = new Color(0.20f, 0.62f, 0.30f);
@@ -916,14 +947,14 @@ namespace GateRush.Runtime
         [Tooltip("Painted: the padlock's keyhole.")]
         [SerializeField] private Color keyholeColor = new Color32(0x6B, 0x43, 0x00, 0xFF);
 
-        [Tooltip("Painted: the time-bonus coin.")]
-        [SerializeField] private Color coinColor = new Color32(0xFF, 0xD4, 0x2A, 0xFF);
+        [Tooltip("Painted: the time-bonus coin's raised rim, green (time_bonus_reference.py).")]
+        [SerializeField] private Color coinColor = new Color32(0x2B, 0xC2, 0x3A, 0xFF);
 
         [Tooltip("Painted: the coin's face.")]
         [SerializeField] private Color coinFaceColor = new Color32(0xFF, 0xF4, 0xC4, 0xFF);
 
-        [Tooltip("Painted: the coin's hands.")]
-        [SerializeField] private Color coinHandColor = new Color32(0x5A, 0x3A, 0x00, 0xFF);
+        [Tooltip("Painted: the coin's hands, dark green.")]
+        [SerializeField] private Color coinHandColor = new Color32(0x1E, 0x5A, 0x12, 0xFF);
 
         [Tooltip("Painted: a closed shutter's raised rim.")]
         [SerializeField] private Color shutterRimColor = new Color32(0xF4, 0xA3, 0x00, 0xFF);
@@ -1264,7 +1295,7 @@ namespace GateRush.Runtime
         /// <summary>The gem's highlight, white, for the specular material.</summary>
         public Sprite GemHighlightSprite => gemHighlightSprite;
 
-        /// <summary>A time-bonus mark's gold clock coin, painted, with its shadow.</summary>
+        /// <summary>A time-bonus mark's green-rimmed clock coin, painted, with its shadow.</summary>
         public Sprite BonusCoinSprite => bonusCoinSprite;
 
         /// <summary>A horizontal one-way block's raised arrow, grey, 9-sliced along its length, tinted the block's colour.</summary>
@@ -1432,8 +1463,26 @@ namespace GateRush.Runtime
         /// <summary>How far a frozen block's padlock or key is raised above its frozen count, in cells.</summary>
         public float FrozenMarkRaiseCells => frozenMarkRaiseCells;
 
-        /// <summary>Space between a time-bonus mark's coin and its text, in cells.</summary>
-        public float TimeBonusMarkGapCells => timeBonusMarkGapCells;
+        /// <summary>Space between a time-bonus mark's coin and the start of its seconds' advance, in cells.</summary>
+        public float TimeBonusLabelGapCells => timeBonusLabelGapCells;
+
+        /// <summary>How far below a time-bonus mark's anchor its seconds' middle sits, in cells.</summary>
+        public float TimeBonusLabelDropCells => timeBonusLabelDropCells;
+
+        /// <summary>How far a time-bonus mark's seconds' outline stands outside the glyphs, in cells.</summary>
+        public float LabelOutlineStrokeCells => labelOutlineStrokeCells;
+
+        /// <summary>The colour of a time-bonus mark's seconds' outline.</summary>
+        public Color LabelOutlineColor => labelOutlineColor;
+
+        /// <summary>The atlas padding of the font asset Generate Art makes for a time-bonus mark's seconds, in pixels.</summary>
+        public int LabelOutlineAtlasPadding => labelOutlineAtlasPadding;
+
+        /// <summary>The characters Generate Art puts in the time-bonus mark's font asset.</summary>
+        public string LabelOutlineCharacters => labelOutlineCharacters;
+
+        /// <summary>The room a time-bonus mark keeps from each side of its width on the block when it is fitted, in cells.</summary>
+        public float MarkFitMarginCells => markFitMarginCells;
 
         /// <summary>The Level Editor's time-bonus plate's fill.</summary>
         public Color TimeBonusMarkColor => timeBonusMarkColor;
@@ -1837,7 +1886,7 @@ namespace GateRush.Runtime
         /// <summary>Painted: the keyhole.</summary>
         public Color KeyholeColor => keyholeColor;
 
-        /// <summary>Painted: the time-bonus coin.</summary>
+        /// <summary>Painted: the time-bonus coin's rim.</summary>
         public Color CoinColor => coinColor;
 
         /// <summary>Painted: the coin's face.</summary>
@@ -1908,6 +1957,22 @@ namespace GateRush.Runtime
 
         /// <summary>The label font's own material, which <see cref="LabelShadowMaterial"/> is made from; null without a label font.</summary>
         public Material LabelFontMaterial => labelFont != null ? labelFont.material : null;
+
+        /// <summary>The time-bonus mark's font asset, with room for its outline; null until Generate Art has made it.</summary>
+        public TMP_FontAsset LabelOutlineFont => labelOutlineFont;
+
+        /// <summary><see cref="LabelOutlineFont"/>'s material with the outline and the drop shadow; null until Generate Art has made it.</summary>
+        public Material LabelOutlineMaterial => labelOutlineMaterial;
+
+        /// <summary>
+        /// True when the outlined label can be drawn: both
+        /// <see cref="LabelOutlineFont"/> and <see cref="LabelOutlineMaterial"/>
+        /// are assigned, since the material only reads its own font's atlas.
+        /// Otherwise an outlined label falls back to the label font with
+        /// <see cref="LabelShadowMaterial"/>. The one test for the board and
+        /// the introduction cards.
+        /// </summary>
+        public bool HasLabelOutline => labelOutlineFont != null && labelOutlineMaterial != null;
 
         /// <summary>Sorting order of the background gradient.</summary>
         public int BackgroundOrder => backgroundOrder;
@@ -2204,15 +2269,82 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The width, in cells, of the time-bonus mark reading
-        /// <paramref name="text"/>: the coin, the gap and the text, with no
-        /// plate around them (Module 46).
+        /// <paramref name="text"/> at full size (Module 46, pass 2, revision
+        /// B): the coin, the gap and the seconds' advance, the outline not
+        /// counted, as <c>time_bonus_reference_b.py</c> measures the group it
+        /// centres on the anchor. Nothing is drawn behind them.
         /// </summary>
         public float TimeBonusMarkWidthCells(string text) =>
-            MarkLayout.BonusBadgeWidth(
-                text.Length, bonusCoinCells, timeBonusMarkCharacterWidthCells, 0f, bonusCoinCells, timeBonusMarkGapCells);
+            bonusCoinCells + timeBonusLabelGapCells + TimeBonusLabelAdvanceCells(text);
 
-        /// <summary>The width, in cells, the text of a time-bonus mark reading <paramref name="text"/> takes.</summary>
-        public float TimeBonusMarkTextWidthCells(string text) => text.Length * timeBonusMarkCharacterWidthCells;
+        /// <summary>
+        /// The advance, in cells, of the seconds reading <paramref name="text"/>
+        /// at <see cref="CountFontSize"/>: the sum of their glyphs' advances in
+        /// <see cref="LabelOutlineFont"/> — or <see cref="LabelFont"/>, the
+        /// same face, before Generate Art has made it — as a world-space
+        /// TextMeshPro label lays them, without kerning, like every label on
+        /// the board. A character the font lacks, or every character when
+        /// neither font is assigned (a fresh config; <see cref="Problems"/>
+        /// reports it), takes Time Bonus Mark Character Width Cells.
+        /// </summary>
+        public float TimeBonusLabelAdvanceCells(string text)
+        {
+            var font = labelOutlineFont != null ? labelOutlineFont : labelFont;
+            if (font == null)
+            {
+                return text.Length * timeBonusMarkCharacterWidthCells;
+            }
+
+            var face = font.faceInfo;
+            var cellsPerFontUnit = countFontSize * WorldUnitsPerFontSize * face.scale / face.pointSize / cellSize;
+            var lookup = font.characterLookupTable;
+            var advance = 0f;
+            foreach (var character in text)
+            {
+                advance += lookup != null && lookup.TryGetValue(character, out var found)
+                    ? found.glyph.metrics.horizontalAdvance * found.glyph.scale * cellsPerFontUnit
+                    : timeBonusMarkCharacterWidthCells;
+            }
+
+            return advance;
+        }
+
+        /// <summary>
+        /// Where the coin's centre sits, right of the anchor, in cells, on the
+        /// mark reading <paramref name="text"/>: the group of
+        /// <see cref="TimeBonusMarkWidthCells"/> is centred on the anchor, so
+        /// the coin moves with the text.
+        /// </summary>
+        public float TimeBonusCoinCenterCells(string text) => (bonusCoinCells - TimeBonusMarkWidthCells(text)) * 0.5f;
+
+        /// <summary>Where the seconds reading <paramref name="text"/> start, right of the anchor, in cells: past the coin and the gap.</summary>
+        public float TimeBonusLabelStartCells(string text) =>
+            -TimeBonusMarkWidthCells(text) * 0.5f + bonusCoinCells + timeBonusLabelGapCells;
+
+        /// <summary>
+        /// How far the full-size time-bonus mark reading <paramref name="text"/>
+        /// reaches from its anchor on either side, in cells: half its width
+        /// with the outline counted at both ends. The group is centred, so this
+        /// is what must fit.
+        /// </summary>
+        public float TimeBonusMarkReachCells(string text) => TimeBonusMarkWidthCells(text) * 0.5f + labelOutlineStrokeCells;
+
+        /// <summary>
+        /// The scale of the time-bonus mark reading <paramref name="text"/> on
+        /// a block whose marks are <paramref name="crowding"/>, where the mark
+        /// has <paramref name="roomCells"/> of width centred on its slot
+        /// (<see cref="MarkLayout.BonusRoomCells"/>): the marks' scale
+        /// (<see cref="MarkScale"/>), times what fits the coin and the seconds
+        /// together, uniformly, inside that width less
+        /// <see cref="MarkFitMarginCells"/> on each side — never above 1. On a
+        /// 2×1 the mark keeps its full size; on a 1×1, a vertical 1×2 or an L
+        /// it shrinks.
+        /// </summary>
+        public float TimeBonusMarkScale(float roomCells, MarkCrowding crowding, string text)
+        {
+            var fit = (roomCells * 0.5f - markFitMarginCells) / TimeBonusMarkReachCells(text);
+            return MarkScale(crowding) * Math.Min(1f, fit);
+        }
 
         /// <summary>The title of <paramref name="mechanic"/>'s introduction card.</summary>
         /// <exception cref="InvalidOperationException">No entry introduces it; see <see cref="Problems"/>.</exception>
@@ -2599,6 +2731,16 @@ namespace GateRush.Runtime
             {
                 problems.Add($"{name}: Label Shadow Material is not assigned; run Gate Rush → Generate Art.");
             }
+
+            if (labelOutlineFont == null)
+            {
+                problems.Add($"{name}: Label Outline Font is not assigned; run Gate Rush → Generate Art.");
+            }
+
+            if (labelOutlineMaterial == null)
+            {
+                problems.Add($"{name}: Label Outline Material is not assigned; run Gate Rush → Generate Art.");
+            }
         }
 
         /// <summary>
@@ -2774,9 +2916,29 @@ namespace GateRush.Runtime
                 problems.Add($"{name}: Time Bonus Mark Format must be a format with at most one placeholder, {{0}}, for the seconds.");
             }
 
-            if (!(bonusCoinCells > 0f && timeBonusMarkGapCells >= 0f && timeBonusMarkCharacterWidthCells > 0f))
+            AddIfNotPositive(problems, bonusCoinCells, "Bonus Coin Cells");
+            AddIfNotPositive(problems, timeBonusMarkCharacterWidthCells, "Time Bonus Mark Character Width Cells");
+            AddIfNotPositive(problems, labelOutlineStrokeCells, "Label Outline Stroke Cells");
+            AddIfNotOpaque(problems, labelOutlineColor, "Label Outline Color");
+            if (!(timeBonusLabelGapCells >= 0f))
             {
-                problems.Add($"{name}: Bonus Coin Cells and Time Bonus Mark Character Width Cells must be positive, and Time Bonus Mark Gap Cells at least 0.");
+                problems.Add($"{name}: Time Bonus Label Gap Cells must be at least 0.");
+            }
+
+            if (labelOutlineAtlasPadding < 1)
+            {
+                problems.Add($"{name}: Label Outline Atlas Padding must be at least 1.");
+            }
+
+            if (isFormatUsable)
+            {
+                AddMissingOutlineCharacters(problems);
+            }
+
+            if (!(markFitMarginCells >= 0f && markFitMarginCells < 0.5f * MarkLayout.SharedMarkRoomCells))
+            {
+                problems.Add($"{name}: Mark Fit Margin Cells must be at least 0 and below half a cell, so a fitted time-bonus mark keeps a size.");
+                return;
             }
 
             if (!(crowdedMarkScale > 0f && crowdedMarkScale <= 1f))
@@ -2796,19 +2958,27 @@ namespace GateRush.Runtime
                 return;
             }
 
+            // A time-bonus mark sharing a block is fitted to a cell less the
+            // margin (TimeBonusMarkScale), so it is measured at that size.
+            var widestBonus = TimeBonusMarkText(WidestBonusSecondsChecked);
+
             // Two marks with room sit a whole cell apart, so each may be a
             // cell wide; crowded ones sit half a cell apart at the crowded
-            // scale, so together they may be a cell wide before scaling.
+            // scale, so together they may be a cell wide before scaling. The
+            // time-bonus group is centred, so its span, outline included, is
+            // twice its reach.
             var icon = Math.Max(padlockSizeCells, keySizeCells);
-            var bonus = TimeBonusMarkWidthCells(TimeBonusMarkText(WidestBonusSecondsChecked));
+            var bonus = 2f * TimeBonusMarkReachCells(widestBonus)
+                        * TimeBonusMarkScale(MarkLayout.SharedMarkRoomCells, MarkCrowding.Roomy, widestBonus);
             var roomyWidth = 2f * MarkLayout.RoomyOffsetCells;
             var crowdedWidth = 4f * MarkLayout.CrowdedOffsetCells;
             if (!(icon <= roomyWidth && bonus <= roomyWidth && crowdedMarkScale * (icon + bonus) <= crowdedWidth))
             {
                 problems.Add(
                     $"{name}: a padlock or key and a time-bonus mark sharing a block would overlap. Padlock Size Cells, Key Size Cells and the " +
-                    $"mark's width for a two-digit bonus ({bonus:0.##} cells, from Bonus Coin Cells, Time Bonus Mark Gap Cells and Time Bonus Mark Character Width Cells) " +
-                    $"must each be at most {roomyWidth:0.##}, and Crowded Mark Scale times the icon plus the mark at most {crowdedWidth:0.##}.");
+                    $"mark's width for a two-digit bonus fitted to a cell ({bonus:0.##} cells, from Bonus Coin Cells, Time Bonus Label Gap Cells, " +
+                    $"the seconds' advance, Label Outline Stroke Cells and Mark Fit Margin Cells) must each be at most {roomyWidth:0.##}, and Crowded Mark " +
+                    $"Scale times the icon plus the mark at most {crowdedWidth:0.##}.");
             }
 
             // The layer badge pairs with either of them by the same two
@@ -2832,6 +3002,33 @@ namespace GateRush.Runtime
                 problems.Add(
                     $"{name}: a padlock or key, a layer count badge and a time-bonus mark sharing a block would overlap. Crowded Triple Mark Scale " +
                     $"times half the badge plus half its neighbour — the icon, or the time-bonus mark — must be at most {apart:0.##}.");
+            }
+        }
+
+        /// <summary>
+        /// Every character a time-bonus mark shows, for any bonus up to
+        /// <see cref="WidestBonusSecondsChecked"/> seconds, must be in
+        /// <see cref="LabelOutlineCharacters"/>: Label Outline Font holds only
+        /// those, so a missing one would not be drawn.
+        /// </summary>
+        private void AddMissingOutlineCharacters(List<string> problems)
+        {
+            var missing = new SortedSet<char>();
+            for (var seconds = 0; seconds <= WidestBonusSecondsChecked; seconds++)
+            {
+                foreach (var character in TimeBonusMarkText(seconds))
+                {
+                    if (labelOutlineCharacters == null || labelOutlineCharacters.IndexOf(character) < 0)
+                    {
+                        missing.Add(character);
+                    }
+                }
+            }
+
+            if (missing.Count > 0)
+            {
+                problems.Add(
+                    $"{name}: Label Outline Characters must hold every character a time-bonus mark shows; it lacks \"{string.Concat(missing)}\".");
             }
         }
 

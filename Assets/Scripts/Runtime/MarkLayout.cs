@@ -9,8 +9,8 @@ namespace GateRush.Runtime
     /// <summary>
     /// Where the marks on a block go (Module 16): the point its icons and
     /// count sit on, where two or three marks sharing a block go (Modules 19
-    /// and 20), the chains across a locked block, and how wide a count's or a
-    /// time bonus's badge is. Plain rules in cell units, so they are tested
+    /// and 20), the chains across a locked block, how wide a count's badge is
+    /// and how much width a time bonus has. Plain rules in cell units, so they are tested
     /// without a scene.
     /// </summary>
     public static class MarkLayout
@@ -37,6 +37,13 @@ namespace GateRush.Runtime
 
         /// <summary>The most marks <see cref="Row"/> places: a padlock or key, a layer count and a time bonus.</summary>
         public const int MostMarksInARow = 3;
+
+        /// <summary>
+        /// The width a mark sharing its block has, in cells: one cell, as two
+        /// marks with room sit a cell apart, and crowded ones share a cell at
+        /// a smaller scale. Geometry, not a tunable.
+        /// </summary>
+        public const float SharedMarkRoomCells = 2f * RoomyOffsetCells;
 
         /// <summary>
         /// The centre of <paramref name="cells"/>, in cell units relative to the
@@ -353,15 +360,52 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The width of a time-bonus mark (M10) showing a text of
-        /// <paramref name="characters"/> characters: the clock icon, the gap
-        /// after it, the characters at <paramref name="digitWidth"/> each, and
-        /// <paramref name="padding"/> on each side; never narrower than it is
-        /// tall.
+        /// The width, in cells, the time-bonus mark (M10) of a block with
+        /// footprint <paramref name="cells"/> has, centred on its slot, before
+        /// it is fitted (<see cref="RuntimeConfig.TimeBonusMarkScale"/>). Shared
+        /// with a padlock, a key or a layer count
+        /// (<paramref name="isShared"/>), it has
+        /// <see cref="SharedMarkRoomCells"/>. Alone it sits on
+        /// <see cref="Anchor"/>, and has twice the distance from the anchor to
+        /// the nearer end of the run of cells it lies on, in the row it lies
+        /// in — or, when it lies on the seam between two rows, the narrower of
+        /// the two: two cells on a 2×1 or a 2×2, one on a 1×1, a vertical 1×2
+        /// or an L. Only the width counts: the mark is shorter than a cell.
         /// </summary>
-        public static float BonusBadgeWidth(
-            int characters, float height, float digitWidth, float padding, float iconWidth, float iconGap) =>
-            Math.Max(height, iconWidth + iconGap + characters * digitWidth + 2f * padding);
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        public static float BonusRoomCells(IReadOnlyList<Coord> cells, bool isShared)
+        {
+            DoubledAnchor(cells, out var doubleX, out var doubleY, out var members);
+            if (isShared)
+            {
+                return SharedMarkRoomCells;
+            }
+
+            // A cell x spans doubled x from 2x to 2x + 2; the anchor touches
+            // every cell around it (DoubledAnchor), so each run below exists.
+            var columns = TouchingIndices(doubleX);
+            var narrowest = int.MaxValue;
+            foreach (var row in TouchingIndices(doubleY))
+            {
+                var first = columns[0];
+                while (members.Contains(new Coord(first - 1, row)))
+                {
+                    first--;
+                }
+
+                var last = columns[columns.Length - 1];
+                while (members.Contains(new Coord(last + 1, row)))
+                {
+                    last++;
+                }
+
+                var nearerEnd = Math.Min(doubleX - 2 * first, 2 * last + 2 - doubleX);
+                narrowest = Math.Min(narrowest, nearerEnd);
+            }
+
+            // Twice the doubled distance over two: the doubled distance itself.
+            return narrowest;
+        }
 
         /// <summary>The lowest and highest cell coordinates of a footprint on each axis.</summary>
         internal static void Bounds(IReadOnlyList<Coord> cells, out int minX, out int maxX, out int minY, out int maxY)

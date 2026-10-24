@@ -9,10 +9,10 @@ using UnityEngine;
 namespace GateRush.Editor
 {
     /// <summary>
-    /// <i>Gate Rush → Render Mechanics Comparison</i> (Module 46, pass 2):
-    /// composes the sheet of the mechanics reference script from the generated
-    /// sprites and writes it next to the reference image, so the two can be
-    /// compared pixel by pixel.
+    /// <i>Gate Rush → Render Mechanics Comparison</i> and <i>Render Time Bonus
+    /// Comparison</i> (Module 46, pass 2): compose the scene of a reference
+    /// script from the generated sprites and write it next to the reference
+    /// image, so the two can be compared pixel by pixel.
     /// </summary>
     /// <remarks>
     /// <para><b>The layout is the script's.</b> <c>mechanics_reference.py</c>
@@ -33,6 +33,12 @@ namespace GateRush.Editor
     /// covers.</para>
     /// <para><b>Left out.</b> The digits and the time bonus's text: the board
     /// draws them as TextMeshPro labels, not as generated sprites.</para>
+    /// <para><b>The time bonus has its own sheet.</b> Option D changed its
+    /// coin (<c>time_bonus_reference.py</c>), so the mechanics sheet's slot
+    /// draws the new coin where the old script put the old one and no longer
+    /// matches <c>mechanics_reference.png</c> there.
+    /// <i>Gate Rush → Render Time Bonus Comparison</i>
+    /// (<see cref="RenderTimeBonus"/>) renders the new reference's scene.</para>
     /// </remarks>
     public static class MechanicsComparison
     {
@@ -66,33 +72,96 @@ namespace GateRush.Editor
         private const int ButtonRightPixels = 24;
         private const int TwoDigitCount = 12;
 
+        /// <summary>Where the time bonus's comparison image is written, from the project's folder: beside its reference.</summary>
+        public const string TimeBonusOutputPath = "Claude outputs/board-lighting/generated_time_bonus.png";
+
+        // time_bonus_reference_b.py's scene: eight 2×1 blocks in its palette
+        // order, four to a row, on its own floor. Its data, not look
+        // parameters of the game; the gap between columns and the left margin
+        // are the mechanics sheet's.
+        private const int TimeBonusColumns = 4;
+        private const int TimeBonusRows = 2;
+        private const int TimeBonusTopPixels = 30;
+        private const int TimeBonusRowGapPixels = 30;
+        private const string TimeBonusFloorHex = "#2A2460";
+        private const string PinkHex = "#F63CA2";
+        private const int TimeBonusSeconds = 10;
+        private static readonly string[] TimeBonusBlockHexes =
+            { RedHex, OrangeHex, YellowHex, GreenHex, CyanHex, BlueHex, PurpleHex, PinkHex };
+
         /// <summary>Renders the comparison from the selected or only recipe and the project's config, and writes it to <see cref="OutputPath"/>.</summary>
         [MenuItem("Gate Rush/Render Mechanics Comparison")]
-        public static void RenderFromMenu()
+        public static void RenderFromMenu() => RenderToFile("Render Mechanics Comparison", OutputPath, Render);
+
+        /// <summary>Renders the time bonus's comparison, as <see cref="RenderFromMenu"/>, and writes it to <see cref="TimeBonusOutputPath"/>.</summary>
+        [MenuItem("Gate Rush/Render Time Bonus Comparison")]
+        public static void RenderTimeBonusFromMenu() =>
+            RenderToFile("Render Time Bonus Comparison", TimeBonusOutputPath, RenderTimeBonus);
+
+        /// <summary>
+        /// Renders with <paramref name="render"/> from the selected or only
+        /// recipe and the project's config, and writes the image to
+        /// <paramref name="outputPath"/>; logs under <paramref name="command"/>
+        /// what it wrote, or why it wrote nothing.
+        /// </summary>
+        private static void RenderToFile(string command, string outputPath, Func<ArtRecipe, RuntimeConfig, ArtImage> render)
         {
             if (!ArtGenerator.TryFindRecipe(out var recipe, out var error))
             {
-                Debug.LogError($"Render Mechanics Comparison: {error} Nothing was rendered.");
+                Debug.LogError($"{command}: {error} Nothing was rendered.");
                 return;
             }
 
             if (!ArtGenerator.TryFindRuntimeConfig(out var config, out var configError))
             {
-                Debug.LogError($"Render Mechanics Comparison: {configError} Nothing was rendered.");
+                Debug.LogError($"{command}: {configError} Nothing was rendered.");
                 return;
             }
 
             var problems = recipe.Problems();
             if (problems.Count > 0)
             {
-                Debug.LogError($"Render Mechanics Comparison: {recipe.name} has {problems.Count} problem(s); see Generate Art. Nothing was rendered.", recipe);
+                Debug.LogError($"{command}: {recipe.name} has {problems.Count} problem(s); see Generate Art. Nothing was rendered.", recipe);
                 return;
             }
 
-            var path = Path.Combine(Directory.GetParent(Application.dataPath).FullName, OutputPath);
+            var path = Path.Combine(Directory.GetParent(Application.dataPath).FullName, outputPath);
             Directory.CreateDirectory(Path.GetDirectoryName(path));
-            File.WriteAllBytes(path, ArtPainter.EncodePng(Render(recipe, config)));
-            Debug.Log($"Render Mechanics Comparison: wrote {path} from {recipe.name} and {config.name}.", recipe);
+            File.WriteAllBytes(path, ArtPainter.EncodePng(render(recipe, config)));
+            Debug.Log($"{command}: wrote {path} from {recipe.name} and {config.name}.", recipe);
+        }
+
+        /// <summary>
+        /// <c>time_bonus_reference_b.py</c>'s scene (Module 46, pass 2, option
+        /// D, revision B), drawn from <paramref name="recipe"/>'s sprites and
+        /// <paramref name="config"/>'s layout: eight 2×1 blocks in its palette
+        /// order, each with the time-bonus coin where the "+10" group centred
+        /// on the block's middle puts it
+        /// (<see cref="RuntimeConfig.TimeBonusCoinCenterCells"/>), on the
+        /// script's canvas and floor. The "+10" itself is left out: the board
+        /// draws it as a TextMeshPro label, checked in play.
+        /// </summary>
+        public static ArtImage RenderTimeBonus(ArtRecipe recipe, RuntimeConfig config)
+        {
+            var cell = recipe.CellPixels;
+            var coinCenter = config.TimeBonusCoinCenterCells(config.TimeBonusMarkText(TimeBonusSeconds)) * cell;
+            var columnPitch = SlotCells * cell + SlotGapPixels;
+            var rowPitch = cell + TimeBonusRowGapPixels;
+            var width = TimeBonusColumns * columnPitch + MarginPixels;
+            var height = TimeBonusRows * rowPitch + TimeBonusTopPixels;
+            var sheet = new Sheet(recipe, config, width, height, TimeBonusFloorHex);
+
+            for (var i = 0; i < TimeBonusBlockHexes.Length; i++)
+            {
+                var left = MarginPixels + i % TimeBonusColumns * columnPitch;
+                var top = TimeBonusTopPixels + i / TimeBonusColumns * rowPitch;
+                sheet.Block(left, top, SlotCells, 1, TimeBonusBlockHexes[i], hasStuds: true, isIce: false);
+                sheet.Natural(
+                    ArtSprite.BonusCoin, left + SlotCells * cell / 2.0 + coinCenter, top + cell / 2.0,
+                    sheet.Lit(Vector3.one));
+            }
+
+            return sheet.ToImage();
         }
 
         /// <summary>The script's sheet, drawn from <paramref name="recipe"/>'s sprites in <paramref name="config"/>'s colours and layout, bottom row first.</summary>
@@ -182,16 +251,24 @@ namespace GateRush.Editor
             private readonly int width;
             private readonly int height;
 
+            /// <summary>The mechanics sheet: four by two slots on the script's floor.</summary>
             public Sheet(ArtRecipe recipe, RuntimeConfig config)
+                : this(
+                    recipe, config, SlotColumns * (SlotCells * recipe.CellPixels + SlotGapPixels) + MarginPixels,
+                    SlotRows * (SlotCells * recipe.CellPixels + SlotGapPixels) + MarginPixels, FloorHex)
+            {
+            }
+
+            /// <summary>A sheet <paramref name="width"/> by <paramref name="height"/> pixels on a floor of <paramref name="floorHex"/>.</summary>
+            public Sheet(ArtRecipe recipe, RuntimeConfig config, int width, int height, string floorHex)
             {
                 this.recipe = recipe;
                 this.config = config;
                 palette = ArtPalette.From(config);
-                var slot = SlotCells * recipe.CellPixels + SlotGapPixels;
-                width = SlotColumns * slot + MarginPixels;
-                height = SlotRows * slot + MarginPixels;
+                this.width = width;
+                this.height = height;
                 image = new Vector3[width * height];
-                var floor = LightingComparison.Linear(FloorHex);
+                var floor = LightingComparison.Linear(floorHex);
                 for (var i = 0; i < image.Length; i++)
                 {
                     image[i] = floor;
