@@ -47,13 +47,15 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// The centre of <paramref name="cells"/>, in cell units relative to the
-        /// footprint's origin: the centre of its bounding box when that point
-        /// lies on the footprint — on a cell, on a seam between two of its
-        /// cells, or where four of its cells meet — so a 1×2 or a T is marked
-        /// at its middle. Otherwise, as at the inside corner of an L, the centre
-        /// of the footprint cell nearest it, the lowest row and then the
-        /// leftmost cell winning a tie, so a mark never sits over a
-        /// neighbouring block.
+        /// footprint's origin, where a block's marks sit. On an L or a T, the
+        /// middle of the cell where its arms meet (<see cref="TryJunction"/>),
+        /// so the mark reads as on the block, not at one of its tips. Otherwise
+        /// the centre of its bounding box when that point lies on the
+        /// footprint — on a cell, on a seam between two of its cells, or where
+        /// four of its cells meet — so a 1×2 is marked at its middle; and
+        /// failing that the centre of the footprint cell nearest it, the lowest
+        /// row and then the leftmost cell winning a tie, so a mark never sits
+        /// over a neighbouring block.
         /// </summary>
         /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
         public static Vector2 Anchor(IReadOnlyList<Coord> cells)
@@ -244,10 +246,86 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
+        /// The cell where an L's or a T's arms meet, if <paramref name="cells"/>
+        /// is one, in any rotation or mirror and with any arm lengths: the
+        /// footprint is two straight runs of cells — one along a row, one along
+        /// a column — crossing at exactly one cell, which is the only cell with
+        /// a neighbour in the block both across and up or down. With two
+        /// neighbours it is an L's corner; with three, a T's junction. Any other
+        /// shape — a 1×1, a bar, a rectangle, an S or a Z, a plus (four
+        /// neighbours), or any polyomino with a cell off those two runs — has
+        /// none, and its marks keep <see cref="Anchor"/>'s other rule.
+        /// </summary>
+        /// <exception cref="ArgumentException"><paramref name="cells"/> is null or empty.</exception>
+        public static bool TryJunction(IReadOnlyList<Coord> cells, out Coord junction)
+        {
+            if (cells == null || cells.Count == 0)
+            {
+                throw new ArgumentException("A footprint has at least one cell.", nameof(cells));
+            }
+
+            return TryJunction(cells, new HashSet<Coord>(cells), out junction);
+        }
+
+        /// <summary><see cref="TryJunction(IReadOnlyList{Coord}, out Coord)"/> on the footprint's <paramref name="members"/>.</summary>
+        private static bool TryJunction(IReadOnlyList<Coord> cells, HashSet<Coord> members, out Coord junction)
+        {
+            junction = default;
+            var candidates = 0;
+            for (var i = 0; i < cells.Count; i++)
+            {
+                var cell = cells[i];
+                var isAcross = members.Contains(new Coord(cell.X - 1, cell.Y)) || members.Contains(new Coord(cell.X + 1, cell.Y));
+                var isUpOrDown = members.Contains(new Coord(cell.X, cell.Y - 1)) || members.Contains(new Coord(cell.X, cell.Y + 1));
+                if (isAcross && isUpOrDown)
+                {
+                    junction = cell;
+                    candidates++;
+                }
+            }
+
+            if (candidates != 1)
+            {
+                return false;
+            }
+
+            // Every cell on the junction's row or column, and those on each
+            // reached from the junction without a gap: two straight runs.
+            var row = RunLength(members, junction, 1, 0) + RunLength(members, junction, -1, 0);
+            var column = RunLength(members, junction, 0, 1) + RunLength(members, junction, 0, -1);
+            if (row + column + 1 != cells.Count)
+            {
+                return false;
+            }
+
+            var neighbours = Math.Min(1, RunLength(members, junction, 1, 0)) + Math.Min(1, RunLength(members, junction, -1, 0))
+                             + Math.Min(1, RunLength(members, junction, 0, 1)) + Math.Min(1, RunLength(members, junction, 0, -1));
+            return neighbours == CornerNeighbours || neighbours == JunctionNeighbours;
+        }
+
+        /// <summary>An L's corner has two neighbours in the block, a T's junction three; a plus's four is neither. Geometry, not a tunable.</summary>
+        private const int CornerNeighbours = 2;
+
+        private const int JunctionNeighbours = 3;
+
+        /// <summary>How many of the block's cells follow <paramref name="from"/> without a gap, one step of (<paramref name="dx"/>, <paramref name="dy"/>) at a time.</summary>
+        private static int RunLength(HashSet<Coord> members, Coord from, int dx, int dy)
+        {
+            var length = 0;
+            while (members.Contains(new Coord(from.X + dx * (length + 1), from.Y + dy * (length + 1))))
+            {
+                length++;
+            }
+
+            return length;
+        }
+
+        /// <summary>
         /// The anchor of <paramref name="cells"/> in doubled coordinates, which
         /// keep it whole: an odd value is a cell's middle on that axis, an even
         /// one a line between cells. Every cell touching the anchor is in the
-        /// footprint.
+        /// footprint. The junction of an L or a T (<see cref="TryJunction"/>)
+        /// first; otherwise the rule <see cref="Anchor"/> describes.
         /// </summary>
         private static void DoubledAnchor(
             IReadOnlyList<Coord> cells, out int doubleX, out int doubleY, out HashSet<Coord> members)
@@ -257,11 +335,18 @@ namespace GateRush.Runtime
                 throw new ArgumentException("A footprint has at least one cell.", nameof(cells));
             }
 
+            members = new HashSet<Coord>(cells);
+            if (TryJunction(cells, members, out var junction))
+            {
+                doubleX = 2 * junction.X + 1;
+                doubleY = 2 * junction.Y + 1;
+                return;
+            }
+
             Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
 
             doubleX = minX + maxX + 1;
             doubleY = minY + maxY + 1;
-            members = new HashSet<Coord>(cells);
             if (AreAllTouchingCellsMembers(members, doubleX, doubleY))
             {
                 return;
