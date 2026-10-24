@@ -20,6 +20,8 @@ MonoBehaviour:
   uiSpecularMaterial: {fileID: 2100000, guid: cd09af12390a2c34a8e16de8763f51bc, type: 2}
   labelFont: {fileID: 11400000, guid: 9bd0b4fb6c61e6c49aff7f5e7c6ef52e, type: 2}
   labelShadowMaterial: {fileID: 2100000, guid: a45714258d519314fae322bde2f26248, type: 2}
+  labelOutlineFont: {fileID: 11400000, guid: 03465f64e0ad87040a0506c64a927d7a, type: 2}
+  labelOutlineMaterial: {fileID: 2100000, guid: 28c506887e6bcdf4c9f9ec49bfd1f434, type: 2}
   quarterOuterSprite: {fileID: 21300000, guid: b29f3da1aa4f7b44387f2f72cf96c017, type: 3}
   quarterEdgeSprite: {fileID: 21300000, guid: 97b3def5b3c7ae7458d9d385a69a40f4, type: 3}
   quarterFillSprite: {fileID: 21300000, guid: 7405c1a7af3ad7f46b0d2754c31ce09c, type: 3}
@@ -136,7 +138,7 @@ MonoBehaviour:
   elevatorHazardEndCells: 0.1875
   oneWayArrowEndInsetCells: 0.1640625
   padlockCountDropCells: 0.15625
-  bonusCoinCells: 0.375
+  bonusCoinCells: 0.53125
   cellSize: 1
   sideMarginCells: 0.3
   topBandScreenFraction: 0.16
@@ -161,8 +163,14 @@ MonoBehaviour:
   keyRotationDegrees: 35
   frozenMarkRaiseCells: 0.3
   timeBonusMarkFormat: +{0}
-  timeBonusMarkGapCells: 0
-  timeBonusMarkCharacterWidthCells: 0.125
+  timeBonusLabelGapCells: 0.03125
+  timeBonusLabelDropCells: 0.015625
+  timeBonusMarkCharacterWidthCells: 0.1484375
+  labelOutlineStrokeCells: 0.0234375
+  labelOutlineColor: {r: 0.16470589, g: 0.08627451, b: 0.3137255, a: 1}
+  labelOutlineAtlasPadding: 17
+  labelOutlineCharacters: +0123456789
+  markFitMarginCells: 0.14
   timeBonusMarkColor: {r: 0.2, g: 0.62, b: 0.3, a: 1}
   timeBonusMarkRimColor: {r: 0.62, g: 0.95, b: 0.62, a: 1}
   timeBonusMarkIconColor: {r: 1, g: 1, b: 1, a: 1}
@@ -390,9 +398,9 @@ MonoBehaviour:
   chainSilverColor: {r: 0.7490196, g: 0.7647059, b: 0.85490197, a: 1}
   lockGoldColor: {r: 1, g: 0.77254903, b: 0.19215687, a: 1}
   keyholeColor: {r: 0.41960785, g: 0.2627451, b: 0, a: 1}
-  coinColor: {r: 1, g: 0.83137256, b: 0.16470589, a: 1}
+  coinColor: {r: 0.16862746, g: 0.7607843, b: 0.22745098, a: 1}
   coinFaceColor: {r: 1, g: 0.95686275, b: 0.76862746, a: 1}
-  coinHandColor: {r: 0.3529412, g: 0.22745098, b: 0, a: 1}
+  coinHandColor: {r: 0.11764706, g: 0.3529412, b: 0.07058824, a: 1}
   shutterRimColor: {r: 0.95686275, g: 0.6392157, b: 0, a: 1}
   shutterCylinderColor: {r: 0.29411766, g: 0.23137255, b: 0.7529412, a: 1}
   machineMetalColor: {r: 0.5568628, g: 0.6039216, b: 0.7529412, a: 1}
