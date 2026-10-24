@@ -125,6 +125,10 @@ namespace GateRush.Tests
         private const float JokerFaceTopInsetPixels = 15f;
         private const float JokerFaceBottomInsetPixels = 30f;
 
+        // The 7.8 follow-ups: the joker icon is 145 units, down from 185, so its
+        // foot clears the pill's top and its sides the face's edges.
+        private const float JokerIconSize = 145f;
+
         // The result panel's middle sits this far under the title and over
         // the buttons, the margin the buttons keep from the panel's foot.
         private const float ResultMiddleGap = 70f;
@@ -268,11 +272,9 @@ namespace GateRush.Tests
         private const float AboutOnePointTwoTimes = 1.18f;
 
         // Module 46's joker bar: a quarter of a button between the buttons, a
-        // pill nearly as wide as the button, and an icon larger than Module
-        // 45's 161 units, standing past the button's top.
+        // pill nearly as wide as the button.
         private const float QuarterAButton = 0.25f;
         private const float PillMinShareOfButton = 0.85f;
-        private const float Module45JokerIconSize = 161f;
         private const float ShareTolerance = 0.02f;
         private const float LockMinShare = 0.45f;
         private const float LockMaxShare = 0.55f;
@@ -941,7 +943,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_JokerBarButtons_IconIsLargerAndCentredOnTheRaisedFace()
+        public void Build_JokerBarButtons_IconIsItsSizeAndCentredOnTheRaisedFace()
         {
             var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
             Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
@@ -957,10 +959,35 @@ namespace GateRush.Tests
                     var faceBottom = -half + JokerFaceBottomInsetPixels / face.pixelsPerUnitMultiplier;
 
                     Assert.AreEqual(JokerButtonSpritePath, AssetDatabase.GetAssetPath(face.sprite), $"{view.name}'s face is the one measured");
-                    Assert.That(icon.sizeDelta.y, Is.GreaterThan(Module45JokerIconSize), $"{view.name}'s icon is larger");
+                    Assert.AreEqual(JokerIconSize, icon.sizeDelta.y, Tolerance, $"{view.name}'s icon is the follow-up's size");
                     Assert.AreEqual((faceTop + faceBottom) / 2f, icon.anchoredPosition.y, Tolerance, $"{view.name}'s icon is centred on the face, above the lip");
                     Assert.That(icon.anchoredPosition.y + icon.sizeDelta.y / 2f, Is.LessThanOrEqualTo(faceTop), $"{view.name}'s icon stays under the face's top");
                     Assert.That(icon.anchoredPosition.y - icon.sizeDelta.y / 2f, Is.GreaterThanOrEqualTo(faceBottom), $"{view.name}'s icon stays above the lip");
+                }
+            }
+        }
+
+        [Test]
+        public void Build_JokerBarButtons_IconFootClearsThePillTop()
+        {
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var button = (RectTransform)Reference<Button>(serialized, "button").transform;
+                    var icon = Reference<Image>(serialized, "icon").rectTransform;
+                    var pill = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
+                    var buttonFoot = -button.rect.height / 2f;
+
+                    var iconFoot = icon.anchoredPosition.y - icon.sizeDelta.y / 2f;
+                    var pillTop = buttonFoot + pill.anchoredPosition.y + pill.sizeDelta.y / 2f;
+
+                    Assert.AreEqual(button, icon.parent, $"{view.name}'s icon is on the button");
+                    Assert.AreEqual(button, pill.parent, $"{view.name}'s pill is on the button, so both are measured in its frame");
+                    Assert.That(iconFoot, Is.GreaterThan(pillTop), $"{view.name}'s icon foot clears the pill's top edge");
                 }
             }
         }

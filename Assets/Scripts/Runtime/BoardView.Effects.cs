@@ -1626,7 +1626,7 @@ namespace GateRush.Runtime
         /// 20 and 46), on the renderers it was drawn with: the window grows
         /// from its inset to the whole body (<see cref="FaceShape"/>) — its
         /// sunken rim fading as it goes, the inner block and its highlight
-        /// growing with it over the darker outer block and its studs — while
+        /// growing with it over the outer block and its studs — while
         /// the inner block's own studs fade out as the per-cell studs of a
         /// plain block, in <paramref name="exposed"/>'s colour, fade in. It
         /// ends as a plain block of the exposed colour, which is

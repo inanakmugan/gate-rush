@@ -74,7 +74,7 @@ namespace GateRush.Runtime
         /// cell (<see cref="Frost"/>).</para>
         /// <para><b>Layered (M4, Module 46).</b> With a colour
         /// <paramref name="beneath"/>, the block is drawn as above in its outer
-        /// colour darkened (<see cref="RuntimeConfig.LayeredOuterFill"/>), and
+        /// colour, exactly as a plain block of that colour is, and
         /// an <c>Inner</c> group sets a recessed window into it, above the
         /// outer studs, so it covers them where they meet: the same tiles
         /// pulled in by <see cref="RuntimeConfig.LayerInsetCells"/> as a sunken
@@ -93,8 +93,6 @@ namespace GateRush.Runtime
             TGroup body, IReadOnlyList<Coord> cells, IReadOnlyList<QuarterTile> tiles, Color fill, Color? beneath,
             bool isIce, MovementAxis axis)
         {
-            var outerFill = beneath.HasValue ? config.LayeredOuterFill(fill) : fill;
-
             var contour = surface.Group(body, "Contour", Vector2.zero, 1f);
             var margin = config.ShadowMarginCells;
             surface.Quarters(
@@ -102,7 +100,7 @@ namespace GateRush.Runtime
                 QuarterLayer.Shadow, Color.white, config.BlockContourOrder);
 
             var face = surface.Group(body, "Face", Vector2.zero, 1f);
-            var faceQuarters = surface.Quarters(face, tiles, BlockTiling.QuarterRect, QuarterLayer.Lit, outerFill, config.BlockOrder);
+            var faceQuarters = surface.Quarters(face, tiles, BlockTiling.QuarterRect, QuarterLayer.Lit, fill, config.BlockOrder);
             var shineQuarters = Highlight(
                 face, tiles, tile => FaceShape.LightQuarterRect(tile, tiles, 0f), config.BlockLightColor, config.BlockShineOrder);
 
@@ -115,7 +113,7 @@ namespace GateRush.Runtime
                     var cell = cells[c];
                     var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
                     studs.Add(surface.Sprite(
-                        face, $"Studs {cell}", config.StudsSprite, center, Vector2.one, outerFill, config.StudOrder, 0f, SpriteLook.Lit));
+                        face, $"Studs {cell}", config.StudsSprite, center, Vector2.one, fill, config.StudOrder, 0f, SpriteLook.Lit));
                     surface.Sprite(
                         face, $"Gloss {cell}", config.StudGlossSprite, center, Vector2.one, config.GlossColor, config.GlossOrder, 0f,
                         SpriteLook.Plain);

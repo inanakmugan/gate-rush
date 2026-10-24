@@ -333,15 +333,15 @@ namespace GateRush.Tests
                 string.Join(" | ", problems));
         }
 
-        [TestCase("layeredOuterDarken", 1.5f)]
-        [TestCase("layerEdgeDarken", -0.1f)]
-        public void Problems_LayerDarkenOutOfRange_IsReportedByName(string field, float value)
+        [TestCase(1.5f)]
+        [TestCase(-0.1f)]
+        public void Problems_LayerEdgeDarkenOutOfRange_IsReportedByName(float value)
         {
-            SetFloat(field, value);
+            SetFloat("layerEdgeDarken", value);
 
             var problems = config.Problems();
 
-            Assert.That(problems, Has.Some.Contains("Layered Outer Darken and Layer Edge Darken must be from 0 to 1"), string.Join(" | ", problems));
+            Assert.That(problems, Has.Some.Contains("Layer Edge Darken must be from 0 to 1"), string.Join(" | ", problems));
         }
 
         [TestCase("layerStudSpacingCells")]
@@ -372,19 +372,16 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void LayeredFills_AnOuterColour_AreItDarkenedByEachShare()
+        public void LayerEdgeFill_AnOuterColour_IsItDarkenedByTheEdgeShare()
         {
             var outer = new Color(0.8f, 0.4f, 0.2f, 1f);
             var serialized = new SerializedObject(config);
-            var outerShare = serialized.FindProperty("layeredOuterDarken").floatValue;
             var edgeShare = serialized.FindProperty("layerEdgeDarken").floatValue;
 
-            var outerFill = config.LayeredOuterFill(outer);
             var edgeFill = config.LayerEdgeFill(outer);
 
-            Assert.AreEqual(new Color(outer.r * outerShare, outer.g * outerShare, outer.b * outerShare, 1f), outerFill);
             Assert.AreEqual(new Color(outer.r * edgeShare, outer.g * edgeShare, outer.b * edgeShare, 1f), edgeFill);
-            Assert.Less(edgeFill.r, outerFill.r, "the rim is darker than the surround");
+            Assert.Less(edgeFill.r, outer.r, "the rim is darker than the surround, which is the outer colour itself");
         }
 
         [Test]
