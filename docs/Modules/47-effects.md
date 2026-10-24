@@ -309,3 +309,88 @@ The look and the feel are checked by hand.
 - Pass 3: every button answers a press; the front end and a level fade
   into each other with no input getting through; tabs and overlays open
   and close smoothly; nothing waits on a closing overlay.
+
+---
+
+## Resolved during implementation
+
+- **Method.** Pass 1's look was rendered first by `effects_reference.py`
+  in the lit model of D80 and approved; `effects_reference_sprites.py`
+  writes the approved sprites at native size, and *Gate Rush → Render
+  Effects Comparison* checks the ports against them: the cube matches
+  95.3 percent of pixels within 4/255 drawn over the floor (it must be
+  stored as a grey shade and a white highlight to tint, which differs
+  only on the bevel edge and the stud's rim), the shards about 99.5
+  percent, the glow and the sparkle 100 percent on bytes. A Lanczos
+  downsampler matching Pillow's is kept for the match; a box filter fell
+  to about 75 percent.
+- **Debris sprites.** The cube is a broken-off quarter of a block with
+  one stud, drawn with `BoardLit` and tinted like a block face. Its
+  specular layer, `CubeHighlight`, is generated but drawn only when
+  `drawCubeHighlights` is on, off by default: at 15 to 28 pixels on
+  screen it would double the cubes' draw calls for little. Three shard
+  outlines (`Shard`, `Shard2`, `Shard3`) take turns by piece index, in a
+  new `shardColor` baked by Generate Art. The gate glow is now 64 by 64
+  and drawn additive with the existing `BoardSpecular` material, so no
+  new material; the pull glow shares it. The introduction card's
+  sparkles take the new sparkle.
+- **Debris pool.** Every cube, shard, sparkle and glow comes from a
+  `DebrisPool` of `debrisPoolSize` (112) renderers made once per view; a
+  dry pool skips a piece silently. About 34 GameObjects were created and
+  destroyed per exit before.
+- **Joker clears in place.** The block's own renderers flash toward
+  white, then cubes burst outward from its cells with a few sparkles,
+  under per-block caps and per-move caps that `BurstLayout.ShareCap`
+  splits across a Broom's blocks. A frozen block keeps its ice-only
+  burst.
+- **The elevator's exit.** A finished elevator's own root moves to
+  debris and sinks toward its region's centre while fading; its shadow
+  is baked into its sprites and goes with it. It adds no renderers.
+- **The win.** The board's celebration (confetti cubes in the palette,
+  sparkles, a pulse of the frame) was built, played and removed by the
+  owner as too much. A win opens the result panel at once with the Win
+  cue; its title pops once more and the gold row's coin spins in, then
+  the gold flies.
+- **Gold.** `CoinFlight` and `GoldCounter` as specified; one coin per
+  `coinFlightGoldPerCoin`, capped by `coinFlightCap`. The coins are a
+  pool of Images on their own nested Coin Flight canvas; each gold pill
+  has a permanent nested canvas whose sorting is lifted above a scrim
+  during a flight (about two draw calls each at all times). The Top
+  Bar's gold canvas carries a raycaster so its plus still works. A Store
+  pack whose card is not showing releases at once with no flight.
+- **A canvas lesson.** `Canvas.overrideSorting` set through the property
+  on a canvas with no canvas above it is not saved, and the getter reads
+  false on any root canvas whatever was saved. The builder writes
+  `m_OverrideSorting` through a `SerializedObject`, `CoinFlightView`
+  sets its sorting in `OnEnable` under the scene canvas, and the tests
+  read the serialized value. Two pill tests had passed by the same
+  accident.
+- **Presses.** `PressFeedback` scales the Button's own object, which is
+  the visible face for every kind, and widens the target graphic's
+  `raycastPadding` while pressed so an edge tap still clicks. It leaves
+  the Selectable transitions (Sprite Swap, Color Tint, None) alone. The
+  builder stops with an error naming the prefab and the Button's path if
+  a Button lacks it; the introduction card's code-built backdrop and
+  close are the only exceptions. The joker slot is now Lift/Pulse/Button
+  so the lift, the marked pulse and the press each own one transform.
+- **Screen fade.** Built in code by the bootstrap as the last child of
+  the scene canvas, on its own one-Image canvas, its timings in
+  `UiConfig` read through `IFrontEnd`, its colour the level's
+  background. `ScreenFadeSequence` is the tested state. Changes in
+  behaviour: the countdown starts when the fade lifts; leaving freezes
+  the level at once; a win whose presentation ends during the fade out
+  opens no panel; the streak reward and Lives overlays open after the
+  fade lifts; Next with the campaign over and Next or Restart with no
+  lives fade to Home.
+- **Tabs and overlays.** `TabPages` keeps at most two pages active and
+  exactly one once a fade ends. `OverlayMotion` on every overlay opens
+  with `OverlayPop` and closes with a short fade and shrink; `IsOpen`
+  leaves out a closing overlay, so a closing confirmation no longer
+  counts as paused. The introduction card only gains a shrink on close
+  (`introCloseScale`).
+- **Per-frame refresh.** Found while wiring the gold: `RefreshLevelUi`
+  and the front end's `RefreshMeta` compare state each frame but rewrite
+  every view when any field changes, which is once a second while a life
+  regenerates, and format their strings each time. Left for the
+  optimisation in 7.8.
+- **Tests.** 3,094 after pass 1, 3,150 after pass 2, 3,308 at the end.

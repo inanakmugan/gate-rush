@@ -368,7 +368,7 @@ sounds. Each spec is written when the module before it is merged.
 | 7.3 | A campaign of thirty levels: the existing fifteen re-ordered and fifteen new ones (D75) | `Modules/44-campaign-thirty.md` | Done |
 | 7.4 | Interface art: a style guide and generated sprites, thirty avatars, the town backgrounds, the larger joker bar (D77, D78) | `Modules/45-interface-art.md` | Done |
 | 7.5 | Board art: the blocks, gates, frame and mechanics shaded by a lit model in the new interface's style; the floor and frame kept across moves (D79, D80) | `Modules/46-board-art.md` | Done |
-| 7.6 | Effects and transitions: block clears, the win, gold flying to its counter, button presses, screen changes, the board's exit cubes, shards and gate glow, an elevator's exit | `Modules/47-effects.md` | Planned |
+| 7.6 | Effects and transitions: the board's debris in the lit model from one pool, joker clears and a finished elevator's exit, gold flying to its counter, button presses, the screen fade, tab and overlay transitions; the win is the panel and the gold (D81) | `Modules/47-effects.md` | Done |
 | 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
 | 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | to be decided | Planned |
 
@@ -383,10 +383,15 @@ on the button face, replaced the square unlock glow with a round gold one
 shape so a free-play win and Time's Up no longer leave an empty middle;
 its values are builder constants reproduced by Build UI Prefabs (D78).
 
-Two small follow-ups from that tour go with 7.8: the layered block's
-outer colour is a little darker than a plain block of the same colour and
-should match; and the joker icons are a little large at 185 units, with
+Follow-ups for 7.8. From that tour: the layered block's outer colour is
+a little darker than a plain block of the same colour and should match
+(Module 46 draws the outer block at 0.85 on purpose; raising that factor
+is the fix); and the joker icons are a little large at 185 units, with
 the icon's foot touching the count pill, and could drop to about 165.
+From 7.6: `RefreshLevelUi` and the front end's `RefreshMeta` rewrite
+every view whenever any field changes, once a second while a life
+regenerates, and format their strings each time; part of the
+optimisation on a phone, with the frame rate measured in the web build.
 
 ---
 

@@ -2499,3 +2499,37 @@ reasons stand. A real 3D board: it would change the rendering, the board
 fit and the WebGL cost for a look the 2D model already reaches.
 
 ---
+
+## D81 — Effects stay cheap, and the win is the panel and the gold
+
+**Decision.** The effects of Phase 7 are a handful of pooled sprites
+moved by tweens, in the board's lit art (D80) and the interface's own
+sprites: no particle systems, post-processing, render textures or new
+materials, and nothing created or destroyed per piece during play. A win
+is shown by the result panel's entrance and the gold flying to its
+counter; the board does not celebrate.
+
+**Why.** The game ships to phones through WebGL, where draw calls,
+overdraw and garbage collection cost more than on a desktop, and the
+reference games keep their effects light. A confetti celebration was
+built and played: it delayed the panel and added little the panel and
+the coins do not already say.
+
+**Consequences.**
+- The board's debris comes from one pool made once per view; caps per
+  block and per move bound every burst.
+- Optional extras that double draw calls, such as the cubes' specular
+  layer, are generated but off by default.
+- Gold is held on screen at its old value until the last coin lands, so
+  the counter always ends on the wallet.
+- Interface motion (presses, tab and overlay transitions, the screen
+  fade) re-batches its canvas only for its own short duration; the fade
+  has its own one-Image canvas.
+
+**Rejected.** A win celebration on the board: tried and removed.
+Particle systems for the debris: more flexible, but heavier on WebGL and
+harder to keep deterministic than seeded layouts. Creating and
+destroying a GameObject per piece, as Phase 2 did: avoidable garbage on
+every exit.
+
+---
