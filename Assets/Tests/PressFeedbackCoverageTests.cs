@@ -12,7 +12,7 @@ namespace GateRush.Tests
     /// Covers Module 47's rule that every button of the interface answers a
     /// press: every <see cref="Button"/> in every prefab under
     /// <c>Assets/Prefabs/UI</c> — the eight hand-made ones and the
-    /// twenty-five the UI builder writes — has a <see cref="PressFeedback"/>
+    /// twenty-six the UI builder writes — has a <see cref="PressFeedback"/>
     /// on its own object, reading the UI Config.
     /// </summary>
     /// <remarks>
@@ -42,7 +42,8 @@ namespace GateRush.Tests
             "Gold Pack Card", "Store Page", "Leaderboard Row", "Leaderboard Page", "Settings Overlay", "Levels Overlay",
             "Lives Overlay", "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", "Streak Marker", "Streak Bar",
             "Streak Ladder Row", "Win Streak Overlay", "Streak Prize", "Streak Reward Overlay", "Avatar Button", "Profile Overlay",
-            "Front End", "Gold Packs Overlay", "Level HUD", "Joker Bar", "Level UI", "Result Overlay", "Confirm Overlay"
+            "Front End", "Gold Packs Overlay", "Level HUD", "Joker Bar", "Level UI", "Result Overlay", "Confirm Overlay",
+            "End of Content Overlay"
         };
 
         [TestCaseSource(nameof(PrefabNames))]

@@ -246,8 +246,17 @@ namespace GateRush.Tests
         private static string[] ClosedOverlayNames => new[]
         {
             "Settings Overlay", "Levels Overlay", "Lives Overlay", "Not Enough Gold Overlay", "Test Purchase Overlay",
-            "Win Streak Overlay", ProfileOverlayName, GoldPacksOverlayName
+            "Win Streak Overlay", ProfileOverlayName, GoldPacksOverlayName, EndOfContentOverlayName
         };
+
+        // Module 49: the End of Content overlay, and the Message overlay's two
+        // sizes, from the privacy text's measure: the tall text box holds its
+        // 14 lines at 48, and the panel grows with it, so OK keeps its place
+        // at the foot and the tall panel stays inside the reference screen.
+        private const string EndOfContentOverlayName = "End of Content Overlay";
+        private const string MessageOverlayName = "Message Overlay";
+        private const float MessageTextMaxFontSize = 48f;
+        private const float MessageTextMinFontSize = 40f;
 
         // The Store's Refill Lives card, and how far a text-only buy label is
         // raised onto the button's face above its lip.
@@ -262,7 +271,7 @@ namespace GateRush.Tests
         {
             "Settings Overlay", "Levels Overlay", "Lives Overlay", "Not Enough Gold Overlay", "Message Overlay",
             "Test Purchase Overlay", "Win Streak Overlay", "Streak Reward Overlay", ProfileOverlayName, GoldPacksOverlayName,
-            ResultOverlayName, ConfirmOverlayName
+            ResultOverlayName, ConfirmOverlayName, EndOfContentOverlayName
         };
 
         // Module 45's joker bar, which the interface review makes about 1.2
@@ -285,7 +294,7 @@ namespace GateRush.Tests
             "Not Enough Gold Overlay", "Message Overlay", "Test Purchase Overlay", StreakMarkerName, StreakBarName,
             StreakLadderRowName, "Win Streak Overlay", StreakPrizeName, "Streak Reward Overlay", AvatarButtonName,
             ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName,
-            ResultOverlayName, ConfirmOverlayName
+            ResultOverlayName, ConfirmOverlayName, EndOfContentOverlayName
         };
 
         private static (Type type, string prefabName)[] LevelOverlays => new[]
@@ -304,7 +313,7 @@ namespace GateRush.Tests
         {
             typeof(SettingsOverlay), typeof(LevelsOverlay), typeof(LivesOverlay),
             typeof(NotEnoughGoldOverlay), typeof(MessageOverlay), typeof(TestPurchaseOverlay),
-            typeof(WinStreakOverlay), typeof(StreakRewardOverlay), typeof(ProfileOverlay)
+            typeof(WinStreakOverlay), typeof(StreakRewardOverlay), typeof(ProfileOverlay), typeof(EndOfContentOverlay)
         };
 
         private string folder;
@@ -330,7 +339,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_IntoFolder_WritesExactlyTheTwentyFivePrefabs()
+        public void Build_IntoFolder_WritesExactlyTheTwentySixPrefabs()
         {
             var names = AssetDatabase.FindAssets("t:Prefab", new[] { folder })
                 .Select(guid => Path.GetFileNameWithoutExtension(AssetDatabase.GUIDToAssetPath(guid)))
@@ -340,7 +349,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void ExistingOutputs_AfterBuild_NamesAllTwentyFive()
+        public void ExistingOutputs_AfterBuild_NamesAllTwentySix()
         {
             var existing = UiPrefabBuilder.ExistingOutputs(folder);
 
@@ -379,11 +388,12 @@ namespace GateRush.Tests
             }
         }
 
-        [TestCase(typeof(SettingsOverlay), 9)]
+        [TestCase(typeof(SettingsOverlay), 11)]
         [TestCase(typeof(LevelsOverlay), 3)]
         [TestCase(typeof(LivesOverlay), 6)]
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
-        [TestCase(typeof(MessageOverlay), 3)]
+        [TestCase(typeof(MessageOverlay), 4)]
+        [TestCase(typeof(EndOfContentOverlay), 5)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
         [TestCase(typeof(StoreScreen), 11)]
         [TestCase(typeof(WinStreakOverlay), 6)]
@@ -391,7 +401,7 @@ namespace GateRush.Tests
         [TestCase(typeof(StreakBar), 6)]
         [TestCase(typeof(ProfileOverlay), 16)]
         [TestCase(typeof(LeaderboardScreen), 7)]
-        [TestCase(typeof(FrontEnd), 21)]
+        [TestCase(typeof(FrontEnd), 22)]
         public void Build_View_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
         {
             var view = LoadBuilt(FrontEndName).GetComponentInChildren(viewType, true);
@@ -777,7 +787,7 @@ namespace GateRush.Tests
         [TestCase(typeof(GoldPacksOverlay), 5)]
         [TestCase(typeof(NotEnoughGoldOverlay), 3)]
         [TestCase(typeof(TestPurchaseOverlay), 6)]
-        [TestCase(typeof(MessageOverlay), 3)]
+        [TestCase(typeof(MessageOverlay), 4)]
         [TestCase(typeof(ResultOverlay), 17)]
         [TestCase(typeof(ConfirmOverlay), 7)]
         public void Build_LevelUiView_EverySerializedReferenceIsAssigned(Type viewType, int expectedFields)
@@ -2201,6 +2211,115 @@ namespace GateRush.Tests
             finally
             {
                 Object.DestroyImmediate(root);
+            }
+        }
+
+        // ----- Module 49: privacy text and the end of content ----------------
+
+        [Test]
+        public void Build_SettingsOverlay_PrivacyRowIsALockedRoundButtonUnderHapticsClearOfLevels()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+
+            ForEachLoaded("Settings Overlay", contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<SettingsOverlay>()))
+                {
+                    var label = Label(serialized, "privacyLabel");
+                    var button = Reference<Button>(serialized, "privacyButton");
+                    var levels = (RectTransform)Reference<Button>(serialized, "levelsButton").transform;
+                    var privacyRow = Named(contents, "Privacy Row");
+                    var hapticsRow = Named(contents, "Haptics Row");
+                    var panel = (RectTransform)privacyRow.parent;
+                    var icon = button.transform.Find("Icon");
+                    var levelsTop = panel.rect.height - (levels.anchoredPosition.y + levels.rect.height);
+                    var privacyBottom = -privacyRow.anchoredPosition.y + privacyRow.rect.height;
+
+                    Assert.AreEqual(config.PrivacyTitle, label.text, "the row's label is the UI Config's");
+                    // The text is on the row's Label child, as Sound's and Haptics' are.
+                    Assert.AreSame(privacyRow, label.transform.parent, "the label sits in the row");
+                    Assert.AreEqual(HandMadePath("Button Round"), SourcePath(button), "a Button Round, as the other rows");
+                    Assert.AreEqual(privacyRow, button.transform.parent, "the button sits in the row");
+                    Assert.IsNotNull(icon, "Button Round's own icon");
+                    Assert.IsTrue(icon.gameObject.activeSelf, "the icon shows: Privacy has no looks");
+                    Assert.AreEqual(LockSpritePath, AssetDatabase.GetAssetPath(icon.GetComponent<Image>().sprite), "the lock");
+                    Assert.IsNotNull(button.GetComponent<PressFeedback>(), "it answers a press");
+                    Assert.AreEqual(hapticsRow.rect.height, privacyRow.rect.height, Tolerance, "the rows are one height");
+                    Assert.That(privacyRow.anchoredPosition.y, Is.LessThan(hapticsRow.anchoredPosition.y - hapticsRow.rect.height), "under Haptics, clear of it");
+                    Assert.That(levelsTop, Is.GreaterThan(privacyBottom), "Levels at the foot stays clear of the Privacy row");
+                }
+            });
+        }
+
+        [Test]
+        public void Build_EndOfContentOverlay_TextsComeFromTheConfigAndRestartIsAButtonPrimaryAtTheFoot()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var overlay = LoadBuilt(EndOfContentOverlayName).GetComponent<EndOfContentOverlay>();
+            Assert.IsNotNull(overlay, nameof(EndOfContentOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var title = Label(serialized, "titleLabel");
+                var line = Label(serialized, "lineLabel");
+                var restart = (RectTransform)Reference<Button>(serialized, "restartButton").transform;
+                var close = Reference<Button>(serialized, "closeButton");
+                var titleRect = title.rectTransform;
+                var lineRect = line.rectTransform;
+
+                Assert.AreEqual(config.EndOfContentTitle, title.text);
+                Assert.AreEqual(config.EndOfContentLine, line.text);
+                Assert.AreEqual(config.EndOfContentRestartLabel, Label(serialized, "restartLabel").text);
+                Assert.AreEqual(HandMadePath("Button Primary"), SourcePath(restart), "Restart is the primary button");
+                Assert.AreEqual(HandMadePath("Button Close"), SourcePath(close), "the close button of every overlay");
+                Assert.AreEqual(PanelButtonPosY, restart.anchoredPosition.y, Tolerance, "Restart at the panel's foot");
+                Assert.AreEqual(TextWrappingModes.Normal, title.textWrappingMode, "the long title wraps beside the close button");
+                Assert.That(
+                    -lineRect.anchoredPosition.y, Is.GreaterThanOrEqualTo(-titleRect.anchoredPosition.y + titleRect.sizeDelta.y),
+                    "the line sits under the title's box");
+            }
+        }
+
+        [Test]
+        public void Build_MessageOverlay_TallSizeHoldsThePrivacyTextAtFullSizeAndKeepsOkAtTheFoot()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+
+            ForEachLoaded(MessageOverlayName, contents =>
+            {
+                using (var serialized = new SerializedObject(contents.GetComponent<MessageOverlay>()))
+                {
+                    var panel = Reference<RectTransform>(serialized, "panel");
+                    var text = Label(serialized, "textLabel");
+                    var shortPanel = serialized.FindProperty("shortPanelSize").vector2Value;
+                    var longPanel = serialized.FindProperty("longPanelSize").vector2Value;
+                    var shortText = serialized.FindProperty("shortTextHeight").floatValue;
+                    var longText = serialized.FindProperty("longTextHeight").floatValue;
+                    var width = text.rectTransform.rect.width;
+                    text.enableAutoSizing = false;
+                    text.fontSize = MessageTextMaxFontSize;
+
+                    var privacyHeight = text.GetPreferredValues(config.PrivacyText, width, 0f).y;
+
+                    Assert.AreEqual(shortPanel, panel.sizeDelta, "saved at the short size, as a failed purchase shows");
+                    Assert.AreEqual(shortText, text.rectTransform.sizeDelta.y, Tolerance, "the text saved at its short height");
+                    Assert.AreEqual(shortPanel.x, longPanel.x, Tolerance, "the tall panel is as wide");
+                    Assert.AreEqual(longText - shortText, longPanel.y - shortPanel.y, Tolerance, "the panel grows with its text, so OK keeps its place");
+                    Assert.That(privacyHeight, Is.LessThanOrEqualTo(longText), "the privacy text fits the tall box at full size");
+                    Assert.That(longPanel.y, Is.LessThan(ReferenceHeight), "the tall panel fits the smallest canvas, 1080 by 1920");
+                }
+            });
+
+            using (var serialized = new SerializedObject(LoadBuilt(MessageOverlayName).GetComponent<MessageOverlay>()))
+            {
+                var text = Label(serialized, "textLabel");
+
+                Assert.IsTrue(text.enableAutoSizing, "a text too long for its box shrinks");
+                Assert.AreEqual(MessageTextMaxFontSize, text.fontSizeMax, Tolerance);
+                Assert.AreEqual(MessageTextMinFontSize, text.fontSizeMin, Tolerance, "never below 40");
             }
         }
 

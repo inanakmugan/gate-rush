@@ -185,6 +185,23 @@ namespace GateRush.UI
         [Tooltip("The label of the Settings overlay's haptics row.")]
         [SerializeField] private string hapticsLabel = "Haptics";
 
+        [Tooltip("The label of the Settings overlay's Privacy row, and the title of the privacy text it opens (Module 49).")]
+        [SerializeField] private string privacyTitle = "Privacy";
+
+        [Tooltip("The privacy text, in the tall message prompt (Module 49). It must stay true: if a change sends anything off the device, this text changes with it.")]
+        [SerializeField, TextArea] private string privacyText =
+            "Gate Rush collects no personal data. Your progress (levels, gold, lives, your name and avatar, and your settings) is saved only in this browser, on this device, and is never sent anywhere. There are no ads, no analytics and no accounts. Purchases are simulated: no payment is ever taken. The leaderboard is local, and its other players are labelled demo players. Clearing this site's data resets your progress.";
+
+        [Header("End of content texts (Module 49)")]
+        [Tooltip("The End of Content overlay's title, shown once the campaign is finished.")]
+        [SerializeField] private string endOfContentTitle = "You finished every level!";
+
+        [Tooltip("The End of Content overlay's line under its title.")]
+        [SerializeField] private string endOfContentLine = "New levels are coming soon.";
+
+        [Tooltip("The label of the End of Content overlay's Restart button, which plays level 1 in free play.")]
+        [SerializeField] private string endOfContentRestartLabel = "Restart";
+
         [Header("Leaderboard texts (formats use the invariant culture)")]
         [Tooltip("The line under the Leaderboard's title, never hidden while the table is simulated (D73).")]
         [SerializeField] private string leaderboardSimulatedNote = "Demo players: online leaderboard not connected.";
@@ -525,6 +542,24 @@ namespace GateRush.UI
         /// <summary>The Settings overlay's haptics row label.</summary>
         public string HapticsLabel => hapticsLabel;
 
+        /// <summary>The Settings overlay's Privacy row label and the privacy text's title (Module 49).</summary>
+        public string PrivacyTitle => privacyTitle;
+
+        /// <summary>
+        /// The privacy text the Privacy row opens (Module 49). It must stay
+        /// true: a change that sends anything off the device changes it too.
+        /// </summary>
+        public string PrivacyText => privacyText;
+
+        /// <summary>The End of Content overlay's title (Module 49).</summary>
+        public string EndOfContentTitle => endOfContentTitle;
+
+        /// <summary>The End of Content overlay's line under its title (Module 49).</summary>
+        public string EndOfContentLine => endOfContentLine;
+
+        /// <summary>The label of the End of Content overlay's Restart button (Module 49).</summary>
+        public string EndOfContentRestartLabel => endOfContentRestartLabel;
+
         /// <summary>The Leaderboard's line saying the table is simulated.</summary>
         public string LeaderboardSimulatedNote => leaderboardSimulatedNote;
 
@@ -853,6 +888,11 @@ namespace GateRush.UI
             AddIfBlank(problems, lifetimeGoldLabel, "Lifetime Gold Label");
             AddIfUnusableFormat(problems, statisticFormat, 1, "Statistic Format", "{0} for the number");
             AddIfBlank(problems, hapticsLabel, "Haptics Label");
+            AddIfBlank(problems, privacyTitle, "Privacy Title");
+            AddIfBlank(problems, privacyText, "Privacy Text");
+            AddIfBlank(problems, endOfContentTitle, "End Of Content Title");
+            AddIfBlank(problems, endOfContentLine, "End Of Content Line");
+            AddIfBlank(problems, endOfContentRestartLabel, "End Of Content Restart Label");
             AddIfBlank(problems, leaderboardSimulatedNote, "Leaderboard Simulated Note");
             AddIfBlank(problems, leaderboardLoadingText, "Leaderboard Loading Text");
             AddIfBlank(problems, leaderboardFailedText, "Leaderboard Failed Text");

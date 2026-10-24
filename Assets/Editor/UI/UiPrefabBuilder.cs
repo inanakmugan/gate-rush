@@ -32,7 +32,9 @@ namespace GateRush.UI.Editor
     /// Level HUD out anew under a ribbon, tints every scrim from the UI
     /// Config, shows a loss's hourglass and lost life on the result panel,
     /// and redraws Profile's name field and chosen avatar, the Lives
-    /// overlay's wait and the Win Streak panel.
+    /// overlay's wait and the Win Streak panel. Module 49 adds the Privacy row
+    /// to the Settings overlay, the Message overlay's tall size for the
+    /// privacy text, and the End of Content Overlay, nested in Front End.
     /// </summary>
     /// <remarks>
     /// <para><b>The hand-made prefabs are never written.</b> They are read
@@ -166,6 +168,7 @@ namespace GateRush.UI.Editor
         private const string LevelUiName = "Level UI";
         private const string ResultOverlayName = "Result Overlay";
         private const string ConfirmOverlayName = "Confirm Overlay";
+        private const string EndOfContentOverlayName = "End of Content Overlay";
 
         // Child objects.
         private const string TitleName = "Title";
@@ -232,6 +235,7 @@ namespace GateRush.UI.Editor
         private const string HapticsRowName = "Haptics Row";
         private const string HapticsOnLookName = "Haptics On Look";
         private const string HapticsOffLookName = "Haptics Off Look";
+        private const string PrivacyRowName = "Privacy Row";
         private const string CrossName = "Cross";
         private const string SelectedName = "Selected";
         private const string AvatarName = "Avatar";
@@ -535,15 +539,18 @@ namespace GateRush.UI.Editor
         private const float PanelButtonPosY = 70f;
         private const float OverlayTextInset = 60f;
 
-        // Settings overlay: the Haptics row under the Sound row, one row
-        // height and a gap lower.
+        // Settings overlay: the Haptics row under the Sound row, and the
+        // Privacy row (Module 49) under that, each one row height and a gap
+        // lower. The panel grew by one row and a gap for Privacy, so Levels
+        // at its foot keeps the room it had under Haptics.
         private const float SettingsPanelWidth = 820f;
-        private const float SettingsPanelHeight = 880f;
         private const float SoundRowInset = 80f;
         private const float SoundRowPosY = -200f;
         private const float SoundRowHeight = 140f;
         private const float SettingsRowSpacing = 40f;
         private const float HapticsRowPosY = SoundRowPosY - SoundRowHeight - SettingsRowSpacing;
+        private const float PrivacyRowPosY = HapticsRowPosY - SoundRowHeight - SettingsRowSpacing;
+        private const float SettingsPanelHeight = 880f + SoundRowHeight + SettingsRowSpacing;
         private const float SoundLabelWidthFraction = 0.5f;
         private const float SoundLabelFontSize = 64f;
 
@@ -618,12 +625,33 @@ namespace GateRush.UI.Editor
         private const float StatusHeight = 90f;
         private const float StatusFontSize = 56f;
 
-        // Message overlay.
+        // Message overlay. A short message, a failed purchase, at the short
+        // size; a long one, the privacy text (Module 49), at the tall size:
+        // the text box and the panel taller by the same amount, so OK stays
+        // at the foot. The privacy text measures 14 lines (about 813 units)
+        // at 48 in the 700-unit box with Fredoka Bold's advances, and 12
+        // lines (581) at 40; the box holds 14 lines with room for kerning.
+        // The text shrinks toward the minimum only when it would not fit.
         private const float MessagePanelWidth = 820f;
         private const float MessagePanelHeight = 620f;
         private const float MessageTextPosY = -170f;
         private const float MessageTextHeight = 240f;
         private const float MessageTextFontSize = 48f;
+        private const float MessageTextMinFontSize = 40f;
+        private const float MessageLongTextHeight = 880f;
+        private const float MessageLongPanelHeight = MessagePanelHeight + MessageLongTextHeight - MessageTextHeight;
+
+        // End of Content overlay (Module 49), in the shared frame with its
+        // close button. Its title, "You finished every level!", is 629 units
+        // wide at the frame's 56 minimum, wider than the 560 the close button
+        // leaves it on a 900 panel, so here it wraps onto two lines in a
+        // taller title box; the line sits under it and Restart at the foot.
+        private const float EndOfContentPanelWidth = 900f;
+        private const float EndOfContentPanelHeight = 640f;
+        private const float EndOfContentTitleHeight = 160f;
+        private const float EndOfContentLinePosY = -230f;
+        private const float EndOfContentLineHeight = 100f;
+        private const float EndOfContentLineFontSize = 52f;
 
         // Not Enough Gold overlay.
         private const float NotEnoughGoldPanelWidth = 820f;
@@ -1075,6 +1103,14 @@ namespace GateRush.UI.Editor
         private const string HapticsButtonField = "hapticsButton";
         private const string HapticsOnLookField = "hapticsOnLook";
         private const string HapticsOffLookField = "hapticsOffLook";
+        private const string PrivacyLabelField = "privacyLabel";
+        private const string PrivacyButtonField = "privacyButton";
+        private const string EndOfContentField = "endOfContent";
+        private const string RestartLabelField = "restartLabel";
+        private const string ShortPanelSizeField = "shortPanelSize";
+        private const string ShortTextHeightField = "shortTextHeight";
+        private const string LongPanelSizeField = "longPanelSize";
+        private const string LongTextHeightField = "longTextHeight";
         private const string SelectedMarkField = "selectedMark";
         private const string AvatarImageField = "avatarImage";
         private const string NameFieldField = "nameField";
@@ -1253,8 +1289,9 @@ namespace GateRush.UI.Editor
                 var streakReward = Save(BuildStreakRewardOverlay(scene, sources, streakPrize), sources, outputFolder);
                 var avatarButton = Save(BuildAvatarButton(scene, sources), sources, outputFolder);
                 var profile = Save(BuildProfileOverlay(scene, sources, avatarButton), sources, outputFolder);
+                var endOfContent = Save(BuildEndOfContentOverlay(scene, sources), sources, outputFolder);
                 var overlays = new OverlayAssets(
-                    settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile);
+                    settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile, endOfContent);
                 Save(BuildFrontEnd(scene, sources, storePage, leaderboardPage, streakBar, overlays), sources, outputFolder);
 
                 var goldPacks = Save(BuildGoldPacksOverlay(scene, sources, goldPackCard), sources, outputFolder);
@@ -1277,7 +1314,7 @@ namespace GateRush.UI.Editor
             NotEnoughGoldOverlayName, MessageOverlayName, TestPurchaseOverlayName, StreakMarkerName, StreakBarName,
             StreakLadderRowName, WinStreakOverlayName, StreakPrizeName, StreakRewardOverlayName, AvatarButtonName,
             ProfileOverlayName, FrontEndName, GoldPacksOverlayName, LevelHudName, JokerBarName, LevelUiName,
-            ResultOverlayName, ConfirmOverlayName
+            ResultOverlayName, ConfirmOverlayName, EndOfContentOverlayName
         };
 
         private static string PrefabPath(string folder, string name) => $"{folder}/{name}{PrefabExtension}";
@@ -1595,6 +1632,11 @@ namespace GateRush.UI.Editor
             UiBuilder.AddIcon(cross, sources.Cross, ParseColor(HapticsCrossColorHex));
             hapticsOffLook.SetActive(false);
 
+            // Module 49: Privacy opens a text rather than switching, so its
+            // Button Round keeps its own icon, the lock, and its transition.
+            var privacyButton = AddSettingsRow(frame.Panel, sources, PrivacyRowName, sources.Config.PrivacyTitle, PrivacyRowPosY, out var privacyLabel);
+            SetRoundIcon(privacyButton, sources.Lock);
+
             var levels = Nest(sources.ButtonPrimary, frame.Panel);
             PlaceAtPanelBottom(levels);
             SetNestedLabel(levels, LevelsButtonText);
@@ -1610,28 +1652,43 @@ namespace GateRush.UI.Editor
                 (HapticsButtonField, haptics.Button),
                 (HapticsOnLookField, hapticsOnLook),
                 (HapticsOffLookField, hapticsOffLook),
+                (PrivacyLabelField, privacyLabel),
+                (PrivacyButtonField, Single<Button>(privacyButton.gameObject, ButtonRoundName)),
                 (LevelsButtonField, Single<Button>(levels.gameObject, ButtonPrimaryName)));
             return frame.Root;
         }
 
         /// <summary>
         /// One row of the Settings overlay at <paramref name="posY"/>: the
-        /// label at its left and a Button Round at its right, with no
-        /// transition, whose own icon is switched off on this instance for the
-        /// two looks the caller adds in its place.
+        /// label at its left, returned in <paramref name="label"/>, and a
+        /// Button Round at its right, returned, as Button Round made it.
         /// </summary>
-        private static ToggleRow AddToggleRow(RectTransform panel, Sources sources, string name, string labelText, float posY)
+        private static RectTransform AddSettingsRow(
+            RectTransform panel, Sources sources, string name, string labelText, float posY, out TMP_Text label)
         {
             var row = UiBuilder.CreateRect(name, panel);
             TopStretch(row, SoundRowInset, posY, SoundRowHeight);
             var labelRect = UiBuilder.CreateRect(SoundLabelName, row);
             UiBuilder.SetAnchors(labelRect, new Vector2(AnchorLow, AnchorLow), new Vector2(SoundLabelWidthFraction, AnchorHigh));
-            var label = AddText(labelRect, sources, labelText, SoundLabelFontSize, OverlayTextColorHex);
-            label.alignment = TextAlignmentOptions.MidlineLeft;
+            var text = AddText(labelRect, sources, labelText, SoundLabelFontSize, OverlayTextColorHex);
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            label = text;
 
-            var toggle = Nest(sources.ButtonRound, row);
-            UiBuilder.Place(toggle, new Vector2(AnchorHigh, AnchorMid), Vector2.zero, toggle.sizeDelta);
-            Record(toggle);
+            var roundButton = Nest(sources.ButtonRound, row);
+            UiBuilder.Place(roundButton, new Vector2(AnchorHigh, AnchorMid), Vector2.zero, roundButton.sizeDelta);
+            Record(roundButton);
+            return roundButton;
+        }
+
+        /// <summary>
+        /// One toggle row of the Settings overlay at <paramref name="posY"/>
+        /// (<see cref="AddSettingsRow"/>): its Button Round has no transition,
+        /// and its own icon is switched off on this instance for the two looks
+        /// the caller adds in its place.
+        /// </summary>
+        private static ToggleRow AddToggleRow(RectTransform panel, Sources sources, string name, string labelText, float posY)
+        {
+            var toggle = AddSettingsRow(panel, sources, name, labelText, posY, out var label);
             var button = Single<Button>(toggle.gameObject, ButtonRoundName);
             button.transition = Selectable.Transition.None;
             Record(button);
@@ -1743,7 +1800,13 @@ namespace GateRush.UI.Editor
             return frame.Root;
         }
 
-        /// <summary>A title, one line and an OK button; no close button, since OK is its one button.</summary>
+        /// <summary>
+        /// A title, a text and an OK button; no close button, since OK is its
+        /// one button. Written at the short size with a failed purchase; the
+        /// tall size, for the privacy text (Module 49), is written beside it
+        /// for <see cref="MessageOverlay.ShowLong"/>. The text shrinks from
+        /// 48 toward 40 only when it would not fit.
+        /// </summary>
         private static GameObject BuildMessageOverlay(Scene scene, Sources sources)
         {
             var config = sources.Config;
@@ -1753,6 +1816,9 @@ namespace GateRush.UI.Editor
             var textRect = UiBuilder.CreateRect(TextName, frame.Panel);
             TopStretch(textRect, OverlayTextInset, MessageTextPosY, MessageTextHeight);
             var text = AddWrappingText(textRect, sources, config.PurchaseFailedText, MessageTextFontSize, OverlayTextColorHex);
+            text.enableAutoSizing = true;
+            text.fontSizeMin = MessageTextMinFontSize;
+            text.fontSizeMax = MessageTextFontSize;
 
             var ok = Nest(sources.ButtonPrimary, frame.Panel);
             PlaceAtPanelBottom(ok);
@@ -1763,7 +1829,51 @@ namespace GateRush.UI.Editor
                 overlay,
                 (TitleLabelField, frame.Title),
                 (TextLabelField, text),
-                (OkButtonField, Single<Button>(ok.gameObject, ButtonPrimaryName)));
+                (OkButtonField, Single<Button>(ok.gameObject, ButtonPrimaryName)),
+                (PanelField, frame.Panel));
+            SetVector2(overlay, ShortPanelSizeField, new Vector2(MessagePanelWidth, MessagePanelHeight));
+            SetFloat(overlay, ShortTextHeightField, MessageTextHeight);
+            SetVector2(overlay, LongPanelSizeField, new Vector2(MessagePanelWidth, MessageLongPanelHeight));
+            SetFloat(overlay, LongTextHeightField, MessageLongTextHeight);
+            return frame.Root;
+        }
+
+        /// <summary>
+        /// The end of the campaign (Module 49): the frame with its close
+        /// button, the title wrapping onto two lines, the line under it and
+        /// Restart (Button Primary) at the foot, the texts from the UI Config;
+        /// the overlay sets them again when it opens.
+        /// </summary>
+        private static GameObject BuildEndOfContentOverlay(Scene scene, Sources sources)
+        {
+            var config = sources.Config;
+            var frame = BuildOverlayFrame(
+                scene, sources, EndOfContentOverlayName, config.EndOfContentTitle, EndOfContentPanelWidth, EndOfContentPanelHeight, true);
+
+            // The frame's title, kept clear of the close button, grows
+            // downward from its top: its pivot is the top edge.
+            frame.Title.textWrappingMode = TextWrappingModes.Normal;
+            var titleRect = frame.Title.rectTransform;
+            titleRect.sizeDelta = new Vector2(titleRect.sizeDelta.x, EndOfContentTitleHeight);
+
+            var lineRect = UiBuilder.CreateRect(LineName, frame.Panel);
+            TopStretch(lineRect, OverlayTextInset, EndOfContentLinePosY, EndOfContentLineHeight);
+            var line = AddWrappingText(lineRect, sources, config.EndOfContentLine, EndOfContentLineFontSize, OverlayTextColorHex);
+
+            var restart = Nest(sources.ButtonPrimary, frame.Panel);
+            restart.name = RestartName;
+            PlaceAtPanelBottom(restart);
+            Record(restart.gameObject);
+            var restartLabel = SetNestedLabel(restart, config.EndOfContentRestartLabel);
+
+            var overlay = frame.Root.AddComponent<EndOfContentOverlay>();
+            SetReferences(
+                overlay,
+                (CloseButtonField, frame.Close),
+                (TitleLabelField, frame.Title),
+                (LineLabelField, line),
+                (RestartButtonField, Single<Button>(restart.gameObject, ButtonPrimaryName)),
+                (RestartLabelField, restartLabel));
             return frame.Root;
         }
 
@@ -2364,6 +2474,7 @@ namespace GateRush.UI.Editor
             var winStreak = NestStretched(overlayAssets.WinStreak, overlays, false);
             var streakReward = NestStretched(overlayAssets.StreakReward, overlays, false);
             var profile = NestStretched(overlayAssets.Profile, overlays, false);
+            var endOfContent = NestStretched(overlayAssets.EndOfContent, overlays, false);
             var coinFlight = AddCoinFlight(root.transform, sources);
 
             var frontEnd = root.AddComponent<FrontEnd>();
@@ -2384,6 +2495,7 @@ namespace GateRush.UI.Editor
                 (WinStreakField, Single<WinStreakOverlay>(winStreak.gameObject, WinStreakOverlayName)),
                 (StreakRewardField, Single<StreakRewardOverlay>(streakReward.gameObject, StreakRewardOverlayName)),
                 (ProfileField, Single<ProfileOverlay>(profile.gameObject, ProfileOverlayName)),
+                (EndOfContentField, Single<EndOfContentOverlay>(endOfContent.gameObject, EndOfContentOverlayName)),
                 (StreakBarField, Single<StreakBar>(streakBar.gameObject, StreakBarName)),
                 (JokerIconsField, sources.JokerIcons),
                 (AvatarCatalogField, sources.AvatarCatalog),
@@ -3872,9 +3984,10 @@ namespace GateRush.UI.Editor
         {
             public OverlayAssets(
                 GameObject settings, GameObject levels, GameObject lives, GameObject notEnoughGold, GameObject message, GameObject testPurchase,
-                GameObject winStreak, GameObject streakReward, GameObject profile)
+                GameObject winStreak, GameObject streakReward, GameObject profile, GameObject endOfContent)
             {
                 Profile = profile;
+                EndOfContent = endOfContent;
                 Settings = settings;
                 Levels = levels;
                 Lives = lives;
@@ -3894,6 +4007,7 @@ namespace GateRush.UI.Editor
             public GameObject WinStreak { get; }
             public GameObject StreakReward { get; }
             public GameObject Profile { get; }
+            public GameObject EndOfContent { get; }
         }
 
         /// <summary>The saved overlay prefabs Level UI nests: the stack's, in stacking order, and the level's two panels.</summary>

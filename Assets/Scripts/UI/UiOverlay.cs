@@ -35,6 +35,9 @@ namespace GateRush.UI
         Profile,
 
         /// <summary>The gold packs over a level, opened by Not Enough Gold's Get Gold (D74). The front end never opens it.</summary>
-        GoldPacks
+        GoldPacks,
+
+        /// <summary>The end of the campaign: the title, the line, Restart into level 1 in free play, and Close (Module 49).</summary>
+        EndOfContent
     }
 }

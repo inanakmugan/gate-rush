@@ -14,8 +14,9 @@ namespace GateRush.UI
     /// The front end (Modules 35 to 38, D68): three tabs — Store, Home and
     /// Leaderboard — under a top bar and over a tab bar, and a stack of
     /// overlays — Settings, Levels, Lives, Not Enough Gold, Message, Test
-    /// Purchase, Win Streak, Streak Reward and Profile — over them. Implements <see cref="IFrontEnd"/>, the one way
-    /// the bootstrap shows and hears it.
+    /// Purchase, Win Streak, Streak Reward, Profile and End of Content — over
+    /// them. Implements <see cref="IFrontEnd"/>, the one way the bootstrap
+    /// shows and hears it.
     /// </summary>
     /// <remarks>
     /// <para><b>No rules.</b> It shows the <see cref="FrontEndState"/> it is
@@ -46,6 +47,12 @@ namespace GateRush.UI
     /// result that arrives while another tab is selected is ignored.</para>
     /// <para><b>Back</b> is the Escape key, which is also Android's back
     /// button under the Input System.</para>
+    /// <para><b>Privacy</b> (Module 49) is the front end's own business, as
+    /// Levels is: the Settings row opens the message prompt at its tall size
+    /// with the UI Config's privacy text, over Settings, and OK returns to
+    /// Settings. <b>End of Content</b> opens only when the bootstrap asks
+    /// (<see cref="ShowEndOfContent"/>); its close button closes it, and its
+    /// Restart is the bootstrap's to decide.</para>
     /// <para><b>The painting</b> behind everything (Module 45) follows the
     /// campaign level of every state shown, by the UI Config's list.</para>
     /// <para><b>Motion (Module 47).</b> What is shown changes at once in the
@@ -91,6 +98,7 @@ namespace GateRush.UI
         [SerializeField] private WinStreakOverlay winStreak;
         [SerializeField] private StreakRewardOverlay streakReward;
         [SerializeField] private ProfileOverlay profile;
+        [SerializeField] private EndOfContentOverlay endOfContent;
 
         [Tooltip("The streak bar: a nested instance under the Home Page instance's Streak Area, placed by the UI builder.")]
         [SerializeField] private StreakBar streakBar;
@@ -121,7 +129,7 @@ namespace GateRush.UI
         private readonly UiOverlay[] frontEndOverlays =
         {
             UiOverlay.Settings, UiOverlay.Levels, UiOverlay.Lives, UiOverlay.NotEnoughGold, UiOverlay.Message,
-            UiOverlay.TestPurchase, UiOverlay.WinStreak, UiOverlay.StreakReward, UiOverlay.Profile
+            UiOverlay.TestPurchase, UiOverlay.WinStreak, UiOverlay.StreakReward, UiOverlay.Profile, UiOverlay.EndOfContent
         };
 
         // Each overlay's shared open and close, and each page's group, read
@@ -175,6 +183,9 @@ namespace GateRush.UI
         public event Action LeaderboardRequested;
 
         /// <inheritdoc />
+        public event Action EndOfContentRestartRequested;
+
+        /// <inheritdoc />
         public event Action ButtonPressed;
 
         /// <inheritdoc />
@@ -202,6 +213,7 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, winStreak, nameof(FrontEnd), nameof(winStreak));
             UiParts.AddIfMissing(missing, streakReward, nameof(FrontEnd), nameof(streakReward));
             UiParts.AddIfMissing(missing, profile, nameof(FrontEnd), nameof(profile));
+            UiParts.AddIfMissing(missing, endOfContent, nameof(FrontEnd), nameof(endOfContent));
             UiParts.AddIfMissing(missing, streakBar, nameof(FrontEnd), nameof(streakBar));
             UiParts.AddIfMissing(missing, jokerIcons, nameof(FrontEnd), nameof(jokerIcons));
             UiParts.AddIfMissing(missing, avatarCatalog, nameof(FrontEnd), nameof(avatarCatalog));
@@ -283,6 +295,11 @@ namespace GateRush.UI
                 profile.AddMissing(missing);
             }
 
+            if (endOfContent != null)
+            {
+                endOfContent.AddMissing(missing);
+            }
+
             if (streakBar != null)
             {
                 streakBar.AddMissing(missing);
@@ -297,6 +314,7 @@ namespace GateRush.UI
             OverlayMotion.AddMissingOn(missing, winStreak, nameof(winStreak));
             OverlayMotion.AddMissingOn(missing, streakReward, nameof(streakReward));
             OverlayMotion.AddMissingOn(missing, profile, nameof(profile));
+            OverlayMotion.AddMissingOn(missing, endOfContent, nameof(endOfContent));
             AddPageGroupMissing(missing, store, nameof(store));
             AddPageGroupMissing(missing, home, nameof(home));
             AddPageGroupMissing(missing, leaderboard, nameof(leaderboard));
@@ -315,7 +333,7 @@ namespace GateRush.UI
 
             if (!OverlaysShareOneParent())
             {
-                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message, Test Purchase, Win Streak, Streak Reward and Profile overlays must share one parent, which stacks them");
+                missing.Add("the Settings, Levels, Lives, Not Enough Gold, Message, Test Purchase, Win Streak, Streak Reward, Profile and End of Content overlays must share one parent, which stacks them");
             }
 
             if (config != null)
@@ -390,6 +408,15 @@ namespace GateRush.UI
             RequireOpen(nameof(ShowNotice));
             navigation.SelectTab(UiTab.Home);
             home.ShowNotice(text);
+        }
+
+        /// <inheritdoc />
+        public void ShowEndOfContent()
+        {
+            RequireOpen(nameof(ShowEndOfContent));
+            navigation.SelectTab(UiTab.Home);
+            endOfContent.Show(config);
+            navigation.Open(UiOverlay.EndOfContent);
         }
 
         /// <inheritdoc />
@@ -581,7 +608,10 @@ namespace GateRush.UI
 
         private bool OverlaysShareOneParent()
         {
-            var overlays = new Component[] { settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile };
+            var overlays = new Component[]
+            {
+                settings, levels, lives, notEnoughGold, message, testPurchase, winStreak, streakReward, profile, endOfContent
+            };
             Transform parent = null;
             for (var i = 0; i < overlays.Length; i++)
             {
@@ -779,6 +809,8 @@ namespace GateRush.UI
                     return streakReward;
                 case UiOverlay.Profile:
                     return profile;
+                case UiOverlay.EndOfContent:
+                    return endOfContent;
                 default:
                     throw new ArgumentOutOfRangeException(nameof(overlay), overlay, "Not a front end overlay.");
             }
@@ -794,7 +826,8 @@ namespace GateRush.UI
             if (isSubscribed || store == null || home == null || leaderboard == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
                 || notEnoughGold == null || message == null || testPurchase == null
-                || winStreak == null || streakReward == null || profile == null || streakBar == null || coinFlight == null)
+                || winStreak == null || streakReward == null || profile == null || endOfContent == null || streakBar == null
+                || coinFlight == null)
             {
                 return;
             }
@@ -815,6 +848,7 @@ namespace GateRush.UI
             settings.SoundToggleRequested += OnSoundToggleRequested;
             settings.HapticsToggleRequested += OnHapticsToggleRequested;
             settings.LevelsRequested += OnLevelsRequested;
+            settings.PrivacyRequested += OnPrivacyRequested;
             levels.CloseRequested += OnLevelsCloseRequested;
             levels.LevelRequested += OnLevelRequested;
             lives.CloseRequested += OnLivesCloseRequested;
@@ -830,6 +864,8 @@ namespace GateRush.UI
             profile.CloseRequested += OnProfileCloseRequested;
             profile.NameChangeRequested += OnNameChangeRequested;
             profile.AvatarChangeRequested += OnAvatarChangeRequested;
+            endOfContent.CloseRequested += OnEndOfContentCloseRequested;
+            endOfContent.RestartRequested += OnEndOfContentRestartRequested;
             isSubscribed = true;
         }
 
@@ -858,6 +894,7 @@ namespace GateRush.UI
             settings.SoundToggleRequested -= OnSoundToggleRequested;
             settings.HapticsToggleRequested -= OnHapticsToggleRequested;
             settings.LevelsRequested -= OnLevelsRequested;
+            settings.PrivacyRequested -= OnPrivacyRequested;
             levels.CloseRequested -= OnLevelsCloseRequested;
             levels.LevelRequested -= OnLevelRequested;
             lives.CloseRequested -= OnLivesCloseRequested;
@@ -873,6 +910,8 @@ namespace GateRush.UI
             profile.CloseRequested -= OnProfileCloseRequested;
             profile.NameChangeRequested -= OnNameChangeRequested;
             profile.AvatarChangeRequested -= OnAvatarChangeRequested;
+            endOfContent.CloseRequested -= OnEndOfContentCloseRequested;
+            endOfContent.RestartRequested -= OnEndOfContentRestartRequested;
             isSubscribed = false;
         }
 
@@ -1007,6 +1046,23 @@ namespace GateRush.UI
         }
 
         private void OnLevelsCloseRequested() => OnCloseClicked(UiOverlay.Levels);
+
+        /// <summary>The Settings overlay's Privacy row: the privacy text in the tall message prompt, over Settings; OK returns to it.</summary>
+        private void OnPrivacyRequested()
+        {
+            message.ShowLong(config.PrivacyTitle, config.PrivacyText);
+            navigation.Open(UiOverlay.Message);
+            ButtonPressed?.Invoke();
+        }
+
+        private void OnEndOfContentCloseRequested() => OnCloseClicked(UiOverlay.EndOfContent);
+
+        /// <summary>The overlay stays open under the screen fade into level 1; the next <see cref="Show"/> closes it.</summary>
+        private void OnEndOfContentRestartRequested()
+        {
+            EndOfContentRestartRequested?.Invoke();
+            ButtonPressed?.Invoke();
+        }
 
         private void OnLevelRequested(string levelName)
         {

@@ -15,9 +15,9 @@ namespace GateRush.Runtime
     /// generated art, palette, tints, sizes, margins, sorting orders, the drag
     /// settings, label settings, the settle, the lift and every feedback
     /// animation (Module 18), the introduction cards with their texts and the
-    /// theme's look (Modules 19 and 41), and Home's campaign-done notice
-    /// (Module 32); the front end's, the level HUD's and the level panels'
-    /// are <c>UiConfig</c>'s (Modules 35, 40 and 41). Nothing in
+    /// theme's look (Modules 19 and 41); the front end's texts, the end of
+    /// content's among them (Module 49), the level HUD's and the level
+    /// panels' are <c>UiConfig</c>'s (Modules 35, 40 and 41). Nothing in
     /// <c>GateRush.Runtime</c> hardcodes one of these at a call site. Board
     /// sizes are in cells unless named otherwise, so the board keeps its
     /// proportions whatever <see cref="CellSize"/> is; card sizes are in
@@ -756,10 +756,6 @@ namespace GateRush.Runtime
 
         [Tooltip("Seconds the preview takes to fade out fully when the block is released.")]
         [SerializeField] private float generatorPreviewFadeOutSeconds = 0.12f;
-
-        [Header("Meta game (Module 32; the result panel's and the confirmation's texts are the UI Config's, Module 41)")]
-        [Tooltip("Shown above Home's play button when Play is pressed after the last campaign level (Module 35).")]
-        [SerializeField] private string campaignDoneNotice = "All levels played. Play any level from Settings.";
 
         [Header("Introduction cards (canvas units; the theme's panel, font and close button, Module 41)")]
         [Tooltip("The font of the card's title, subtitle and sentence: Assets/ThirdParty/Fonts/Fredoka/Fredoka-Bold SDF.asset, whose fallback list holds Nunito for what Fredoka lacks. The illustrations' counts and marks keep Label Font.")]
@@ -1813,9 +1809,6 @@ namespace GateRush.Runtime
         /// <summary>Easing of that fade.</summary>
         public Ease BreakFadeEase => breakFadeEase;
 
-        /// <summary>The notice above Home's play button when Play is pressed after the last campaign level.</summary>
-        public string CampaignDoneNotice => campaignDoneNotice;
-
         /// <summary>
         /// The font of an introduction card's title, subtitle and sentence:
         /// the theme's (Module 41), whose fallback list covers what it lacks.
@@ -2814,7 +2807,6 @@ namespace GateRush.Runtime
 
             AddBoardLookProblems(problems);
 
-            AddMetaProblems(problems);
             AddJokerBreakProblems(problems);
             AddMarkProblems(problems);
             AddIntroductionProblems(problems);
@@ -3562,16 +3554,6 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// The constraint on the meta game's one value left here (Module 32):
-        /// Home's campaign-done notice is there to read. The result panel's
-        /// and the confirmation's texts are the UI Config's (Module 41).
-        /// </summary>
-        private void AddMetaProblems(List<string> problems)
-        {
-            AddIfBlank(problems, campaignDoneNotice, "Campaign Done Notice");
-        }
-
-        /// <summary>
         /// The constraint on the joker break (Module 34): a destroyed frozen
         /// block's fade takes a positive time.
         /// </summary>
@@ -3688,14 +3670,6 @@ namespace GateRush.Runtime
         private const int MaxBreakSparkleCount = 8;
         private const int MaxBreakSparkleMoveCap = 32;
         private const int MaxDebrisPoolSize = 512;
-
-        private void AddIfBlank(List<string> problems, string text, string field)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-            {
-                problems.Add($"{name}: {field} is empty.");
-            }
-        }
 
         private static bool IsUsableFormat(string format) => IsUsableFormat(format, 1);
 

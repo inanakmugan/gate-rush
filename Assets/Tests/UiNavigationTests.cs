@@ -16,7 +16,10 @@ namespace GateRush.Tests
     /// Streak and Streak Reward overlays stack and close with Back too, and
     /// Module 38's Profile opens over any tab and closes with Back. Module
     /// 40's ReplaceTop swaps the top overlay in one change, opens one when
-    /// none is open, and changes nothing when it is already on top.
+    /// none is open, and changes nothing when it is already on top. Module
+    /// 49: the Streak Reward opened after End of Content is seen first and
+    /// collecting it reveals End of Content; Close leaves Home bare; the
+    /// privacy text's OK returns to Settings.
     /// </summary>
     public class UiNavigationTests
     {
@@ -321,6 +324,46 @@ namespace GateRush.Tests
 
             CollectionAssert.AreEqual(new[] { UiOverlay.GoldPacks }, navigation.Overlays);
             Assert.AreEqual(0, changes);
+        }
+
+        [Test]
+        public void Open_StreakRewardAfterEndOfContent_RewardIsSeenFirstAndCollectRevealsEndOfContent()
+        {
+            // The bootstrap's order on Home after the last campaign win (Module 49).
+            navigation.Open(UiOverlay.EndOfContent);
+            navigation.Open(UiOverlay.StreakReward);
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.EndOfContent, UiOverlay.StreakReward }, navigation.Overlays);
+
+            navigation.Back();
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.EndOfContent }, navigation.Overlays);
+        }
+
+        [Test]
+        public void Back_FromEndOfContent_LeavesHomeWithNoOverlay()
+        {
+            navigation.Open(UiOverlay.EndOfContent);
+            changes = 0;
+
+            var isHandled = navigation.Back();
+
+            Assert.IsTrue(isHandled);
+            Assert.AreEqual(UiTab.Home, navigation.Tab);
+            Assert.AreEqual(0, navigation.Overlays.Count);
+            Assert.AreEqual(1, changes);
+        }
+
+        [Test]
+        public void Back_FromMessageOverSettings_ReturnsToSettings()
+        {
+            // Privacy's text opens over Settings, and OK closes it (Module 49).
+            navigation.Open(UiOverlay.Settings);
+            navigation.Open(UiOverlay.Message);
+
+            navigation.Back();
+
+            CollectionAssert.AreEqual(new[] { UiOverlay.Settings }, navigation.Overlays);
         }
 
         private void OnChanged()
