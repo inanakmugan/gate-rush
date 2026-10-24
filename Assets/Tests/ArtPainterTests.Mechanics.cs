@@ -313,6 +313,54 @@ namespace GateRush.Tests
             Assert.Less(hand.r + hand.g + hand.b, face.r + face.g + face.b, "the hand is dark on the face");
         }
 
+        [Test]
+        public void Paint_Coin_DefaultConfig_HasAGreenRimAndDarkGreenHands()
+        {
+            // time_bonus_reference.py, option D: rim #2BC23A, hands #1E5A12.
+            var coin = ArtPainter.Paint(recipe, palette, ArtSprite.BonusCoin);
+
+            var rim = CoinRim(coin);
+            var hand = CoinHand(coin);
+
+            Assert.Greater(rim.g, rim.r, "the rim is green, not gold");
+            Assert.Greater(rim.g, rim.b, "the rim is green");
+            Assert.Greater(hand.g, hand.r, "the hands are green, not brown");
+            Assert.Greater(hand.g, hand.b, "the hands are green");
+        }
+
+        [Test]
+        public void Paint_Coin_ConfigColours_PaintTheRimAndTheHands()
+        {
+            var serialized = new UnityEditor.SerializedObject(config);
+            serialized.FindProperty("coinColor").colorValue = Color.blue;
+            serialized.FindProperty("coinHandColor").colorValue = Color.red;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var coin = ArtPainter.Paint(recipe, ArtPalette.From(config), ArtSprite.BonusCoin);
+
+            var rim = CoinRim(coin);
+            var hand = CoinHand(coin);
+            Assert.Greater(rim.b, rim.g, "the rim follows Coin Color");
+            Assert.Greater(rim.b, rim.r, "the rim follows Coin Color");
+            Assert.Greater(hand.r, hand.g, "the hands follow Coin Hand Color");
+            Assert.Greater(hand.r, hand.b, "the hands follow Coin Hand Color");
+        }
+
+        /// <summary>A pixel on the coin's rim, between its face and its edge, to the lower right, away from the light's highlight.</summary>
+        private Color32 CoinRim(ArtImage coin)
+        {
+            var c = coin.Width / 2;
+            var along = (int)((recipe.CoinRadiusPixels + recipe.CoinFaceRadiusPixels) / 2f / Mathf.Sqrt(2f));
+            return TopDown(coin, c + along, c + along);
+        }
+
+        /// <summary>A pixel halfway along the hand at twelve.</summary>
+        private Color32 CoinHand(ArtImage coin)
+        {
+            var c = coin.Width / 2;
+            return TopDown(coin, c, c - (int)(recipe.CoinMinuteHandPixels / 2f));
+        }
+
         [TestCase(ArtSprite.ElevatorHazardLeft)]
         [TestCase(ArtSprite.ElevatorHazardRight)]
         public void Paint_ElevatorHazard_HasLightAndDarkStripes(ArtSprite sprite)

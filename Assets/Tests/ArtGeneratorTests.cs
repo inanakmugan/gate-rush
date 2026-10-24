@@ -115,6 +115,122 @@ namespace GateRush.Tests
             }
 
             Assert.IsNotNull(config.LabelShadowMaterial, "the label shadow material is assigned");
+            Assert.IsTrue(config.HasLabelOutline, "the time-bonus seconds' outline font and material are assigned");
+        }
+
+        // An atlas padded by p has a gradient scale of p + 1; a bold weight
+        // of 0.75 dilates by a quarter of it.
+        private const float Weight = 0.75f / 4f;
+
+        // Revision B's stroke: 3 pixels at the count digits' 34, in atlas
+        // pixels of Lilita One sampled at 71; and the padding-17 atlas's
+        // gradient scale. A field unit spans two gradient scales.
+        private const float StrokeB = 3f / 34f * 71f;
+        private const float GradientScale17 = 18f;
+
+        [Test]
+        public void OutlineFor_RevisionBStroke_IsLinearBelowTheRatiosKnee()
+        {
+            // 17 usable atlas pixels, two gradient scales a field unit: the
+            // reach is W · 2 · 17 while weight + 2W stays at most 1.
+            var outline = ArtGenerator.OutlineFor(StrokeB, GradientScale17, Weight);
+
+            Assert.AreEqual(StrokeB / 34f, outline.Width, 1e-5f, "about 0.184");
+            Assert.LessOrEqual(Weight + 2f * outline.Width, 1f, "below the knee");
+            Assert.AreEqual(StrokeB, outline.ReachTexels, 1e-3f);
+            Assert.IsTrue(outline.IsWholeStroke);
+        }
+
+        [Test]
+        public void OutlineFor_StrokePastTheKnee_SolvesForTheWidthThatReachesIt()
+        {
+            // Padding 10: W = s · weight / (2 · 10 − 2s) for a stroke s = 9.
+            const float stroke = 9f;
+
+            var outline = ArtGenerator.OutlineFor(stroke, 11f, Weight);
+
+            Assert.AreEqual(stroke * Weight / (20f - 2f * stroke), outline.Width, 1e-4f);
+            Assert.Greater(Weight + 2f * outline.Width, 1f, "past the knee");
+            Assert.AreEqual(stroke, outline.ReachTexels, 1e-3f);
+            Assert.IsTrue(outline.IsWholeStroke);
+        }
+
+        [Test]
+        public void OutlineFor_StrokeThePaddingCannotHold_IsTheWidestOutlineAndNamesThePaddingNeeded()
+        {
+            // Padding 10 holds at most 2 · 10 / (weight + 2) of a 12-pixel
+            // stroke; 12 · (weight + 2) / 2 = 13.1, so 14 is needed.
+            const float stroke = 12f;
+
+            var outline = ArtGenerator.OutlineFor(stroke, 11f, Weight);
+
+            Assert.AreEqual(1f, outline.Width, "the slider's most");
+            Assert.AreEqual(20f / (Weight + 2f), outline.ReachTexels, 1e-4f, "short of the stroke");
+            Assert.IsFalse(outline.IsWholeStroke);
+            Assert.AreEqual(14, outline.PaddingNeeded);
+            Assert.IsTrue(ArtGenerator.OutlineFor(stroke, outline.PaddingNeeded + 1f, Weight).IsWholeStroke, "the padding named is enough");
+        }
+
+        [Test]
+        public void EdgesOf_OutlineForsSetting_KeepsTheFaceAtTheGlyphsSizeAndReachesTheStroke()
+        {
+            var outline = ArtGenerator.OutlineFor(StrokeB, GradientScale17, Weight);
+
+            var edges = ArtGenerator.EdgesOf(outline.Width, outline.Width, GradientScale17, Weight);
+
+            Assert.AreEqual(0f, edges.FaceTexels, 1e-5f, "the white face is the undilated glyph");
+            Assert.AreEqual(StrokeB, edges.OuterTexels, 1e-3f, "only the outline reaches out, by the stroke");
+        }
+
+        [Test]
+        public void EdgesOf_DilationUnequalToTheWidth_MovesTheFaceEdge()
+        {
+            var thin = ArtGenerator.EdgesOf(0.2f, 0f, GradientScale17, Weight);
+            var fat = ArtGenerator.EdgesOf(0.2f, 0.4f, GradientScale17, Weight);
+
+            Assert.Less(thin.FaceTexels, 0f, "an undilated outline eats into the face");
+            Assert.Greater(fat.FaceTexels, 0f, "more dilation than width grows the face");
+        }
+
+        [Test]
+        public void EdgesOf_RevisionASettings_ReachedTwiceTheStrokeAskedFor()
+        {
+            // Regression: revision A's LabelOutline.mat had width and dilation
+            // 0.924 on the padding-17 atlas, worked out with a field unit of
+            // one gradient scale. It asked for 5 pixels at 46, 7.72 atlas
+            // pixels, and drew twice that, with the face still the glyph's.
+            const float revisionAWidth = 0.92447877f;
+            const float revisionAStroke = 5f / 46f * 71f;
+
+            var edges = ArtGenerator.EdgesOf(revisionAWidth, revisionAWidth, GradientScale17, Weight);
+
+            Assert.AreEqual(0f, edges.FaceTexels, 1e-5f, "the face was right");
+            Assert.AreEqual(2f * revisionAStroke, edges.OuterTexels, 0.05f, "the outline was twice the stroke");
+        }
+
+        [Test]
+        public void ProjectLabelOutlineMaterial_KeepsTheFaceAtTheGlyphsSizeAndReachesTheConfigsStroke()
+        {
+            // Reads the material Generate Art made, so it passes once Generate
+            // Art has run on the current config.
+            var guids = AssetDatabase.FindAssets($"t:{nameof(RuntimeConfig)}");
+            Assert.AreEqual(1, guids.Length, "the project has one Runtime Config");
+            var config = AssetDatabase.LoadAssetAtPath<RuntimeConfig>(AssetDatabase.GUIDToAssetPath(guids[0]));
+            var material = config.LabelOutlineMaterial;
+            Assert.IsNotNull(material, "Label Outline Material is assigned");
+            Assert.IsNotNull(config.LabelOutlineFont, "Label Outline Font is assigned");
+
+            var width = material.GetFloat("_OutlineWidth");
+            var dilate = material.GetFloat("_FaceDilate");
+            var gradientScale = material.GetFloat("_GradientScale");
+            var weight = Mathf.Max(material.GetFloat("_WeightNormal"), material.GetFloat("_WeightBold")) / 4f;
+            var edges = ArtGenerator.EdgesOf(width, dilate, gradientScale, weight);
+
+            Assert.AreEqual(width, dilate, 1e-6f, "dilated by exactly the outline's width");
+            Assert.AreEqual(0f, edges.FaceTexels, 1e-4f, "the white face is the undilated glyph");
+            Assert.AreEqual(
+                ArtGenerator.StrokeTexels(config, config.LabelOutlineFont.faceInfo.pointSize), edges.OuterTexels, 0.01f,
+                "the outline stands the config's stroke outside it");
         }
     }
 }

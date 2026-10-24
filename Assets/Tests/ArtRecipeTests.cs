@@ -257,12 +257,29 @@ namespace GateRush.Tests
             Assert.AreEqual(new Vector2(30f, 26f), recipe.LockBodyHalfSizePixels, "the padlock's body");
             Assert.AreEqual(24f, recipe.GoldKeyBowRadiusPixels, 1e-5f, "key: the bow, 1.2 times the script's 20");
             Assert.AreEqual(7.2f, recipe.GoldKeyShaftHalfPixels, 1e-5f, "the shaft, 1.2 times the script's 6");
-            Assert.AreEqual((24f, 16f), (recipe.CoinRadiusPixels, recipe.CoinFaceRadiusPixels), "time_bonus: the coin and its face");
+            Assert.AreEqual((34f, 26f), (recipe.CoinRadiusPixels, recipe.CoinFaceRadiusPixels), "time_bonus_reference.py: the coin and its face, R - 8");
             Assert.AreEqual((48f, 94f, 14f), (recipe.OneWayHeadStartPixels, recipe.OneWayTipPixels, recipe.OneWayRaisePixels), "one_way: the heads, the tips, the height");
             Assert.AreEqual((22f, 24), (recipe.ShutterInnerInsetPixels, recipe.ShutterCylinderPitchPixels), "shutter: the inner edge and the slats");
             Assert.AreEqual(new Vector2(68f, 56f), recipe.MachineScreenSizePixels, "generator: the screen");
             Assert.AreEqual(new Vector2(22f, 16f), recipe.ElevatorInnerInsetPixels, "elevator: the recess");
             Assert.AreEqual(new Vector2(3f, -5f), recipe.RaisedShadow.OffsetPixels, "the floor shadow, y up");
+        }
+
+        [Test]
+        public void Defaults_CoinHands_ScaleWithTheCoinAsTheScriptsDo()
+        {
+            // time_bonus_reference.py: s = R / 24; the hands are 2.2·s wide
+            // each side, 12·s up and 9·s right, and the hour hand's tail of 1
+            // pixel is not scaled.
+            var s = recipe.CoinRadiusPixels / 24f;
+
+            Assert.AreEqual(2.2f * s, recipe.CoinHandHalfWidthPixels, 1e-5f, "half a hand's width");
+            Assert.AreEqual(12f * s, recipe.CoinMinuteHandPixels, 1e-5f, "the hand up");
+            Assert.AreEqual(9f * s, recipe.CoinHourHandPixels, 1e-5f, "the hand right");
+            Assert.AreEqual(1f, recipe.CoinHourHandTailPixels, 1e-5f, "the tail");
+            Assert.AreEqual((7f, 8f, 2f), (recipe.CoinRimPixels, recipe.CoinHeightPixels, recipe.CoinFaceDepthPixels), "the rim's rise, its height, the face set in");
+            Assert.AreEqual((40f, 0.5f), (recipe.CoinFinish.Shininess, recipe.CoinFinish.Specular), "the rim's shine and speck");
+            Assert.AreEqual((new Vector2(2f, -4f), 3f, 0.5f), (recipe.CoinShadow.OffsetPixels, recipe.CoinShadow.BlurPixels, recipe.CoinShadow.Strength), "the contact shadow, y up");
         }
 
         [Test]

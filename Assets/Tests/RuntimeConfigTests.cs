@@ -853,9 +853,11 @@ namespace GateRush.Tests
                 (Actual: config.ChainSilverColor, Expected: new Color32(0xBF, 0xC3, 0xDA, 0xFF), Name: "chain and shackle"),
                 (Actual: config.LockGoldColor, Expected: new Color32(0xFF, 0xC5, 0x31, 0xFF), Name: "padlock and key"),
                 (Actual: config.KeyholeColor, Expected: new Color32(0x6B, 0x43, 0x00, 0xFF), Name: "keyhole"),
-                (Actual: config.CoinColor, Expected: new Color32(0xFF, 0xD4, 0x2A, 0xFF), Name: "coin"),
+                // time_bonus_reference.py, option D: the green rim and hands.
+                (Actual: config.CoinColor, Expected: new Color32(0x2B, 0xC2, 0x3A, 0xFF), Name: "coin rim"),
                 (Actual: config.CoinFaceColor, Expected: new Color32(0xFF, 0xF4, 0xC4, 0xFF), Name: "coin face"),
-                (Actual: config.CoinHandColor, Expected: new Color32(0x5A, 0x3A, 0x00, 0xFF), Name: "coin hands"),
+                (Actual: config.CoinHandColor, Expected: new Color32(0x1E, 0x5A, 0x12, 0xFF), Name: "coin hands"),
+                (Actual: config.LabelOutlineColor, Expected: new Color32(0x2A, 0x16, 0x50, 0xFF), Name: "the seconds' outline"),
                 (Actual: config.ShutterRimColor, Expected: new Color32(0xF4, 0xA3, 0x00, 0xFF), Name: "shutter rim"),
                 (Actual: config.ShutterCylinderColor, Expected: new Color32(0x4B, 0x3B, 0xC0, 0xFF), Name: "shutter slats"),
                 (Actual: config.MachineMetalColor, Expected: new Color32(0x8E, 0x9A, 0xC0, 0xFF), Name: "machine metal"),
@@ -937,7 +939,8 @@ namespace GateRush.Tests
                          "One Way Arrow Vertical Highlight Sprite", "Shutter Rim Sprite", "Shutter Cylinders Sprite",
                          "Machine Body Sprite", "Machine Screen Sprite", "Machine Vent Sprite", "Machine Button Sprite",
                          "Elevator Rim Sprite", "Elevator Hazard Left Sprite", "Elevator Hazard Right Sprite",
-                         "Elevator Door Sprite", "Elevator Handle Sprite", "Label Shadow Material"
+                         "Elevator Door Sprite", "Elevator Handle Sprite", "Label Shadow Material", "Label Outline Font",
+                         "Label Outline Material"
                      })
             {
                 Assert.That(problems, Has.Some.Contains($"{shownName} is not assigned"), shownName);
@@ -945,14 +948,175 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void TimeBonusMarkWidthCells_IsTheCoinAndItsText_WithNoPlate()
+        public void Defaults_TimeBonusMark_AreTheReferencesMeasuresAtACellOf128Pixels()
+        {
+            // time_bonus_reference_b.py: a coin of radius 34, a gap of 4, the
+            // seconds at the count digits' 34 pixels, 2 low, with a 3-pixel
+            // stroke.
+            Assert.AreEqual(68f / 128f, config.BonusCoinCells, 1e-6f, "the coin's diameter");
+            Assert.AreEqual(4f / 128f, config.TimeBonusLabelGapCells, 1e-6f, "the gap");
+            Assert.AreEqual(2f / 128f, config.TimeBonusLabelDropCells, 1e-6f, "how low the seconds sit");
+            Assert.AreEqual(2.65625f, config.CountFontSize, 1e-6f, "the seconds at the count digits' 34 pixels");
+            Assert.AreEqual(3f / 128f, config.LabelOutlineStrokeCells, 1e-6f, "the stroke");
+            Assert.AreEqual(0.14f, config.MarkFitMarginCells, 1e-6f, "the key's margin");
+        }
+
+        [Test]
+        public void TimeBonusMarkWidthCells_IsTheCoinTheGapAndTheSecondsAdvance_WithNoPlate()
         {
             var text = config.TimeBonusMarkText(5);
 
             var width = config.TimeBonusMarkWidthCells(text);
 
             Assert.AreEqual(
-                config.BonusCoinCells + config.TimeBonusMarkGapCells + config.TimeBonusMarkTextWidthCells(text), width, 1e-6f);
+                config.BonusCoinCells + config.TimeBonusLabelGapCells + config.TimeBonusLabelAdvanceCells(text), width, 1e-6f,
+                "the outline not counted");
+        }
+
+        [TestCase(5)]
+        [TestCase(10)]
+        [TestCase(RuntimeConfig.WidestBonusSecondsChecked)]
+        public void TimeBonusCoinAndLabel_AnyValue_AreCentredOnTheAnchorWithTheGapBetween(int seconds)
+        {
+            var text = config.TimeBonusMarkText(seconds);
+
+            var coin = config.TimeBonusCoinCenterCells(text);
+            var start = config.TimeBonusLabelStartCells(text);
+
+            var coinLeft = coin - config.BonusCoinCells / 2f;
+            var labelEnd = start + config.TimeBonusLabelAdvanceCells(text);
+            Assert.AreEqual(-coinLeft, labelEnd, 1e-6f, "the coin's left edge and the advance's end either side of the anchor");
+            Assert.AreEqual(config.TimeBonusLabelGapCells, start - (coin + config.BonusCoinCells / 2f), 1e-6f, "the gap after the coin");
+        }
+
+        [Test]
+        public void TimeBonusCoinCenterCells_LongerText_MovesTheCoinLeft()
+        {
+            var five = config.TimeBonusCoinCenterCells(config.TimeBonusMarkText(5));
+
+            var ninetyNine = config.TimeBonusCoinCenterCells(config.TimeBonusMarkText(RuntimeConfig.WidestBonusSecondsChecked));
+
+            Assert.Less(ninetyNine, five, "the group recentres for each value");
+        }
+
+        [Test]
+        public void TimeBonusLabelAdvanceCells_LabelFont_IsTheGlyphsAdvancesAtTheCountDigitsSize()
+        {
+            // Lilita One's "+", "1" and "0" advance 42.734375, 28.828125 and
+            // 45.375 at a sampling size of 71; a label of Count Font Size has
+            // an em of a tenth of it, in cells.
+            const int samplingPointSize = 71;
+            const int atlasPadding = 17;
+            const int atlasSize = 512;
+            var ttf = AssetDatabase.LoadAssetAtPath<Font>(LilitaOnePath);
+            Assert.IsNotNull(ttf, LilitaOnePath);
+            var font = TMPro.TMP_FontAsset.CreateFontAsset(
+                ttf, samplingPointSize, atlasPadding, UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA, atlasSize, atlasSize,
+                TMPro.AtlasPopulationMode.Dynamic, false);
+            try
+            {
+                Assert.IsTrue(font.TryAddCharacters("+10"), "the glyphs render");
+                SetObject("labelFont", font);
+
+                var advance = config.TimeBonusLabelAdvanceCells("+10");
+
+                var expected = (42.734375f + 28.828125f + 45.375f) / samplingPointSize * config.CountFontSize
+                               * RuntimeConfig.WorldUnitsPerFontSize / config.CellSize;
+                Assert.AreEqual(expected, advance, 0.5f / 128f, "56 pixels of 128, within half a pixel");
+            }
+            finally
+            {
+                Object.DestroyImmediate(font.material);
+                Object.DestroyImmediate(font.atlasTexture);
+                Object.DestroyImmediate(font);
+            }
+        }
+
+        [Test]
+        public void TimeBonusLabelAdvanceCells_NoFont_IsTheCharacterWidthPerCharacter()
+        {
+            var advance = config.TimeBonusLabelAdvanceCells("+10");
+
+            Assert.AreEqual(3f * 19f / 128f, advance, 1e-6f);
+        }
+
+        private const string LilitaOnePath = "Assets/Art/Fonts/LilitaOne-Regular.ttf";
+
+        [Test]
+        public void TimeBonusMarkScale_TwoCellsOfRoom_IsFullSize()
+        {
+            var text = config.TimeBonusMarkText(RuntimeConfig.WidestBonusSecondsChecked);
+
+            var scale = config.TimeBonusMarkScale(2f, MarkCrowding.Roomy, text);
+
+            Assert.AreEqual(1f, scale);
+        }
+
+        [TestCase(5)]
+        [TestCase(10)]
+        [TestCase(RuntimeConfig.WidestBonusSecondsChecked)]
+        public void TimeBonusMarkScale_OneCellOfRoom_ShrinksTheGroupToFitInsideTheMargins(int seconds)
+        {
+            var text = config.TimeBonusMarkText(seconds);
+            var half = MarkLayout.SharedMarkRoomCells / 2f - config.MarkFitMarginCells;
+
+            var scale = config.TimeBonusMarkScale(MarkLayout.SharedMarkRoomCells, MarkCrowding.Roomy, text);
+
+            Assert.Less(scale, 1f, "the full-size group is wider than a cell");
+            var reach = config.TimeBonusMarkWidthCells(text) / 2f + config.LabelOutlineStrokeCells;
+            Assert.AreEqual(reach, config.TimeBonusMarkReachCells(text), 1e-6f, "half the group, the outline at both ends");
+            Assert.AreEqual(half, reach * scale, 1e-6f, "both sides touch the margin");
+        }
+
+        [Test]
+        public void TimeBonusMarkScale_CrowdedPair_IsTheCrowdedScaleTimesTheFit()
+        {
+            var text = config.TimeBonusMarkText(10);
+            var fitted = config.TimeBonusMarkScale(MarkLayout.SharedMarkRoomCells, MarkCrowding.Roomy, text);
+
+            var crowded = config.TimeBonusMarkScale(MarkLayout.SharedMarkRoomCells, MarkCrowding.CrowdedPair, text);
+
+            Assert.AreEqual(config.CrowdedMarkScale * fitted, crowded, 1e-6f);
+        }
+
+        [Test]
+        public void Problems_DefaultTimeBonusMark_ReportNothingAboutIt()
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains("time-bonus"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Mark Fit Margin Cells"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Label Outline Characters"), string.Join(" | ", problems));
+            Assert.That(problems, Has.None.Contains("Label Outline Atlas Padding"), string.Join(" | ", problems));
+            foreach (var field in new[]
+                     {
+                         "Bonus Coin Cells", "Time Bonus Mark Character Width Cells", "Label Outline Stroke Cells",
+                         "Time Bonus Label Gap Cells", "Label Outline Color"
+                     })
+            {
+                Assert.That(problems, Has.None.Contains($": {field} must"), field);
+            }
+        }
+
+        [TestCase(0.5f)]
+        [TestCase(-0.01f)]
+        public void Problems_MarkFitMarginOutOfRange_IsReported(float margin)
+        {
+            SetFloat("markFitMarginCells", margin);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Mark Fit Margin Cells must be at least 0 and below half a cell"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_OutlineCharactersMissingADigit_NamesIt()
+        {
+            SetString("labelOutlineCharacters", "+012345678");
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Label Outline Characters must hold every character a time-bonus mark shows; it lacks \"9\""), string.Join(" | ", problems));
         }
 
         [Test]

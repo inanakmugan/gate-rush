@@ -331,21 +331,39 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void BonusBadgeWidth_MoreDigits_WidenIt()
+        public void BonusRoomCells_AloneOnEachShape_IsTwiceTheDistanceToTheNearerEndOfItsRun()
         {
-            const float height = 0.34f;
-            const float digit = 0.15f;
-            const float padding = 0.08f;
-            const float icon = 0.24f;
-            const float gap = 0.03f;
+            var cases = new[]
+            {
+                (Cells: Single, Expected: 1f, Name: "1x1"),
+                (Cells: Horizontal2, Expected: 2f, Name: "2x1: the anchor on the seam, a cell either side"),
+                (Cells: Vertical2, Expected: 1f, Name: "vertical 1x2: one cell wide in both rows"),
+                (Cells: Horizontal3, Expected: 3f, Name: "1x3: on the middle cell"),
+                (Cells: Square, Expected: 2f, Name: "2x2: both rows two cells wide"),
+                (Cells: L, Expected: 1f, Name: "L: on its corner cell"),
+                (Cells: T, Expected: 1f, Name: "T: its stem row is one cell wide"),
+            };
 
-            var two = MarkLayout.BonusBadgeWidth(2, height, digit, padding, icon, gap);
-            var three = MarkLayout.BonusBadgeWidth(3, height, digit, padding, icon, gap);
-
-            Assert.AreEqual(icon + gap + 2 * digit + 2 * padding, two, Tolerance);
-            Assert.AreEqual(digit, three - two, Tolerance, "each character adds a digit's width");
+            foreach (var c in cases)
+            {
+                Assert.AreEqual(c.Expected, MarkLayout.BonusRoomCells(c.Cells, false), Tolerance, c.Name);
+            }
         }
 
+        [Test]
+        public void BonusRoomCells_SharedWithAnotherMark_IsOneCell()
+        {
+            var room = MarkLayout.BonusRoomCells(Horizontal3, true);
+
+            Assert.AreEqual(MarkLayout.SharedMarkRoomCells, room, Tolerance);
+            Assert.AreEqual(1f, MarkLayout.SharedMarkRoomCells, Tolerance, "a cell each");
+        }
+
+        [Test]
+        public void BonusRoomCells_NoCells_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => MarkLayout.BonusRoomCells(Array.Empty<Coord>(), false));
+        }
         private const float FrozenRaise = 0.3f;
 
         [Test]
