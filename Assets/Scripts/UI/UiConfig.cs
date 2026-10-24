@@ -314,8 +314,8 @@ namespace GateRush.UI
 
         [SerializeField] private Ease markedPulseEase = Ease.InOutSine;
 
-        [Tooltip("The glow behind a marked joker button at the height of its pulse.")]
-        [SerializeField] private Color markedGlowColor = new Color(1f, 0.85f, 0.3f);
+        [Tooltip("The round glow behind a marked joker button at the height of its pulse: the interface palette's gold, #FFC531.")]
+        [SerializeField] private Color markedGlowColor = new Color(1f, 0.77254903f, 0.19215687f);
 
         [Tooltip("The glow's opacity at rest, as a fraction of Marked Glow Color's: from 0 to 1.")]
         [SerializeField] private float markedGlowMinAlpha = 0.25f;

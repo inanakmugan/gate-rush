@@ -31,14 +31,14 @@ namespace GateRush.Tests
         };
 
         [Test]
-        public void RuntimeConfigField_EveryGeneratedSpriteButRestart_IsASpriteFieldOfTheConfig()
+        public void RuntimeConfigField_EveryGeneratedSpriteButTheInterfaces_IsASpriteFieldOfTheConfig()
         {
             foreach (var sprite in ArtPainter.All)
             {
                 var field = ArtGenerator.RuntimeConfigField(sprite);
-                if (sprite == ArtSprite.Restart)
+                if (sprite == ArtSprite.Restart || sprite == ArtSprite.RoundGlow)
                 {
-                    Assert.IsNull(field, "the restart icon is the interface's, not the board's");
+                    Assert.IsNull(field, $"{sprite} is the interface's, not the board's");
                     continue;
                 }
 

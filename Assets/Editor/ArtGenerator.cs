@@ -633,12 +633,13 @@ namespace GateRush.Editor
         /// <summary>
         /// The <see cref="RuntimeConfig"/> field that holds <paramref name="sprite"/>:
         /// the sprite's name in camel case followed by <c>Sprite</c>. Null for
-        /// <see cref="ArtSprite.Restart"/>, which the interface's prefabs use
-        /// and the board's config does not hold.
+        /// <see cref="ArtSprite.Restart"/> and <see cref="ArtSprite.RoundGlow"/>,
+        /// which the interface's prefabs use and the board's config does not
+        /// hold.
         /// </summary>
         public static string RuntimeConfigField(ArtSprite sprite)
         {
-            if (sprite == ArtSprite.Restart)
+            if (sprite == ArtSprite.Restart || sprite == ArtSprite.RoundGlow)
             {
                 return null;
             }

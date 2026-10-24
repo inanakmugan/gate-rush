@@ -65,7 +65,11 @@ namespace GateRush.Tests
     /// and its Menu is close to the other buttons' height; Profile's name
     /// field is the pill with white text and the chosen avatar wears the gold
     /// ring; "Next life in" sits above the wait; and the Win Streak rule sits
-    /// right under the shipped ladder.
+    /// right under the shipped ladder. The UI polish pass: the joker icons
+    /// are centred on the raised face, the marked glow is the round generated
+    /// glow reaching past the button's corners, and the result panel has one
+    /// size per shape, the middle the same gap under the title and over the
+    /// buttons and the compact panel's sides as far from its widest row.
     /// </summary>
     /// <remarks>
     /// The build reads the project's real hand-made prefabs, sprites and UI
@@ -112,6 +116,18 @@ namespace GateRush.Tests
         private const string JokerButtonSpritePath = "Assets/Art/Sprites/UI/button_square_green.png";
         private const string JokerButtonDisabledSpritePath = "Assets/Art/Sprites/UI/button_square_grey.png";
         private const string LockSpritePath = "Assets/Art/Sprites/UI/lock.png";
+
+        // The UI polish pass: the marked glow is the generated round glow, and
+        // the icon sits on the raised face of button_square_green.png, whose
+        // outline above the face is 15 of its pixel rows and lip and outline
+        // below it 30, both drawn at the face's Pixels Per Unit Multiplier.
+        private const string RoundGlowSpritePath = "Assets/Art/Generated/RoundGlow.png";
+        private const float JokerFaceTopInsetPixels = 15f;
+        private const float JokerFaceBottomInsetPixels = 30f;
+
+        // The result panel's middle sits this far under the title and over
+        // the buttons, the margin the buttons keep from the panel's foot.
+        private const float ResultMiddleGap = 70f;
 
         // Module 45: the owner's interface art, drawn in its own colours.
         private const string InterfaceArtFolder = "Assets/Art/Sprites/UI/";
@@ -867,6 +883,37 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Build_JokerBarButtons_GlowIsTheRoundGlowCentredAndClearOfTheButtonsCorners()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiConfigPath);
+            Assert.IsNotNull(config, UiConfigPath);
+            var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
+            Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
+
+            foreach (var view in buttons)
+            {
+                using (var serialized = new SerializedObject(view))
+                {
+                    var glow = Reference<Image>(serialized, "glow");
+                    var rect = glow.rectTransform;
+                    var centre = new Vector2(0.5f, 0.5f);
+                    var buttonDiagonal = Mathf.Sqrt(2f) * ((RectTransform)view.transform).sizeDelta.x;
+
+                    Assert.AreEqual(RoundGlowSpritePath, AssetDatabase.GetAssetPath(glow.sprite), $"{view.name}'s glow is the generated round glow");
+                    Assert.AreEqual(Image.Type.Simple, glow.type, $"{view.name}'s glow is drawn whole, not sliced");
+                    Assert.IsFalse(glow.raycastTarget, $"{view.name}'s glow, wider than its slot, takes no presses");
+                    Assert.AreEqual(config.MarkedGlowColor, glow.color, $"{view.name}'s glow is the UI Config's colour");
+                    Assert.AreEqual(centre, rect.anchorMin, $"{view.name}'s glow is anchored at the centre");
+                    Assert.AreEqual(centre, rect.anchorMax, $"{view.name}'s glow is anchored at the centre");
+                    Assert.AreEqual(centre, rect.pivot, $"{view.name}'s glow is pivoted at its centre");
+                    Assert.AreEqual(Vector2.zero, rect.anchoredPosition, $"{view.name}'s glow is centred on the button");
+                    Assert.AreEqual(rect.sizeDelta.x, rect.sizeDelta.y, Tolerance, $"{view.name}'s glow is round");
+                    Assert.That(rect.sizeDelta.x, Is.GreaterThanOrEqualTo(buttonDiagonal), $"{view.name}'s glow reaches past the button's corners");
+                }
+            }
+        }
+
+        [Test]
         public void Build_JokerBarButtons_IconIsCentredAboveTheDepthStrip()
         {
             var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
@@ -891,7 +938,7 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Build_JokerBarButtons_IconIsLargerAndStandsPastTheButtonsTop()
+        public void Build_JokerBarButtons_IconIsLargerAndCentredOnTheRaisedFace()
         {
             var buttons = LoadBuilt(JokerBarName).GetComponentsInChildren<JokerBarButton>(true);
             Assert.AreEqual(3, buttons.Length, "the Clock, Rocket and Broom buttons");
@@ -900,12 +947,17 @@ namespace GateRush.Tests
             {
                 using (var serialized = new SerializedObject(view))
                 {
-                    var button = (RectTransform)Reference<Button>(serialized, "button").transform;
+                    var face = Reference<Button>(serialized, "button").image;
                     var icon = Reference<Image>(serialized, "icon").rectTransform;
-                    var iconTop = icon.anchoredPosition.y + icon.sizeDelta.y / 2f;
+                    var half = ((RectTransform)view.transform).sizeDelta.y / 2f;
+                    var faceTop = half - JokerFaceTopInsetPixels / face.pixelsPerUnitMultiplier;
+                    var faceBottom = -half + JokerFaceBottomInsetPixels / face.pixelsPerUnitMultiplier;
 
+                    Assert.AreEqual(JokerButtonSpritePath, AssetDatabase.GetAssetPath(face.sprite), $"{view.name}'s face is the one measured");
                     Assert.That(icon.sizeDelta.y, Is.GreaterThan(Module45JokerIconSize), $"{view.name}'s icon is larger");
-                    Assert.That(iconTop, Is.GreaterThan(button.rect.height / 2f), $"{view.name}'s icon stands past the button's top");
+                    Assert.AreEqual((faceTop + faceBottom) / 2f, icon.anchoredPosition.y, Tolerance, $"{view.name}'s icon is centred on the face, above the lip");
+                    Assert.That(icon.anchoredPosition.y + icon.sizeDelta.y / 2f, Is.LessThanOrEqualTo(faceTop), $"{view.name}'s icon stays under the face's top");
+                    Assert.That(icon.anchoredPosition.y - icon.sizeDelta.y / 2f, Is.GreaterThanOrEqualTo(faceBottom), $"{view.name}'s icon stays above the lip");
                 }
             }
         }
@@ -991,21 +1043,22 @@ namespace GateRush.Tests
                 using (var serialized = new SerializedObject(view))
                 {
                     var slot = (RectTransform)view.transform;
-                    var glow = Reference<Image>(serialized, "glow").rectTransform;
                     var icon = Reference<Image>(serialized, "icon").rectTransform;
                     var pill = (RectTransform)Label(serialized, "badgeLabel").transform.parent;
                     var coin = (RectTransform)Reference<GameObject>(serialized, "coin").transform;
                     var raise = serialized.FindProperty("selectedRaise").floatValue;
                     var half = slot.sizeDelta.y / 2f;
 
-                    var raisedGlowTop = slot.anchoredPosition.y + half + raise + glow.offsetMax.y;
+                    // The round glow is left out: its soft rim may reach past
+                    // the row's top while it pulses (the UI polish pass).
+                    var raisedButtonTop = slot.anchoredPosition.y + half + raise;
                     var raisedIconTop = slot.anchoredPosition.y + raise + icon.anchoredPosition.y + icon.sizeDelta.y / 2f;
                     var pillFoot = slot.anchoredPosition.y - half - pill.sizeDelta.y / 2f;
                     // The coin is pivoted on its left edge at the pill's left end.
                     var coinLeft = slot.anchoredPosition.x - pill.sizeDelta.x / 2f + coin.anchoredPosition.x;
                     var pillRight = slot.anchoredPosition.x + pill.sizeDelta.x / 2f;
 
-                    Assert.That(raisedGlowTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised glow stays in the row");
+                    Assert.That(raisedButtonTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised button stays in the row");
                     Assert.That(raisedIconTop, Is.LessThanOrEqualTo(design.y / 2f), $"{view.name}'s raised icon stays in the row");
                     Assert.That(pillFoot, Is.GreaterThan(-design.y / 2f), $"{view.name}'s pill stands off the row's foot");
                     Assert.That(coinLeft, Is.GreaterThanOrEqualTo(-design.x / 2f), $"{view.name}'s coin stays in the row");
@@ -1479,10 +1532,10 @@ namespace GateRush.Tests
                 var lossArt = (RectTransform)Reference<GameObject>(serialized, "lossArt").transform;
                 var lifeLost = (RectTransform)Reference<GameObject>(serialized, "lifeLost").transform;
                 var label = Label(serialized, "lifeLostLabel");
-                var panel = Reference<RectTransform>(serialized, "panel");
                 var buttons = (RectTransform)Reference<Button>(serialized, "nextButton").transform.parent;
                 var heart = lifeLost.GetComponentsInChildren<Image>(true).Single();
-                var buttonsTop = panel.sizeDelta.y - (buttons.anchoredPosition.y + buttons.sizeDelta.y);
+                var lifeLostHeight = serialized.FindProperty("lifeLostPanelSize").vector2Value.y;
+                var buttonsTop = lifeLostHeight - (buttons.anchoredPosition.y + buttons.sizeDelta.y);
 
                 Assert.AreEqual(HourglassSpritePath, AssetDatabase.GetAssetPath(lossArt.GetComponent<Image>().sprite));
                 Assert.AreEqual(HeartSpritePath, AssetDatabase.GetAssetPath(heart.sprite));
@@ -1491,6 +1544,94 @@ namespace GateRush.Tests
                 Assert.IsFalse(lifeLost.gameObject.activeSelf, "saved hidden");
                 Assert.That(ExtentBelowTop(lossArt).bottom, Is.LessThanOrEqualTo(ExtentBelowTop(lifeLost).top + Tolerance), "the heart is under the hourglass");
                 Assert.That(ExtentBelowTop(lifeLost).bottom, Is.LessThanOrEqualTo(buttonsTop + Tolerance), "both clear of the buttons");
+            }
+        }
+
+        [Test]
+        public void Build_ResultOverlay_RewardPanelIsThePanelItWasBuiltAt()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var panel = Reference<RectTransform>(serialized, "panel");
+
+                Assert.AreEqual(panel.sizeDelta, serialized.FindProperty("rewardPanelSize").vector2Value, "the campaign's win keeps its panel");
+            }
+        }
+
+        [Test]
+        public void Build_ResultOverlay_LossMiddleSitsOneGapUnderTheTitleAndOverTheButtons()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var title = Label(serialized, "titleLabel").rectTransform;
+                var lossArt = (RectTransform)Reference<GameObject>(serialized, "lossArt").transform;
+                var lifeLost = (RectTransform)Reference<GameObject>(serialized, "lifeLost").transform;
+                var buttons = (RectTransform)Reference<Button>(serialized, "nextButton").transform.parent;
+                var buttonsHeight = buttons.anchoredPosition.y + buttons.sizeDelta.y;
+                var titleFoot = ExtentBelowTop(title).bottom;
+                var lossHeight = serialized.FindProperty("lossPanelSize").vector2Value.y;
+                var lifeLostHeight = serialized.FindProperty("lifeLostPanelSize").vector2Value.y;
+
+                Assert.AreEqual(ResultMiddleGap, buttons.anchoredPosition.y, Tolerance, "the gap is the buttons' margin from the foot");
+                Assert.AreEqual(ResultMiddleGap, ExtentBelowTop(lossArt).top - titleFoot, Tolerance, "the hourglass one gap under the title");
+                Assert.AreEqual(
+                    ResultMiddleGap, lossHeight - buttonsHeight - ExtentBelowTop(lossArt).bottom, Tolerance,
+                    "a loss: the hourglass one gap over the buttons");
+                Assert.AreEqual(
+                    ResultMiddleGap, lifeLostHeight - buttonsHeight - ExtentBelowTop(lifeLost).bottom, Tolerance,
+                    "a lost life: the heart one gap over the buttons");
+            }
+        }
+
+        [Test]
+        public void Build_ResultOverlay_CompactPanelKeepsTheGapAndFitsTheWidestRowWithEvenMargins()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var title = Label(serialized, "titleLabel").rectTransform;
+                var buttons = (RectTransform)Reference<Button>(serialized, "nextButton").transform.parent;
+                var row = buttons.GetComponent<HorizontalLayoutGroup>();
+
+                // A free-play win's row: Next, the blue Restart and Menu.
+                var shown = new[] { "nextButton", "winRestartButton", "menuButton" }
+                    .Select(field => (RectTransform)Reference<Button>(serialized, field).transform)
+                    .ToList();
+                var widestRow = shown.Sum(button => button.sizeDelta.x) + (shown.Count - 1) * row.spacing;
+                var compact = serialized.FindProperty("compactPanelSize").vector2Value;
+                var buttonsHeight = buttons.anchoredPosition.y + buttons.sizeDelta.y;
+
+                Assert.AreEqual(ResultMiddleGap, compact.y - buttonsHeight - ExtentBelowTop(title).bottom, Tolerance, "one gap between the title and the buttons");
+                Assert.AreEqual(buttons.anchoredPosition.y, (compact.x - widestRow) / 2f, Tolerance, "the sides as far from Next, Restart and Menu as the foot");
+            }
+        }
+
+        [Test]
+        public void Build_ResultOverlay_EverySizeHoldsThePanelsSliceBorders()
+        {
+            var overlay = LoadBuilt(ResultOverlayName).GetComponent<ResultOverlay>();
+            Assert.IsNotNull(overlay, nameof(ResultOverlay));
+
+            using (var serialized = new SerializedObject(overlay))
+            {
+                var panelImage = Reference<RectTransform>(serialized, "panel").GetComponent<Image>();
+                var border = panelImage.sprite.border / panelImage.pixelsPerUnitMultiplier;
+
+                foreach (var field in new[] { "rewardPanelSize", "compactPanelSize", "lossPanelSize", "lifeLostPanelSize" })
+                {
+                    var size = serialized.FindProperty(field).vector2Value;
+
+                    Assert.That(size.x, Is.GreaterThanOrEqualTo(border.x + border.z), $"{field}: wider than its left and right borders");
+                    Assert.That(size.y, Is.GreaterThanOrEqualTo(border.y + border.w), $"{field}: taller than its bottom and top borders");
+                }
             }
         }
 

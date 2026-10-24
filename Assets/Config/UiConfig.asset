@@ -107,7 +107,7 @@ MonoBehaviour:
   markedPulseSeconds: 0.9
   markedPulseScale: 1.06
   markedPulseEase: 4
-  markedGlowColor: {r: 1, g: 0.85, b: 0.3, a: 1}
+  markedGlowColor: {r: 1, g: 0.77254903, b: 0.19215687, a: 1}
   markedGlowMinAlpha: 0.25
   clockName: Clock
   rocketName: Rocket
