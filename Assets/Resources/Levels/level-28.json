@@ -88,7 +88,7 @@
             "unfreezeAtClearCount": -1,
             "lockId": -1,
             "requiredKeyCount": 0,
-            "keyTargetLockId": 1,
+            "keyTargetLockId": -1,
             "timeBonusSeconds": 0
         },
         {
@@ -591,6 +591,6 @@
         }
     ],
     "elevators": [],
-    "suggestedTimeBudgetSeconds": 105,
+    "suggestedTimeBudgetSeconds": 95,
     "goldReward": 50
 }

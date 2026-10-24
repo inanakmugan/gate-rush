@@ -393,7 +393,7 @@
             "unfreezeAtClearCount": -1,
             "lockId": -1,
             "requiredKeyCount": 0,
-            "keyTargetLockId": 1,
+            "keyTargetLockId": -1,
             "timeBonusSeconds": 0
         },
         {
@@ -638,6 +638,6 @@
             ]
         }
     ],
-    "suggestedTimeBudgetSeconds": 120,
+    "suggestedTimeBudgetSeconds": 110,
     "goldReward": 50
 }
