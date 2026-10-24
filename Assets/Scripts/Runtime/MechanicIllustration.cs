@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using GateRush.Core;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -108,8 +109,16 @@ namespace GateRush.Runtime
                 case LevelMechanic.IceBlock:
                 {
                     var body = DrawBlock(root, "Ice block", Vector2.zero, Horizontal2, config.IceColor, isIce: true);
-                    recipes.Badge(body, MarkLayout.Anchor(Horizontal2), config.IntroCount, config.BadgeRimColor);
-                    return BlockBounds(Vector2.zero, Horizontal2);
+                    var corner = MarkLayout.CornerBadge(Horizontal2, config.BlockBadgeInsetCells);
+                    recipes.Badge(body, corner, config.IntroCount, config.CountBadgeRimColor);
+
+                    // The badge overlaps the block's edge at its corner, so
+                    // the card frames it too.
+                    var bounds = BlockBounds(Vector2.zero, Horizontal2);
+                    var halfBadge = new Vector2(config.BadgeWidthCells(config.IntroCount), config.BadgeHeightCells) * 0.5f;
+                    return Rect.MinMaxRect(
+                        bounds.xMin, Mathf.Min(bounds.yMin, corner.y - halfBadge.y),
+                        Mathf.Max(bounds.xMax, corner.x + halfBadge.x), bounds.yMax);
                 }
 
                 case LevelMechanic.IceDoor:
@@ -141,8 +150,13 @@ namespace GateRush.Runtime
 
                 default:
                 {
+                    // Fitted by the board's rule, so the card shows the mark
+                    // at the size a 2×1 on the board has: its full size.
                     var body = DrawBlock(root, "Time-bonus block", Vector2.zero, Horizontal2, block);
-                    recipes.TimeBonusMark(body, MarkLayout.Anchor(Horizontal2), 1f, config.IntroBonusSeconds);
+                    var scale = config.TimeBonusMarkScale(
+                        MarkLayout.BonusRoomCells(Horizontal2, false), MarkCrowding.Roomy,
+                        config.TimeBonusMarkText(config.IntroBonusSeconds));
+                    recipes.TimeBonusMark(body, MarkLayout.Anchor(Horizontal2), scale, config.IntroBonusSeconds);
                     return BlockBounds(Vector2.zero, Horizontal2);
                 }
             }
@@ -167,9 +181,7 @@ namespace GateRush.Runtime
 
             DrawGate(root, ctx, isOpen: true);
 
-            // The gate's lip hangs below its face; the block's is inside its cell.
-            var lip = config.LipOffsetCells;
-            return Rect.MinMaxRect(0f, -lip, boardWidth + config.FrameThicknessCells, 1f);
+            return Rect.MinMaxRect(0f, 0f, boardWidth + config.FrameThicknessCells, 1f);
         }
 
         /// <summary>A closed gate (M2) on the top edge of a board as wide as the gate.</summary>
@@ -180,8 +192,7 @@ namespace GateRush.Runtime
 
             DrawGate(root, ctx, isOpen: false);
 
-            var span = GateSpan(ctx);
-            return Rect.MinMaxRect(span.xMin, span.yMin - config.LipOffsetCells, span.xMax, span.yMax);
+            return GateSpan(ctx);
         }
 
         /// <summary>A locked 1×2 block beside a 1×1 block carrying its key, whose gem is the lock's colour (D47).</summary>
@@ -201,15 +212,15 @@ namespace GateRush.Runtime
             return Rect.MinMaxRect(first.xMin, first.yMin, second.xMax, first.yMax);
         }
 
-        /// <summary>A closed shutter's panel (M5): slats, a border, and its count.</summary>
+        /// <summary>A closed shutter's panel (M5): slats, a rim, and its count.</summary>
         private Rect DrawShutter(RectTransform root)
         {
             var region = new Rect(0f, 0f, RegionCells, RegionCells);
-            recipes.ShutterPanel(root, region, config.IntroCount, config.BadgeRimColor);
+            recipes.ShutterPanel(root, region, config.IntroCount, config.CountBadgeRimColor);
             return region;
         }
 
-        /// <summary>An elevator's lift doors (M9): panels, a divider down the middle, and a border.</summary>
+        /// <summary>An elevator (M9): its rim with hazard strips, and its two doors.</summary>
         private Rect DrawElevator(RectTransform root)
         {
             var region = new Rect(0f, 0f, RegionCells, RegionCells);
@@ -220,8 +231,8 @@ namespace GateRush.Runtime
         /// <summary>
         /// A generator's machine (M6, D48) above a board as wide as the
         /// machine: body, screen, the next block in miniature, and the queued
-        /// count. Placed by <see cref="GeneratorMachine.Place"/>, the board's
-        /// rule.
+        /// count on the screen. Placed by <see cref="GeneratorMachine.Place"/>,
+        /// the board's rule; the card frames its body.
         /// </summary>
         private Rect DrawGenerator(RectTransform root)
         {
@@ -236,19 +247,14 @@ namespace GateRush.Runtime
             var placement = config.CreateGeneratorMachine().Place(EdgeFeatureCells, 1, generator);
             var body = placement.Body;
 
-            recipes.Machine(
-                root, body, placement.Screen, placement.BadgeCenter, Horizontal2, config.BlockFill(config.IntroBlockColor),
-                queue.Length);
-
-            var badgeTop = placement.BadgeCenter.y + config.BadgeHeightCells * 0.5f;
-            return Rect.MinMaxRect(body.xMin, body.yMin - config.LipOffsetCells, body.xMax, Mathf.Max(body.yMax, badgeTop));
+            recipes.Machine(root, body, placement.Screen, Horizontal2, config.BlockFill(config.IntroBlockColor), queue.Length);
+            return body;
         }
 
         /// <summary>
         /// A block at <paramref name="origin"/>, by the board's recipe
-        /// (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>). A layered
-        /// block's studs are shown at the recipe's stud scale here, about
-        /// their own centres, as the board shows them.
+        /// (<see cref="BoardRecipes{TGroup, TPiece}.Block"/>), as the board
+        /// shows it.
         /// </summary>
         /// <returns>The block's body, whose frame is the footprint's: marks go under it.</returns>
         private RectTransform DrawBlock(
@@ -256,13 +262,7 @@ namespace GateRush.Runtime
             Color? beneath = null, bool isIce = false, MovementAxis axis = MovementAxis.Free)
         {
             var body = AddGroup(parent, name, origin);
-            var parts = recipes.Block(body, cells, BlockTiling.Compute(cells), fill, beneath, isIce, axis);
-
-            for (var s = 0; s < parts.Studs.Count; s++)
-            {
-                parts.Studs[s].rectTransform.localScale = new Vector3(parts.StudScale, parts.StudScale, 1f);
-            }
-
+            recipes.Block(body, cells, BlockTiling.Compute(cells), fill, beneath, isIce, axis);
             return body;
         }
 
@@ -285,7 +285,6 @@ namespace GateRush.Runtime
                 group, gate, tiles,
                 tile => FrameTiling.QuarterRect(tile, ctx.Width, ctx.Height, thickness),
                 GateSpan(ctx),
-                i => FrameTiling.EdgeSpanRect(ctx.Width, ctx.Height, gate.Edge, gate.Offset + i, 1, thickness),
                 isOpen ? gate.Color : (BlockColor?)null,
                 isOpen ? 0 : gate.OpenAtClearCount.Value);
         }
@@ -323,56 +322,105 @@ namespace GateRush.Runtime
         }
 
         List<Image> IRecipeSurface<RectTransform, Image>.Quarters(
-            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color, int order) =>
-            AddQuarters(parent, tiles, rectOf, color);
+            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color,
+            int order) =>
+            AddQuarters(parent, tiles, rectOf, layer, color);
 
         Image IRecipeSurface<RectTransform, Image>.Sprite(
             RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, Color color, int order,
-            float rotationDegrees) =>
-            AddSprite(parent, name, sprite, center, size, color, rotationDegrees);
+            float rotationDegrees, SpriteLook look)
+        {
+            var image = AddSprite(parent, name, sprite, center, size, color, rotationDegrees);
+            image.material = MaterialOf(look);
+            return image;
+        }
 
         Image IRecipeSurface<RectTransform, Image>.Sliced(
-            RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order) =>
-            AddSliced(parent, name, sprite, center, size, border, color);
+            RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float border, Color color, int order,
+            SpriteLook look)
+        {
+            var image = AddSliced(parent, name, sprite, center, size, border, color);
+            if (image != null)
+            {
+                image.material = MaterialOf(look);
+            }
+
+            return image;
+        }
 
         Image IRecipeSurface<RectTransform, Image>.Tiled(
             RectTransform parent, string name, Sprite sprite, Vector2 center, Vector2 size, float tileCells,
-            bool tileIsMeasuredByHeight, Color color, int order) =>
-            AddTiled(
+            bool tileIsMeasuredByHeight, Color color, int order, SpriteLook look)
+        {
+            var image = AddTiled(
                 parent, name, sprite, center, size, tileIsMeasuredByHeight ? sprite.rect.height : sprite.rect.width,
                 tileCells, color);
+            image.material = MaterialOf(look);
+            return image;
+        }
 
         /// <summary>
-        /// Sliced, so only the strip's middle stretches along its length; its
-        /// thickness is the sprite's whole height.
+        /// Sliced, so only the strip's middle stretches along its length,
+        /// across x or along y; its thickness is the sprite's whole extent
+        /// across it.
         /// </summary>
         Image IRecipeSurface<RectTransform, Image>.Strip(
-            RectTransform parent, string name, Sprite sprite, Vector2 center, float length, float thickness, Color color,
-            int order, float rotationDegrees)
+            RectTransform parent, string name, Sprite sprite, Vector2 center, float length, float thickness, bool isAlongY,
+            Color color, int order, SpriteLook look)
         {
-            var image = AddImage(parent, name, sprite, center, new Vector2(length, thickness), color, rotationDegrees);
+            var size = isAlongY ? new Vector2(thickness, length) : new Vector2(length, thickness);
+            var image = AddImage(parent, name, sprite, center, size, color, 0f);
             image.type = Image.Type.Sliced;
+            image.material = MaterialOf(look);
             image.pixelsPerUnitMultiplier = UiBuilder.TiledPixelsPerUnitMultiplier(
-                sprite.rect.height, sprite.pixelsPerUnit, referencePixelsPerUnit, thickness * unitsPerCell);
+                isAlongY ? sprite.rect.width : sprite.rect.height, sprite.pixelsPerUnit, referencePixelsPerUnit, thickness * unitsPerCell);
             return image;
         }
 
         void IRecipeSurface<RectTransform, Image>.Label(
-            RectTransform parent, string name, Vector2 center, string text, float boardFontSize, Color color) =>
-            AddLabel(parent, name, center, text, boardFontSize, color);
+            RectTransform parent, string name, Vector2 center, string text, float boardFontSize, Color color, bool isShadowed) =>
+            AddLabel(
+                parent, name, center, text, boardFontSize, color, config.LabelFont, isShadowed ? config.LabelShadowMaterial : null,
+                false);
+
+        void IRecipeSurface<RectTransform, Image>.OutlinedLabel(
+            RectTransform parent, string name, Vector2 start, string text, float boardFontSize, Color color)
+        {
+            var hasOutline = config.HasLabelOutline;
+            AddLabel(
+                parent, name, start, text, boardFontSize, color, hasOutline ? config.LabelOutlineFont : config.LabelFont,
+                hasOutline ? config.LabelOutlineMaterial : config.LabelShadowMaterial, true);
+        }
+
+        /// <summary>The material a UI Image drawing a sprite as <paramref name="look"/> uses: the board's UI twins, or the UI default.</summary>
+        private Material MaterialOf(SpriteLook look)
+        {
+            switch (look)
+            {
+                case SpriteLook.Lit:
+                    return config.QuarterUiMaterial(QuarterLayer.Lit);
+                case SpriteLook.Highlight:
+                    return config.QuarterUiMaterial(QuarterLayer.Body);
+                default:
+                    return null;
+            }
+        }
 
         /// <summary>
-        /// One image per quarter, in the tiles' order, each posed as its tile
-        /// says over its rectangle enlarged by the seam overlap; a rotated
-        /// sprite's own x runs along the scene's y. An <see cref="Image"/>
-        /// has no flip, so a mirrored quarter gets a negative scale, which —
-        /// like a <c>SpriteRenderer</c>'s flip on the board — acts in the
-        /// sprite's own frame, before the rotation.
+        /// One image per quarter, in the tiles' order, each with its layer's
+        /// UI material (<see cref="RuntimeConfig.QuarterUiMaterial"/>) and
+        /// posed as its tile says over its rectangle enlarged by the seam
+        /// overlap; a rotated sprite's own x runs along the scene's y. An
+        /// <see cref="Image"/> has no flip, so a mirrored quarter gets a
+        /// negative scale, which — like a <c>SpriteRenderer</c>'s flip on the
+        /// board — acts in the sprite's own frame, before the rotation.
         /// </summary>
-        private List<Image> AddQuarters(RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, Color color)
+        private List<Image> AddQuarters(
+            RectTransform parent, IReadOnlyList<QuarterTile> tiles, Func<QuarterTile, Rect> rectOf, QuarterLayer layer, Color color)
         {
             var images = new List<Image>(tiles.Count);
-            var overlap = config.SeamOverlapCells * 2f;
+            var overlap = QuarterLayers.SeamOverlap(layer, color, config.SeamOverlapCells) * 2f;
+            var material = config.QuarterUiMaterial(layer);
             for (var i = 0; i < tiles.Count; i++)
             {
                 var tile = tiles[i];
@@ -380,9 +428,10 @@ namespace GateRush.Runtime
                 var size = rect.size + new Vector2(overlap, overlap);
                 var frameSize = tile.IsRotated ? new Vector2(size.y, size.x) : size;
                 var image = AddSprite(
-                    parent, tile.ToString(), config.QuarterSprite(tile.SpriteKind), rect.center, frameSize, color,
+                    parent, tile.ToString(), config.QuarterSprite(layer, tile), rect.center, frameSize, color,
                     tile.IsRotated ? QuarterTile.EdgeAlongYRotationDegrees : 0f);
                 image.rectTransform.localScale = new Vector3(tile.FlipX ? -1f : 1f, tile.FlipY ? -1f : 1f, 1f);
+                image.material = material;
                 images.Add(image);
             }
 
@@ -451,14 +500,35 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A label in the label font, sized as the board's world-space label of
-        /// <paramref name="boardFontSize"/> reads on a cell.
+        /// A label in <paramref name="font"/>, sized as the board's world-space
+        /// label of <paramref name="boardFontSize"/> reads on a cell: centred on
+        /// <paramref name="position"/>, or starting at it — its left edge, at
+        /// its middle height — when <paramref name="isFromLeft"/>. Drawn with
+        /// <paramref name="material"/> when one is given, made from that font:
+        /// the board's label shadow, or a time-bonus mark's outline. The font is
+        /// set first, as setting it replaces a material made from another
+        /// font's atlas.
         /// </summary>
-        private void AddLabel(RectTransform parent, string name, Vector2 center, string text, float boardFontSize, Color color)
+        private void AddLabel(
+            RectTransform parent, string name, Vector2 position, string text, float boardFontSize, Color color, TMP_FontAsset font,
+            Material material, bool isFromLeft)
         {
-            var rect = AddRect(parent, name, center, Vector2.one, 0f);
+            var rect = AddRect(parent, name, position, Vector2.one, 0f);
             var fontSize = boardFontSize * WorldFontUnitsPerCanvasFontUnit / config.CellSize * unitsPerCell;
-            UiBuilder.AddLabel(rect, config.LabelFont, fontSize, color, false).text = text;
+            var label = UiBuilder.AddLabel(rect, font, fontSize, color, false);
+            if (material != null)
+            {
+                label.fontSharedMaterial = material;
+            }
+
+            if (isFromLeft)
+            {
+                // The pivot moves to the left edge and stays on the position.
+                rect.pivot = new Vector2(0f, rect.pivot.y);
+                label.alignment = TextAlignmentOptions.Left;
+            }
+
+            label.text = text;
         }
 
         /// <summary>

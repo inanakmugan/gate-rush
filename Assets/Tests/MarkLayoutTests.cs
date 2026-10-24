@@ -71,12 +71,122 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void Anchor_T_IsTheCentreOfItsBoundingBox()
+        public void Anchor_T_IsItsJunctionCellNotTheSeamToItsStem()
         {
-            // (1.5, 1) lies on the seam between the T's stem and its bar.
+            // Its bounding box's centre, (1.5, 1), is the seam between the bar
+            // and the stem; the mark goes on the cell where they meet.
             var anchor = MarkLayout.Anchor(T);
 
-            AssertPoint(new Vector2(1.5f, 1f), anchor);
+            AssertPoint(new Vector2(1.5f, 1.5f), anchor);
+        }
+
+        // ----- Junctions of L and T blocks -----
+
+        /// <summary>
+        /// <paramref name="cell"/> in orientation <paramref name="orientation"/>
+        /// (0–3 turned a quarter at a time, 4–7 mirrored then turned), shifted
+        /// by <paramref name="shift"/> on both axes so no coordinate is
+        /// negative.
+        /// </summary>
+        private static Coord Orient(Coord cell, int orientation, int shift)
+        {
+            var x = orientation >= 4 ? -cell.X : cell.X;
+            var y = cell.Y;
+            for (var turn = 0; turn < orientation % 4; turn++)
+            {
+                var turned = -y;
+                y = x;
+                x = turned;
+            }
+
+            return new Coord(x + shift, y + shift);
+        }
+
+        [TestCase(0, 2)]
+        [TestCase(1, 2)]
+        [TestCase(2, 2)]
+        [TestCase(3, 2)]
+        [TestCase(4, 2)]
+        [TestCase(5, 2)]
+        [TestCase(6, 2)]
+        [TestCase(7, 2)]
+        [TestCase(0, 3)]
+        [TestCase(1, 3)]
+        [TestCase(2, 3)]
+        [TestCase(3, 3)]
+        [TestCase(4, 3)]
+        [TestCase(5, 3)]
+        [TestCase(6, 3)]
+        [TestCase(7, 3)]
+        public void TryJunction_L_IsItsCornerCellAndTheAnchorSitsOnIt(int orientation, int arm)
+        {
+            // Two arms of the given length meeting at the origin's cell.
+            var shift = arm - 1;
+            var cells = new List<Coord> { Orient(new Coord(0, 0), orientation, shift) };
+            for (var k = 1; k < arm; k++)
+            {
+                cells.Add(Orient(new Coord(k, 0), orientation, shift));
+                cells.Add(Orient(new Coord(0, k), orientation, shift));
+            }
+
+            var corner = Orient(new Coord(0, 0), orientation, shift);
+
+            var isJunction = MarkLayout.TryJunction(cells, out var junction);
+
+            Assert.IsTrue(isJunction, "an L");
+            Assert.AreEqual(corner, junction, "the corner cell");
+            AssertPoint(new Vector2(corner.X + 0.5f, corner.Y + 0.5f), MarkLayout.Anchor(cells));
+        }
+
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void TryJunction_T_IsTheCellWithThreeNeighbours(int orientation)
+        {
+            // A bar of three across the origin's cell, a stem below it.
+            const int shift = 1;
+            var cells = new[]
+            {
+                Orient(new Coord(-1, 0), orientation, shift), Orient(new Coord(0, 0), orientation, shift),
+                Orient(new Coord(1, 0), orientation, shift), Orient(new Coord(0, -1), orientation, shift)
+            };
+            var middle = Orient(new Coord(0, 0), orientation, shift);
+
+            var isJunction = MarkLayout.TryJunction(cells, out var junction);
+
+            Assert.IsTrue(isJunction, "a T");
+            Assert.AreEqual(middle, junction, "the junction");
+            AssertPoint(new Vector2(middle.X + 0.5f, middle.Y + 0.5f), MarkLayout.Anchor(cells));
+        }
+
+        private static IEnumerable<TestCaseData> NoJunction()
+        {
+            // Each with today's anchor: its bounding box's centre.
+            yield return new TestCaseData((object)Horizontal3, new Vector2(1.5f, 0.5f)).SetName("TryJunction_Bar_HasNoneAndKeepsTheBoxCentre");
+            yield return new TestCaseData((object)Square, new Vector2(1f, 1f)).SetName("TryJunction_Square_HasNoneAndKeepsTheBoxCentre");
+            yield return new TestCaseData(
+                    (object)new[] { new Coord(0, 0), new Coord(1, 0), new Coord(1, 1), new Coord(2, 1) }, new Vector2(1.5f, 1f))
+                .SetName("TryJunction_S_HasNoneAndKeepsTheBoxCentre");
+            yield return new TestCaseData(
+                    (object)new[] { new Coord(1, 0), new Coord(0, 1), new Coord(1, 1), new Coord(2, 1), new Coord(1, 2) },
+                    new Vector2(1.5f, 1.5f))
+                .SetName("TryJunction_Plus_HasNoneAndKeepsTheBoxCentre");
+        }
+
+        [TestCaseSource(nameof(NoJunction))]
+        public void TryJunction_OtherShapes_HaveNoneAndKeepTodaysAnchor(Coord[] cells, Vector2 anchor)
+        {
+            var isJunction = MarkLayout.TryJunction(cells, out _);
+
+            Assert.IsFalse(isJunction);
+            AssertPoint(anchor, MarkLayout.Anchor(cells));
+        }
+
+        [Test]
+        public void TryJunction_NoCells_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => MarkLayout.TryJunction(Array.Empty<Coord>(), out _));
         }
 
         [Test]
@@ -331,21 +441,39 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void BonusBadgeWidth_MoreDigits_WidenIt()
+        public void BonusRoomCells_AloneOnEachShape_IsTwiceTheDistanceToTheNearerEndOfItsRun()
         {
-            const float height = 0.34f;
-            const float digit = 0.15f;
-            const float padding = 0.08f;
-            const float icon = 0.24f;
-            const float gap = 0.03f;
+            var cases = new[]
+            {
+                (Cells: Single, Expected: 1f, Name: "1x1"),
+                (Cells: Horizontal2, Expected: 2f, Name: "2x1: the anchor on the seam, a cell either side"),
+                (Cells: Vertical2, Expected: 1f, Name: "vertical 1x2: one cell wide in both rows"),
+                (Cells: Horizontal3, Expected: 3f, Name: "1x3: on the middle cell"),
+                (Cells: Square, Expected: 2f, Name: "2x2: both rows two cells wide"),
+                (Cells: L, Expected: 1f, Name: "L: on its corner cell"),
+                (Cells: T, Expected: 3f, Name: "T: on its junction, the middle of its bar of three"),
+            };
 
-            var two = MarkLayout.BonusBadgeWidth(2, height, digit, padding, icon, gap);
-            var three = MarkLayout.BonusBadgeWidth(3, height, digit, padding, icon, gap);
-
-            Assert.AreEqual(icon + gap + 2 * digit + 2 * padding, two, Tolerance);
-            Assert.AreEqual(digit, three - two, Tolerance, "each character adds a digit's width");
+            foreach (var c in cases)
+            {
+                Assert.AreEqual(c.Expected, MarkLayout.BonusRoomCells(c.Cells, false), Tolerance, c.Name);
+            }
         }
 
+        [Test]
+        public void BonusRoomCells_SharedWithAnotherMark_IsOneCell()
+        {
+            var room = MarkLayout.BonusRoomCells(Horizontal3, true);
+
+            Assert.AreEqual(MarkLayout.SharedMarkRoomCells, room, Tolerance);
+            Assert.AreEqual(1f, MarkLayout.SharedMarkRoomCells, Tolerance, "a cell each");
+        }
+
+        [Test]
+        public void BonusRoomCells_NoCells_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => MarkLayout.BonusRoomCells(Array.Empty<Coord>(), false));
+        }
         private const float FrozenRaise = 0.3f;
 
         [Test]
@@ -556,6 +684,57 @@ namespace GateRush.Tests
                     CollectionAssert.Contains(cells, cell, $"the {label} mark at {point} touches {cell}");
                 }
             }
+        }
+
+        [Test]
+        public void CornerBadge_SingleCell_IsItsBottomRightCornerPulledInByTheInset()
+        {
+            const float inset = 0.14f;
+
+            var corner = MarkLayout.CornerBadge(Single, inset);
+
+            AssertPoint(new Vector2(1f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_Square_IsTheBottomRowsRightCell()
+        {
+            const float inset = 0.14f;
+
+            var corner = MarkLayout.CornerBadge(Square, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_BarWithAFootToTheLeft_IsTheFootRowsRightMostCell()
+        {
+            // A bar three high in column 1 with its foot to the left at the
+            // bottom: the lowest row is the foot's, and its right-most cell
+            // is the bar's foot.
+            var cells = new[] { new Coord(0, 0), new Coord(1, 0), new Coord(1, 1), new Coord(1, 2) };
+            const float inset = 0.2f;
+
+            var corner = MarkLayout.CornerBadge(cells, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_T_IsOnTheLowestRowEvenWhereItIsOneCell()
+        {
+            const float inset = 0.1f;
+
+            var corner = MarkLayout.CornerBadge(T, inset);
+
+            AssertPoint(new Vector2(2f - inset, inset), corner);
+        }
+
+        [Test]
+        public void CornerBadge_NoCells_Throws()
+        {
+            Assert.Throws<ArgumentException>(() => MarkLayout.CornerBadge(Array.Empty<Coord>(), 0.1f));
+            Assert.Throws<ArgumentException>(() => MarkLayout.CornerBadge(null, 0.1f));
         }
 
         private static void AssertPoint(Vector2 expected, Vector2 actual)

@@ -1,4 +1,5 @@
 using GateRush.Editor;
+using GateRush.Runtime;
 using NUnit.Framework;
 using UnityEditor;
 using UnityEngine;
@@ -9,7 +10,8 @@ namespace GateRush.Tests
     /// Covers <see cref="ArtRecipe.Problems"/>: the default recipe generates,
     /// and each constraint that keeps the pieces meeting at their seams and the
     /// state sprites (Module 16) drawable is reported, naming its field, when
-    /// broken.
+    /// broken. Module 46: the default occlusion falloff follows the reference
+    /// script's blur at a bevel's foot.
     /// </summary>
     public class ArtRecipeTests
     {
@@ -36,19 +38,34 @@ namespace GateRush.Tests
         }
 
         [TestCase("concaveRadiusPixels", 6f, "Concave Radius Pixels")]
-        [TestCase("cornerRadiusPixels", 60f, "Corner Radius Pixels")]
+        [TestCase("cornerRadiusPixels", 63f, "Corner Radius Pixels")]
         [TestCase("rimWidthPixels", 60f, "Rim Width Pixels")]
-        [TestCase("studDiameterPixels", 60f, "Stud Diameter Pixels")]
-        [TestCase("studSpacingPixels", 100f, "Stud Spacing Pixels")]
+        [TestCase("bevelPixels", 0f, "Bevel Pixels")]
+        [TestCase("bevelPixels", 30f, "Bevel Pixels")]
+        [TestCase("cornerRadiusPixels", 10f, "Bevel Pixels")]
+        [TestCase("bodyHeightPixels", 0f, "Body Height Pixels")]
+        [TestCase("shininess", 0.5f, "Shininess")]
+        [TestCase("occlusionFootPixels", 0f, "Occlusion Foot Pixels")]
+        [TestCase("occlusionFootPixels", 20f, "Occlusion Foot Pixels")]
+        [TestCase("shadeHeadroom", 1f, "Shade Headroom")]
+        [TestCase("floorShadowSpreadPixels", 0f, "Floor Shadow Spread Pixels")]
+        [TestCase("floorShadowSpreadPixels", 70f, "Floor Shadow Spread Pixels")]
+        [TestCase("studDiameterPixels", 130f, "Stud Diameter Pixels")]
+        [TestCase("studDiameterPixels", 62f, "Stud Diameter Pixels")]
+        [TestCase("studEdgePixels", 0f, "Stud Edge Pixels")]
+        [TestCase("studContactInnerPixels", 7f, "Stud Contact Inner Pixels")]
+        [TestCase("studRimFullPixels", 4f, "Stud Rim")]
+        [TestCase("studRimLightExponent", 0f, "Stud Rim Light Exponent")]
+        [TestCase("studSpacingPixels", 40f, "Stud Spacing Pixels")]
+        [TestCase("studSpacingPixels", 80f, "Stud Spacing Pixels")]
+        [TestCase("gateArrowOutlinePixels", 0f, "Gate Arrow Outline Pixels")]
+        [TestCase("gateArrowOutlinePixels", 6f, "Gate Arrow Outline Pixels")]
         [TestCase("axisArrowHeadLengthPixels", 96f, "Axis Arrow Head Length Pixels")]
         [TestCase("vignetteInner", 1f, "Vignette Inner")]
-        [TestCase("frostInsetPixels", 5f, "Frost Inset Pixels")]
         [TestCase("panelCornerRadiusPixels", 40f, "Panel Corner Radius Pixels")]
-        [TestCase("chainLinkWallPixels", 20f, "Chain Link Wall Pixels")]
         [TestCase("padlockShackleRadius", 0.5f, "Padlock Shackle Radius")]
         [TestCase("keyGemDiameterPixels", 40f, "gem inside hole")]
         [TestCase("slatGapPixels", 40f, "Slat Gap Pixels")]
-        [TestCase("doorLineWidthPixels", 70f, "Door Line Width Pixels")]
         [TestCase("clockRimThickness", 0.6f, "Clock Rim Thickness")]
         [TestCase("clockMinuteHandLength", 0.45f, "Clock Minute Hand Length")]
         [TestCase("clockHandThickness", 0f, "Clock Hand Thickness")]
@@ -64,6 +81,20 @@ namespace GateRush.Tests
         [TestCase("gateGlowHold", -0.1f, "Gate Glow Hold")]
         [TestCase("sparkleWaist", 0f, "Sparkle Waist")]
         [TestCase("sparkleWaist", 0.25f, "Sparkle Waist")]
+        [TestCase("iceInsetPixels", 3f, "Ice Inset Pixels")]
+        [TestCase("iceBevelPixels", 30f, "Ice Bevel Pixels")]
+        [TestCase("badgeDigitWidthPixels", 0f, "Badge Size Pixels")]
+        [TestCase("badgeShadow.blurPixels", 0f, "Badge Shadow")]
+        [TestCase("gemFinish.shininess", 0.5f, "Gem Finish")]
+        [TestCase("chainSpacingPixels", 30.5f, "Chain Spacing Pixels")]
+        [TestCase("keyholeRisePixels", 30f, "Keyhole Rise Pixels")]
+        [TestCase("gemRadiusPixels", 13f, "Gem Radius Pixels")]
+        [TestCase("coinMinuteHandPixels", 20f, "Coin Minute Hand Pixels")]
+        [TestCase("oneWayTipPixels", 120f, "One Way Tip Pixels")]
+        [TestCase("shutterInnerInsetPixels", 2f, "Shutter Inner Inset Pixels")]
+        [TestCase("machineGlareFadePixels.y", 40f, "Machine Glare Fade Pixels")]
+        [TestCase("elevatorHazardCentrePixels", 2f, "Elevator Hazard Centre Pixels")]
+        [TestCase("elevatorDoorPanelInsetPixels.x", 60f, "Elevator Door Panel Inset Pixels")]
         public void Problems_FloatOutOfRange_IsReportedByName(string field, float value, string label)
         {
             // Some fields feed more than one constraint — frost's inset depends
@@ -132,6 +163,172 @@ namespace GateRush.Tests
             var problems = recipe.Problems();
 
             Assert.That(problems, Has.Some.Contains("Shard Points"), string.Join(" | ", problems));
+        }
+
+        [TestCase(0, TestName = "Problems_StudsPerCellSideZero_IsReported")]
+        [TestCase(3, TestName = "Problems_ThreeStudsPerCellSideAtTheDefaultDiameter_IsReported")]
+        [TestCase(4, TestName = "Problems_FourStudsPerCellSideCloserThanTheDefaultDiameter_IsReported")]
+        public void Problems_StudsPerCellSideOutOfRange_IsReported(int perSide)
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("studsPerCellSide").intValue = perSide;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Studs Per Cell Side"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_LightBehindTheBoard_IsReported()
+        {
+            var serialized = new SerializedObject(recipe);
+            serialized.FindProperty("lightDirection").vector3Value = new Vector3(-0.45f, 0.55f, -0.7f);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = recipe.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Light Direction"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void OcclusionPair_DefaultRecipe_MatchesTheReferenceBlurBesideANeighbour()
+        {
+            // The reference darkens a bevel's foot by how much a blur of the
+            // height rises above it: AO = clamp(1 − (blur(h) − h) · k, 0.4, 1),
+            // a Gaussian of 6 px, k 0.06 (reference_render.py). Across a
+            // straight edge, with the next block's bevel the gap away as on
+            // the board, the blur is one-dimensional. The recipe's falloff
+            // must follow it to within a few hundredths, foot to flat.
+            const double Sigma = 6.0;
+            const double K = 0.06;
+            const double Floor = 0.4;
+            const double Tolerance = 0.03;
+            const double Step = 0.05;
+            const double Reach = 40.0;
+            double gap = recipe.BlockGapPixels;
+            double bevel = recipe.BevelPixels;
+            double bodyHeight = recipe.BodyHeightPixels;
+
+            double Height(double depth)
+            {
+                // Inside this body, in the gap, or inside the neighbour.
+                var into = depth > 0.0 ? depth : depth < -gap ? -depth - gap : 0.0;
+                var t = System.Math.Min(1.0, into / bevel);
+                return into <= 0.0 ? 0.0 : System.Math.Sqrt(1.0 - (1.0 - t) * (1.0 - t)) * bodyHeight;
+            }
+
+            var compared = 0;
+            foreach (var depth in new[] { 0.25, 0.5, 1.0, 1.5, 2.0, 3.0, 6.0 })
+            {
+                var sum = 0.0;
+                var weights = 0.0;
+                for (var x = -Reach; x <= Reach; x += Step)
+                {
+                    var weight = System.Math.Exp(-x * x / (2.0 * Sigma * Sigma));
+                    sum += weight * Height(depth + x);
+                    weights += weight;
+                }
+
+                var reference = System.Math.Max(Floor, System.Math.Min(1.0, 1.0 - (sum / weights - Height(depth)) * K));
+                var t = System.Math.Min(1.0, depth / recipe.OcclusionFootPixels);
+                var recipes = System.Math.Max(recipe.OcclusionMinimum, 1.0 - recipe.OcclusionFoot * (1.0 - t * t * (3.0 - 2.0 * t)));
+
+                Assert.AreEqual(reference, recipes, Tolerance, $"the occlusion {depth} px in");
+                compared++;
+            }
+
+            Assert.AreEqual(7, compared);
+        }
+
+        [Test]
+        public void Defaults_Mechanics_AreTheReferenceScriptsNumbers()
+        {
+            // mechanics_reference.py, function by function.
+            Assert.AreEqual(new Vector2(56f, 54f), recipe.BadgeSizePixels, "count_badge: w, h");
+            Assert.AreEqual(10f, recipe.BadgeDigitWidthPixels, "the two-digit badge is 66 wide");
+            Assert.AreEqual((15f, 8f, 9f), (recipe.BadgeRim.CornerPixels, recipe.BadgeRim.BevelPixels, recipe.BadgeRim.HeightPixels), "the rim");
+            Assert.AreEqual(7f, recipe.BadgeFaceInsetPixels, "the face's inset");
+            Assert.AreEqual((5f, 14f, 10f), (recipe.IceInsetPixels, recipe.IceBevelPixels, recipe.IceHeightPixels), "frozen: the ice");
+            Assert.AreEqual((60f, 0.7f), (recipe.IceFinish.Shininess, recipe.IceFinish.Specular), "the ice's highlight");
+            Assert.AreEqual(0.32f, recipe.IceTintAlpha, "the thin tint");
+            CollectionAssert.AreEqual(new[] { 95f, 140f, 175f }, recipe.IceStreakOffsetsPixels, "the three streaks");
+            Assert.AreEqual(31f, recipe.ChainSpacingPixels, "locked: the links' spacing");
+            Assert.AreEqual(new Vector2(30f, 26f), recipe.LockBodyHalfSizePixels, "the padlock's body");
+            Assert.AreEqual(24f, recipe.GoldKeyBowRadiusPixels, 1e-5f, "key: the bow, 1.2 times the script's 20");
+            Assert.AreEqual(7.2f, recipe.GoldKeyShaftHalfPixels, 1e-5f, "the shaft, 1.2 times the script's 6");
+            Assert.AreEqual((34f, 26f), (recipe.CoinRadiusPixels, recipe.CoinFaceRadiusPixels), "time_bonus_reference.py: the coin and its face, R - 8");
+            Assert.AreEqual((48f, 94f, 14f), (recipe.OneWayHeadStartPixels, recipe.OneWayTipPixels, recipe.OneWayRaisePixels), "one_way: the heads, the tips, the height");
+            Assert.AreEqual((22f, 24), (recipe.ShutterInnerInsetPixels, recipe.ShutterCylinderPitchPixels), "shutter: the inner edge and the slats");
+            Assert.AreEqual(new Vector2(68f, 56f), recipe.MachineScreenSizePixels, "generator: the screen");
+            Assert.AreEqual(new Vector2(22f, 16f), recipe.ElevatorInnerInsetPixels, "elevator: the recess");
+            Assert.AreEqual(new Vector2(3f, -5f), recipe.RaisedShadow.OffsetPixels, "the floor shadow, y up");
+        }
+
+        [Test]
+        public void Defaults_CoinHands_ScaleWithTheCoinAsTheScriptsDo()
+        {
+            // time_bonus_reference.py: s = R / 24; the hands are 2.2·s wide
+            // each side, 12·s up and 9·s right, and the hour hand's tail of 1
+            // pixel is not scaled.
+            var s = recipe.CoinRadiusPixels / 24f;
+
+            Assert.AreEqual(2.2f * s, recipe.CoinHandHalfWidthPixels, 1e-5f, "half a hand's width");
+            Assert.AreEqual(12f * s, recipe.CoinMinuteHandPixels, 1e-5f, "the hand up");
+            Assert.AreEqual(9f * s, recipe.CoinHourHandPixels, 1e-5f, "the hand right");
+            Assert.AreEqual(1f, recipe.CoinHourHandTailPixels, 1e-5f, "the tail");
+            Assert.AreEqual((7f, 8f, 2f), (recipe.CoinRimPixels, recipe.CoinHeightPixels, recipe.CoinFaceDepthPixels), "the rim's rise, its height, the face set in");
+            Assert.AreEqual((40f, 0.5f), (recipe.CoinFinish.Shininess, recipe.CoinFinish.Specular), "the rim's shine and speck");
+            Assert.AreEqual((new Vector2(2f, -4f), 3f, 0.5f), (recipe.CoinShadow.OffsetPixels, recipe.CoinShadow.BlurPixels, recipe.CoinShadow.Strength), "the contact shadow, y up");
+        }
+
+        [Test]
+        public void BoardMeasures_DefaultRecipe_AreRuntimeConfigsCodeDefaults()
+        {
+            // What Generate Art writes is what a fresh config already holds,
+            // so the code defaults draw the default recipe's sprites as painted.
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            try
+            {
+                var serialized = new SerializedObject(config);
+                var measures = recipe.BoardMeasures();
+
+                foreach (var (field, value) in measures)
+                {
+                    var property = serialized.FindProperty(field);
+                    Assert.IsNotNull(property, $"RuntimeConfig has a measure field '{field}'");
+                    Assert.AreEqual(value, property.floatValue, 1e-6f, field);
+                }
+
+                Assert.AreEqual(16, measures.Count, "every measure is checked");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
+        }
+
+        [Test]
+        public void MarkSizes_DefaultRecipe_FitWithinTheConfigsLayoutSizes()
+        {
+            // The marks' layout checks (RuntimeConfig.Problems) measure the
+            // padlock and the key by the config's sizes; what the board draws
+            // must lie within them.
+            var config = ScriptableObject.CreateInstance<RuntimeConfig>();
+            try
+            {
+                float cell = recipe.CellPixels;
+                var padlock = 2f * recipe.LockBodyHalfSizePixels.x / cell;
+                var key = (recipe.GoldKeyBowOffsetPixels + recipe.GoldKeyBowRadiusPixels
+                           + Mathf.Max(recipe.GoldKeyShaftEndPixels, recipe.GoldKeySecondToothPixels.y)) / cell * config.KeyScale;
+
+                Assert.LessOrEqual(padlock, config.PadlockSizeCells, "the padlock's body");
+                Assert.LessOrEqual(key, config.KeySizeCells, "the key, bow to tip, at Key Scale");
+            }
+            finally
+            {
+                Object.DestroyImmediate(config);
+            }
         }
 
         private void SetFloat(string field, float value)

@@ -12,28 +12,104 @@ namespace GateRush.Editor
         QuarterEdge,
         QuarterFill,
         QuarterConcave,
+        FaceOuterTopLeft,
+        FaceOuterTopRight,
+        FaceOuterBottomLeft,
+        FaceOuterBottomRight,
+        FaceConcaveTopLeft,
+        FaceConcaveTopRight,
+        FaceConcaveBottomLeft,
+        FaceConcaveBottomRight,
+        FaceEdgeTop,
+        FaceEdgeBottom,
+        FaceEdgeLeft,
+        FaceEdgeRight,
+        FaceFill,
+        BodyOuterTopLeft,
+        BodyOuterTopRight,
+        BodyOuterBottomLeft,
+        BodyOuterBottomRight,
+        BodyConcaveTopLeft,
+        BodyConcaveTopRight,
+        BodyConcaveBottomLeft,
+        BodyConcaveBottomRight,
+        BodyEdgeTop,
+        BodyEdgeBottom,
+        BodyEdgeLeft,
+        BodyEdgeRight,
+        BodyFill,
+        ShadowOuterTopLeft,
+        ShadowOuterTopRight,
+        ShadowOuterBottomLeft,
+        ShadowOuterBottomRight,
+        ShadowConcaveTopLeft,
+        ShadowConcaveTopRight,
+        ShadowConcaveBottomLeft,
+        ShadowConcaveBottomRight,
+        ShadowEdgeTop,
+        ShadowEdgeBottom,
+        ShadowEdgeLeft,
+        ShadowEdgeRight,
         Studs,
         StudGloss,
+        SingleStud,
+        SingleStudGloss,
         Floor,
         GateArrow,
+        GateArrowOutline,
         AxisArrow,
         BackgroundRamp,
         Vignette,
-        Frost,
         RoundedRect,
-        Ring,
         Chain,
         Padlock,
         KeyBody,
         KeyGem,
         ShutterSlats,
-        DoorPanel,
         Clock,
         Restart,
         Cube,
         Shard,
         GateGlow,
-        Sparkle
+        Sparkle,
+        IceOuterTopLeft,
+        IceOuterTopRight,
+        IceOuterBottomLeft,
+        IceOuterBottomRight,
+        IceConcaveTopLeft,
+        IceConcaveTopRight,
+        IceConcaveBottomLeft,
+        IceConcaveBottomRight,
+        IceEdgeTop,
+        IceEdgeBottom,
+        IceEdgeLeft,
+        IceEdgeRight,
+        IceFill,
+        IceStreaks,
+        IceStreaksWide,
+        BadgeRim,
+        BadgeFace,
+        BadgeHighlight,
+        Lock,
+        GoldKey,
+        Gem,
+        GemHighlight,
+        BonusCoin,
+        OneWayArrow,
+        OneWayArrowHighlight,
+        OneWayArrowVertical,
+        OneWayArrowVerticalHighlight,
+        ShutterRim,
+        ShutterCylinders,
+        MachineBody,
+        MachineScreen,
+        MachineVent,
+        MachineButton,
+        ElevatorRim,
+        ElevatorHazardLeft,
+        ElevatorHazardRight,
+        ElevatorDoor,
+        ElevatorHandle
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -67,19 +143,23 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Modules 15, 16, 17, 18 and 19 from an
-    /// <see cref="ArtRecipe"/> alone, in greyscale plus alpha, for the runtime
-    /// to tint (D46).
+    /// Paints every generated sprite of Modules 15, 16, 17, 18, 19 and 46 from an
+    /// <see cref="ArtRecipe"/>, in greyscale plus alpha for the runtime to
+    /// tint where a colour varies (D46), and in an <see cref="ArtPalette"/>'s
+    /// colours where it never does (Module 46, pass 2).
     /// </summary>
     /// <remarks>
     /// <para><b>Shapes</b> are signed distance functions evaluated at pixel
     /// centres: coverage is <c>0.5 − d / antiAlias</c>, clamped, and tone is a
-    /// function of the depth inside the shape — an outline, then a rim
-    /// highlight fading into the face. A piece's shading therefore depends only
-    /// on the distance to its boundary, so mirroring or rotating it onto
-    /// another quarter never turns its lighting the wrong way. Fully
-    /// transparent pixels keep the edge's tone in RGB, so filtering never pulls
-    /// a dark fringe into the edge.</para>
+    /// function of the depth inside the shape. A block's body (Module 46) is
+    /// lit: its face pieces carry the shade of a height field under one light,
+    /// its body pieces the white highlight and its shadow pieces its shadow on
+    /// the floor (see <c>ArtPainter.Lighting.cs</c>). Those depend on which
+    /// way the edge faces once posed, so there is one per corner of a cell
+    /// and one per side for an edge, and the runtime picks the one for the
+    /// quarter's place; the plain pieces depend only on the distance to the
+    /// boundary. Fully transparent pixels keep the edge's tone in RGB, so
+    /// filtering never pulls a dark fringe into the edge.</para>
     /// <para><b>Quarter pieces</b> are drawn for the top-right quarter, in
     /// quarter-local pixels whose origin is the cell's centre: the cell's
     /// corner is at <c>(q, q)</c> and the outline runs at <c>e = q − gap/2</c>.
@@ -89,10 +169,15 @@ namespace GateRush.Editor
     /// <c>Math.Sqrt</c>, <c>Abs</c>, <c>Floor</c>, <c>Min</c> and <c>Max</c> are
     /// used, all exactly rounded — no <c>Mathf</c>,
     /// <c>Pow</c> or <c>Exp</c>, no randomness, no clock — and each value is
-    /// rounded to a byte with an explicit midpoint rule. The same recipe
-    /// always paints the same bytes.</para>
+    /// rounded to a byte with an explicit midpoint rule. The exceptions —
+    /// the highlight's and the stud rim's powers and the sRGB encoding, and
+    /// the mechanics' blurs and slats (<c>ArtPainter.Mechanics.cs</c>) — go
+    /// through <c>Math.Pow</c>, <c>Math.Exp</c> or <c>Math.Sin</c> and are
+    /// rounded to nine decimals (<see cref="StablePow"/>), so a last-bit
+    /// difference never reaches a byte. The same recipe and palette always
+    /// paint the same bytes.</para>
     /// </remarks>
-    public static class ArtPainter
+    public static partial class ArtPainter
     {
         /// <summary>
         /// Width of the background ramp. Not a look parameter: the ramp only
@@ -101,16 +186,65 @@ namespace GateRush.Editor
         /// </summary>
         private const int RampWidthPixels = 2;
 
+        /// <summary>
+        /// The decimals a power or a square root of a power is rounded to
+        /// (<see cref="StablePow"/>). Not a look parameter: it only keeps a
+        /// platform's last bit out of the pixels.
+        /// </summary>
+        private const int StableDecimals = 9;
+
+        /// <summary>The four shapes a quarter piece takes (Module 15), whatever layer it is painted for.</summary>
+        private enum QuarterShape
+        {
+            Outer,
+            Edge,
+            Fill,
+            Concave
+        }
+
         /// <summary>Every sprite, in the order the generator writes them.</summary>
         public static IReadOnlyList<ArtSprite> All { get; } = (ArtSprite[])Enum.GetValues(typeof(ArtSprite));
 
-        /// <summary>Paints <paramref name="sprite"/> from <paramref name="recipe"/>.</summary>
-        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null.</exception>
-        public static ArtImage Paint(ArtRecipe recipe, ArtSprite sprite)
+        /// <summary>
+        /// Paints <paramref name="sprite"/> from <paramref name="recipe"/>, for
+        /// a sprite that takes no colour of its own (<see cref="NeedsPalette"/>).
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null, or the sprite needs a palette.</exception>
+        public static ArtImage Paint(ArtRecipe recipe, ArtSprite sprite) => Paint(recipe, null, sprite);
+
+        /// <summary>
+        /// True for the sprites painted in colours of their own, read from
+        /// <paramref name="sprite"/>'s <see cref="ArtPalette"/> (Module 46,
+        /// pass 2): the parts of the mechanics whose colour never varies.
+        /// </summary>
+        public static bool NeedsPalette(ArtSprite sprite) =>
+            IsIcePiece(sprite)
+            || sprite == ArtSprite.Chain || sprite == ArtSprite.Lock || sprite == ArtSprite.GoldKey
+            || sprite == ArtSprite.BonusCoin || sprite == ArtSprite.ShutterRim || sprite == ArtSprite.ShutterCylinders
+            || sprite == ArtSprite.MachineBody || sprite == ArtSprite.MachineScreen || sprite == ArtSprite.MachineButton
+            || sprite == ArtSprite.ElevatorRim || sprite == ArtSprite.ElevatorHazardLeft
+            || sprite == ArtSprite.ElevatorHazardRight || sprite == ArtSprite.ElevatorDoor || sprite == ArtSprite.ElevatorHandle;
+
+        /// <summary>
+        /// Paints <paramref name="sprite"/> from <paramref name="recipe"/>, in
+        /// <paramref name="palette"/>'s colours where it has colours of its own.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="recipe"/> is null, or <paramref name="palette"/> is and the sprite needs it.</exception>
+        public static ArtImage Paint(ArtRecipe recipe, ArtPalette palette, ArtSprite sprite)
         {
             if (recipe == null)
             {
                 throw new ArgumentNullException(nameof(recipe));
+            }
+
+            if (palette == null && NeedsPalette(sprite))
+            {
+                throw new ArgumentNullException(nameof(palette), $"{sprite} is painted in the palette's colours.");
+            }
+
+            if (IsIcePiece(sprite))
+            {
+                return PaintIce(recipe, palette, PlaceOf(sprite));
             }
 
             switch (sprite)
@@ -120,28 +254,71 @@ namespace GateRush.Editor
                 case ArtSprite.QuarterFill:
                 case ArtSprite.QuarterConcave:
                     return PaintQuarter(recipe, sprite);
+                case ArtSprite.FaceOuterTopLeft:
+                case ArtSprite.FaceOuterTopRight:
+                case ArtSprite.FaceOuterBottomLeft:
+                case ArtSprite.FaceOuterBottomRight:
+                case ArtSprite.FaceConcaveTopLeft:
+                case ArtSprite.FaceConcaveTopRight:
+                case ArtSprite.FaceConcaveBottomLeft:
+                case ArtSprite.FaceConcaveBottomRight:
+                case ArtSprite.FaceEdgeTop:
+                case ArtSprite.FaceEdgeBottom:
+                case ArtSprite.FaceEdgeLeft:
+                case ArtSprite.FaceEdgeRight:
+                case ArtSprite.FaceFill:
+                    return PaintLit(recipe, PlaceOf(sprite), LitLayer.Face);
+                case ArtSprite.BodyOuterTopLeft:
+                case ArtSprite.BodyOuterTopRight:
+                case ArtSprite.BodyOuterBottomLeft:
+                case ArtSprite.BodyOuterBottomRight:
+                case ArtSprite.BodyConcaveTopLeft:
+                case ArtSprite.BodyConcaveTopRight:
+                case ArtSprite.BodyConcaveBottomLeft:
+                case ArtSprite.BodyConcaveBottomRight:
+                case ArtSprite.BodyEdgeTop:
+                case ArtSprite.BodyEdgeBottom:
+                case ArtSprite.BodyEdgeLeft:
+                case ArtSprite.BodyEdgeRight:
+                case ArtSprite.BodyFill:
+                    return PaintLit(recipe, PlaceOf(sprite), LitLayer.Specular);
+                case ArtSprite.ShadowOuterTopLeft:
+                case ArtSprite.ShadowOuterTopRight:
+                case ArtSprite.ShadowOuterBottomLeft:
+                case ArtSprite.ShadowOuterBottomRight:
+                case ArtSprite.ShadowConcaveTopLeft:
+                case ArtSprite.ShadowConcaveTopRight:
+                case ArtSprite.ShadowConcaveBottomLeft:
+                case ArtSprite.ShadowConcaveBottomRight:
+                case ArtSprite.ShadowEdgeTop:
+                case ArtSprite.ShadowEdgeBottom:
+                case ArtSprite.ShadowEdgeLeft:
+                case ArtSprite.ShadowEdgeRight:
+                    return PaintShadow(recipe, PlaceOf(sprite));
                 case ArtSprite.Studs:
-                    return PaintStuds(recipe);
+                    return PaintStuds(recipe, recipe.StudsPerCellSide);
                 case ArtSprite.StudGloss:
-                    return PaintGloss(recipe);
+                    return PaintGloss(recipe, recipe.StudsPerCellSide);
+                case ArtSprite.SingleStud:
+                    return PaintStuds(recipe, 1);
+                case ArtSprite.SingleStudGloss:
+                    return PaintGloss(recipe, 1);
                 case ArtSprite.Floor:
                     return PaintFloor(recipe);
                 case ArtSprite.GateArrow:
-                    return PaintGateArrow(recipe);
+                    return PaintGateArrow(recipe, 0.0);
+                case ArtSprite.GateArrowOutline:
+                    return PaintGateArrow(recipe, recipe.GateArrowOutlinePixels);
                 case ArtSprite.AxisArrow:
                     return PaintAxisArrow(recipe);
                 case ArtSprite.BackgroundRamp:
                     return PaintRamp(recipe);
                 case ArtSprite.Vignette:
                     return PaintVignette(recipe);
-                case ArtSprite.Frost:
-                    return PaintFrost(recipe);
                 case ArtSprite.RoundedRect:
                     return PaintRoundedRect(recipe);
-                case ArtSprite.Ring:
-                    return PaintRing(recipe);
                 case ArtSprite.Chain:
-                    return PaintChain(recipe);
+                    return PaintChain(recipe, palette);
                 case ArtSprite.Padlock:
                     return PaintPadlock(recipe);
                 case ArtSprite.KeyBody:
@@ -162,8 +339,58 @@ namespace GateRush.Editor
                     return PaintGateGlow(recipe);
                 case ArtSprite.Sparkle:
                     return PaintSparkle(recipe);
+                case ArtSprite.IceStreaks:
+                    return PaintIceStreaks(recipe, 1);
+                case ArtSprite.IceStreaksWide:
+                    return PaintIceStreaks(recipe, 2);
+                case ArtSprite.BadgeRim:
+                    return PaintBadge(recipe, BadgeLayer.Rim);
+                case ArtSprite.BadgeFace:
+                    return PaintBadge(recipe, BadgeLayer.Face);
+                case ArtSprite.BadgeHighlight:
+                    return PaintBadge(recipe, BadgeLayer.Highlight);
+                case ArtSprite.Lock:
+                    return PaintLock(recipe, palette);
+                case ArtSprite.GoldKey:
+                    return PaintGoldKey(recipe, palette);
+                case ArtSprite.Gem:
+                    return PaintGem(recipe, isHighlight: false);
+                case ArtSprite.GemHighlight:
+                    return PaintGem(recipe, isHighlight: true);
+                case ArtSprite.BonusCoin:
+                    return PaintCoin(recipe, palette);
+                case ArtSprite.OneWayArrow:
+                    return PaintOneWayArrow(recipe, isVertical: false, isHighlight: false);
+                case ArtSprite.OneWayArrowHighlight:
+                    return PaintOneWayArrow(recipe, isVertical: false, isHighlight: true);
+                case ArtSprite.OneWayArrowVertical:
+                    return PaintOneWayArrow(recipe, isVertical: true, isHighlight: false);
+                case ArtSprite.OneWayArrowVerticalHighlight:
+                    return PaintOneWayArrow(recipe, isVertical: true, isHighlight: true);
+                case ArtSprite.ShutterRim:
+                    return PaintShutterRim(recipe, palette);
+                case ArtSprite.ShutterCylinders:
+                    return PaintShutterCylinders(recipe, palette);
+                case ArtSprite.MachineBody:
+                    return PaintMachineBody(recipe, palette);
+                case ArtSprite.MachineScreen:
+                    return PaintMachineScreen(recipe, palette);
+                case ArtSprite.MachineVent:
+                    return PaintMachineVent(recipe);
+                case ArtSprite.MachineButton:
+                    return PaintMachineButton(recipe, palette);
+                case ArtSprite.ElevatorRim:
+                    return PaintElevatorRim(recipe, palette);
+                case ArtSprite.ElevatorHazardLeft:
+                    return PaintElevatorHazard(recipe, palette, isLeft: true);
+                case ArtSprite.ElevatorHazardRight:
+                    return PaintElevatorHazard(recipe, palette, isLeft: false);
+                case ArtSprite.ElevatorDoor:
+                    return PaintElevatorDoor(recipe, palette);
+                case ArtSprite.ElevatorHandle:
+                    return PaintElevatorHandle(recipe, palette);
                 default:
-                    return PaintDoorPanel(recipe);
+                    throw new ArgumentOutOfRangeException(nameof(sprite), sprite, "Not a generated sprite.");
             }
         }
 
@@ -185,62 +412,131 @@ namespace GateRush.Editor
             }
         }
 
+        /// <summary>
+        /// A plain piece: the piece's silhouette, white, for whatever draws a
+        /// block's shape flat — a grabbed block's outline, a preview. The lit
+        /// body is the face pieces' (<see cref="PaintFace"/>).
+        /// </summary>
         private static ArtImage PaintQuarter(ArtRecipe recipe, ArtSprite sprite)
+        {
+            var shape = ShapeOf(sprite);
+            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
+                (1.0, Coverage(recipe, SilhouetteSd(recipe, shape, x, y))));
+        }
+
+        /// <summary>
+        /// The centre of the stud nearest a cell-sprite pixel: one of
+        /// <paramref name="perSide"/> per axis,
+        /// <see cref="ArtRecipe.StudSpacingPixels"/> apart, centred on the cell.
+        /// </summary>
+        private static (double x, double y) NearestStud(ArtRecipe recipe, int perSide, double x, double y) =>
+            (NearestStudAlong(recipe, perSide, x), NearestStudAlong(recipe, perSide, y));
+
+        private static double NearestStudAlong(ArtRecipe recipe, int perSide, double position)
+        {
+            var count = perSide;
+            double spacing = recipe.StudSpacingPixels;
+            var center = recipe.CellPixels / 2.0;
+            var first = center - (count - 1) * spacing / 2.0;
+            var index = count > 1 ? Clamp(Math.Floor((position - first) / spacing + 0.5), 0.0, count - 1) : 0.0;
+            return first + index * spacing;
+        }
+
+        /// <summary>The quarter shape a plain sprite is painted for.</summary>
+        private static QuarterShape ShapeOf(ArtSprite sprite)
+        {
+            switch (sprite)
+            {
+                case ArtSprite.QuarterOuter:
+                    return QuarterShape.Outer;
+                case ArtSprite.QuarterEdge:
+                    return QuarterShape.Edge;
+                case ArtSprite.QuarterFill:
+                    return QuarterShape.Fill;
+                default:
+                    return QuarterShape.Concave;
+            }
+        }
+
+        /// <summary>
+        /// Signed distance to a piece's silhouette, the body's edge, in
+        /// quarter-local pixels: the cell's centre at the origin, its corner
+        /// at <c>(q, q)</c>, the edge at <c>e = q − gap/2</c>.
+        /// </summary>
+        private static double SilhouetteSd(ArtRecipe recipe, QuarterShape shape, double x, double y)
         {
             double q = recipe.QuarterPixels;
             var e = q - recipe.BlockGapPixels / 2.0;
             double r = recipe.CornerRadiusPixels;
             double rc = recipe.ConcaveRadiusPixels;
 
-            return Paint(recipe.QuarterPixels, recipe.QuarterPixels, Vector4.zero, (x, y) =>
+            switch (shape)
             {
-                double sd;
-                switch (sprite)
+                case QuarterShape.Outer:
+                    return SdLowerQuadrant(x, y, e - r, e - r) - r;
+                case QuarterShape.Edge:
+                    return y - e;
+                case QuarterShape.Fill:
+                    // Deeper than any bevel reaches: the whole quarter is face.
+                    return -2.0 * q;
+                default:
+                    return rc - SdUpperQuadrant(x, y, e + rc, e + rc);
+            }
+        }
+
+        /// <summary>
+        /// The outward direction of the boundary nearest <c>(x, y)</c>, in the
+        /// sprite's own frame (the top-right quarter). Exact wherever the
+        /// bevel reaches, which <see cref="ArtRecipe.Problems"/> keeps within a
+        /// corner's radius of the edge: there it turns smoothly, never jumping
+        /// across a corner's diagonal.
+        /// </summary>
+        private static (double x, double y) OutwardNormal(ArtRecipe recipe, QuarterShape shape, double x, double y)
+        {
+            double q = recipe.QuarterPixels;
+            var e = q - recipe.BlockGapPixels / 2.0;
+
+            switch (shape)
+            {
+                case QuarterShape.Outer:
                 {
-                    case ArtSprite.QuarterOuter:
-                        sd = SdLowerQuadrant(x, y, e - r, e - r) - r;
-                        break;
-                    case ArtSprite.QuarterEdge:
-                        sd = y - e;
-                        break;
-                    case ArtSprite.QuarterFill:
-                        // Deeper than any bevel reaches: the whole quarter is face.
-                        sd = -2.0 * q;
-                        break;
-                    default:
-                        sd = rc - SdUpperQuadrant(x, y, e + rc, e + rc);
-                        break;
+                    // Round the corner's centre the normal points out of it;
+                    // beside it, the nearer straight side decides.
+                    var c = e - recipe.CornerRadiusPixels;
+                    var dx = x - c;
+                    var dy = y - c;
+                    if (dx > 0.0 && dy > 0.0)
+                    {
+                        var length = Length(dx, dy);
+                        return (dx / length, dy / length);
+                    }
+
+                    return dy >= dx ? (0.0, 1.0) : (1.0, 0.0);
                 }
 
-                return (FaceTone(recipe, -sd), Coverage(recipe, sd));
-            });
-        }
+                case QuarterShape.Edge:
+                case QuarterShape.Fill:
+                    return (0.0, 1.0);
+                default:
+                {
+                    // The notch is the quadrant beyond (c, c), rounded: below
+                    // it the edge is the notch's floor, beside it a side, and
+                    // diagonally off it the normal points at its corner.
+                    var c = e + recipe.ConcaveRadiusPixels;
+                    if (x >= c && y < c)
+                    {
+                        return (0.0, 1.0);
+                    }
 
-        /// <summary>A cell's 2×2 studs, centred on the cell, each with a darker ring at its edge.</summary>
-        private static ArtImage PaintStuds(ArtRecipe recipe)
-        {
-            var radius = recipe.StudDiameterPixels / 2.0;
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var (cx, cy) = NearestStud(recipe, x, y);
-                var sd = Length(x - cx, y - cy) - radius;
-                var inStud = Clamp01(-sd - recipe.StudRingWidthPixels + 0.5);
-                var tone = Lerp(recipe.StudRingTone, recipe.StudTone, inStud);
-                return (tone, Coverage(recipe, sd));
-            });
-        }
+                    if (x < c && y < c)
+                    {
+                        var length = Length(c - x, c - y);
+                        return ((c - x) / length, (c - y) / length);
+                    }
 
-        /// <summary>One soft white highlight per stud, offset from its centre.</summary>
-        private static ArtImage PaintGloss(ArtRecipe recipe)
-        {
-            var radius = recipe.GlossDiameterPixels / 2.0;
-            var softness = Math.Max(recipe.GlossSoftnessPixels, recipe.AntiAliasPixels);
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var (cx, cy) = NearestStud(recipe, x, y);
-                var d = Length(x - cx - recipe.GlossOffsetPixels.x, y - cy - recipe.GlossOffsetPixels.y);
-                return (1.0, recipe.GlossAlpha * Clamp01(0.5 + (radius - d) / softness));
-            });
+                    return (1.0, 0.0);
+                }
+            }
         }
 
         /// <summary>An opaque tile with half the grid line along each of its edges.</summary>
@@ -256,8 +552,15 @@ namespace GateRush.Editor
             });
         }
 
-        /// <summary>A white arrow pointing up, centred in its square.</summary>
-        private static ArtImage PaintGateArrow(ArtRecipe recipe)
+        /// <summary>
+        /// A white arrow pointing up, centred in its square, grown by
+        /// <paramref name="growPixels"/> on every side: 0 for the arrow itself,
+        /// the outline's width for the outline the runtime draws under it.
+        /// The head's distance is exact outside it too, so the grown arrow
+        /// is rounded at its tip and corners, never spiked, and reaches no
+        /// further than the growth.
+        /// </summary>
+        private static ArtImage PaintGateArrow(ArtRecipe recipe, double growPixels)
         {
             double s = recipe.GateArrowPixels;
             var length = recipe.GateArrowLength * s;
@@ -268,14 +571,41 @@ namespace GateRush.Editor
             var halfHead = recipe.GateArrowHeadWidth * s / 2.0;
             var halfShaft = recipe.GateArrowShaftWidth * s / 2.0;
 
+            // The head's corners counter-clockwise, across then along.
+            var headXs = new[] { halfHead, 0.0, -halfHead };
+            var headYs = new[] { headBase, tip, headBase };
+
             return Paint(recipe.GateArrowPixels, recipe.GateArrowPixels, Vector4.zero, (x, y) =>
             {
                 var u = x - s / 2.0;
                 var v = y - s / 2.0;
-                var head = SdTriangle(v, u, headBase, tip, halfHead);
+                var head = SdConvexPolygon(u, v, headXs, headYs);
                 var shaft = SdBox(u, v - (tail + headBase) / 2.0, halfShaft, (headBase - tail) / 2.0);
-                return (1.0, Coverage(recipe, Math.Min(head, shaft)));
+                return (1.0, Coverage(recipe, Math.Min(head, shaft) - growPixels));
             });
+        }
+
+        /// <summary>
+        /// Exact signed distance to a convex polygon whose corners are listed
+        /// counter-clockwise: inside, the nearest edge line's (the largest of
+        /// them); outside, the nearest edge segment's.
+        /// </summary>
+        private static double SdConvexPolygon(double x, double y, IReadOnlyList<double> xs, IReadOnlyList<double> ys)
+        {
+            var nearestLine = double.NegativeInfinity;
+            var nearestSegment = double.MaxValue;
+            for (var i = 0; i < xs.Count; i++)
+            {
+                var j = (i + 1) % xs.Count;
+                var dx = xs[j] - xs[i];
+                var dy = ys[j] - ys[i];
+
+                // Counter-clockwise, so the outward normal is (dy, −dx).
+                nearestLine = Math.Max(nearestLine, ((x - xs[i]) * dy - (y - ys[i]) * dx) / Length(dx, dy));
+                nearestSegment = Math.Min(nearestSegment, DistanceToSegment(x, y, xs[i], ys[i], xs[j], ys[j]));
+            }
+
+            return nearestLine <= 0.0 ? nearestLine : nearestSegment;
         }
 
         /// <summary>
@@ -329,38 +659,6 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// Frost for one cell of ice: pale streaks on the diagonal, side by
-        /// side, clipped to a box inset from every side so frost never leaves a
-        /// block's rounded face. The clip also shortens the outer streaks.
-        /// White; its colour and strength come from the runtime.
-        /// </summary>
-        private static ArtImage PaintFrost(ArtRecipe recipe)
-        {
-            var center = recipe.CellPixels / 2.0;
-            var clipHalf = center - recipe.FrostInsetPixels;
-            var halfWidth = recipe.FrostStreakWidthPixels / 2.0;
-            var halfLength = recipe.FrostStreakLengthPixels / 2.0;
-            var count = recipe.FrostStreakCount;
-            var diagonal = 1.0 / Math.Sqrt(2.0);
-
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var along = (x - center + (y - center)) * diagonal;
-                var across = (y - center - (x - center)) * diagonal;
-                var nearest = double.MaxValue;
-                for (var i = 0; i < count; i++)
-                {
-                    var offset = (i - (count - 1) / 2.0) * recipe.FrostStreakSpacingPixels;
-                    var sd = Length(Math.Max(Math.Abs(along) - halfLength, 0.0), across - offset) - halfWidth;
-                    nearest = Math.Min(nearest, sd);
-                }
-
-                var clip = SdBox(x - center, y - center, clipHalf, clipHalf);
-                return (1.0, recipe.FrostAlpha * Coverage(recipe, nearest) * Coverage(recipe, clip));
-            });
-        }
-
-        /// <summary>
         /// A rounded box shaded like a block's face — outline, then a rim
         /// highlight easing into the face — reaching the sprite's edges. It is
         /// 9-sliced at <see cref="ArtRecipe.PanelBorderPixels"/> on every side,
@@ -377,57 +675,6 @@ namespace GateRush.Editor
             {
                 var sd = SdRoundedBox(x - half, y - half, half, half, radius);
                 return (FaceTone(recipe, -sd), Coverage(recipe, sd));
-            });
-        }
-
-        /// <summary>
-        /// A white outline around the sprite's edges, as wide as its 9-slice
-        /// border, with its outer corners rounded by that width. The runtime
-        /// scales it so the border draws at the thickness it asks for.
-        /// </summary>
-        private static ArtImage PaintRing(ArtRecipe recipe)
-        {
-            var half = recipe.RingPixels / 2.0;
-            double width = recipe.RingWidthPixels;
-            float border = recipe.RingWidthPixels;
-
-            return Paint(recipe.RingPixels, recipe.RingPixels, new Vector4(border, border, border, border), (x, y) =>
-            {
-                var outer = SdRoundedBox(x - half, y - half, half, half, width);
-                var inner = SdBox(x - half, y - half, half - width, half - width);
-                return (1.0, Coverage(recipe, outer) * (1.0 - Coverage(recipe, inner)));
-            });
-        }
-
-        /// <summary>
-        /// One period of chain along x: a link seen face-on — an open oval — in
-        /// the middle, and a link seen edge-on — a short bar — straddling both
-        /// ends, drawn over it. The pattern is symmetric about the period's
-        /// ends, so tiles meet without a seam.
-        /// </summary>
-        private static ArtImage PaintChain(ArtRecipe recipe)
-        {
-            double period = recipe.ChainPeriodPixels;
-            var middle = recipe.ChainThicknessPixels / 2.0;
-            double wall = recipe.ChainLinkWallPixels;
-            var halfWall = wall / 2.0;
-            var linkHalfLength = recipe.ChainLinkLengthPixels / 2.0;
-            var edgeHalfLength = recipe.ChainEdgeLinkLengthPixels / 2.0;
-
-            (double tone, double alpha) Metal(double sd) =>
-                (Lerp(recipe.ChainShadeTone, recipe.ChainTone, Clamp01(-sd / halfWall)), Coverage(recipe, sd));
-
-            return Paint(recipe.ChainPeriodPixels, recipe.ChainThicknessPixels, Vector4.zero, (x, y) =>
-            {
-                var v = y - middle;
-                var outline = SdRoundedBox(x - period / 2.0, v, linkHalfLength, middle, middle);
-                var faceOn = Math.Abs(outline + halfWall) - halfWall;
-
-                var edgeOn = Math.Min(
-                    SdRoundedBox(x, v, edgeHalfLength, halfWall, halfWall),
-                    SdRoundedBox(x - period, v, edgeHalfLength, halfWall, halfWall));
-
-                return Over(Metal(edgeOn), Metal(faceOn));
             });
         }
 
@@ -532,25 +779,6 @@ namespace GateRush.Editor
                 var groove = Clamp01(halfGap - toGroove + 0.5);
                 var slat = Lerp(recipe.SlatShadeTone, recipe.SlatTone, inSlat / pitch);
                 return (Lerp(slat, recipe.SlatGapTone, groove), 1.0);
-            });
-        }
-
-        /// <summary>
-        /// One opaque cell of lift door: a flat panel with faint vertical lines,
-        /// one on each side edge and the rest evenly between, so tiles meet
-        /// without a seam.
-        /// </summary>
-        private static ArtImage PaintDoorPanel(ArtRecipe recipe)
-        {
-            var pitch = (double)recipe.CellPixels / recipe.DoorLinesPerCell;
-            var halfLine = recipe.DoorLineWidthPixels / 2.0;
-
-            return Paint(recipe.CellPixels, recipe.CellPixels, Vector4.zero, (x, y) =>
-            {
-                var inPanel = x - pitch * Math.Floor(x / pitch);
-                var toLine = Math.Min(inPanel, pitch - inPanel);
-                var line = Clamp01(halfLine - toLine + 0.5);
-                return (Lerp(recipe.DoorTone, recipe.DoorLineTone, line), 1.0);
             });
         }
 
@@ -791,14 +1019,6 @@ namespace GateRush.Editor
         }
 
         private static double Coverage(ArtRecipe recipe, double sd) => Clamp01(0.5 - sd / recipe.AntiAliasPixels);
-
-        /// <summary>The centre of the stud nearest a cell-sprite pixel: one of four, spaced around the cell's centre.</summary>
-        private static (double x, double y) NearestStud(ArtRecipe recipe, double x, double y)
-        {
-            var center = recipe.CellPixels / 2.0;
-            var offset = recipe.StudSpacingPixels / 2.0;
-            return (x < center ? center - offset : center + offset, y < center ? center - offset : center + offset);
-        }
 
         /// <summary>Signed distance to the region <c>x ≤ cx, y ≤ cy</c>.</summary>
         private static double SdLowerQuadrant(double x, double y, double cx, double cy) =>

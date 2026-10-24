@@ -87,7 +87,6 @@ namespace GateRush.UI.Editor
         private const string RibbonSpritePath = "Assets/Art/Sprites/UI/ribbon.png";
         private const string BarTrackSpritePath = "Assets/Art/Sprites/UI/bar_track.png";
         private const string BarFillSpritePath = "Assets/Art/Sprites/UI/bar_fill.png";
-        private const string BadgeSpritePath = "Assets/Art/Sprites/UI/badge.png";
         private const string RedButtonSpritePath = "Assets/Art/Sprites/UI/button_rect_red.png";
         private const string JokerButtonSpritePath = "Assets/Art/Sprites/UI/button_square_green.png";
         private const string JokerButtonDisabledSpritePath = "Assets/Art/Sprites/UI/button_square_grey.png";
@@ -263,7 +262,7 @@ namespace GateRush.UI.Editor
         private const string LockName = "Lock";
         private const string RingName = "Ring";
         private const string ButtonName = "Button";
-        private const string BadgeName = "Badge";
+        private const string JokerPillName = "Pill";
         private const string BadgeLabelName = "Label";
         private const string PacksName = "Packs";
         private const string GoldRowName = "Gold";
@@ -440,8 +439,8 @@ namespace GateRush.UI.Editor
         // The streak bar's 36-unit track and its fill: 34 units of border.
         private const float BarPixelsPerUnitMultiplier = 1.25f;
 
-        // The joker badge, 86 square: 70 units of border.
-        private const float BadgePixelsPerUnitMultiplier = 1.17f;
+        // The joker pill, 72 tall: 66 units of border, the HUD pills' share.
+        private const float JokerPillPixelsPerUnitMultiplier = 1.85f;
 
         // The 235-unit square joker buttons: 143 units of border, the same
         // share of the button as Module 45's 118 of 196.
@@ -829,44 +828,51 @@ namespace GateRush.UI.Editor
         // Module 40: the Joker Bar's row, laid out at the reference and
         // scaled down by BandFit when the bottom band is smaller.
         //
-        // The interface review: the square buttons, the icon and the badge
-        // with everything in it are about 1.2 times Module 45's, the gap
-        // between the buttons half a button, the three grouped in the centre
-        // of a row only as wide as they need. The bottom band (0.145 of the
-        // screen's height, the most the board-fit floor allows with the top
-        // band at 0.16) scales the 312-unit row: about 0.89 at the 1920-unit
-        // reference and the web build's window, about 1 on a tall phone,
-        // where the screen's width holds it to about 0.96.
+        // Module 46, from the reference's proportions: the three square
+        // buttons grouped in the centre a quarter of a button apart, each
+        // carrying its count, price or unlock level on a dark pill centred
+        // under it, overlapping its foot by half the pill's height, and its
+        // icon a little larger, standing JokerIconOverhang past its top. The
+        // row is as tall as its parts from the foot up: the clearance under
+        // the pill, the pill's lower half, the button, the selected raise and
+        // the glow above it (92 + 36 + 235 + 20 + 16 = 399), so its foot is
+        // the band's and the clearance is the margin under the pill. The
+        // bottom band (0.145 of the screen's height) holds it at about 0.77
+        // on a 1080 by 2340 phone — buttons about 18.5% of the screen's width,
+        // the pill's foot about 3.3% of its height up — and at about 0.70 in
+        // a 9:16 window.
         //
-        // Each slot stands JokerBottomClearance above the row's foot under its
-        // badge: its centre is -156 + 22 + 19 + 117.5 = 2.5. The raised
-        // glow's top reaches 2.5 + 117.5 + 20 + 16 = 156, the row's half
-        // height; the raised ring's 153, and a raised button at the UI
-        // Config's default pulse of 1.06 reaches 2.5 + 124.6 + 20 = 147.1. The
-        // outer badge's right edge is at 353 + 117.5 + 19 = 489.5, inside the
-        // row's 499.5. "Lv 15" widens the badge to about 205 units, within the
-        // 235-unit button.
-        //
-        // The square sprite has 29 pixels of outline and lip at its foot and
-        // 15 of outline at its top; drawn at JokerButtonPixelsPerUnitMultiplier
-        // the face's middle sits (29 - 15) / 2 / 1.08, about 6.5 units, above
-        // the button's, so the icon is raised by JokerIconRaise.
+        // Each slot's centre is -199.5 + 92 + 36 + 117.5 = 46. The raised
+        // glow's top reaches 46 + 117.5 + 20 + 16 = 199.5, the row's half
+        // height; the raised icon's 46 + 33 + 92.5 + 20 = 191.5, and at the UI
+        // Config's default pulse of 1.06 about the button's centre
+        // 46 + 125.5 · 1.06 + 20 = 199.
         private const float JokerButtonSize = 235f;
-        private const float JokerSlotGap = 118f;
-        private const float BadgeOutset = 19f;
+        private const float JokerGapShare = 0.25f;
+        private const float JokerSlotGap = JokerButtonSize * JokerGapShare;
         private const float JokerRowSideMargin = 10f;
-        private const float JokerRowWidth = 2f * (JokerButtonSize + JokerSlotGap + JokerButtonSize / 2f + BadgeOutset + JokerRowSideMargin);
-        private const float JokerRowHeight = 312f;
-        private const float JokerBottomClearance = 22f;
+        private const float JokerFootClearance = 92f;
         private const float JokerRaise = 20f;
         private const float JokerRingOutset = 13f;
-        private const float JokerIconRaise = 6.5f;
-        private const float JokerIconSize = 161f;
-        private const float BadgeSize = 86f;
-        private const int BadgePadding = 17;
-        private const float BadgeSpacing = 7f;
-        private const float BadgeCoinSize = 67f;
-        private const float BadgeFontSize = 67f;
+        private const float JokerIconSize = 185f;
+        private const float JokerIconOverhang = 8f;
+        private const float JokerIconRaise = JokerButtonSize / 2f + JokerIconOverhang - JokerIconSize / 2f;
+        private const float JokerPillWidthShare = 0.9f;
+        private const float JokerPillWidth = JokerButtonSize * JokerPillWidthShare;
+        private const float JokerPillHeight = 72f;
+        private const float JokerPillFontSize = 52f;
+
+        // The coin hangs off the pill's left end as the HUD pills' icons do,
+        // PillIconOutsideShare of it outside, so it reaches this far past the
+        // button's left edge; the row leaves room for it.
+        private const float JokerCoinHeightShare = 1.1f;
+        private const float JokerCoinOverhang =
+            JokerPillHeight * JokerCoinHeightShare * PillIconOutsideShare - (JokerButtonSize - JokerPillWidth) / 2f;
+
+        private const float JokerRowWidth =
+            2f * (JokerButtonSize + JokerSlotGap + JokerButtonSize / 2f + JokerCoinOverhang + JokerRowSideMargin);
+
+        private const float JokerRowHeight = JokerFootClearance + JokerPillHeight / 2f + JokerButtonSize + JokerRaise + JokerGlowOutset;
 
         // Module 43: a locked joker's lock, centred on its icon — about half
         // the button since the interface review — and a marked joker's glow
@@ -1055,6 +1061,8 @@ namespace GateRush.UI.Editor
         private const string CoinField = "coin";
         private const string BadgeLabelField = "badgeLabel";
         private const string SelectedRaiseField = "selectedRaise";
+        private const string LabelInsetField = "labelInset";
+        private const string PriceLabelLeftField = "priceLabelLeft";
         private const string ClockField = "clock";
         private const string RocketField = "rocket";
         private const string BroomField = "broom";
@@ -2716,23 +2724,24 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// One joker's slot, <paramref name="x"/> from the row's centre and
-        /// raised off the row's foot by the bottom clearance under its badge:
-        /// the lift, raised while selected, holding the glow (hidden; shown
-        /// while marked, Module 43) and the ring (hidden) behind a Button
-        /// Primary instance made square on this instance — the green square
-        /// face and its grey disabled look, with no pressed look until Module
-        /// 46 — with its own label switched off; on the button, the joker's
-        /// icon from the Joker Icons asset centred on the face above its lip
-        /// with the lock (hidden; Module 43) centred on it, and the red badge
-        /// on the bottom-right corner with the coin (hidden) and the count
-        /// (Module 42).
+        /// raised off the row's foot by the clearance under its pill and the
+        /// pill's lower half: the lift, raised while selected, holding the glow
+        /// (hidden; shown while marked, Module 43) and the ring (hidden) behind
+        /// a Button Primary instance made square on this instance — the green
+        /// square face and its grey disabled look, with no pressed look — with
+        /// its own label switched off; on the button, the joker's icon from
+        /// the Joker Icons asset, standing a little past the button's top, with
+        /// the lock (hidden; Module 43) centred on it, and the dark pill
+        /// centred under the button, over its foot, with the coin (hidden)
+        /// hanging off its left end and the count (Module 46). The pill is on
+        /// the button, so it rises with the lift and pulses with the button.
         /// </summary>
         private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
         {
             var config = sources.Config;
             var slot = UiBuilder.CreateRect(kind.ToString(), row);
             UiBuilder.PlaceCentered(slot, new Vector2(JokerButtonSize, JokerButtonSize));
-            var slotY = -JokerRowHeight / 2f + JokerBottomClearance + BadgeOutset + JokerButtonSize / 2f;
+            var slotY = -JokerRowHeight / 2f + JokerFootClearance + JokerPillHeight / 2f + JokerButtonSize / 2f;
             slot.anchoredPosition = new Vector2(x, slotY);
 
             var lift = UiBuilder.CreateRect(LiftName, slot);
@@ -2781,37 +2790,26 @@ namespace GateRush.UI.Editor
             var iconImage = UiBuilder.AddIcon(icon, sources.JokerIcons.IconOf(kind), config.IconColor);
             var lockIcon = AddLock(icon, sources, JokerLockSize);
 
-            // Pivoted on the button's bottom-right corner, so the fitter widens
-            // it leftwards across the face and it never leaves the corner.
-            var badge = UiBuilder.CreateRect(BadgeName, button);
+            // Centred on the button's foot, so half of it hangs below.
+            var pill = UiBuilder.CreateRect(JokerPillName, button);
             UiBuilder.Place(
-                badge, new Vector2(AnchorHigh, AnchorLow), new Vector2(BadgeOutset, -BadgeOutset), new Vector2(BadgeSize, BadgeSize));
-            AddSliced(badge, sources.Badge, OwnColorsHex, BadgePixelsPerUnitMultiplier);
-            var badgeElement = badge.gameObject.AddComponent<LayoutElement>();
-            badgeElement.minWidth = BadgeSize;
-            var fitter = badge.gameObject.AddComponent<ContentSizeFitter>();
-            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-            var layout = badge.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(BadgePadding, BadgePadding, 0, 0);
-            layout.spacing = BadgeSpacing;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = true;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = false;
+                pill, new Vector2(AnchorMid, AnchorLow), Vector2.zero, new Vector2(JokerPillWidth, JokerPillHeight));
+            pill.pivot = new Vector2(AnchorMid, AnchorMid);
+            AddSliced(pill, sources.Pill, OwnColorsHex, JokerPillPixelsPerUnitMultiplier);
 
-            var coin = UiBuilder.CreateRect(CoinName, badge);
-            var coinElement = coin.gameObject.AddComponent<LayoutElement>();
-            coinElement.preferredWidth = BadgeCoinSize;
-            coinElement.preferredHeight = BadgeCoinSize;
-            UiBuilder.AddIcon(coin, sources.Coin, ParseColor(IconColorHex));
-            coin.gameObject.SetActive(false);
+            // The text centres on the pill, and beside the coin when a price
+            // shows it: JokerBarButton moves the text's left edge between the two.
+            var coinRight = AddPillIcon(pill, CoinName, sources.Coin, JokerCoinHeightShare);
+            var coin = pill.Find(CoinName).gameObject;
+            coin.SetActive(false);
+            var priceLabelLeft = coinRight + PillTextGap;
 
-            var label = UiBuilder.CreateRect(BadgeLabelName, badge);
+            var label = UiBuilder.CreateRect(BadgeLabelName, pill);
+            HorizontalBand(label, PillTextInset, PillTextInset);
             var placeholder = new JokerButton(JokerBadge.Count, CountPlaceholder, true, 0, false);
-            var badgeLabel = AddText(label, sources, LevelHudTexts.JokerBadge(placeholder, config), BadgeFontSize, HudTextColorHex);
+            var badgeLabel = AddText(label, sources, LevelHudTexts.JokerBadge(placeholder, config), JokerPillFontSize, HudTextColorHex);
             badgeLabel.color = config.JokerBadgeTextColor;
+            badgeLabel.fontStyle = FontStyles.Bold;
 
             var view = slot.gameObject.AddComponent<JokerBarButton>();
             SetReferences(
@@ -2822,9 +2820,11 @@ namespace GateRush.UI.Editor
                 (IconField, iconImage),
                 (LockIconField, lockIcon),
                 (GlowField, glowImage),
-                (CoinField, coin.gameObject),
+                (CoinField, coin),
                 (BadgeLabelField, badgeLabel));
             SetFloat(view, SelectedRaiseField, JokerRaise);
+            SetFloat(view, LabelInsetField, PillTextInset);
+            SetFloat(view, PriceLabelLeftField, priceLabelLeft);
             return view;
         }
 
@@ -3718,9 +3718,6 @@ namespace GateRush.UI.Editor
             public Sprite BarTrack { get; private set; }
             public Sprite BarFill { get; private set; }
 
-            /// <summary>The joker button's red corner badge, 9-sliced.</summary>
-            public Sprite Badge { get; private set; }
-
             public Sprite SoundOn { get; private set; }
             public Sprite SoundOff { get; private set; }
             public Sprite Heart { get; private set; }
@@ -3807,7 +3804,6 @@ namespace GateRush.UI.Editor
                     Ribbon = LoadSlicedSprite(RibbonSpritePath),
                     BarTrack = LoadSlicedSprite(BarTrackSpritePath),
                     BarFill = LoadSlicedSprite(BarFillSpritePath),
-                    Badge = LoadSlicedSprite(BadgeSpritePath),
                     SoundOn = LoadSprite(SoundOnSpritePath),
                     SoundOff = LoadSprite(SoundOffSpritePath),
                     Heart = LoadSprite(HeartSpritePath),

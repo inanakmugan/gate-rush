@@ -434,8 +434,10 @@ namespace GateRush.Runtime
             if (block.Outline == null)
             {
                 block.Outline = AddGroup(block.Body, "Outline", Vector2.zero);
+                // The plain pieces are the block's whole silhouette, so the
+                // outline grows out from its edge (Module 46).
                 block.OutlineQuarters = AddQuarters(
-                    block.Outline, block.Tiles, blockQuarterRect, config.OutlineColor, config.OutlineOrder);
+                    block.Outline, block.Tiles, blockQuarterRect, QuarterLayer.Plain, config.OutlineColor, config.OutlineOrder);
                 ApplyLift(block, block.LiftAmount);
             }
 
@@ -487,7 +489,7 @@ namespace GateRush.Runtime
             for (var i = 0; i < block.Tiles.Count; i++)
             {
                 var tile = block.Tiles[i];
-                PoseQuarter(block.OutlineQuarters[i], tile, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
+                PoseQuarter(block.OutlineQuarters[i], tile, QuarterLayer.Plain, CellRectToLocal(LiftOutline.QuarterRect(tile, width)));
             }
         }
 
@@ -1378,55 +1380,108 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A surviving layered block peels its removed outer colour (Module
-        /// 20), on the renderers it was drawn with: the inner shape grows from
-        /// its inset to the whole face (<see cref="FaceShape"/>), its studs
-        /// with it, while the
-        /// outer face shrinks inward by that inset and fades, the inner
-        /// shape's edge fades, and the lip turns from the outer colour's to
-        /// <paramref name="exposed"/>'s. It ends as a plain block of the
-        /// exposed colour, which is what the redraw then shows — with a third
-        /// colour's inner shape inside it when the stack goes deeper.
+        /// A surviving layered block peels its removed outer colour (Modules
+        /// 20 and 46), on the renderers it was drawn with: the window grows
+        /// from its inset to the whole body (<see cref="FaceShape"/>) — its
+        /// sunken rim fading as it goes, the inner block and its highlight
+        /// growing with it over the darker outer block and its studs — while
+        /// the inner block's own studs fade out as the per-cell studs of a
+        /// plain block, in <paramref name="exposed"/>'s colour, fade in. It
+        /// ends as a plain block of the exposed colour, which is
+        /// what the redraw then shows — with a third colour in its window when
+        /// the stack goes deeper.
         /// </summary>
         /// <returns>
         /// The peel, to run in the leave stage's sequence, which carries this
-        /// view as its id; or null for a block drawn without an inner shape —
-        /// one that was cleared while frozen (M3 hides its colours) — which has
+        /// view as its id; or null for a block drawn without a window — one
+        /// that was cleared while frozen (M3 hides its colours) — which has
         /// nothing to peel and is left to the redraw.
         /// </returns>
         private Tween PeelEffect(DrawnBlock block, BlockColor exposed)
         {
-            if (block.LayerQuarters == null)
+            var layer = block.Layer;
+            if (layer == null)
             {
                 return null;
             }
 
-            var inset = config.LayerInsetCells;
-            var edgeInset = inset - config.LayerEdgeCells;
+            var edgeInset = config.LayerInsetCells;
+            var innerInset = config.LayerInnerInsetCells;
 
-            // A footprint has at least one cell, so each list holds at least
-            // four quarters, all drawn in one colour.
-            var faceColor = block.FaceQuarters[0].color;
-            var edgeColor = block.LayerEdgeQuarters[0].color;
-            var lipFrom = block.LipQuarters[0].color;
-            var lipTo = config.LipFill(config.BlockFill(exposed));
+            // A footprint has at least one cell, so each quarter list holds
+            // at least four quarters, all drawn in one colour.
+            var edgeColor = layer.Edge[0].color;
+            var exposedFill = config.BlockFill(exposed);
+            var innerStudColors = new Color[layer.Studs.Count];
+            for (var i = 0; i < innerStudColors.Length; i++)
+            {
+                innerStudColors[i] = layer.Studs[i].color;
+            }
+
+            var plainStuds = AddPeelStuds(block, exposedFill);
 
             return DOVirtual.Float(0f, 1f, config.PeelSeconds, t =>
                 {
                     // An easing may overshoot; a size may follow it, an
                     // opacity may not.
-                    var opacity = 1f - Mathf.Clamp01(t);
+                    var shown = Mathf.Clamp01(t);
+                    var opacity = 1f - shown;
 
-                    PoseInset(block.LayerQuarters, block.Tiles, inset * (1f - t));
-                    PoseInset(block.LayerEdgeQuarters, block.Tiles, edgeInset * (1f - t));
-                    PoseInset(block.FaceQuarters, block.Tiles, inset * t);
-                    block.SetStudScale(Mathf.LerpUnclamped(config.LayerStudScale, 1f, t));
+                    // Colours first: a quarter's seam overlap follows its
+                    // opacity (QuarterLayers.SeamOverlap).
+                    SetColor(layer.Edge, WithOpacity(edgeColor, opacity));
 
-                    SetColor(block.FaceQuarters, WithOpacity(faceColor, opacity));
-                    SetColor(block.LayerEdgeQuarters, WithOpacity(edgeColor, opacity));
-                    SetColor(block.LipQuarters, Color.Lerp(lipFrom, lipTo, t));
+                    PoseInset(layer.Edge, block.Tiles, QuarterLayer.ReversedLit, edgeInset * (1f - t));
+                    PoseInset(layer.Face, block.Tiles, QuarterLayer.Lit, innerInset * (1f - t));
+                    PoseShineInset(layer.Shine, block.Tiles, innerInset * (1f - t));
+
+                    for (var i = 0; i < layer.Studs.Count; i++)
+                    {
+                        layer.Studs[i].color = WithOpacity(innerStudColors[i], opacity);
+                    }
+
+                    for (var i = 0; i < plainStuds.Count; i++)
+                    {
+                        plainStuds[i].Renderer.color = WithOpacity(plainStuds[i].Color, shown);
+                    }
                 })
                 .SetEase(config.PeelEase);
+        }
+
+        /// <summary>
+        /// The per-cell studs and gloss of a plain block of
+        /// <paramref name="exposedFill"/>, added over the window at nothing
+        /// and paired with the colour each fades in to. None for a block that
+        /// carries no studs. They are masked as the block's face is, should a
+        /// gate's clip hold it.
+        /// </summary>
+        private List<(SpriteRenderer Renderer, Color Color)> AddPeelStuds(DrawnBlock block, Color exposedFill)
+        {
+            var studs = new List<(SpriteRenderer Renderer, Color Color)>();
+            if (block.IsIce || block.Axis != MovementAxis.Free)
+            {
+                return studs;
+            }
+
+            IRecipeSurface<Transform, SpriteRenderer> surface = this;
+            var mask = block.FaceQuarters[0].maskInteraction;
+            for (var c = 0; c < block.Cells.Count; c++)
+            {
+                var cell = block.Cells[c];
+                var center = new Vector2(cell.X + 0.5f, cell.Y + 0.5f);
+                var stud = surface.Sprite(
+                    block.Body, $"Peel studs {cell}", config.StudsSprite, center, Vector2.one, WithOpacity(exposedFill, 0f),
+                    config.LayerStudOrder, 0f, SpriteLook.Lit);
+                var gloss = surface.Sprite(
+                    block.Body, $"Peel gloss {cell}", config.StudGlossSprite, center, Vector2.one,
+                    WithOpacity(config.GlossColor, 0f), config.LayerGlossOrder, 0f, SpriteLook.Plain);
+                stud.maskInteraction = mask;
+                gloss.maskInteraction = mask;
+                studs.Add((stud, exposedFill));
+                studs.Add((gloss, config.GlossColor));
+            }
+
+            return studs;
         }
 
         private static void SetColor(List<SpriteRenderer> renderers, Color color)
@@ -1473,12 +1528,9 @@ namespace GateRush.Runtime
             var cells = ctx.SpecAt(blockIndex).Cells;
 
             // The marks as the old drawing had them: the block was locked, so
-            // it had its padlock, beside a layer badge and a time-bonus mark
-            // if it carried them.
+            // it had its padlock, beside a time-bonus mark if it carried one.
             var shown = before != null ? visibility.Block(before, blockIndex) : default;
-            var marks = MarksOf(
-                cells, shown.IsFrozen, hasIcon: true, hasBonus: shown.TimeBonusSeconds > 0,
-                hasLayers: shown.LayerNumeral.HasValue);
+            var marks = MarksOf(cells, hasIcon: true, bonusSeconds: shown.TimeBonusSeconds);
             var icon = marks.Icon * layout.CellSize;
             var pivot = AddGroup(stage, $"Opening lock {blockIndex}", OriginToLocal(origin) + icon);
             var frame = AddGroup(pivot, "Lock", -icon);
@@ -1507,12 +1559,14 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A generated block starts at its machine's screen, at the size the
-        /// screen showed it, and grows while moving to its cells.
+        /// A generated block starts on its machine's screen, where and at the
+        /// size the screen showed it (<see cref="SplitScreen"/>), and grows
+        /// while moving to its cells.
         /// </summary>
         private Tween ArriveFromGenerator(DrawnBlock block, int generatorIndex)
         {
-            var screen = GridRectToLocal(machines[generatorIndex].Screen);
+            var screen = SplitScreen(
+                GridRectToLocal(machines[generatorIndex].Screen), config.MachineScreenCountShare, config.MachineMiniatureFillShare).block;
             var startScale = MiniatureFit(block.Cells, screen, out _) / layout.CellSize;
             Vector2 target = block.Root.localPosition;
             var start = screen.center - block.FootprintCenter;
@@ -1529,15 +1583,13 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// An elevator delivers a wave: its doors, drawn again as two temporary
-        /// halves over the hidden doors, slide apart into the region's sides;
-        /// the wave's blocks rise from slightly small and low to their cells;
-        /// and the halves close again beneath them.
+        /// doors with their handles over the hidden ones, slide apart into the
+        /// recess's sides; the wave's blocks rise from slightly small and low
+        /// to their cells; and the doors close again beneath them.
         /// </summary>
         private void RiseFromElevator(Sequence arrive, int elevatorIndex, List<DrawnBlock> wave)
         {
             var elevator = ctx.Elevators[elevatorIndex];
-            var center = RegionCenter(elevator.Min, elevator.Max);
-            var size = RegionSize(elevator.Min, elevator.Max);
 
             if (elevatorDoors.TryGetValue(elevatorIndex, out var doors))
             {
@@ -1548,22 +1600,29 @@ namespace GateRush.Runtime
                 }
             }
 
-            var sprite = config.DoorPanelSprite;
-            var scale = CellTileScale(sprite);
-            var halfWidth = size.x * 0.5f;
-            var leftEdge = center.x - halfWidth;
-            var rightEdge = center.x + halfWidth;
-            var left = AddTiled(stage, "Left door", sprite, center, size, scale, config.ElevatorDoorColor, config.ElevatorDoorOrder);
-            var right = AddTiled(stage, "Right door", sprite, center, size, scale, config.ElevatorDoorColor, config.ElevatorDoorOrder);
+            var region = RegionViewCells(elevator.Min, elevator.Max);
+            var (leftDoor, rightDoor) = ElevatorDoorRects(config, region);
+            var offset = config.ElevatorHandleOffsetCells;
+            var left = recipes.Door(stage, "Left door", leftDoor);
+            var right = recipes.Door(stage, "Right door", rightDoor);
+            var leftHandle = recipes.Handle(stage, "Left handle", new Vector2(region.center.x - offset, region.center.y));
+            var rightHandle = recipes.Handle(stage, "Right handle", new Vector2(region.center.x + offset, region.center.y));
 
-            // Each half keeps its outer side against the region's side and
-            // narrows toward it, so the doors slide under the sides unmasked.
+            // A handle sits this far in from its door's inner edge, and rides
+            // with it while it is on the door.
+            var handleIn = offset - config.ElevatorDoorGapCells;
+            var halfWidth = leftDoor.width;
+
+            // Each door keeps its outer side against the recess's side and
+            // narrows toward it, so the doors slide under the rim unmasked.
             void SetDoors(float width)
             {
-                left.size = new Vector2(width / scale, size.y / scale);
-                left.transform.localPosition = new Vector2(leftEdge + width * 0.5f, center.y);
-                right.size = new Vector2(width / scale, size.y / scale);
-                right.transform.localPosition = new Vector2(rightEdge - width * 0.5f, center.y);
+                PlaceDoor(left, new Rect(leftDoor.xMin, leftDoor.yMin, width, leftDoor.height));
+                PlaceDoor(right, new Rect(rightDoor.xMax - width, rightDoor.yMin, width, rightDoor.height));
+                leftHandle.transform.localPosition = new Vector2(CellsToWorld(leftDoor.xMin + width - handleIn), CellsToWorld(region.center.y));
+                rightHandle.transform.localPosition = new Vector2(CellsToWorld(rightDoor.xMax - width + handleIn), CellsToWorld(region.center.y));
+                leftHandle.enabled = width > handleIn;
+                rightHandle.enabled = width > handleIn;
             }
 
             SetDoors(halfWidth);
@@ -1602,6 +1661,26 @@ namespace GateRush.Runtime
             arrive.Insert(
                 open + rise,
                 DOVirtual.Float(0f, 1f, config.DoorsCloseSeconds, t => SetDoors(halfWidth * t)).SetEase(config.DoorsEase));
+        }
+
+        /// <summary>
+        /// Lays a sliced door, drawn by <see cref="BoardRecipes{TGroup, TPiece}.Door"/>,
+        /// over <paramref name="door"/>, in cells in the view's frame: its
+        /// sprite reaches past it for its shadow, at the scale it was drawn at.
+        /// </summary>
+        private void PlaceDoor(SpriteRenderer renderer, Rect door)
+        {
+            // Null only when the door's sprite has no slice border, which
+            // Generate Art never paints; nothing is drawn to place then.
+            if (renderer == null)
+            {
+                return;
+            }
+
+            var scale = renderer.transform.localScale.x;
+            var reach = 2f * config.ElevatorDoorShadowMarginCells;
+            renderer.transform.localPosition = door.center * layout.CellSize;
+            renderer.size = new Vector2(CellsToWorld(door.width + reach) / scale, CellsToWorld(door.height + reach) / scale);
         }
     }
 }

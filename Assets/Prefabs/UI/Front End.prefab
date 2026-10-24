@@ -217,7 +217,7 @@ RectTransform:
   - {fileID: 7328506789903193797}
   - {fileID: 4671015535231869800}
   - {fileID: 8393526146151962697}
-  - {fileID: 9085724706445485021}
+  - {fileID: 3698387103469311339}
   m_Father: {fileID: 4372607163616459405}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -379,7 +379,7 @@ MonoBehaviour:
   testPurchase: {fileID: 7995786594449595439}
   winStreak: {fileID: 5782300815194947033}
   streakReward: {fileID: 134481653250666734}
-  profile: {fileID: 6050194435521325162}
+  profile: {fileID: 2212163287520108252}
   streakBar: {fileID: 7002795279280308135}
   jokerIcons: {fileID: 11400000, guid: ec92205ed001334499340bb9a7d55a35, type: 2}
   avatarCatalog: {fileID: 11400000, guid: 2082e31ea4c10dc4ab4b00a1ef41838e, type: 2}
@@ -1652,7 +1652,7 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: aee40f41dfd209546b4ff98214acef15, type: 3}
---- !u!114 &6050194435521325162 stripped
+--- !u!114 &2212163287520108252 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 4688660297489561933, guid: aee40f41dfd209546b4ff98214acef15, type: 3}
   m_PrefabInstance: {fileID: 6891168755680569233}
@@ -1663,7 +1663,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f12ceb49726f5eb48b3ce1a1ef57b714, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.UI::GateRush.UI.ProfileOverlay
---- !u!224 &9085724706445485021 stripped
+--- !u!224 &3698387103469311339 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7850079819599508218, guid: aee40f41dfd209546b4ff98214acef15, type: 3}
   m_PrefabInstance: {fileID: 6891168755680569233}
