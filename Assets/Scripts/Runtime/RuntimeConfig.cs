@@ -230,7 +230,10 @@ namespace GateRush.Runtime
         [SerializeField] private Sprite shutterSlatsSprite;
         [SerializeField] private Sprite clockSprite;
         [SerializeField] private Sprite cubeSprite;
+        [SerializeField] private Sprite cubeHighlightSprite;
         [SerializeField] private Sprite shardSprite;
+        [SerializeField] private Sprite shard2Sprite;
+        [SerializeField] private Sprite shard3Sprite;
         [SerializeField] private Sprite gateGlowSprite;
         [SerializeField] private Sprite sparkleSprite;
 
@@ -544,7 +547,7 @@ namespace GateRush.Runtime
         [Tooltip("Easing of the bump's way in, and mirrored, of its way back.")]
         [SerializeField] private Ease peelBumpEase = Ease.OutQuad;
 
-        [Tooltip("Seconds a block a Rocket or Broom destroyed takes to fade where it stands while its shards fly (Module 34). Input never waits for it; a win's panel does.")]
+        [Tooltip("Seconds a block a Rocket or Broom destroyed takes to fade where it stands, after its flash, while its cubes fly — or, frozen, its ice shards (Modules 34, 47). Input never waits for it; a win's panel does.")]
         [SerializeField] private float breakFadeSeconds = 0.2f;
 
         [SerializeField] private Ease breakFadeEase = Ease.OutQuad;
@@ -626,6 +629,68 @@ namespace GateRush.Runtime
         [SerializeField] private float shardMaxDelaySeconds = 0.03f;
 
         [SerializeField] private Ease shardEase = Ease.OutQuad;
+
+        [Tooltip("The shards' glassy ice, baked into the three shard sprites by Gate Rush > Generate Art (Module 47): run it again after a change. Opaque.")]
+        [SerializeField] private Color shardColor = new Color(0.65882355f, 0.8862745f, 1f);
+
+        [Tooltip("Draws each exit, peel and joker cube's white highlight as a second sprite, as a block's is drawn. Off by default: the cube is small, and the highlight doubles its renderers.")]
+        [SerializeField] private bool drawCubeHighlights;
+
+        [Header("Joker clears in place (Module 47: a destroyed block breaks apart where it stands)")]
+        [Tooltip("How far the block's colour moves toward white at the height of its flash, from 0 (no flash) to 1.")]
+        [SerializeField] private float breakFlashStrength = 0.6f;
+
+        [Tooltip("Seconds the flash takes to reach its height; the fade over Break Fade Seconds then takes the block away. Above 0, at most 1.")]
+        [SerializeField] private float breakFlashSeconds = 0.08f;
+
+        [Tooltip("Cubes per cell of the block, before the caps: at least 1, at most Cube Count Per Cell.")]
+        [SerializeField] private int breakCubeCountPerCell = 4;
+
+        [Tooltip("The most cubes one block breaks into: at least 1, at most Cube Cap.")]
+        [SerializeField] private int breakCubeCap = 16;
+
+        [Tooltip("The most cubes one joker breaks into over every block it clears, shared between them (a Broom): at least Break Cube Cap, at most 128.")]
+        [SerializeField] private int breakCubeMoveCap = 48;
+
+        [Tooltip("How far a cube flies out from the block's centre, in cells: x the shortest, y the longest. The Exit cubes' size, spin, seconds, ease and end scale apply.")]
+        [SerializeField] private Vector2 breakCubeTravelCells = new Vector2(0.4f, 1.2f);
+
+        [Tooltip("How far a cube's direction may turn from straight out from the block's centre, in degrees either way: at least 0, below 90.")]
+        [SerializeField] private float breakCubeSpreadDegrees = 25f;
+
+        [Tooltip("The latest a cube starts after the break does, in seconds.")]
+        [SerializeField] private float breakCubeMaxDelaySeconds = 0.03f;
+
+        [Tooltip("Sparkles over one block that breaks, before the cap: from 0 (none) to 8.")]
+        [SerializeField] private int breakSparkleCount = 2;
+
+        [Tooltip("The most sparkles one joker shows over every block it clears, shared between them: from 0 to 32.")]
+        [SerializeField] private int breakSparkleMoveCap = 6;
+
+        [Tooltip("Side of a sparkle in cells: x the smallest, y the largest.")]
+        [SerializeField] private Vector2 breakSparkleSizeCells = new Vector2(0.35f, 0.5f);
+
+        [Tooltip("How far a sparkle drifts out from the block's centre, in cells: x the shortest, y the longest.")]
+        [SerializeField] private Vector2 breakSparkleTravelCells = new Vector2(0.1f, 0.3f);
+
+        [Tooltip("Seconds one sparkle shows, shrinking and fading. Above 0, at most 2.")]
+        [SerializeField] private float breakSparkleSeconds = 0.35f;
+
+        [Tooltip("A sparkle's scale at the end, from 0 to 1.")]
+        [SerializeField] private float breakSparkleEndScale = 0f;
+
+        [Header("Debris pool (Module 47)")]
+        [Tooltip("Sprite renderers made once for the debris (cubes, shards, sparkles, gate glows) and reused: none is made or destroyed in play. A piece is skipped while all are flying. At least what one exit, one joker clear and one gate's or block's shards need at once; at most 512.")]
+        [SerializeField] private int debrisPoolSize = 112;
+
+        [Header("Finished elevator (Module 47)")]
+        [Tooltip("Seconds an elevator whose last wave cleared takes to sink into the floor and fade. Above 0, at most 2.")]
+        [SerializeField] private float elevatorSinkSeconds = 0.35f;
+
+        [Tooltip("The lift's scale about its region's centre when it has sunk, from 0 to below 1.")]
+        [SerializeField] private float elevatorSinkEndScale = 0.2f;
+
+        [SerializeField] private Ease elevatorSinkEase = Ease.InQuad;
 
         [Header("Shutters, locks and badges")]
         [Tooltip("Seconds an opening shutter's panel takes to lift off: it shrinks toward its top edge while fading.")]
@@ -1349,7 +1414,70 @@ namespace GateRush.Runtime
         /// <summary>One cube of a destroyed block's burst, tinted the block's colour.</summary>
         public Sprite CubeSprite => cubeSprite;
 
-        /// <summary>One ice shard, tinted <see cref="IceColor"/>.</summary>
+        /// <summary>A cube's white highlight, added over it by the specular material while <see cref="DrawCubeHighlights"/> is on.</summary>
+        public Sprite CubeHighlightSprite => cubeHighlightSprite;
+
+        /// <summary>
+        /// The ice shard sprites, baked in <see cref="ShardColor"/>: Shard,
+        /// Shard2 and Shard3, one per outline. A burst's piece <c>i</c> draws
+        /// shard <c>i</c> modulo their count, so a burst mixes all of them.
+        /// </summary>
+        public Sprite ShardSpriteAt(int index)
+        {
+            switch (index % ShardSpriteCount)
+            {
+                case 0:
+                    return shardSprite;
+                case 1:
+                    return shard2Sprite;
+                default:
+                    return shard3Sprite;
+            }
+        }
+
+        /// <summary>How many shard sprites there are.</summary>
+        public const int ShardSpriteCount = 3;
+
+        /// <summary>The shards' glassy ice, baked into their sprites by Generate Art.</summary>
+        public Color ShardColor => shardColor;
+
+        /// <summary>True when a cube's highlight is drawn as a second sprite; off by default, for performance.</summary>
+        public bool DrawCubeHighlights => drawCubeHighlights;
+
+        /// <summary>How far a breaking block's colour moves toward white at its flash's height.</summary>
+        public float BreakFlashStrength => breakFlashStrength;
+
+        /// <summary>Seconds a breaking block's flash takes to reach its height.</summary>
+        public float BreakFlashSeconds => breakFlashSeconds;
+
+        /// <summary>The most cubes one joker breaks into over every block it clears.</summary>
+        public int BreakCubeMoveCap => breakCubeMoveCap;
+
+        /// <summary>Sparkles over one block that breaks, before the caps.</summary>
+        public int BreakSparkleCount => breakSparkleCount;
+
+        /// <summary>The most sparkles one joker shows over every block it clears.</summary>
+        public int BreakSparkleMoveCap => breakSparkleMoveCap;
+
+        /// <summary>Seconds one sparkle shows.</summary>
+        public float BreakSparkleSeconds => breakSparkleSeconds;
+
+        /// <summary>A sparkle's scale at the end.</summary>
+        public float BreakSparkleEndScale => breakSparkleEndScale;
+
+        /// <summary>Sprite renderers made once for the debris and reused.</summary>
+        public int DebrisPoolSize => debrisPoolSize;
+
+        /// <summary>Seconds a finished elevator takes to sink and fade.</summary>
+        public float ElevatorSinkSeconds => elevatorSinkSeconds;
+
+        /// <summary>A finished elevator's scale when it has sunk.</summary>
+        public float ElevatorSinkEndScale => elevatorSinkEndScale;
+
+        /// <summary>How a finished elevator sinks.</summary>
+        public Ease ElevatorSinkEase => elevatorSinkEase;
+
+        /// <summary>The first ice shard, baked in <see cref="ShardColor"/> (<see cref="ShardSpriteAt"/> gives all three).</summary>
         public Sprite ShardSprite => shardSprite;
 
         /// <summary>A soft white gradient, strongest along its bottom edge: the glow inside a gate a block is passing.</summary>
@@ -2424,6 +2552,34 @@ namespace GateRush.Runtime
                 cubeCountPerCell, cubeCap, cubeSizeCells.x, cubeSizeCells.y, cubeTravelCells.x, cubeTravelCells.y,
                 cubeSpreadDegrees, cubeSpinDegrees, CubeStreamSetsItsOwnDelays);
 
+        /// <summary>
+        /// The layout of the cubes a block a joker destroyed breaks into, flying
+        /// out from its centre (Module 47): its own count, cap, travel, spread
+        /// and delay, and the exit cubes' size and spin.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A value is out of range; see <see cref="Problems"/>.</exception>
+        public BurstSettings CreateBreakCubeBurst() =>
+            new BurstSettings(
+                breakCubeCountPerCell, breakCubeCap, cubeSizeCells.x, cubeSizeCells.y, breakCubeTravelCells.x, breakCubeTravelCells.y,
+                breakCubeSpreadDegrees, cubeSpinDegrees, breakCubeMaxDelaySeconds);
+
+        /// <summary>
+        /// The layout of the sparkles over a block a joker destroyed: one per
+        /// cell before the caps, which <see cref="BreakSparkleCount"/> and
+        /// <see cref="BreakSparkleMoveCap"/> set, unspun.
+        /// </summary>
+        /// <exception cref="ArgumentOutOfRangeException">A value is out of range; see <see cref="Problems"/>.</exception>
+        public BurstSettings CreateBreakSparkleBurst() =>
+            new BurstSettings(
+                SparklesPerCell, Math.Max(SparklesPerCell, breakSparkleCount), breakSparkleSizeCells.x, breakSparkleSizeCells.y,
+                breakSparkleTravelCells.x, breakSparkleTravelCells.y, breakCubeSpreadDegrees, SparkleSpinDegrees, breakCubeMaxDelaySeconds);
+
+        // A sparkle's layout spreads it over the block's cells, one a cell
+        // before its count caps it, and never turns it. Not tunables: the
+        // count and the caps are.
+        private const int SparklesPerCell = 1;
+        private const float SparkleSpinDegrees = 0f;
+
         /// <summary>The layout of the ice shards of a thaw or a gate opening.</summary>
         /// <exception cref="ArgumentOutOfRangeException">A shard value is out of range; see <see cref="Problems"/>.</exception>
         public BurstSettings CreateShardBurst() =>
@@ -2548,7 +2704,10 @@ namespace GateRush.Runtime
             AddIfUnassigned(problems, shutterSlatsSprite, "Shutter Slats Sprite");
             AddIfUnassigned(problems, clockSprite, "Clock Sprite");
             AddIfUnassigned(problems, cubeSprite, "Cube Sprite");
+            AddIfUnassigned(problems, cubeHighlightSprite, "Cube Highlight Sprite");
             AddIfUnassigned(problems, shardSprite, "Shard Sprite");
+            AddIfUnassigned(problems, shard2Sprite, "Shard 2 Sprite");
+            AddIfUnassigned(problems, shard3Sprite, "Shard 3 Sprite");
             AddIfUnassigned(problems, gateGlowSprite, "Gate Glow Sprite");
             AddIfUnassigned(problems, sparkleSprite, "Sparkle Sprite");
             AddMechanicSpriteProblems(problems);
@@ -3410,7 +3569,116 @@ namespace GateRush.Runtime
         private void AddJokerBreakProblems(List<string> problems)
         {
             AddIfNotPositive(problems, breakFadeSeconds, "Break Fade Seconds");
+            AddEffectProblems(problems);
         }
+
+        /// <summary>
+        /// The constraints on Module 47's debris, joker break, pool and
+        /// finished elevator, each message naming its field: the joker's caps
+        /// stay within the exit's, and the pool holds one exit's cubes, one
+        /// joker clear's cubes and sparkles and one burst of shards at once.
+        /// </summary>
+        private void AddEffectProblems(List<string> problems)
+        {
+            if (!(shardColor.a >= 1f))
+            {
+                problems.Add($"{name}: Shard Color must be opaque.");
+            }
+
+            if (!(breakFlashStrength >= 0f && breakFlashStrength <= 1f))
+            {
+                problems.Add($"{name}: Break Flash Strength must be from 0 to 1.");
+            }
+
+            if (!(breakFlashSeconds > 0f && breakFlashSeconds <= MaxEffectSeconds))
+            {
+                problems.Add($"{name}: Break Flash Seconds must be above 0 and at most {MaxEffectSeconds}.");
+            }
+
+            if (!(breakCubeCountPerCell >= 1 && breakCubeCountPerCell <= cubeCountPerCell))
+            {
+                problems.Add($"{name}: Break Cube Count Per Cell must be at least 1 and at most Cube Count Per Cell ({cubeCountPerCell}).");
+            }
+
+            if (!(breakCubeCap >= 1 && breakCubeCap <= cubeCap))
+            {
+                problems.Add($"{name}: Break Cube Cap must be at least 1 and at most Cube Cap ({cubeCap}).");
+            }
+
+            if (!(breakCubeMoveCap >= breakCubeCap && breakCubeMoveCap <= MaxBreakCubeMoveCap))
+            {
+                problems.Add($"{name}: Break Cube Move Cap must be at least Break Cube Cap ({breakCubeCap}) and at most {MaxBreakCubeMoveCap}.");
+            }
+
+            foreach (var problem in BurstSettings.Problems(
+                         "Break Cube", breakCubeCountPerCell, breakCubeCap, cubeSizeCells.x, cubeSizeCells.y, breakCubeTravelCells.x,
+                         breakCubeTravelCells.y, breakCubeSpreadDegrees, cubeSpinDegrees, breakCubeMaxDelaySeconds))
+            {
+                problems.Add($"{name}: {problem}");
+            }
+
+            if (!(breakSparkleCount >= 0 && breakSparkleCount <= MaxBreakSparkleCount))
+            {
+                problems.Add($"{name}: Break Sparkle Count must be from 0 to {MaxBreakSparkleCount}.");
+            }
+
+            if (!(breakSparkleMoveCap >= 0 && breakSparkleMoveCap <= MaxBreakSparkleMoveCap))
+            {
+                problems.Add($"{name}: Break Sparkle Move Cap must be from 0 to {MaxBreakSparkleMoveCap}.");
+            }
+
+            if (!(breakSparkleSizeCells.x > 0f && breakSparkleSizeCells.y >= breakSparkleSizeCells.x) || float.IsInfinity(breakSparkleSizeCells.y))
+            {
+                problems.Add($"{name}: Break Sparkle Size Cells must have a positive smallest size (x) no larger than its largest (y).");
+            }
+
+            if (!(breakSparkleTravelCells.x > 0f && breakSparkleTravelCells.y >= breakSparkleTravelCells.x) || float.IsInfinity(breakSparkleTravelCells.y))
+            {
+                problems.Add($"{name}: Break Sparkle Travel Cells must have a positive shortest travel (x) no longer than its longest (y).");
+            }
+
+            if (!(breakSparkleSeconds > 0f && breakSparkleSeconds <= MaxEffectSeconds))
+            {
+                problems.Add($"{name}: Break Sparkle Seconds must be above 0 and at most {MaxEffectSeconds}.");
+            }
+
+            if (!(breakSparkleEndScale >= 0f && breakSparkleEndScale <= 1f))
+            {
+                problems.Add($"{name}: Break Sparkle End Scale must be from 0 to 1.");
+            }
+
+            var needed = DebrisPoolNeed;
+            if (!(debrisPoolSize >= needed && debrisPoolSize <= MaxDebrisPoolSize))
+            {
+                problems.Add($"{name}: Debris Pool Size must be at least {needed} — one exit's cubes, one joker clear's cubes and sparkles, one burst of shards and a gate glow at once — and at most {MaxDebrisPoolSize}.");
+            }
+
+            if (!(elevatorSinkSeconds > 0f && elevatorSinkSeconds <= MaxEffectSeconds))
+            {
+                problems.Add($"{name}: Elevator Sink Seconds must be above 0 and at most {MaxEffectSeconds}.");
+            }
+
+            if (!(elevatorSinkEndScale >= 0f && elevatorSinkEndScale < 1f))
+            {
+                problems.Add($"{name}: Elevator Sink End Scale must be at least 0 and below 1.");
+            }
+        }
+
+        /// <summary>
+        /// The fewest pooled renderers the debris needs: one exit's cubes, one
+        /// joker clear's cubes and sparkles, one burst of shards and one gate
+        /// glow at once, a cube taking two while its highlight is drawn.
+        /// </summary>
+        public int DebrisPoolNeed =>
+            (cubeCap + breakCubeMoveCap) * (drawCubeHighlights ? 2 : 1) + breakSparkleMoveCap + shardCap + 1;
+
+        // The bounds of Module 47's counts and durations: past them an
+        // effect would drag on or crowd the board. Not tunables.
+        private const float MaxEffectSeconds = 2f;
+        private const int MaxBreakCubeMoveCap = 128;
+        private const int MaxBreakSparkleCount = 8;
+        private const int MaxBreakSparkleMoveCap = 32;
+        private const int MaxDebrisPoolSize = 512;
 
         private void AddIfBlank(List<string> problems, string text, string field)
         {

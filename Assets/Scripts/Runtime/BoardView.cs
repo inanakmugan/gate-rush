@@ -95,6 +95,15 @@ namespace GateRush.Runtime
         // Per elevator, its doors and divider, hidden while a wave rises.
         private readonly Dictionary<int, GameObject[]> elevatorDoors = new Dictionary<int, GameObject[]>();
 
+        // Per elevator, the group its whole lift is drawn under, which sinks
+        // away as debris once its last wave has cleared (Module 47).
+        private readonly Dictionary<int, Transform> elevatorRoots = new Dictionary<int, Transform>();
+
+        // The debris renderers, made once per view and config and lent to
+        // every cube, shard, sparkle and gate glow (Module 47). Its root sits
+        // beside the view's groups and outlives Clear.
+        private DebrisPool pool;
+
         // The id of every debris tween. Owned by this view and never shared,
         // so killing it reaches this view's debris and nothing else.
         private readonly object debrisId = new object();
@@ -106,6 +115,8 @@ namespace GateRush.Runtime
         private BoardState drawnState;
         private BurstSettings cubeBurst;
         private BurstSettings shardBurst;
+        private BurstSettings breakCubeBurst;
+        private BurstSettings breakSparkleBurst;
 
         // The recipes the introduction cards share (Module 28), drawing on
         // this view as their surface.
@@ -169,7 +180,10 @@ namespace GateRush.Runtime
             this.visibility = visibility;
             cubeBurst = config.CreateCubeBurst();
             shardBurst = config.CreateShardBurst();
+            breakCubeBurst = config.CreateBreakCubeBurst();
+            breakSparkleBurst = config.CreateBreakSparkleBurst();
             recipes = new BoardRecipes<Transform, SpriteRenderer>(config, this);
+            EnsurePool();
 
             frameTiles = FrameTiling.Compute(ctx);
             gateTiles = new IReadOnlyList<QuarterTile>[ctx.Gates.Count];
@@ -308,7 +322,11 @@ namespace GateRush.Runtime
             }
         }
 
-        /// <summary>Stops every animation, debris included, and destroys everything drawn.</summary>
+        /// <summary>
+        /// Stops every animation, debris included, and destroys everything
+        /// drawn; the debris pool's renderers are only taken back, for the next
+        /// drawing to lend again.
+        /// </summary>
         public void Clear()
         {
             StopAnimations();
@@ -318,7 +336,14 @@ namespace GateRush.Runtime
             // Destroy is deferred to the end of the frame, so the groups are
             // forgotten here and created afresh by the next drawing: nothing new
             // lands in a group that is about to go.
-            DestroyChildren(transform);
+            for (var i = transform.childCount - 1; i >= 0; i--)
+            {
+                var child = transform.GetChild(i);
+                if (pool == null || child != pool.Root)
+                {
+                    DestroyDrawn(child.gameObject);
+                }
+            }
             board = null;
             floorAndFrame.Clear();
             frameContour = null;
@@ -358,6 +383,9 @@ namespace GateRush.Runtime
             passesInFlight = 0;
             ForgetPullGlow();
             ForgetGeneratorPreview();
+
+            // Every debris tween is dead, so nothing returns a renderer late.
+            pool?.ReturnAll();
             DestroyChildren(debris);
             DestroyChildren(stage);
             DestroyChildren(preview);
@@ -379,6 +407,9 @@ namespace GateRush.Runtime
             ForgetPullGlow();
             ForgetGeneratorPreview();
             ResetPresentation();
+
+            // Every debris tween is dead, so nothing returns a renderer late.
+            pool?.ReturnAll();
 
             // The passes died with their tweens; presentations waiting on them
             // are abandoned, never reported, like the presentation itself.
@@ -514,6 +545,27 @@ namespace GateRush.Runtime
             drawnBlocks.Clear();
             badges.Clear();
             elevatorDoors.Clear();
+            elevatorRoots.Clear();
+        }
+
+        /// <summary>
+        /// Makes the debris pool on first use, and again only when the config
+        /// asks for another size or material — on binding a level, never in
+        /// play. The old pool's renderers go with its root.
+        /// </summary>
+        private void EnsurePool()
+        {
+            if (pool != null && pool.Root != null && pool.Size == config.DebrisPoolSize && pool.Material == config.SpriteMaterial)
+            {
+                return;
+            }
+
+            if (pool != null && pool.Root != null)
+            {
+                DestroyDrawn(pool.Root.gameObject);
+            }
+
+            pool = new DebrisPool(transform, config.DebrisPoolSize, config.SpriteMaterial);
         }
 
         private void EnsureGroups()
@@ -969,6 +1021,7 @@ namespace GateRush.Runtime
                 var parts = recipes.Elevator(root, RegionViewCells(elevator.Min, elevator.Max));
 
                 elevatorDoors[e] = new[] { parts.Doors.gameObject };
+                elevatorRoots[e] = root;
             }
         }
 
@@ -1428,12 +1481,20 @@ namespace GateRush.Runtime
             }
 
             /// <summary>Sets every part to <paramref name="opacity"/> times its original alpha.</summary>
-            public void Apply(float opacity)
+            public void Apply(float opacity) => Apply(opacity, 0f);
+
+            /// <summary>
+            /// Sets every sprite's colour <paramref name="whiten"/> of the way
+            /// from its original toward white — a joker break's flash (Module
+            /// 47) — and every part to <paramref name="opacity"/> times its
+            /// original alpha.
+            /// </summary>
+            public void Apply(float opacity, float whiten)
             {
                 for (var i = 0; i < sprites.Length; i++)
                 {
-                    var color = spriteColors[i];
-                    color.a *= opacity;
+                    var color = Color.Lerp(spriteColors[i], Color.white, whiten);
+                    color.a = spriteColors[i].a * opacity;
                     sprites[i].color = color;
                 }
 

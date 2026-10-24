@@ -739,6 +739,149 @@ namespace GateRush.Tests
             Assert.That(problems, Has.Some.Contains($"{shownName} must be positive"), string.Join(" | ", problems));
         }
 
+        // ----- Module 47: the debris, the joker break, the pool, the elevator --
+
+        [TestCase("Shard Color")]
+        [TestCase("Break Flash")]
+        [TestCase("Break Cube")]
+        [TestCase("Break Sparkle")]
+        [TestCase("Debris Pool")]
+        [TestCase("Elevator Sink")]
+        public void Problems_DefaultEffectValues_ReportNothingAboutThem(string shownName)
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("breakFlashStrength", 1.5f, "Break Flash Strength")]
+        [TestCase("breakFlashSeconds", 0f, "Break Flash Seconds")]
+        [TestCase("breakFlashSeconds", 3f, "Break Flash Seconds")]
+        [TestCase("breakCubeSpreadDegrees", 90f, "Break Cube Spread Degrees")]
+        [TestCase("breakCubeMaxDelaySeconds", -1f, "Break Cube Max Delay Seconds")]
+        [TestCase("breakSparkleSeconds", 0f, "Break Sparkle Seconds")]
+        [TestCase("breakSparkleEndScale", 1.5f, "Break Sparkle End Scale")]
+        [TestCase("elevatorSinkSeconds", 0f, "Elevator Sink Seconds")]
+        [TestCase("elevatorSinkEndScale", 1f, "Elevator Sink End Scale")]
+        public void Problems_EffectFloatOutOfRange_IsReportedByName(string field, float value, string shownName)
+        {
+            SetFloat(field, value);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("breakCubeCountPerCell", 0, "Break Cube Count Per Cell")]
+        [TestCase("breakCubeCountPerCell", 9, "Break Cube Count Per Cell")]
+        [TestCase("breakCubeCap", 41, "Break Cube Cap")]
+        [TestCase("breakCubeMoveCap", 10, "Break Cube Move Cap")]
+        [TestCase("breakCubeMoveCap", 129, "Break Cube Move Cap")]
+        [TestCase("breakSparkleCount", -1, "Break Sparkle Count")]
+        [TestCase("breakSparkleCount", 9, "Break Sparkle Count")]
+        [TestCase("breakSparkleMoveCap", 33, "Break Sparkle Move Cap")]
+        [TestCase("debrisPoolSize", 50, "Debris Pool Size")]
+        [TestCase("debrisPoolSize", 513, "Debris Pool Size")]
+        public void Problems_EffectCountOutOfRange_IsReportedByName(string field, int value, string shownName)
+        {
+            SetInt(field, value);
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_CubeHighlightsOnWithTheDefaultPool_ReportsThePoolTooSmall()
+        {
+            // A highlighted cube takes two renderers, so the pool must hold
+            // twice the cubes.
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("drawCubeHighlights").boolValue = true;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(config.DebrisPoolNeed, Is.GreaterThan(config.DebrisPoolSize));
+            Assert.That(problems, Has.Some.Contains("Debris Pool Size"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void DebrisPoolNeed_Default_IsOneExitOneJokerClearOneShardBurstAndAGlow()
+        {
+            var serialized = new SerializedObject(config);
+            int Int(string field) => serialized.FindProperty(field).intValue;
+
+            var need = config.DebrisPoolNeed;
+
+            Assert.AreEqual(Int("cubeCap") + Int("breakCubeMoveCap") + Int("breakSparkleMoveCap") + Int("shardCap") + 1, need);
+            Assert.That(config.DebrisPoolSize, Is.GreaterThanOrEqualTo(need), "the default pool holds them");
+        }
+
+        [Test]
+        public void CreateBreakCubeBurst_Default_IsTheBreaksOwnCountCapTravelAndSpreadWithTheExitCubesSize()
+        {
+            var serialized = new SerializedObject(config);
+
+            var settings = config.CreateBreakCubeBurst();
+
+            Assert.AreEqual(serialized.FindProperty("breakCubeCountPerCell").intValue, settings.CountPerArea);
+            Assert.AreEqual(serialized.FindProperty("breakCubeCap").intValue, settings.Cap);
+            Assert.AreEqual(serialized.FindProperty("breakCubeTravelCells").vector2Value.x, settings.TravelMinCells);
+            Assert.AreEqual(serialized.FindProperty("breakCubeTravelCells").vector2Value.y, settings.TravelMaxCells);
+            Assert.AreEqual(serialized.FindProperty("breakCubeSpreadDegrees").floatValue, settings.SpreadDegrees);
+            Assert.AreEqual(serialized.FindProperty("cubeSizeCells").vector2Value.x, settings.SizeMinCells);
+            Assert.AreEqual(serialized.FindProperty("cubeSizeCells").vector2Value.y, settings.SizeMaxCells);
+        }
+
+        [Test]
+        public void CreateBreakSparkleBurst_Default_CapsAtTheSparkleCountAndNeverTurns()
+        {
+            var serialized = new SerializedObject(config);
+
+            var settings = config.CreateBreakSparkleBurst();
+
+            Assert.AreEqual(serialized.FindProperty("breakSparkleCount").intValue, settings.Cap);
+            Assert.AreEqual(0f, settings.SpinDegrees);
+        }
+
+        [Test]
+        public void ShardSpriteAt_EachIndex_CyclesThroughTheThreeShards()
+        {
+            var texture = new Texture2D(2, 2);
+            var sprites = new Sprite[RuntimeConfig.ShardSpriteCount];
+            try
+            {
+                var fields = new[] { "shardSprite", "shard2Sprite", "shard3Sprite" };
+                for (var i = 0; i < sprites.Length; i++)
+                {
+                    sprites[i] = Sprite.Create(texture, new Rect(0f, 0f, 2f, 2f), Vector2.zero);
+                    SetObject(fields[i], sprites[i]);
+                }
+
+                for (var index = 0; index < 2 * sprites.Length; index++)
+                {
+                    Assert.AreSame(sprites[index % sprites.Length], config.ShardSpriteAt(index), $"piece {index}");
+                }
+            }
+            finally
+            {
+                foreach (var sprite in sprites)
+                {
+                    Object.DestroyImmediate(sprite);
+                }
+
+                Object.DestroyImmediate(texture);
+            }
+        }
+
+        private void SetInt(string field, int value)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
         /// <summary>Sets the sorting order <paramref name="field"/> to the value <paramref name="sameAs"/> has.</summary>
         private void SetOrderEqualTo(string field, string sameAs)
         {

@@ -24,13 +24,17 @@ namespace GateRush.Runtime
     /// (a spawned block) from its source to its place, and badges that
     /// counted down popping. A stage with nothing to play is skipped at once.
     /// <see cref="IsBusy"/> holds through both.</para>
-    /// <para><b>Debris</b> — a destroyed block passing through its gate, the
-    /// cubes it streams out, the gate's glow, and ice shards — plays on its
-    /// own, under <c>Effects/Debris</c>, with <see cref="debrisId"/> as its
-    /// tweens' id. It does not hold <see cref="IsBusy"/>, and the view's own
-    /// redraw between the stages, which kills the view's id, leaves it
-    /// playing. Only <see cref="Rebuild"/>, <see cref="Clear"/>, disabling and
-    /// destroying remove it.</para>
+    /// <para><b>Debris</b> — a destroyed block passing through its gate or
+    /// breaking in place, the cubes, shards and sparkles, the gate's glow, and
+    /// a finished elevator sinking away — plays on its own, with
+    /// <see cref="debrisId"/> as its tweens' id. The blocks and the elevator
+    /// move under <c>Effects/Debris</c>; every cube, shard, sparkle and glow is
+    /// a renderer lent by the debris pool (<see cref="DebrisPool"/>, Module
+    /// 47) and given back when it ends, so none is made or destroyed in play.
+    /// It does not hold <see cref="IsBusy"/>, and the view's own redraw
+    /// between the stages, which kills the view's id, leaves it playing. Only
+    /// <see cref="Rebuild"/>, <see cref="Clear"/>, disabling and destroying
+    /// remove it.</para>
     /// <para><b>Waiting for a pass.</b> A presentation that ends while a block
     /// is still passing through its gate reports done only once the last one
     /// is through, so the win panel waits for it without holding input.</para>
@@ -242,6 +246,7 @@ namespace GateRush.Runtime
             Sequence leave = null;
 
             var clears = presentedChanges.Clears;
+            var (cubeShares, sparkleShares) = BreakShares(clears);
             for (var i = 0; i < clears.Count; i++)
             {
                 var clear = clears[i];
@@ -254,7 +259,7 @@ namespace GateRush.Runtime
                 {
                     if (clear.IsInPlace)
                     {
-                        BreakApart(block, clear);
+                        BreakApart(block, clear, cubeShares[i], sparkleShares[i]);
                     }
                     else
                     {
@@ -268,7 +273,7 @@ namespace GateRush.Runtime
                 {
                     // Only a joker clears a frozen block, and only in place; a
                     // peel would show the colour it exposes (M3).
-                    ShatterBlock(clear.BlockIndex, leftState.Origins[clear.BlockIndex], BurstKind.Break, config.IceColor);
+                    ShatterBlock(clear.BlockIndex, leftState.Origins[clear.BlockIndex], BurstKind.Break);
                     continue;
                 }
 
@@ -325,6 +330,13 @@ namespace GateRush.Runtime
             var before = leftState;
             var changes = presentedChanges;
             var state = presentedState;
+
+            // Taken out of the old drawing before the redraw would destroy it.
+            for (var i = 0; i < changes.FinishedElevators.Count; i++)
+            {
+                SinkElevator(changes.FinishedElevators[i]);
+            }
+
             Redraw(state);
 
             for (var i = 0; i < changes.ThawedBlocks.Count; i++)
@@ -399,6 +411,54 @@ namespace GateRush.Runtime
             }
 
             arrive.OnComplete(FinishArrive);
+        }
+
+        /// <summary>
+        /// An elevator whose last wave cleared leaves (Module 47): its group,
+        /// with every part it was drawn with — the rim and its floor shadow,
+        /// baked into the rim's sprite, the hazard strips, and the closed
+        /// doors with their handles and shadows — moves from the drawing to
+        /// <c>Effects/Debris</c>, keeping its sorting orders, so it shows over
+        /// the new floor and under every block. It then sinks: it shrinks about
+        /// its region's centre to <see cref="RuntimeConfig.ElevatorSinkEndScale"/>
+        /// while it fades, over <see cref="RuntimeConfig.ElevatorSinkSeconds"/>,
+        /// and is destroyed. Its doors need no closing: they are drawn closed
+        /// whenever no wave is rising, and a finished elevator has none. It is
+        /// debris — <see cref="debrisId"/>, never <see cref="IsBusy"/> — and
+        /// adds no renderer. Does nothing for an elevator that is not drawn.
+        /// </summary>
+        private void SinkElevator(int elevatorIndex)
+        {
+            if (!elevatorRoots.TryGetValue(elevatorIndex, out var root) || root == null || debris == null)
+            {
+                return;
+            }
+
+            elevatorRoots.Remove(elevatorIndex);
+            elevatorDoors.Remove(elevatorIndex);
+            root.SetParent(debris, true);
+
+            var elevator = ctx.Elevators[elevatorIndex];
+            var centre = RegionViewCells(elevator.Min, elevator.Max).center * layout.CellSize;
+            Vector2 rest = root.localPosition;
+            var endScale = config.ElevatorSinkEndScale;
+            var fade = new Fade(root);
+            DOVirtual.Float(0f, 1f, config.ElevatorSinkSeconds, t =>
+                {
+                    var scale = Mathf.LerpUnclamped(1f, endScale, t);
+                    root.localScale = new Vector3(scale, scale, 1f);
+                    root.localPosition = rest + (centre - rest) * (1f - scale);
+                    fade.Apply(1f - t);
+                })
+                .SetEase(config.ElevatorSinkEase)
+                .SetId(debrisId)
+                .OnComplete(() =>
+                {
+                    if (root != null)
+                    {
+                        Destroy(root.gameObject);
+                    }
+                });
         }
 
         /// <summary>The arrive stage is over: its temporary pieces go, hidden doors come back.</summary>
@@ -523,17 +583,22 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A block a joker destroyed breaks apart where it stands (Module 34),
-        /// as debris: it leaves the drawing for <c>Effects/Debris</c>, shards
-        /// in the colour it was drawn in — ice for a frozen block, so its
-        /// hidden colour stays hidden (M3) — fly out of its footprint, and it
-        /// fades over <see cref="RuntimeConfig.BreakFadeSeconds"/> where it is,
-        /// then is destroyed. It travels nowhere and no gate glows. Like a
-        /// pass through a gate, every tween carries <see cref="debrisId"/> and
-        /// the fade is counted as a pass, so a win's panel waits for it
-        /// (<see cref="EndPresentation"/>) while input does not.
+        /// A block a joker destroyed breaks apart where it stands (Modules 34
+        /// and 47), as debris: it leaves the drawing for <c>Effects/Debris</c>,
+        /// flashes toward white over <see cref="RuntimeConfig.BreakFlashSeconds"/>
+        /// and fades over <see cref="RuntimeConfig.BreakFadeSeconds"/> where it
+        /// is, then is destroyed; meanwhile <paramref name="cubeCount"/> cubes
+        /// of its colour burst out of its cells in every direction, away from
+        /// its centre, and <paramref name="sparkleCount"/> sparkles show over
+        /// it — its shares of the joker's caps (<see cref="BreakShares"/>). A
+        /// frozen block keeps its colour hidden (M3): its ice only bursts into
+        /// shards, with no flash and no cubes. It travels nowhere and no gate
+        /// glows. Like a pass through a gate, every tween carries
+        /// <see cref="debrisId"/> and the fade is counted as a pass, so a win's
+        /// panel waits for it (<see cref="EndPresentation"/>) while input does
+        /// not.
         /// </summary>
-        private void BreakApart(DrawnBlock block, ClearedBlock clear)
+        private void BreakApart(DrawnBlock block, ClearedBlock clear, int cubeCount, int sparkleCount)
         {
             var root = block.Root;
 
@@ -542,14 +607,32 @@ namespace GateRush.Runtime
             drawnBlocks.Remove(clear.BlockIndex);
             root.SetParent(debris, true);
 
-            // A block's face is drawn in one colour (DrawBlocks): its fill, or
-            // ice while frozen.
-            ShatterBlock(clear.BlockIndex, leftState.Origins[clear.BlockIndex], BurstKind.Break, block.FaceQuarters[0].color);
+            var origin = leftState.Origins[clear.BlockIndex];
+            var flash = 0f;
+            if (block.IsIce)
+            {
+                ShatterBlock(clear.BlockIndex, origin, BurstKind.Break);
+            }
+            else
+            {
+                BurstCubes(clear, origin, cubeCount, sparkleCount);
+                flash = config.BreakFlashSeconds;
+            }
 
             var fade = new Fade(root);
+            var fadeSeconds = config.BreakFadeSeconds;
+            var strength = config.BreakFlashStrength;
+            var fadeEase = config.BreakFadeEase;
             passesInFlight++;
-            DOVirtual.Float(1f, 0f, config.BreakFadeSeconds, fade.Apply)
-                .SetEase(config.BreakFadeEase)
+            DOVirtual.Float(0f, flash + fadeSeconds, flash + fadeSeconds, time =>
+                {
+                    // The flash rises to its height, then the block fades out
+                    // still flashed: the cubes take its place.
+                    var whiten = flash > 0f ? strength * Mathf.Clamp01(time / flash) : 0f;
+                    var opacity = time <= flash ? 1f : 1f - DOVirtual.EasedValue(0f, 1f, (time - flash) / fadeSeconds, fadeEase);
+                    fade.Apply(opacity, whiten);
+                })
+                .SetEase(Ease.Linear)
                 .SetId(debrisId)
                 .OnComplete(() =>
                 {
@@ -560,6 +643,68 @@ namespace GateRush.Runtime
 
                     OnPassEnded();
                 });
+        }
+
+        /// <summary>
+        /// The cubes and sparkles of a block breaking in place: cubes in the
+        /// colour <paramref name="clear"/> removed, flying out from the
+        /// footprint's centre with the break's layout, and sparkles over it,
+        /// each at most its share of the joker's caps, seeded from the kind,
+        /// the block and the move.
+        /// </summary>
+        private void BurstCubes(ClearedBlock clear, Coord origin, int cubeCount, int sparkleCount)
+        {
+            var cells = ctx.SpecAt(clear.BlockIndex).Cells;
+            MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
+            var centre = new Vector2((minX + maxX + 1) * 0.5f, (minY + maxY + 1) * 0.5f);
+            var areas = CellAreas(cells);
+            Vector2 ToLocal(Vector2 cellsInBlock) => GridToLocal(new Vector2(origin.X, origin.Y) + cellsInBlock);
+
+            var cubes = BurstLayout.Pieces(
+                areas, null, centre, BurstLayout.Seed(BurstKind.Break, clear.BlockIndex, presentedMoveNumber), breakCubeBurst, cubeCount);
+            PlayBurst(
+                cubes, ToLocal, layout.CellSize, DebrisKind.Cube, config.BlockFill(clear.RemovedColor),
+                config.CubeSeconds, config.CubeEase, config.CubeEndScale, 0f);
+
+            if (sparkleCount > 0)
+            {
+                var sparkles = BurstLayout.Pieces(
+                    areas, null, centre, BurstLayout.Seed(BurstKind.BreakSparkle, clear.BlockIndex, presentedMoveNumber),
+                    breakSparkleBurst, sparkleCount);
+                PlayBurst(
+                    sparkles, ToLocal, layout.CellSize, DebrisKind.Sparkle, Color.white,
+                    config.BreakSparkleSeconds, config.CubeEase, config.BreakSparkleEndScale, 0f);
+            }
+        }
+
+        /// <summary>
+        /// Each clear's share of a joker's caps (Module 47): for every block
+        /// destroyed in place and drawn unfrozen, the cubes its footprint
+        /// wants under the break's own cap and the sparkles it wants, one a
+        /// cell up to <see cref="RuntimeConfig.BreakSparkleCount"/>; then the
+        /// move's caps split over them all (<see cref="BurstLayout.ShareCap"/>),
+        /// so a Broom's breaks all start together within one budget. Zero for
+        /// every other clear.
+        /// </summary>
+        private (int[] cubes, int[] sparkles) BreakShares(IReadOnlyList<ClearedBlock> clears)
+        {
+            var cubes = new int[clears.Count];
+            var sparkles = new int[clears.Count];
+            for (var i = 0; i < clears.Count; i++)
+            {
+                var clear = clears[i];
+                if (!clear.IsDestroyed || !clear.IsInPlace
+                    || !drawnBlocks.TryGetValue(clear.BlockIndex, out var block) || block.IsIce)
+                {
+                    continue;
+                }
+
+                var cells = ctx.SpecAt(clear.BlockIndex).Cells.Count;
+                cubes[i] = Math.Min(breakCubeBurst.CountPerArea * cells, breakCubeBurst.Cap);
+                sparkles[i] = Math.Min(cells, config.BreakSparkleCount);
+            }
+
+            return (BurstLayout.ShareCap(cubes, config.BreakCubeMoveCap), BurstLayout.ShareCap(sparkles, config.BreakSparkleMoveCap));
         }
 
         /// <summary>
@@ -645,7 +790,7 @@ namespace GateRush.Runtime
             }
 
             PlayBurst(
-                cubes, GridToLocal, layout.CellSize, config.CubeSprite, config.BlockFill(clear.RemovedColor),
+                cubes, GridToLocal, layout.CellSize, DebrisKind.Cube, config.BlockFill(clear.RemovedColor),
                 config.CubeSeconds, config.CubeEase, config.CubeEndScale, 0f);
         }
 
@@ -904,6 +1049,11 @@ namespace GateRush.Runtime
         {
             // Above everything: this glow lights the passing block on purpose.
             var glow = AddGateGlow(gateIndex, config.EffectOrder, out var color);
+            if (glow == null)
+            {
+                return;
+            }
+
             color.a = config.GateGlowAlpha;
             var fadeIn = config.GateGlowFadeInSeconds;
             var fadeOut = config.GateGlowFadeOutSeconds;
@@ -927,24 +1077,21 @@ namespace GateRush.Runtime
             DOVirtual.Float(0f, total, total, Show)
                 .SetEase(Ease.Linear)
                 .SetId(debrisId)
-                .OnComplete(() =>
-                {
-                    if (glow != null)
-                    {
-                        Destroy(glow.gameObject);
-                    }
-                });
+                .OnComplete(() => pool.Return(glow));
         }
 
         /// <summary>
-        /// The glow sprite of gate <paramref name="gateIndex"/>, under
-        /// <c>Effects/Debris</c> and fully clear: the gradient over
-        /// <see cref="GateExit.GlowRect"/>, turned so its strong edge lies on
-        /// the gate. <paramref name="tint"/> is its colour at full opacity,
-        /// from the gate's colour toward white. The one placement the exit's
-        /// glow and the pull's glow share; they differ in
-        /// <paramref name="order"/>, the exit's above the passing block and
-        /// the pull's below every block.
+        /// The glow sprite of gate <paramref name="gateIndex"/>, lent by the
+        /// debris pool and fully clear, or null when the pool has none free:
+        /// the 2D glow (Module 47) over <see cref="GateExit.GlowRect"/> — its
+        /// bump across the gate stretched over the gate's width, its falloff
+        /// over the glow's depth — turned so its strong edge lies on the gate's
+        /// inner line, and drawn with the board's highlight material, which
+        /// adds its colour to what is under it rather than covering it.
+        /// <paramref name="tint"/> is its colour at full opacity, from the
+        /// gate's colour toward white. The one placement the exit's glow and
+        /// the pull's glow share; they differ in <paramref name="order"/>, the
+        /// exit's above the passing block and the pull's below every block.
         /// </summary>
         private SpriteRenderer AddGateGlow(int gateIndex, int order, out Color tint)
         {
@@ -961,7 +1108,14 @@ namespace GateRush.Runtime
 
             var clear = tint;
             clear.a = 0f;
-            return AddSprite(debris, "Gate glow", config.GateGlowSprite, area.center, size, clear, order, turn);
+            var glow = pool?.Borrow(config.GateGlowSprite, MaterialOf(SpriteLook.Highlight), clear, order);
+            if (glow != null)
+            {
+                var bounds = config.GateGlowSprite.bounds.size;
+                PosePiece(glow.transform, area.center, turn, new Vector3(size.x / bounds.x, size.y / bounds.y, 1f));
+            }
+
+            return glow;
         }
 
         /// <summary>
@@ -996,6 +1150,14 @@ namespace GateRush.Runtime
             {
                 ReleasePullGlow();
                 pullGlow = AddGateGlow(target.GateIndex, config.PullGlowOrder, out pullGlowTint);
+                if (pullGlow == null)
+                {
+                    // Every pooled renderer is flying: no glow this frame; the
+                    // next one asks again.
+                    ForgetPullGlow();
+                    return;
+                }
+
                 pullGlowGate = target.GateIndex;
                 pullGlowAlpha = 0f;
             }
@@ -1030,7 +1192,7 @@ namespace GateRush.Runtime
 
             if (!(from > 0f))
             {
-                Destroy(glow.gameObject);
+                pool.Return(glow);
                 return;
             }
 
@@ -1045,18 +1207,12 @@ namespace GateRush.Runtime
                 })
                 .SetEase(Ease.Linear)
                 .SetId(debrisId)
-                .OnComplete(() =>
-                {
-                    if (glow != null)
-                    {
-                        Destroy(glow.gameObject);
-                    }
-                });
+                .OnComplete(() => pool.Return(glow));
         }
 
         /// <summary>
         /// Forgets the pull's glow without touching the sprite: for when the
-        /// debris group it sits in is being destroyed anyway.
+        /// debris pool is taking every renderer back anyway.
         /// </summary>
         private void ForgetPullGlow()
         {
@@ -1259,16 +1415,17 @@ namespace GateRush.Runtime
         /// <summary>Ice shards fly out from the centre of a block that thawed, over its unfrozen face.</summary>
         private void ShatterBlockIce(int blockIndex, BoardState state)
         {
-            ShatterBlock(blockIndex, state.Origins[blockIndex], BurstKind.Thaw, config.IceColor);
+            ShatterBlock(blockIndex, state.Origins[blockIndex], BurstKind.Thaw);
         }
 
         /// <summary>
-        /// Shards in <paramref name="color"/> fly out from the centre of block
+        /// Ice shards fly out from the centre of block
         /// <paramref name="blockIndex"/>'s footprint at <paramref name="origin"/>,
         /// seeded from <paramref name="kind"/>, the block and the move. The one
-        /// burst over a block for a thaw and for a joker's clear in place.
+        /// burst over a block for a thaw and for a joker's clear of a frozen
+        /// block.
         /// </summary>
-        private void ShatterBlock(int blockIndex, Coord origin, BurstKind kind, Color color)
+        private void ShatterBlock(int blockIndex, Coord origin, BurstKind kind)
         {
             var cells = ctx.SpecAt(blockIndex).Cells;
             MarkLayout.Bounds(cells, out var minX, out var maxX, out var minY, out var maxY);
@@ -1277,7 +1434,7 @@ namespace GateRush.Runtime
                 CellAreas(cells), null, centre,
                 BurstLayout.Seed(kind, blockIndex, presentedMoveNumber), shardBurst);
 
-            PlayShards(pieces, cellsInBlock => GridToLocal(new Vector2(origin.X, origin.Y) + cellsInBlock), color);
+            PlayShards(pieces, cellsInBlock => GridToLocal(new Vector2(origin.X, origin.Y) + cellsInBlock));
         }
 
         /// <summary>Ice shards burst from the ice of a gate that opened, over the coloured gate now drawn.</summary>
@@ -1296,32 +1453,58 @@ namespace GateRush.Runtime
                 areas, null, span.center,
                 BurstLayout.Seed(BurstKind.GateOpening, gateIndex, presentedMoveNumber), shardBurst);
 
-            PlayShards(pieces, GridToLocal, config.IceColor);
+            PlayShards(pieces, GridToLocal);
         }
 
-        private void PlayShards(IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal, Color color)
+        /// <summary>Plays <paramref name="pieces"/> as ice shards, each drawn in its baked colour.</summary>
+        private void PlayShards(IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal)
         {
             PlayBurst(
-                pieces, toLocal, layout.CellSize, config.ShardSprite, color,
+                pieces, toLocal, layout.CellSize, DebrisKind.Shard, Color.white,
                 config.ShardSeconds, config.ShardEase, config.ShardEndScale, config.ShardFallCells);
         }
 
+        /// <summary>What a burst's pieces are drawn as (Module 47).</summary>
+        private enum DebrisKind
+        {
+            /// <summary>A cube: the lit material, tinted, with its white highlight added when <see cref="RuntimeConfig.DrawCubeHighlights"/> is on.</summary>
+            Cube,
+
+            /// <summary>An ice shard: one of the three baked sprites by the piece's index, untinted, with the plain material.</summary>
+            Shard,
+
+            /// <summary>A sparkle: white, with the plain material.</summary>
+            Sparkle
+        }
+
+        // A cube's highlight sorts just above the cubes, so the specular
+        // material adds it over its own cube; one order step, not a tunable.
+        private const int HighlightOrderStep = 1;
+
         /// <summary>
-        /// Plays <paramref name="pieces"/> as debris: one sprite each, flying
-        /// its travel, turning, shrinking to <paramref name="endScale"/>,
-        /// falling <paramref name="fallCells"/> and fading, each after its
-        /// delay. One tween drives them all, with <see cref="debrisId"/> as its
-        /// id, and destroys them when it ends. The one path for cubes and
-        /// shards.
+        /// Plays <paramref name="pieces"/> as debris: each a renderer the debris
+        /// pool lends (<see cref="DebrisPool"/>), drawn as
+        /// <paramref name="kind"/> says, flying its travel, turning, shrinking
+        /// to <paramref name="endScale"/>, falling <paramref name="fallCells"/>
+        /// and fading, each after its delay. One tween drives them all, with
+        /// <see cref="debrisId"/> as its id, and gives every renderer back when
+        /// it ends. A piece the pool has no renderer for is skipped. The one
+        /// path for cubes, shards and sparkles.
         /// </summary>
         /// <param name="toLocal">Where a piece's start, in the burst's cell units, is in this view's frame.</param>
         /// <param name="worldPerCell">World units per cell of travel and size.</param>
         private void PlayBurst(
-            IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal, float worldPerCell, Sprite sprite,
+            IReadOnlyList<BurstPiece> pieces, Func<Vector2, Vector2> toLocal, float worldPerCell, DebrisKind kind,
             Color color, float seconds, Ease ease, float endScale, float fallCells)
         {
-            var group = AddGroup(debris, "Burst", Vector2.zero);
+            if (pieces.Count == 0 || pool == null)
+            {
+                return;
+            }
+
+            var hasHighlight = kind == DebrisKind.Cube && config.DrawCubeHighlights;
             var renderers = new SpriteRenderer[pieces.Count];
+            var highlights = hasHighlight ? new SpriteRenderer[pieces.Count] : null;
             var starts = new Vector2[pieces.Count];
             var baseScales = new Vector3[pieces.Count];
             var longestDelay = 0f;
@@ -1329,11 +1512,29 @@ namespace GateRush.Runtime
             for (var i = 0; i < pieces.Count; i++)
             {
                 var piece = pieces[i];
+                var renderer = BorrowPiece(kind, i, color, config.EffectOrder);
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                renderers[i] = renderer;
                 starts[i] = toLocal(piece.Start);
                 var side = piece.Size * worldPerCell;
-                renderers[i] = AddSprite(group, "Piece", sprite, starts[i], new Vector2(side, side), color, config.EffectOrder);
-                baseScales[i] = renderers[i].transform.localScale;
+                var bounds = renderer.sprite.bounds.size;
+                baseScales[i] = new Vector3(side / bounds.x, side / bounds.y, 1f);
+                PosePiece(renderer.transform, starts[i], 0f, baseScales[i]);
                 longestDelay = Mathf.Max(longestDelay, piece.DelaySeconds);
+
+                if (hasHighlight)
+                {
+                    highlights[i] = pool.Borrow(
+                        config.CubeHighlightSprite, MaterialOf(SpriteLook.Highlight), Color.white, config.EffectOrder + HighlightOrderStep);
+                    if (highlights[i] != null)
+                    {
+                        PosePiece(highlights[i].transform, starts[i], 0f, baseScales[i]);
+                    }
+                }
             }
 
             var fall = fallCells * worldPerCell;
@@ -1342,29 +1543,70 @@ namespace GateRush.Runtime
                 {
                     for (var i = 0; i < pieces.Count; i++)
                     {
+                        var renderer = renderers[i];
+                        if (renderer == null)
+                        {
+                            continue;
+                        }
+
                         var piece = pieces[i];
                         var u = Mathf.Clamp01((time - piece.DelaySeconds) / seconds);
                         var eased = DOVirtual.EasedValue(0f, 1f, u, ease);
-                        var transformOf = renderers[i].transform;
-                        transformOf.localPosition =
-                            starts[i] + piece.Travel * (worldPerCell * eased) + Vector2.down * (fall * u * u);
-                        transformOf.localRotation = Quaternion.Euler(0f, 0f, piece.SpinDegrees * eased);
-                        transformOf.localScale = baseScales[i] * Mathf.LerpUnclamped(1f, endScale, eased);
+                        var position = starts[i] + piece.Travel * (worldPerCell * eased) + Vector2.down * (fall * u * u);
+                        var scale = baseScales[i] * Mathf.LerpUnclamped(1f, endScale, eased);
+                        var spin = piece.SpinDegrees * eased;
+                        PosePiece(renderer.transform, position, spin, scale);
 
                         var faded = color;
                         faded.a *= 1f - u;
-                        renderers[i].color = faded;
+                        renderer.color = faded;
+
+                        var highlight = highlights?[i];
+                        if (highlight != null)
+                        {
+                            PosePiece(highlight.transform, position, spin, scale);
+                            highlight.color = new Color(1f, 1f, 1f, 1f - u);
+                        }
                     }
                 })
                 .SetEase(Ease.Linear)
                 .SetId(debrisId)
                 .OnComplete(() =>
                 {
-                    if (group != null)
+                    for (var i = 0; i < renderers.Length; i++)
                     {
-                        Destroy(group.gameObject);
+                        pool.Return(renderers[i]);
+                        if (highlights != null)
+                        {
+                            pool.Return(highlights[i]);
+                        }
                     }
                 });
+        }
+
+        /// <summary>
+        /// A renderer from the pool for piece <paramref name="index"/> of a
+        /// burst of <paramref name="kind"/>, in <paramref name="color"/>; null
+        /// when the pool has none free.
+        /// </summary>
+        private SpriteRenderer BorrowPiece(DebrisKind kind, int index, Color color, int order)
+        {
+            switch (kind)
+            {
+                case DebrisKind.Cube:
+                    return pool.Borrow(config.CubeSprite, MaterialOf(SpriteLook.Lit), color, order);
+                case DebrisKind.Shard:
+                    return pool.Borrow(config.ShardSpriteAt(index), config.SpriteMaterial, color, order);
+                default:
+                    return pool.Borrow(config.SparkleSprite, config.SpriteMaterial, color, order);
+            }
+        }
+
+        private static void PosePiece(Transform piece, Vector2 position, float spinDegrees, Vector3 scale)
+        {
+            piece.localPosition = position;
+            piece.localRotation = Quaternion.Euler(0f, 0f, spinDegrees);
+            piece.localScale = scale;
         }
 
         /// <summary>One unit rectangle per cell, in the cells' own frame: where a block's pieces start.</summary>

@@ -11,7 +11,9 @@ namespace GateRush.Tests
     /// same pieces, the count never exceeds the cap, and every piece moves out
     /// through the gate's edge — or, in a radial burst, away from the centre.
     /// Module 20: a peel's stream is a fraction of an exit's, still under the
-    /// cap, and never shares a seed with it.
+    /// cap, and never shares a seed with it. Module 47: a limited burst is the
+    /// start of the unlimited one, and a joker's breaks share one cap per move
+    /// in proportion to what each wants.
     /// </summary>
     public class BurstLayoutTests
     {
@@ -329,6 +331,82 @@ namespace GateRush.Tests
 
             Assert.AreNotEqual(exitSeed, peelSeed);
             CollectionAssert.AreNotEqual(exit, peel, "so the two streams of one block on one move share no layout");
+        }
+
+        // ----- Module 47: a joker's breaks share one cap per move -----------
+
+        [Test]
+        public void Pieces_Limit_GivesTheFirstPiecesOfTheUnlimitedBurst()
+        {
+            var seed = BurstLayout.Seed(BurstKind.Break, 3, 7);
+            var whole = BurstLayout.Pieces(Areas(LShape), null, new Vector2(1f, 1f), seed, Settings());
+
+            var limited = BurstLayout.Pieces(Areas(LShape), null, new Vector2(1f, 1f), seed, Settings(), 5);
+
+            Assert.Greater(whole.Count, 5, "the fixture's burst is larger than the limit");
+            CollectionAssert.AreEqual(new List<BurstPiece>(whole).GetRange(0, 5), limited);
+        }
+
+        [Test]
+        public void Pieces_LimitAboveTheCap_KeepsTheCap()
+        {
+            var pieces = BurstLayout.Pieces(Areas(LShape), null, Vector2.zero, 1, Settings(), Cap * 2);
+
+            Assert.AreEqual(System.Math.Min(PerCell * LShape.Length, Cap), pieces.Count);
+        }
+
+        [Test]
+        public void Seed_BreakSparkleAndBreak_DifferForTheSameBlockAndMove()
+        {
+            Assert.AreNotEqual(BurstLayout.Seed(BurstKind.Break, 2, 5), BurstLayout.Seed(BurstKind.BreakSparkle, 2, 5));
+        }
+
+        [Test]
+        public void ShareCap_WantsWithinTheCap_GivesEveryBurstWhatItWants()
+        {
+            var shares = BurstLayout.ShareCap(new[] { 8, 12, 0, 4 }, 30);
+
+            CollectionAssert.AreEqual(new[] { 8, 12, 0, 4 }, shares);
+        }
+
+        [Test]
+        public void ShareCap_WantsOverTheCap_FillsTheCapProportionallyNeverPastAWant()
+        {
+            // Level 15's Orange Broom: eight blocks of 2, 2, 3, 4, 2, 2, 2 and 2
+            // cells at four cubes a cell, 76 wanted, under a cap of 48.
+            var wanted = new[] { 8, 8, 12, 16, 8, 8, 8, 8 };
+
+            var shares = BurstLayout.ShareCap(wanted, 48);
+
+            var total = 0;
+            for (var i = 0; i < shares.Length; i++)
+            {
+                Assert.That(shares[i], Is.InRange(0, wanted[i]), $"burst {i}");
+                Assert.AreEqual(wanted[i] * 48.0 / 76.0, shares[i], 1.0, $"burst {i}: its proportional part, rounded");
+                total += shares[i];
+            }
+
+            Assert.AreEqual(48, total, "the whole cap");
+        }
+
+        [Test]
+        public void ShareCap_SameWants_GiveTheSameShares()
+        {
+            var wanted = new[] { 5, 9, 3, 7 };
+
+            CollectionAssert.AreEqual(BurstLayout.ShareCap(wanted, 10), BurstLayout.ShareCap(wanted, 10));
+        }
+
+        [Test]
+        public void ShareCap_ZeroCap_GivesNothing()
+        {
+            CollectionAssert.AreEqual(new[] { 0, 0 }, BurstLayout.ShareCap(new[] { 3, 4 }, 0));
+        }
+
+        [Test]
+        public void ShareCap_NegativeWant_Throws()
+        {
+            Assert.Throws<System.ArgumentOutOfRangeException>(() => BurstLayout.ShareCap(new[] { 3, -1 }, 4));
         }
 
         private static IReadOnlyList<BurstPiece> Stream(BoardEdge edge, int cells, int seed, float countFraction = 1f) =>
