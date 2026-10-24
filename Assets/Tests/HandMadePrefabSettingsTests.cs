@@ -21,7 +21,7 @@ namespace GateRush.Tests
     /// the settings button's icon stays hidden with no sprite override (7.8);
     /// the selected tabs' labels share the largest fixed size at which
     /// "Leaderboard" fits its tile; and Home's Play button sits just above
-    /// the tab bar, its size kept, with the notice just above it.
+    /// the tab bar, its size kept, and its unused notice line is gone (7.8).
     /// </summary>
     /// <remarks>
     /// These read the project's real prefabs, so they fail until the owner
@@ -228,12 +228,11 @@ namespace GateRush.Tests
         }
 
         [Test]
-        public void HomePage_PlayButton_SitsJustAboveTheTabBarWithTheNoticeAboveIt()
+        public void HomePage_PlayButton_SitsJustAboveTheTabBar()
         {
             var homePage = AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePrefabSettings.HomePagePath);
             Assert.IsNotNull(homePage, HandMadePrefabSettings.HomePagePath);
             var play = Rect(homePage, HandMadePrefabSettings.PlayButtonPath);
-            var notice = Rect(homePage, HandMadePrefabSettings.NoticePath);
             var bottom = HandMadePrefabSettings.BottomCentre;
 
             Assert.AreEqual(bottom, play.anchorMin, "pinned to the page's foot, which is the tab bar's top");
@@ -241,13 +240,17 @@ namespace GateRush.Tests
             Assert.AreEqual(bottom, play.pivot);
             Assert.AreEqual(new Vector2(0f, HandMadePrefabSettings.PlayButtonBottomGap), play.anchoredPosition, "a gap above the tab bar");
             Assert.AreEqual(PlayButtonSize, play.sizeDelta, "its size kept");
-            Assert.AreEqual(bottom, notice.anchorMin);
-            Assert.AreEqual(bottom, notice.anchorMax);
-            Assert.AreEqual(bottom, notice.pivot);
-            Assert.AreEqual(
-                HandMadePrefabSettings.PlayButtonBottomGap + play.sizeDelta.y + HandMadePrefabSettings.NoticeGap, notice.anchoredPosition.y,
-                "the notice just above the button");
-            Assert.AreEqual(0f, notice.anchoredPosition.x);
+        }
+
+        [Test]
+        public void HomePage_Notice_IsRemoved()
+        {
+            var homePage = AssetDatabase.LoadAssetAtPath<GameObject>(HandMadePrefabSettings.HomePagePath);
+            Assert.IsNotNull(homePage, HandMadePrefabSettings.HomePagePath);
+
+            var notice = HandMadePrefabSettings.FindByPath(homePage, HandMadePrefabSettings.NoticePath);
+
+            Assert.IsNull(notice, $"'{HandMadePrefabSettings.NoticePath}' is unused since Module 49 and removed");
         }
 
         // ----- Module 47, pass 3: every hand-made button answers a press -----

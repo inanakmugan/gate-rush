@@ -9,9 +9,8 @@ namespace GateRush.UI
 {
     /// <summary>
     /// The Home tab (Module 35): an empty area kept for the streak bar of
-    /// Module 6.3, the large green play button reading "Level N" or "All
-    /// Played", and one notice line under it. Pressing Play only asks; the
-    /// bootstrap decides what follows.
+    /// Module 6.3 and the large green play button reading "Level N" or "All
+    /// Played". Pressing Play only asks; the bootstrap decides what follows.
     /// </summary>
     public sealed class HomeScreen : MonoBehaviour
     {
@@ -19,9 +18,6 @@ namespace GateRush.UI
 
         [Tooltip("The play button's label.")]
         [SerializeField] private TMP_Text playLabel;
-
-        [Tooltip("The line above the play button, empty until a notice is shown.")]
-        [SerializeField] private TMP_Text noticeLabel;
 
         /// <summary>Raised when Play is pressed.</summary>
         public event Action PlayRequested;
@@ -32,24 +28,11 @@ namespace GateRush.UI
             playLabel.text = HomeTexts.PlayLabel(state.CampaignLevelNumber, config);
         }
 
-        /// <summary>Shows <paramref name="text"/> above the play button.</summary>
-        public void ShowNotice(string text)
-        {
-            noticeLabel.text = text;
-        }
-
-        /// <summary>Empties the notice line.</summary>
-        public void ClearNotice()
-        {
-            noticeLabel.text = string.Empty;
-        }
-
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
         public void AddMissing(List<string> missing)
         {
             UiParts.AddIfMissing(missing, playButton, nameof(HomeScreen), nameof(playButton));
             UiParts.AddIfMissing(missing, playLabel, nameof(HomeScreen), nameof(playLabel));
-            UiParts.AddIfMissing(missing, noticeLabel, nameof(HomeScreen), nameof(noticeLabel));
         }
 
         private void OnEnable()

@@ -112,7 +112,7 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
         void HoldInput(Func<bool> isHeld);
 
-        /// <summary>Opens the front end on the Home tab with no overlay and no notice, showing <paramref name="state"/>.</summary>
+        /// <summary>Opens the front end on the Home tab with no overlay, showing <paramref name="state"/>.</summary>
         void Show(FrontEndState state);
 
         /// <summary>Shows <paramref name="state"/> in place, on whatever tab and overlays are showing.</summary>
@@ -130,14 +130,6 @@ namespace GateRush.Runtime
         /// </summary>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowEndOfContent();
-
-        /// <summary>
-        /// Shows <paramref name="text"/> in the line above Home's play button,
-        /// selecting Home first. It stays until the tab changes or the front
-        /// end is shown again.
-        /// </summary>
-        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
-        void ShowNotice(string text);
 
         /// <summary>
         /// Opens the Not Enough Gold prompt over whatever is showing, with
