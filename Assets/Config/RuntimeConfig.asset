@@ -159,7 +159,7 @@ MonoBehaviour:
   blockBadgeInsetCells: 0.265625
   chainEndInsetCells: 0.1
   padlockSizeCells: 0.62
-  keySizeCells: 0.72
+  keySizeCells: 0.6
   keyRotationDegrees: 35
   frozenMarkRaiseCells: 0.3
   timeBonusMarkFormat: +{0}

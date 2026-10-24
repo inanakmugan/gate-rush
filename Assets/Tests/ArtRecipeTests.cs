@@ -320,10 +320,10 @@ namespace GateRush.Tests
                 float cell = recipe.CellPixels;
                 var padlock = 2f * recipe.LockBodyHalfSizePixels.x / cell;
                 var key = (recipe.GoldKeyBowOffsetPixels + recipe.GoldKeyBowRadiusPixels
-                           + Mathf.Max(recipe.GoldKeyShaftEndPixels, recipe.GoldKeySecondToothPixels.y)) / cell;
+                           + Mathf.Max(recipe.GoldKeyShaftEndPixels, recipe.GoldKeySecondToothPixels.y)) / cell * config.KeyScale;
 
                 Assert.LessOrEqual(padlock, config.PadlockSizeCells, "the padlock's body");
-                Assert.LessOrEqual(key, config.KeySizeCells, "the key, bow to tip");
+                Assert.LessOrEqual(key, config.KeySizeCells, "the key, bow to tip, at Key Scale");
             }
             finally
             {

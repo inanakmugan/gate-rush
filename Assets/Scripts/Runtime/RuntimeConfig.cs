@@ -387,8 +387,11 @@ namespace GateRush.Runtime
         [Tooltip("The padlock's width, in cells, as the marks sharing a block are laid out, and as the Level Editor draws it: at least the board's padlock's body (ArtRecipeTests checks it against the art recipe).")]
         [SerializeField] private float padlockSizeCells = 0.62f;
 
-        [Tooltip("The key's length, in cells, as the marks sharing a block are laid out, and as the Level Editor draws it: at least the board's key's, bow to tip (ArtRecipeTests checks it against the art recipe).")]
-        [SerializeField] private float keySizeCells = 0.72f;
+        [Tooltip("The key's length, in cells, as the marks sharing a block are laid out, and as the Level Editor draws it: at least the board's key's, bow to tip, at Key Scale (ArtRecipeTests checks it against the art recipe).")]
+        [SerializeField] private float keySizeCells = 0.6f;
+
+        [Tooltip("The board's key's size relative to its painted size: its gem and the gem's highlight with it, about the key's centre. The key is painted at 1.2 times the reference script's bow and shaft; 1 / 1.2 draws it at the script's size (Module 46). Above 0.")]
+        [SerializeField] private float keyScale = 1f / 1.2f;
 
         [Tooltip("How far the Level Editor turns its key from horizontal, in degrees, counter-clockwise. The board's key lies flat: a lit sprite turned would turn its light (Module 46).")]
         [SerializeField] private float keyRotationDegrees = 35f;
@@ -1456,6 +1459,9 @@ namespace GateRush.Runtime
 
         /// <summary>A key's length as the marks are laid out and the Level Editor draws it, in cells.</summary>
         public float KeySizeCells => keySizeCells;
+
+        /// <summary>The board's key's size relative to its painted size, gem included.</summary>
+        public float KeyScale => keyScale;
 
         /// <summary>How far the Level Editor turns its key from horizontal, in degrees.</summary>
         public float KeyRotationDegrees => keyRotationDegrees;
@@ -2607,6 +2613,8 @@ namespace GateRush.Runtime
             {
                 problems.Add($"{name}: Padlock Size Cells and Key Size Cells must be positive.");
             }
+
+            AddIfNotPositive(problems, keyScale, "Key Scale");
 
             AddMechanicMeasureProblems(problems);
 

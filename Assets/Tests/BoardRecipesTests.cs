@@ -35,7 +35,11 @@ namespace GateRush.Tests
             texture = new Texture2D(SpriteTexels, SpriteTexels);
             coin = Sprite.Create(texture, new Rect(0f, 0f, SpriteTexels, SpriteTexels), new Vector2(0.5f, 0.5f), SpritePixelsPerUnit);
             var serialized = new SerializedObject(config);
-            serialized.FindProperty("bonusCoinSprite").objectReferenceValue = coin;
+            foreach (var field in new[] { "bonusCoinSprite", "goldKeySprite", "gemSprite", "gemHighlightSprite" })
+            {
+                serialized.FindProperty(field).objectReferenceValue = coin;
+            }
+
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             surface = new RecordingSurface();
@@ -102,6 +106,26 @@ namespace GateRush.Tests
             Assert.AreEqual(
                 -(coinCenter - config.BonusCoinCells / 2f), start + config.TimeBonusLabelAdvanceCells(text), Tolerance,
                 "the coin's left edge and the advance's end either side of the anchor");
+        }
+
+        [Test]
+        public void Key_Drawn_IsOneGroupAtKeyScaleOnItsCentre_TheGemInIt()
+        {
+            var parent = new RecordedGroup("Body", null, Vector2.zero, 1f);
+            var icon = new Vector2(0.5f, 0.5f);
+            const float scale = 0.6f;
+
+            recipes.Key(parent, icon, scale, Color.red);
+
+            var key = surface.Groups.Find(g => g.Name == "Key");
+            Assert.AreEqual(icon, key.Center, "the key keeps its centre");
+            Assert.AreEqual(scale * config.KeyScale, key.Scale, Tolerance, "shrunk by Key Scale with the marks' scale");
+            CollectionAssert.AreEqual(
+                new[] { "Sprite Body", "Sprite Gem", "Sprite Gem highlight" }, surface.Calls, "the gem and its highlight shrink with it");
+            foreach (var piece in surface.Pieces)
+            {
+                Assert.AreEqual(Vector2.zero, piece.Center, $"{piece.Name} on the key's centre");
+            }
         }
 
         [Test]

@@ -841,6 +841,16 @@ namespace GateRush.Tests
         }
 
         [Test]
+        public void Defaults_Key_IsDrawnAtTheScriptsSizeAndLaidOutAtIt()
+        {
+            // The key is painted at 1.2 times the script's bow and shaft; the
+            // board draws it at 1 / 1.2, and lays it out 0.6 of a cell long.
+            Assert.AreEqual(1f / 1.2f, config.KeyScale, 1e-6f, "Key Scale");
+            Assert.AreEqual(0.6f, config.KeySizeCells, 1e-6f, "Key Size Cells");
+            Assert.That(config.Problems(), Has.None.Contains("Key Scale"), "the default passes");
+        }
+
+        [Test]
         public void Defaults_MechanicColours_AreTheReferenceScripts()
         {
             // mechanics_reference.py's colours, one per painted or tinted part.

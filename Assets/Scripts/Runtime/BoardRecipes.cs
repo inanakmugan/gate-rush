@@ -348,13 +348,15 @@ namespace GateRush.Runtime
 
         /// <summary>
         /// A key (M8) under a block's body, centred on <paramref name="icon"/>
-        /// at <paramref name="scale"/>: the gold key, lying flat so its light
-        /// falls from the top left, then its gem in <paramref name="gem"/>, the
-        /// colour of the lock it opens (D47), and the gem's highlight.
+        /// at <paramref name="scale"/> times <see cref="RuntimeConfig.KeyScale"/>:
+        /// the gold key, lying flat so its light falls from the top left, then
+        /// its gem in <paramref name="gem"/>, the colour of the lock it opens
+        /// (D47), and the gem's highlight — all in one group, so they shrink
+        /// together about the key's centre.
         /// </summary>
         public void Key(TGroup parent, Vector2 icon, float scale, Color gem)
         {
-            var key = surface.Group(parent, "Key", icon, scale);
+            var key = surface.Group(parent, "Key", icon, scale * config.KeyScale);
             var size = NaturalSize(config.GoldKeySprite);
             surface.Sprite(key, "Body", config.GoldKeySprite, Vector2.zero, size, Color.white, config.IconOrder, 0f, SpriteLook.Lit);
             surface.Sprite(key, "Gem", config.GemSprite, Vector2.zero, size, gem, config.KeyGemOrder, 0f, SpriteLook.Lit);
