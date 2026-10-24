@@ -150,3 +150,39 @@ Names are negotiable.
 - Finishing level 30 in the campaign: the result panel, then Home with
   the overlay; Restart plays level 1 in free play with gold, lives and
   completed levels unchanged; Play on Home opens the overlay again.
+
+---
+
+## Resolved during implementation
+
+- **Privacy.** Handled inside `FrontEnd`, with no `IFrontEnd` members:
+  the request never needs the bootstrap. The Message Overlay gained a
+  tall size the builder writes beside the short one (as `ResultOverlay`
+  does); `ShowLong` uses it, `Show` keeps the short size for Purchase
+  Failed. The text auto-sizes from 48 to 40 and fits at 48 in 14 lines.
+  The row reuses the Settings row layout with Button Round and the
+  existing gold lock icon; the panel grows from 880 to 1060. The text's
+  claims were checked: analytics, crash and performance reporting are
+  off in the project.
+- **The final win.** Its result panel already showed the closing message
+  (Thanks for playing!) with Next and Restart hidden, so Menu is the way
+  out, and Menu opens Home and then the overlay. The Next path in
+  `StartCampaignLevel` leads to the overlay too, as a safety net nothing
+  reaches today.
+- **Rewards first.** The overlay opens and a due streak reward opens on
+  top of it; Collect reveals it. The two scrims stack, which the owner
+  accepted in play.
+- **Decisions as plain code.** `CampaignLevels.ChooseStart` answers
+  Level, NoLife or Over (Over before lives, as before); `CampaignEnd`
+  answers whether the campaign is over, whether a win has just finished
+  it, and which level Restart plays, always in free play. The flow test
+  encodes the whole save before and after Restart and compares it.
+- **Removed and left.** `campaignDoneNotice` is removed from
+  `RuntimeConfig` and its asset. `IFrontEnd.ShowNotice`,
+  `FrontEnd.ShowNotice` and Home's notice label are now unused and left
+  for a later cleanup.
+- **Dev tool.** *Gate Rush → Dev: Move Campaign To Last Level* sets the
+  saved campaign position to the last level through the save code,
+  editor only and refused in Play Mode. Undo is *Edit → Clear All
+  PlayerPrefs*, which resets the whole save.
+- **Tests.** 3,381 at the end (3,341 before).
