@@ -18,6 +18,7 @@ namespace GateRush.Tests
     /// the avatar fills its 120-unit frame inside a thin rim with no Layout
     /// Element of its own; the Name Tag stays centred on the frame's bottom
     /// edge; the gold has a canvas and a raycaster of its own (Module 47);
+    /// the settings button's icon stays hidden with no sprite override (7.8);
     /// the selected tabs' labels share the largest fixed size at which
     /// "Leaderboard" fits its tile; and Home's Play button sits just above
     /// the tab bar, its size kept, with the notice just above it.
@@ -143,6 +144,41 @@ namespace GateRush.Tests
 
             Assert.IsNotNull(gold.GetComponent<GraphicRaycaster>(), "the gold's '+' stays pressable");
             Assert.AreEqual(canvas, Rect(topBar, HandMadePrefabSettings.GoldPlusIconPath).GetComponentInParent<Canvas>(true), "the '+' is on it");
+        }
+
+        [Test]
+        public void TopBar_SettingsIcon_StaysHidden()
+        {
+            // The cog is the settings button's face; its own icon is hidden,
+            // which is what lets 7.8 revert that icon's sprite unseen.
+            var icon = Rect(topBar, HandMadePrefabSettings.SettingsIconPath);
+
+            Assert.IsFalse(icon.gameObject.activeSelf, $"{HandMadePrefabSettings.SettingsIconPath} stays hidden");
+        }
+
+        [Test]
+        public void TopBar_SettingsIcon_HasNoSpriteOverrideAndFollowsButtonRound()
+        {
+            // Loaded as contents, as the command edits it, so the nested
+            // Button Round instance reports its overrides.
+            var contents = PrefabUtility.LoadPrefabContents(HandMadePrefabSettings.TopBarPath);
+            try
+            {
+                var icon = Rect(contents, HandMadePrefabSettings.SettingsIconPath).GetComponent<Image>();
+                var buttonRoundIcon = Rect(buttonRound, HandMadePrefabSettings.ButtonRoundIconPath).GetComponent<Image>();
+                Assert.IsNotNull(icon, HandMadePrefabSettings.SettingsIconPath);
+
+                using (var serialized = new SerializedObject(icon))
+                {
+                    Assert.IsFalse(serialized.FindProperty("m_Sprite").prefabOverride, "no leftover sprite override");
+                }
+
+                Assert.AreEqual(buttonRoundIcon.sprite, icon.sprite, "the icon follows Button Round's glyph");
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(contents);
+            }
         }
 
         [Test]
