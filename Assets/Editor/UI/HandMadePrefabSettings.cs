@@ -24,7 +24,8 @@ namespace GateRush.UI.Editor
     /// settings button's hidden icon drops its leftover sprite override
     /// (7.8); in Tab Bar the selected tabs' labels share the largest size at which
     /// "Leaderboard" fits its tile; in Home Page the Play button sits just
-    /// above the tab bar with the notice above it (the interface review).
+    /// above the tab bar (the interface review), and the notice line, unused
+    /// since Module 49, is removed (7.8).
     /// Every hand-made button answers a press (Module 47): Button Primary,
     /// Button Round and Level Button carry a PressFeedback on their root,
     /// which Button Secondary and Button Close, their variants, and every
@@ -85,14 +86,11 @@ namespace GateRush.UI.Editor
         /// The Play button's foot above the page's foot, which is the tab bar's
         /// top: in the lower third, within a thumb's reach, and clear of the
         /// selected tab's raised tile, which stands about 25 units above the
-        /// bar. The notice sits <see cref="NoticeGap"/> above the button.
+        /// bar.
         /// </summary>
         public const float PlayButtonBottomGap = 120f;
 
-        /// <summary>The space between the Play button's top and the notice above it.</summary>
-        public const float NoticeGap = 20f;
-
-        /// <summary>The anchor and pivot the Play button and the notice are pinned by: the middle of the page's foot.</summary>
+        /// <summary>The anchor and pivot the Play button is pinned by: the middle of the page's foot.</summary>
         public static readonly Vector2 BottomCentre = new Vector2(0.5f, 0f);
 
         /// <summary>The prefabs the command sets.</summary>
@@ -160,7 +158,10 @@ namespace GateRush.UI.Editor
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string PlayButtonPath = "Home Page/Play Button";
 
-        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        /// <summary>
+        /// The notice line above the Play button, which nothing has shown
+        /// since Module 49; the Home Page step removes it (7.8).
+        /// </summary>
         public const string NoticePath = "Home Page/Notice";
 
         /// <inheritdoc cref="ButtonRoundIconPath"/>
@@ -617,22 +618,35 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// Home Page's steps: the Play button just above the tab bar, its size
-        /// kept, and the notice just above it. Returns the refusal, or null.
+        /// kept, and the unused notice line removed (7.8). A page without the
+        /// notice is left as it is. The notice must be the page's own object:
+        /// one inside a nested prefab instance cannot be removed from these
+        /// contents. Everything is checked before anything is changed. Returns
+        /// the refusal, or null.
         /// </summary>
         private static string SetHomePage(GameObject root, List<string> changes)
         {
             var play = FindByPath(root, PlayButtonPath) as RectTransform;
-            var notice = FindByPath(root, NoticePath) as RectTransform;
+            var notice = FindByPath(root, NoticePath);
             var missing = new List<string>();
             AddIfMissing(missing, play, $"a RectTransform at '{PlayButtonPath}'");
-            AddIfMissing(missing, notice, $"a RectTransform at '{NoticePath}'");
+            if (notice != null && PrefabUtility.IsPartOfPrefabInstance(notice))
+            {
+                missing.Add($"'{NoticePath}' to be the page's own object, not part of a prefab instance, so it can be removed");
+            }
+
             if (missing.Count > 0)
             {
                 return $"it needs {string.Join(", ", missing)}";
             }
 
             SetBottomCentred(play, PlayButtonBottomGap, PlayButtonPath, changes);
-            SetBottomCentred(notice, PlayButtonBottomGap + play.sizeDelta.y + NoticeGap, NoticePath, changes);
+            if (notice != null)
+            {
+                Object.DestroyImmediate(notice.gameObject);
+                changes.Add($"{NoticePath} removed");
+            }
+
             return null;
         }
 

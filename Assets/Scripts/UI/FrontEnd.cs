@@ -139,7 +139,8 @@ namespace GateRush.UI
         private CanvasGroup homeGroup;
         private CanvasGroup leaderboardGroup;
 
-        // The tab the notice belongs to: the notice goes when the tab changes.
+        // The tab last shown, so a tab change can end a gold flight and ask
+        // the Leaderboard for a fresh table.
         private UiTab shownTab = UiTab.Home;
         private bool isSubscribed;
 
@@ -374,7 +375,6 @@ namespace GateRush.UI
             navigation.Reset();
             shownTab = navigation.Tab;
             ApplyNavigation(false);
-            home.ClearNotice();
             Refresh(state);
         }
 
@@ -400,14 +400,6 @@ namespace GateRush.UI
         {
             RequireOpen(nameof(ShowLives));
             navigation.Open(UiOverlay.Lives);
-        }
-
-        /// <inheritdoc />
-        public void ShowNotice(string text)
-        {
-            RequireOpen(nameof(ShowNotice));
-            navigation.SelectTab(UiTab.Home);
-            home.ShowNotice(text);
         }
 
         /// <inheritdoc />
@@ -929,7 +921,6 @@ namespace GateRush.UI
             {
                 shownTab = navigation.Tab;
                 EndGoldFlight();
-                home.ClearNotice();
                 if (shownTab == UiTab.Leaderboard)
                 {
                     RequestLeaderboard();

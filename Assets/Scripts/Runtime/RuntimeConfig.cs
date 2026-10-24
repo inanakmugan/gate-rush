@@ -890,8 +890,8 @@ namespace GateRush.Runtime
         [Tooltip("The line under every New Joker card's title.")]
         [SerializeField] private string newJokerSubtitle = "New Joker Unlocked!";
 
-        [Tooltip("The joker icon's size, centred in the illustration area with the sparkles around it.")]
-        [SerializeField] private float newJokerIconSizeUnits = 540f;
+        [Tooltip("The joker icon's size, centred in the illustration area with the sparkles around it. At most the area's shorter side; at 360 in the 720-high area, 216 units stay clear above and below it, as around a mechanic's drawing.")]
+        [SerializeField] private float newJokerIconSizeUnits = 360f;
 
         [Tooltip("The joker icon's colour: white, since the Joker Icons are drawn in their own colours (Module 45).")]
         [SerializeField] private Color newJokerIconColor = Color.white;
@@ -1922,6 +1922,14 @@ namespace GateRush.Runtime
 
         /// <summary>The size of the joker icon on a New Joker card, in canvas units.</summary>
         public float NewJokerIconSizeUnits => newJokerIconSizeUnits;
+
+        /// <summary>
+        /// The clear space, in canvas units, between the New Joker card's
+        /// icon and the subtitle above it, and equally between the icon and
+        /// the text box below it: the illustration area's margin around the
+        /// centred icon plus the spacing between the card's rows.
+        /// </summary>
+        public float NewJokerIconGapUnits => (introIllustrationSizeUnits.y - newJokerIconSizeUnits) * 0.5f + introSpacingUnits;
 
         /// <summary>The colour of the joker icon on a New Joker card.</summary>
         public Color NewJokerIconColor => newJokerIconColor;
@@ -3314,7 +3322,8 @@ namespace GateRush.Runtime
         /// naming its field or joker: the Joker Icons are assigned and report
         /// no problem; every joker has exactly one entry, with a title and a
         /// sentence that formats with the Clock's seconds; the subtitle is not
-        /// empty; the icon has a positive size and a colour that shows.
+        /// empty; the icon has a positive size, fits the illustration area,
+        /// and has a colour that shows.
         /// </summary>
         private void AddNewJokerProblems(List<string> problems)
         {
@@ -3372,6 +3381,11 @@ namespace GateRush.Runtime
             }
 
             AddIfNotPositive(problems, newJokerIconSizeUnits, "New Joker Icon Size Units");
+
+            if (newJokerIconSizeUnits > Mathf.Min(introIllustrationSizeUnits.x, introIllustrationSizeUnits.y))
+            {
+                problems.Add($"{name}: New Joker Icon Size Units must be at most the shorter side of Intro Illustration Size Units, or the icon covers the rows beside it.");
+            }
 
             if (!(newJokerIconColor.a > 0f))
             {

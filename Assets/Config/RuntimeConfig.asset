@@ -363,7 +363,7 @@ MonoBehaviour:
     title: Broom!
     text: Tap the Broom, then a block, to clear that colour from every block.
   newJokerSubtitle: New Joker Unlocked!
-  newJokerIconSizeUnits: 540
+  newJokerIconSizeUnits: 360
   newJokerIconColor: {r: 1, g: 1, b: 1, a: 1}
   introSparkles:
   - position: {x: -0.52, y: 0.4}
