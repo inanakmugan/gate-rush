@@ -1009,14 +1009,25 @@ namespace GateRush.Runtime
         /// callers that cost a life have reported it. Does nothing while no
         /// level is loaded. Home opens under the screen fade
         /// (<see cref="LeaveToFrontEnd"/>) and announces the streak rewards
-        /// once the fade has lifted.
+        /// once the fade has lifted. Leaving the win that finished the
+        /// campaign also opens the End of Content overlay, under the rewards
+        /// (Module 49).
         /// </summary>
         private void GoToMenu()
         {
-            if (run != null)
+            if (run == null)
             {
-                LeaveToFrontEnd(OpenHome, AnnounceStreakRewards);
+                return;
             }
+
+            // Asked before the level is left: the run's outcome goes with it.
+            if (CampaignEnd.IsJustFinished(mode, run.Outcome, catalog, metaGame.CampaignPosition))
+            {
+                LeaveToFrontEnd(OpenHome, ShowEndOfContentUnderRewards);
+                return;
+            }
+
+            LeaveToFrontEnd(OpenHome, AnnounceStreakRewards);
         }
 
         /// <summary>
@@ -1123,38 +1134,37 @@ namespace GateRush.Runtime
         /// <summary>
         /// Starts the campaign level, the one at
         /// <see cref="MetaGame.CampaignPosition"/> in the level order — from
-        /// Play, or from Next after a campaign win. Past the last level the
-        /// campaign is over: Home's notice says so and nothing starts, lives
-        /// or none. With no life left the Lives overlay opens instead
-        /// (D57). Starting spends nothing.
+        /// Play, or from Next after a campaign win — as
+        /// <see cref="CampaignLevels.ChooseStart"/> decides. Past the last
+        /// level the campaign is over: the End of Content overlay opens on
+        /// Home (Module 49) and nothing starts, lives or none. With no life
+        /// left the Lives overlay opens instead (D57). Starting spends nothing.
         /// </summary>
         private void StartCampaignLevel()
         {
-            if (!CampaignLevels.TryGetLevel(catalog, metaGame.CampaignPosition, out var campaignName))
+            switch (CampaignLevels.ChooseStart(catalog, metaGame, out var campaignName))
             {
-                // The notice selects Home, which closes every overlay, so the
-                // streak rewards are announced after it. From a level (Next),
-                // Home and the notice come under the screen fade.
-                if (!frontEndView.IsOpen)
-                {
-                    LeaveToFrontEnd(OpenHomeWithCampaignDone, AnnounceStreakRewards);
+                case CampaignStart.Over:
+                    // From a level (Next, which the last win's panel does not
+                    // offer: kept as a safety net), Home and the overlay come
+                    // under the screen fade.
+                    if (!frontEndView.IsOpen)
+                    {
+                        LeaveToFrontEnd(OpenHome, ShowEndOfContentUnderRewards);
+                        return;
+                    }
+
+                    ShowEndOfContentUnderRewards();
                     return;
-                }
-
-                frontEndView.ShowNotice(config.CampaignDoneNotice);
-                AnnounceStreakRewards();
-                return;
+                case CampaignStart.NoLife:
+                    ShowLivesOverlay();
+                    return;
+                case CampaignStart.Level:
+                    // Every name in the catalog is a level that loaded, kept in
+                    // levelAssets under that name (BuildCatalog), so this cannot miss.
+                    Load(levelAssets[campaignName], PlayMode.Campaign);
+                    return;
             }
-
-            if (!metaGame.CanStartCampaignLevel())
-            {
-                ShowLivesOverlay();
-                return;
-            }
-
-            // Every name in the catalog is a level that loaded, kept in
-            // levelAssets under that name (BuildCatalog), so this cannot miss.
-            Load(levelAssets[campaignName], PlayMode.Campaign);
         }
 
         /// <summary>
@@ -1189,11 +1199,36 @@ namespace GateRush.Runtime
             frontEndView.ShowLives();
         }
 
-        /// <summary>Opens Home with the campaign-done notice: a campaign finished by Next.</summary>
-        private void OpenHomeWithCampaignDone()
+        /// <summary>
+        /// Opens the End of Content overlay on Home, then announces the streak
+        /// rewards kept since Home was last shown over it (Module 49): the
+        /// player sees the rewards first, and collecting them shows the
+        /// overlay beneath. The front end must be open.
+        /// </summary>
+        private void ShowEndOfContentUnderRewards()
         {
-            OpenHome();
-            frontEndView.ShowNotice(config.CampaignDoneNotice);
+            frontEndView.ShowEndOfContent();
+            AnnounceStreakRewards();
+        }
+
+        /// <summary>
+        /// Restart on the End of Content overlay (Module 49): level 1 in free
+        /// play (D58), loaded as the level grid loads a level, under the
+        /// screen fade. Nothing is reported to the meta game, so the save is
+        /// left exactly as it was. With no usable level order, which a
+        /// finished campaign cannot have, it logs and changes nothing.
+        /// </summary>
+        private void OnEndOfContentRestartRequested()
+        {
+            if (!CampaignEnd.TryGetRestartLevel(catalog, out var firstName))
+            {
+                Debug.LogError("Restart on the End of Content overlay found no level order to start; nothing changes.", this);
+                return;
+            }
+
+            // Every name in the catalog is a level that loaded, kept in
+            // levelAssets under that name (BuildCatalog), so this cannot miss.
+            Load(levelAssets[firstName], CampaignEnd.RestartMode);
         }
 
         /// <summary>
@@ -1444,6 +1479,7 @@ namespace GateRush.Runtime
             frontEndView.CoinLanded += OnCoinLanded;
             frontEndView.JokerPurchaseRequested += OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested += OnLeaderboardRequested;
+            frontEndView.EndOfContentRestartRequested += OnEndOfContentRestartRequested;
             boardView.LeaveStarted += OnLeaveStarted;
             boardView.ArriveStarted += OnArriveStarted;
             inputController.DragStarted += OnDragStarted;
@@ -1489,6 +1525,7 @@ namespace GateRush.Runtime
             frontEndView.CoinLanded -= OnCoinLanded;
             frontEndView.JokerPurchaseRequested -= OnJokerPurchaseRequested;
             frontEndView.LeaderboardRequested -= OnLeaderboardRequested;
+            frontEndView.EndOfContentRestartRequested -= OnEndOfContentRestartRequested;
             boardView.LeaveStarted -= OnLeaveStarted;
             boardView.ArriveStarted -= OnArriveStarted;
             inputController.DragStarted -= OnDragStarted;

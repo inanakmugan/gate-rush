@@ -1,4 +1,5 @@
 using System;
+using GateRush.Meta;
 
 namespace GateRush.Runtime
 {
@@ -32,6 +33,43 @@ namespace GateRush.Runtime
 
             name = catalog.Names[position];
             return true;
+        }
+
+        /// <summary>
+        /// What starting the campaign level does for <paramref name="meta"/>'s
+        /// position in <paramref name="catalog"/>'s order: past the last level
+        /// the campaign is over, whatever the lives — checked first, so a
+        /// finished campaign never asks for a life; with no life left, nothing
+        /// starts (D57); otherwise the level <paramref name="name"/> starts.
+        /// Reads the lives at the meta game's clock and changes nothing.
+        /// <paramref name="name"/> is null unless the answer is
+        /// <see cref="CampaignStart.Level"/>. With no usable level order the
+        /// answer is <see cref="CampaignStart.Over"/>, as
+        /// <see cref="TryGetLevel"/> has no level; Play falls back before
+        /// asking.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="meta"/> is null.</exception>
+        public static CampaignStart ChooseStart(LevelCatalog catalog, MetaGame meta, out string name)
+        {
+            if (meta == null)
+            {
+                throw new ArgumentNullException(nameof(meta));
+            }
+
+            if (!TryGetLevel(catalog, meta.CampaignPosition, out var levelName))
+            {
+                name = null;
+                return CampaignStart.Over;
+            }
+
+            if (!meta.CanStartCampaignLevel())
+            {
+                name = null;
+                return CampaignStart.NoLife;
+            }
+
+            name = levelName;
+            return CampaignStart.Level;
         }
     }
 }

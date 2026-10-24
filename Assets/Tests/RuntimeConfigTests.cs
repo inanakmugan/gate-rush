@@ -582,35 +582,6 @@ namespace GateRush.Tests
                 string.Join(" | ", problems));
         }
 
-        [Test]
-        public void Problems_DefaultMetaWiringValues_ReportNothingAboutThem()
-        {
-            var problems = config.Problems();
-
-            // Every message about Module 32's values names one of these.
-            Assert.That(problems, Has.None.Contains("Meta "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Format"), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("Confirm "), string.Join(" | ", problems));
-            Assert.That(problems, Has.None.Contains("is empty"), string.Join(" | ", problems));
-        }
-
-        [Test]
-        public void Defaults_MetaTexts_AreTheSpecified()
-        {
-            // The confirmation's texts moved to the UI Config (Module 41).
-            Assert.AreEqual("All levels played. Play any level from Settings.", config.CampaignDoneNotice);
-        }
-
-        [TestCase("campaignDoneNotice", "Campaign Done Notice")]
-        public void Problems_EmptyMetaText_IsReportedByName(string field, string shownName)
-        {
-            SetString(field, "  ");
-
-            var problems = config.Problems();
-
-            Assert.That(problems, Has.Some.Contains($"{shownName} is empty"), string.Join(" | ", problems));
-        }
-
         // ----- Module 41: the introduction card's theme -------------------------
         // The result panel's and the confirmation's values left with them.
 

@@ -8,11 +8,11 @@ using UnityEngine.UI;
 namespace GateRush.UI
 {
     /// <summary>
-    /// The Settings overlay (Modules 35 and 38): the sound toggle, the haptics
-    /// toggle under it, and the Levels button that opens the level grid. The
-    /// two toggles are independent: sound off leaves vibration on, and the
-    /// other way round. They show the state they are given; pressing one only
-    /// asks.
+    /// The Settings overlay (Modules 35, 38 and 49): the sound toggle, the
+    /// haptics toggle under it, the Privacy row under that, and the Levels
+    /// button that opens the level grid. The two toggles are independent:
+    /// sound off leaves vibration on, and the other way round. They show the
+    /// state they are given; pressing one, or Privacy, only asks.
     /// </summary>
     public sealed class SettingsOverlay : MonoBehaviour
     {
@@ -40,6 +40,12 @@ namespace GateRush.UI
         [Tooltip("Shown while haptics are off: the phone with a cross over it.")]
         [SerializeField] private GameObject hapticsOffLook;
 
+        [Tooltip("The Privacy row's label, from the UI Config.")]
+        [SerializeField] private TMP_Text privacyLabel;
+
+        [Tooltip("The Privacy row's button: opens the privacy text over Settings (Module 49).")]
+        [SerializeField] private Button privacyButton;
+
         [SerializeField] private Button levelsButton;
 
         /// <summary>Raised when the close button is pressed.</summary>
@@ -54,7 +60,10 @@ namespace GateRush.UI
         /// <summary>Raised when Levels is pressed.</summary>
         public event Action LevelsRequested;
 
-        /// <summary>Shows the sound and haptics settings of <paramref name="state"/> on the toggles, and the haptics label of <paramref name="config"/>.</summary>
+        /// <summary>Raised when the Privacy row's button is pressed.</summary>
+        public event Action PrivacyRequested;
+
+        /// <summary>Shows the sound and haptics settings of <paramref name="state"/> on the toggles, and the haptics and privacy labels of <paramref name="config"/>.</summary>
         /// <exception cref="ArgumentNullException"><paramref name="config"/> is null.</exception>
         public void Show(FrontEndState state, UiConfig config)
         {
@@ -68,6 +77,7 @@ namespace GateRush.UI
             hapticsLabel.text = config.HapticsLabel;
             hapticsOnLook.SetActive(state.IsHapticsOn);
             hapticsOffLook.SetActive(!state.IsHapticsOn);
+            privacyLabel.text = config.PrivacyTitle;
         }
 
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
@@ -81,6 +91,8 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, hapticsButton, nameof(SettingsOverlay), nameof(hapticsButton));
             UiParts.AddIfMissing(missing, hapticsOnLook, nameof(SettingsOverlay), nameof(hapticsOnLook));
             UiParts.AddIfMissing(missing, hapticsOffLook, nameof(SettingsOverlay), nameof(hapticsOffLook));
+            UiParts.AddIfMissing(missing, privacyLabel, nameof(SettingsOverlay), nameof(privacyLabel));
+            UiParts.AddIfMissing(missing, privacyButton, nameof(SettingsOverlay), nameof(privacyButton));
             UiParts.AddIfMissing(missing, levelsButton, nameof(SettingsOverlay), nameof(levelsButton));
         }
 
@@ -89,6 +101,7 @@ namespace GateRush.UI
             UiParts.Listen(closeButton, OnCloseClicked);
             UiParts.Listen(soundButton, OnSoundClicked);
             UiParts.Listen(hapticsButton, OnHapticsClicked);
+            UiParts.Listen(privacyButton, OnPrivacyClicked);
             UiParts.Listen(levelsButton, OnLevelsClicked);
         }
 
@@ -97,6 +110,7 @@ namespace GateRush.UI
             UiParts.Unlisten(closeButton, OnCloseClicked);
             UiParts.Unlisten(soundButton, OnSoundClicked);
             UiParts.Unlisten(hapticsButton, OnHapticsClicked);
+            UiParts.Unlisten(privacyButton, OnPrivacyClicked);
             UiParts.Unlisten(levelsButton, OnLevelsClicked);
         }
 
@@ -105,6 +119,8 @@ namespace GateRush.UI
         private void OnSoundClicked() => SoundToggleRequested?.Invoke();
 
         private void OnHapticsClicked() => HapticsToggleRequested?.Invoke();
+
+        private void OnPrivacyClicked() => PrivacyRequested?.Invoke();
 
         private void OnLevelsClicked() => LevelsRequested?.Invoke();
     }

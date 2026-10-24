@@ -66,6 +66,14 @@ namespace GateRush.Runtime
         event Action LeaderboardRequested;
 
         /// <summary>
+        /// Raised when the player presses Restart on the End of Content overlay
+        /// (Module 49): the bootstrap starts level 1 in free play (D58), and
+        /// nothing in the save changes. The overlay stays open until the
+        /// front end is hidden.
+        /// </summary>
+        event Action EndOfContentRestartRequested;
+
+        /// <summary>
         /// Raised when the player presses any button of the front end, or Back
         /// changed something, after the press's own event — so sound turned
         /// on by the press is on before the press sounds (Module 25).
@@ -113,6 +121,15 @@ namespace GateRush.Runtime
         /// <summary>Opens the Lives overlay over the current tab.</summary>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowLives();
+
+        /// <summary>
+        /// Selects Home and opens the End of Content overlay over it (Module
+        /// 49): the campaign is finished. Its close button closes it; its
+        /// Restart raises <see cref="EndOfContentRestartRequested"/>. An
+        /// overlay opened after it, such as the Streak Reward, opens over it.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">The front end is not open.</exception>
+        void ShowEndOfContent();
 
         /// <summary>
         /// Shows <paramref name="text"/> in the line above Home's play button,

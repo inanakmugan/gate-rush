@@ -27,7 +27,8 @@ namespace GateRush.Tests
     /// unusable timing is reported, the defaults read as specified, and the
     /// selected joker's ring reads its own colour. Module 41's level panel
     /// texts and formats are checked the same way, an unusable pop is
-    /// reported, and the defaults read as specified.
+    /// reported, and the defaults read as specified. Module 49's privacy and
+    /// End of Content texts read as specified and are checked the same way.
     /// </summary>
     public class UiConfigTests
     {
@@ -198,6 +199,11 @@ namespace GateRush.Tests
         [TestCase("lifetimeGoldLabel", "Lifetime Gold Label")]
         [TestCase("statisticFormat", "Statistic Format")]
         [TestCase("hapticsLabel", "Haptics Label")]
+        [TestCase("privacyTitle", "Privacy Title")]
+        [TestCase("privacyText", "Privacy Text")]
+        [TestCase("endOfContentTitle", "End Of Content Title")]
+        [TestCase("endOfContentLine", "End Of Content Line")]
+        [TestCase("endOfContentRestartLabel", "End Of Content Restart Label")]
         [TestCase("leaderboardSimulatedNote", "Leaderboard Simulated Note")]
         [TestCase("leaderboardLoadingText", "Leaderboard Loading Text")]
         [TestCase("leaderboardFailedText", "Leaderboard Failed Text")]
@@ -384,6 +390,21 @@ namespace GateRush.Tests
 
             Assert.AreEqual(themePurple, config.DisabledButtonLabelColor, "readable on the grey button");
             Assert.AreEqual(greyBlue, config.DisabledJokerIconColor, "a disabled joker's icon looks as before");
+        }
+
+        [Test]
+        public void Defaults_PrivacyAndEndOfContentTexts_AreTheSpecified()
+        {
+            Assert.AreEqual("Privacy", config.PrivacyTitle);
+            Assert.AreEqual(
+                "Gate Rush collects no personal data. Your progress (levels, gold, lives, your name and avatar, and your " +
+                "settings) is saved only in this browser, on this device, and is never sent anywhere. There are no ads, no " +
+                "analytics and no accounts. Purchases are simulated: no payment is ever taken. The leaderboard is local, and " +
+                "its other players are labelled demo players. Clearing this site's data resets your progress.",
+                config.PrivacyText);
+            Assert.AreEqual("You finished every level!", config.EndOfContentTitle);
+            Assert.AreEqual("New levels are coming soon.", config.EndOfContentLine);
+            Assert.AreEqual("Restart", config.EndOfContentRestartLabel);
         }
 
         [Test]

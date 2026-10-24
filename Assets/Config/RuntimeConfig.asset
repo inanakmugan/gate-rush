@@ -285,7 +285,6 @@ MonoBehaviour:
   generatorPreviewCornerCells: 0.18
   generatorPreviewFadeInSeconds: 0.1
   generatorPreviewFadeOutSeconds: 0.12
-  campaignDoneNotice: All levels played. Play any level from Settings.
   introFont: {fileID: 11400000, guid: 7e272475c6b4f394f96d8a8ed970fc53, type: 2}
   introPanelSprite: {fileID: 21300000, guid: e3cc49508eeea074ebdfbdbaea10c7d5, type: 3}
   introPanelPaddingUnits: 40
