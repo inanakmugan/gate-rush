@@ -20,8 +20,9 @@ namespace GateRush.UI.Editor
     /// in Top Bar the plus buttons' icons follow it, the lives count takes
     /// the HUD's font size, the heart sits close to the coin's size and the
     /// avatar fills its frame inside a thin rim (Module 45 follow-ups), and
-    /// the gold has a canvas and a raycaster of its own (Module 47); in
-    /// Tab Bar the selected tabs' labels share the largest size at which
+    /// the gold has a canvas and a raycaster of its own (Module 47), and the
+    /// settings button's hidden icon drops its leftover sprite override
+    /// (7.8); in Tab Bar the selected tabs' labels share the largest size at which
     /// "Leaderboard" fits its tile; in Home Page the Play button sits just
     /// above the tab bar with the notice above it (the interface review).
     /// Every hand-made button answers a press (Module 47): Button Primary,
@@ -139,6 +140,14 @@ namespace GateRush.UI.Editor
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string NameTagPath = "Top Bar/Avatar Frame/Name Tag";
 
+        /// <summary>
+        /// The settings button's own icon, a Button Round glyph the Top Bar
+        /// keeps hidden: the cog is drawn by the button's face. It carried a
+        /// leftover override to the game-icons.net cog, which 7.8 removes so
+        /// the icon follows Button Round and that pack can be deleted.
+        /// </summary>
+        public const string SettingsIconPath = "Top Bar/Settings/Icon";
+
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string HomeTabLabelPath = "Tab Bar/Home Tab/Selected/Plate/Name";
 
@@ -187,6 +196,9 @@ namespace GateRush.UI.Editor
         // where the canvas is a root one in the prefab's contents.
         private const string CanvasOverrideSortingProperty = "m_OverrideSorting";
         private const char PathSeparator = '/';
+
+        // An Image's serialized sprite, whose prefab override is reverted.
+        private const string ImageSpriteProperty = "m_Sprite";
 
         // PressFeedback's serialized configuration.
         private const string PressConfigField = "config";
@@ -377,7 +389,8 @@ namespace GateRush.UI.Editor
 
         /// <summary>
         /// Top Bar's steps: the plus icons, the lives count, the heart, the
-        /// avatar and its press (Module 47). Everything is found before anything is changed, so a
+        /// avatar and its press (Module 47), and the settings icon's sprite
+        /// override (7.8). Everything is found before anything is changed, so a
         /// refusal leaves the contents as they were loaded. Returns the
         /// refusal, or null.
         /// </summary>
@@ -391,10 +404,12 @@ namespace GateRush.UI.Editor
             var frame = FindByPath(root, AvatarFramePath);
             var avatar = FindByPath(root, AvatarPath) as RectTransform;
             var goldPill = FindByPath(root, TopBarGoldPath);
+            var settingsIconObject = FindByPath(root, SettingsIconPath);
 
             var heartLayout = heart == null ? null : heart.GetComponent<LayoutElement>();
             var countText = livesCount == null ? null : livesCount.GetComponent<TMP_Text>();
             var frameLayout = frame == null ? null : frame.GetComponent<LayoutElement>();
+            var settingsIcon = settingsIconObject == null ? null : settingsIconObject.GetComponent<Image>();
 
             var missing = new List<string>();
             AddIfMissing(missing, goldPlusIcon, $"a RectTransform at '{GoldPlusIconPath}'");
@@ -405,6 +420,19 @@ namespace GateRush.UI.Editor
             AddIfMissing(missing, avatar, $"a RectTransform at '{AvatarPath}'");
             AddIfMissing(missing, goldPill, $"an object at '{TopBarGoldPath}'");
             AddIfMissing(missing, avatarButton, $"a Button at '{AvatarPath}'");
+            AddIfMissing(missing, settingsIcon, $"an Image at '{SettingsIconPath}'");
+            if (settingsIcon != null && !PrefabUtility.IsPartOfPrefabInstance(settingsIcon))
+            {
+                missing.Add($"'{SettingsIconPath}' to be part of a Button Round instance");
+            }
+
+            // Reverting the sprite of a shown icon would change what the
+            // settings button draws; the step only tidies a hidden one.
+            if (settingsIcon != null && settingsIcon.gameObject.activeSelf)
+            {
+                missing.Add($"'{SettingsIconPath}' to be hidden, since reverting its sprite would change what the settings button shows");
+            }
+
             if (goldPlusIcon != null && !PrefabUtility.IsPartOfPrefabInstance(goldPlusIcon))
             {
                 missing.Add($"'{GoldPlusIconPath}' to be part of a Button Round instance");
@@ -446,6 +474,7 @@ namespace GateRush.UI.Editor
             }
 
             SetGoldPillCanvas(goldPill.gameObject, changes);
+            RevertSettingsIconSprite(settingsIcon, changes);
 
             // The plus and settings buttons are Button Round instances and
             // follow its press; the avatar's button is the bar's own.
@@ -489,6 +518,28 @@ namespace GateRush.UI.Editor
             {
                 goldPill.AddComponent<GraphicRaycaster>();
                 changes.Add($"{TopBarGoldPath} Graphic Raycaster added");
+            }
+        }
+
+        /// <summary>
+        /// Reverts the sprite override of the settings button's hidden icon
+        /// (7.8), so it follows Button Round's glyph and no longer points at
+        /// the game-icons.net cog; the icon's hidden state, also an override,
+        /// is kept. Compares first: an icon without the override is left as
+        /// it is. Noting the change.
+        /// </summary>
+        private static void RevertSettingsIconSprite(Image icon, List<string> changes)
+        {
+            using (var serialized = new SerializedObject(icon))
+            {
+                var sprite = serialized.FindProperty(ImageSpriteProperty);
+                if (!sprite.prefabOverride)
+                {
+                    return;
+                }
+
+                PrefabUtility.RevertPropertyOverride(sprite, InteractionMode.AutomatedAction);
+                changes.Add($"{SettingsIconPath} sprite override reverted; it follows Button Round and stays hidden");
             }
         }
 

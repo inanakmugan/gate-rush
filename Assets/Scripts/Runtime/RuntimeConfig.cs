@@ -157,7 +157,7 @@ namespace GateRush.Runtime
         [Tooltip("The highlight material's twin on Gate Rush/Board UI Sprite, for the introduction cards' UI Images.")]
         [SerializeField] private Material uiSpecularMaterial;
 
-        [Tooltip("TextMeshPro font asset for the board's labels: its counts, and the counts and marks in the introduction cards' illustrations. Lilita One (D46), created from Assets/Art/Fonts. The cards' own texts use Intro Font.")]
+        [Tooltip("TextMeshPro font asset for the board's labels: its counts, and the counts and marks in the introduction cards' illustrations. Lilita One (D46), created from Assets/ThirdParty/Fonts/LilitaOne. The cards' own texts use Intro Font.")]
         [SerializeField] private TMP_FontAsset labelFont;
 
         [Tooltip("The label font's material with a soft drop shadow (its underlay): the white digits on badges, padlocks and time-bonus marks (Module 46, pass 2). Gate Rush → Generate Art makes it from Label Font and the Label Shadow values, and assigns it.")]
@@ -765,13 +765,13 @@ namespace GateRush.Runtime
         [Tooltip("The font of the card's title, subtitle and sentence: Assets/ThirdParty/Fonts/Fredoka/Fredoka-Bold SDF.asset, whose fallback list holds Nunito for what Fredoka lacks. The illustrations' counts and marks keep Label Font.")]
         [SerializeField] private TMP_FontAsset introFont;
 
-        [Tooltip("The card's panel, drawn 9-sliced behind its rows, so it needs a border: the theme's grey panel, Assets/ThirdParty/Kenney/UIPack/Grey/button_square_flat.png.")]
+        [Tooltip("The card's panel, drawn 9-sliced behind its rows, so it needs a border: the theme's panel, Assets/Art/Sprites/UI/panel.png.")]
         [SerializeField] private Sprite introPanelSprite;
 
         [Tooltip("Space between the panel's edges and the card's rows.")]
         [SerializeField] private float introPanelPaddingUnits = 40f;
 
-        [Tooltip("The face of the round close button, drawn in its own colours: Assets/ThirdParty/Kenney/UIPack/Red/button_round_depth_gradient.png, as Button Close's.")]
+        [Tooltip("The face of the round close button, drawn in its own colours: Assets/Art/Sprites/UI/button_round_red.png, as Button Close's.")]
         [SerializeField] private Sprite introCloseSprite;
 
         [Tooltip("The cross on the close button, drawn in its own colours: Assets/ThirdParty/Kenney/GameIcons/cross.png, as Button Close's.")]
@@ -2645,7 +2645,7 @@ namespace GateRush.Runtime
 
             if (labelFont == null)
             {
-                problems.Add($"{name}: Label Font is not assigned; create the Lilita One font asset from Assets/Art/Fonts and assign it.");
+                problems.Add($"{name}: Label Font is not assigned; create the Lilita One font asset from Assets/ThirdParty/Fonts/LilitaOne and assign it.");
             }
 
             AddIfUnassigned(problems, quarterOuterSprite, "Quarter Outer Sprite");
@@ -3407,7 +3407,7 @@ namespace GateRush.Runtime
 
             if (introCloseSprite == null)
             {
-                problems.Add($"{name}: Intro Close Sprite is not assigned; assign Assets/ThirdParty/Kenney/UIPack/Red/button_round_depth_gradient.png.");
+                problems.Add($"{name}: Intro Close Sprite is not assigned; assign Assets/Art/Sprites/UI/button_round_red.png.");
             }
 
             if (introCloseCrossSprite == null)

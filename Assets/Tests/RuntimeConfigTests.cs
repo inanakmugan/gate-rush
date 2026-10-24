@@ -1211,7 +1211,7 @@ namespace GateRush.Tests
             Assert.AreEqual(3f * 19f / 128f, advance, 1e-6f);
         }
 
-        private const string LilitaOnePath = "Assets/Art/Fonts/LilitaOne-Regular.ttf";
+        private const string LilitaOnePath = "Assets/ThirdParty/Fonts/LilitaOne/LilitaOne-Regular.ttf";
 
         [Test]
         public void TimeBonusMarkScale_TwoCellsOfRoom_IsFullSize()

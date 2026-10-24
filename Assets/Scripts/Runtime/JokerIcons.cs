@@ -16,13 +16,13 @@ namespace GateRush.Runtime
     [CreateAssetMenu(fileName = "JokerIcons", menuName = "Gate Rush/Joker Icons")]
     public sealed class JokerIcons : ScriptableObject
     {
-        [Tooltip("The Clock's icon. A stand-in until 6.6: BoardGameIcons/hourglass.")]
+        [Tooltip("The Clock's icon: Assets/Art/Sprites/UI/hourglass.png (Module 45).")]
         [SerializeField] private Sprite clockIcon;
 
-        [Tooltip("The Rocket's icon. A stand-in until 6.6: BoardGameIcons/exploding.")]
+        [Tooltip("The Rocket's icon: Assets/Art/Sprites/UI/rocket.png (Module 45).")]
         [SerializeField] private Sprite rocketIcon;
 
-        [Tooltip("The Broom's icon. A stand-in until 6.6: BoardGameIcons/arrow_horizontal.")]
+        [Tooltip("The Broom's icon: Assets/Art/Sprites/UI/broom.png (Module 45).")]
         [SerializeField] private Sprite broomIcon;
 
         /// <summary>The icon of <paramref name="kind"/>; null when it is not assigned, which <see cref="Problems"/> reports.</summary>
