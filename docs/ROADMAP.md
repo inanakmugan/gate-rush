@@ -372,6 +372,22 @@ sounds. Each spec is written when the module before it is merged.
 | 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
 | 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | to be decided | Planned |
 
+Between 7.5 and 7.6 two small jobs landed on their own. Levels 28 and 29
+each had a lock with one more key carrier than it required; the extra key
+was destroyed only after the lock had opened in the proven shortest
+solution, so it was a decoy. The spare keys were removed and the time
+budgets re-derived by the editor's formula; a survey of all thirty levels
+found no other case. A small interface tour then centred the joker icons
+on the button face, replaced the square unlock glow with a round gold one
+(a RoundGlow sprite from Generate Art), and sized the result panels per
+shape so a free-play win and Time's Up no longer leave an empty middle;
+its values are builder constants reproduced by Build UI Prefabs (D78).
+
+Two small follow-ups from that tour go with 7.8: the layered block's
+outer colour is a little darker than a plain block of the same colour and
+should match; and the joker icons are a little large at 185 units, with
+the icon's foot touching the count pill, and could drop to about 165.
+
 ---
 
 ## Phase 8 — Release
