@@ -149,6 +149,7 @@ GameObject:
   - component: {fileID: 6338370889489984754}
   - component: {fileID: 5431400088701312487}
   - component: {fileID: 8959401123252289822}
+  - component: {fileID: 3389731873690318745}
   m_Layer: 5
   m_Name: Button Primary
   m_TagString: Untagged
@@ -258,3 +259,16 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3389731873690318745
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8138155750093085964}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88db49693c7d2d74aafa271769166149, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.PressFeedback
+  config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}

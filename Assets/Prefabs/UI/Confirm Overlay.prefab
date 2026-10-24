@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 3543899293722651439}
   - component: {fileID: 1299399675134768680}
+  - component: {fileID: 1673331187067320760}
   - component: {fileID: 8929406338089681472}
   m_Layer: 5
   m_Name: Confirm Overlay
@@ -51,6 +52,20 @@ CanvasGroup:
   m_Interactable: 1
   m_BlocksRaycasts: 1
   m_IgnoreParentGroups: 0
+--- !u!114 &1673331187067320760
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 536488247460257903}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86af0a77b7f211d4ba96b15b032fda87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.OverlayMotion
+  group: {fileID: 1299399675134768680}
+  panel: {fileID: 2147098289875552604}
 --- !u!114 &8929406338089681472
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -63,8 +78,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 020bca086f599dc4e91c735ec2b3ce09, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.UI::GateRush.UI.ConfirmOverlay
-  group: {fileID: 1299399675134768680}
-  panel: {fileID: 2147098289875552604}
+  motion: {fileID: 1673331187067320760}
   titleLabel: {fileID: 2038585288345098782}
   lineLabel: {fileID: 4357395339514968603}
   loseLifeButton: {fileID: 1400910382062206121}

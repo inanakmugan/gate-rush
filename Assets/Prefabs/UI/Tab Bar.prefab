@@ -90,6 +90,7 @@ GameObject:
   - component: {fileID: 8948328752707385084}
   - component: {fileID: 2268346904053062422}
   - component: {fileID: 4114054264437170439}
+  - component: {fileID: 2746288371886463714}
   m_Layer: 5
   m_Name: Home Tab
   m_TagString: Untagged
@@ -215,6 +216,19 @@ MonoBehaviour:
   button: {fileID: 2268346904053062422}
   selectedLook: {fileID: 9069541348230123591}
   idleLook: {fileID: 2525811396006050633}
+--- !u!114 &2746288371886463714
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1312012817728440772}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88db49693c7d2d74aafa271769166149, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.PressFeedback
+  config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}
 --- !u!1 &1591172763294403478
 GameObject:
   m_ObjectHideFlags: 0
@@ -305,6 +319,7 @@ GameObject:
   - component: {fileID: 1864100394224869180}
   - component: {fileID: 3678836299077190995}
   - component: {fileID: 294934068909565688}
+  - component: {fileID: 3229446263538406722}
   m_Layer: 5
   m_Name: Store Tab
   m_TagString: Untagged
@@ -430,6 +445,19 @@ MonoBehaviour:
   button: {fileID: 3678836299077190995}
   selectedLook: {fileID: 7089449376978123972}
   idleLook: {fileID: 4900790460512463547}
+--- !u!114 &3229446263538406722
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2376957841486452508}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88db49693c7d2d74aafa271769166149, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.PressFeedback
+  config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}
 --- !u!1 &2525811396006050633
 GameObject:
   m_ObjectHideFlags: 0
@@ -875,6 +903,7 @@ GameObject:
   - component: {fileID: 4902492476053633083}
   - component: {fileID: 3074669588018160282}
   - component: {fileID: 4483206240417941967}
+  - component: {fileID: 7998899712586765583}
   m_Layer: 5
   m_Name: LeaderBoard Tab
   m_TagString: Untagged
@@ -1000,6 +1029,19 @@ MonoBehaviour:
   button: {fileID: 3074669588018160282}
   selectedLook: {fileID: 4407456927113589954}
   idleLook: {fileID: 7451801875066560535}
+--- !u!114 &7998899712586765583
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4877982046805752884}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88db49693c7d2d74aafa271769166149, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.PressFeedback
+  config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}
 --- !u!1 &4900790460512463547
 GameObject:
   m_ObjectHideFlags: 0

@@ -316,6 +316,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 632882281461142120}
+  - component: {fileID: 3744127836320200476}
+  - component: {fileID: 6288774809784645238}
   - component: {fileID: 5139810246597971513}
   m_Layer: 5
   m_Name: Not Enough Gold Overlay
@@ -345,6 +347,32 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &3744127836320200476
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4656312896816277684}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &6288774809784645238
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4656312896816277684}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86af0a77b7f211d4ba96b15b032fda87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.OverlayMotion
+  group: {fileID: 3744127836320200476}
+  panel: {fileID: 5610704424468480278}
 --- !u!114 &5139810246597971513
 MonoBehaviour:
   m_ObjectHideFlags: 0

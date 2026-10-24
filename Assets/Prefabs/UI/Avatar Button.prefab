@@ -160,6 +160,7 @@ GameObject:
   m_Component:
   - component: {fileID: 5139321793051499643}
   - component: {fileID: 1173698418002037572}
+  - component: {fileID: 588429269962677595}
   - component: {fileID: 5565627230203770978}
   m_Layer: 5
   m_Name: Avatar Button
@@ -233,6 +234,19 @@ MonoBehaviour:
   m_OnClick:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &588429269962677595
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8956861962597834206}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88db49693c7d2d74aafa271769166149, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.PressFeedback
+  config: {fileID: 11400000, guid: 55e8235e0a8c96e489f7b205c582e4ec, type: 2}
 --- !u!114 &5565627230203770978
 MonoBehaviour:
   m_ObjectHideFlags: 0

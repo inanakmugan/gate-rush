@@ -1371,19 +1371,39 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 415240321519651590, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1746982696441485857}
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7641830846365217734, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 523597521621007919}
   m_SourcePrefab: {fileID: 100100000, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
 --- !u!114 &1659873394479071337 stripped
 MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 6690620705230156491, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
   m_PrefabInstance: {fileID: 5463097365366960802}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 2440369018342293860}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 438aea24ab1068f41b16862494427024, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.UI::GateRush.UI.HomeScreen
+--- !u!1 &2440369018342293860 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7641830846365217734, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
+  m_PrefabInstance: {fileID: 5463097365366960802}
+  m_PrefabAsset: {fileID: 0}
+--- !u!225 &523597521621007919
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2440369018342293860}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!224 &3224769624044450183 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7426573193880683301, guid: 2d79d47362dc78e43975134aefe3c400, type: 3}
@@ -2086,7 +2106,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 2736025684487486587, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2970450758914430103}
   m_SourcePrefab: {fileID: 100100000, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
 --- !u!224 &321726743820341103 stripped
 RectTransform:
@@ -2098,12 +2121,29 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 5713048976670202273, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
   m_PrefabInstance: {fileID: 8465307837254954128}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 5801340545805701355}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e0e772079610e3e4b80fc040a1f5471e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: GateRush.UI::GateRush.UI.LeaderboardScreen
+--- !u!1 &5801340545805701355 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 2736025684487486587, guid: b95b04f8f5de3a545b5137923b8c8433, type: 3}
+  m_PrefabInstance: {fileID: 8465307837254954128}
+  m_PrefabAsset: {fileID: 0}
+--- !u!225 &2970450758914430103
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5801340545805701355}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!1001 &8910541909665922669
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -2203,8 +2243,28 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 9040613266103770546, guid: a00165f7b87f652459327a07d869f2a8, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2390909087712325923}
   m_SourcePrefab: {fileID: 100100000, guid: a00165f7b87f652459327a07d869f2a8, type: 3}
+--- !u!1 &494885192441439199 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 9040613266103770546, guid: a00165f7b87f652459327a07d869f2a8, type: 3}
+  m_PrefabInstance: {fileID: 8910541909665922669}
+  m_PrefabAsset: {fileID: 0}
+--- !u!225 &2390909087712325923
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 494885192441439199}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
 --- !u!224 &2231098911441853565 stripped
 RectTransform:
   m_CorrespondingSourceObject: {fileID: 7304537379784532496, guid: a00165f7b87f652459327a07d869f2a8, type: 3}
@@ -2215,7 +2275,7 @@ MonoBehaviour:
   m_CorrespondingSourceObject: {fileID: 2633266714041724014, guid: a00165f7b87f652459327a07d869f2a8, type: 3}
   m_PrefabInstance: {fileID: 8910541909665922669}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
+  m_GameObject: {fileID: 494885192441439199}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 66cfc8219c8441148806c2de106df9fa, type: 3}
