@@ -285,7 +285,8 @@ and bronze.
   game-icons.net icons are no longer shown; the game-icons.net cog is
   only a hidden leftover override on the Top Bar's settings button. The
   unused files stay in the project until the cleanup in 7.8, and README
-  credits only what is shown.
+  credits only what is shown. *Later (7.8):* the unused files and the
+  cog override are removed.
 - **Numbering.** The board's art becomes its own module, 7.5 (Module
   46), so effects move to 7.6 and sound balance to 7.7.
 - **Tests.** 2,707 after the main implementation, 2,764 at the end.

@@ -147,7 +147,7 @@ favour of a hand-authoring editor with live solver validation.
 
 Unity → Window → General → Test Runner → Edit Mode → Run All
 
-3,308 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
+3,341 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
 
@@ -163,9 +163,11 @@ are all tested headless.
   fallback for Turkish letters, and
   [Lilita One](https://fonts.google.com/specimen/Lilita+One) for the
   board's labels, all SIL Open Font License 1.1.
+- Sound effects: [Kenney](https://kenney.nl)'s audio packs, CC0, except
+  the soft lift and drop sounds, which were made for the game.
 
-Kenney's and the interface fonts' licences are kept beside the files
-under `Assets/ThirdParty/`.
+The licences of Kenney's glyphs and of the three fonts are kept beside
+the files under `Assets/ThirdParty/`.
 
 ## Note on the web build
 

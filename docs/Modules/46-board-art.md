@@ -290,7 +290,9 @@ screenshots beside the target before the next:
   and a specular rim.
 - **Layered blocks.** The outer block is drawn darker (0.85) with a
   recessed window, inset 0.31 of a cell, that shows the colour beneath
-  as a smaller lit body with its own studs.
+  as a smaller lit body with its own studs. *Later (7.8):* the darkening
+  is removed; the outer block now matches a plain block of its colour,
+  and the window reads as recessed through its rim and inner body.
 - **Palette.** Measured from the reference look and kept: Red #F02A1E,
   Orange #F6660C, Yellow #F6BA00, Green #07A515, Cyan #06A8F6, Blue
   #0054F6, Purple #A236F6, Pink #F63CA2.
@@ -335,5 +337,6 @@ screenshots beside the target before the next:
   finished its waves, move to 7.6 (Module 47).
 - **The joker bar.** Reworked here: a tight group in the centre with a
   quarter button between buttons, a dark pill under each button for its
-  count, price or level, and the icon at 185 units.
+  count, price or level, and the icon at 185 units. *Later (7.8):* the
+  icon is 145 units, clear of the count pill.
 - **Tests.** 2,882 after pass 1, 3,012 at the end.

@@ -383,15 +383,20 @@ on the button face, replaced the square unlock glow with a round gold one
 shape so a free-play win and Time's Up no longer leave an empty middle;
 its values are builder constants reproduced by Build UI Prefabs (D78).
 
-Follow-ups for 7.8. From that tour: the layered block's outer colour is
-a little darker than a plain block of the same colour and should match
-(Module 46 draws the outer block at 0.85 on purpose; raising that factor
-is the fix); and the joker icons are a little large at 185 units, with
-the icon's foot touching the count pill, and could drop to about 165.
-From 7.6: `RefreshLevelUi` and the front end's `RefreshMeta` rewrite
-every view whenever any field changes, once a second while a life
-regenerates, and format their strings each time; part of the
-optimisation on a phone, with the frame rate measured in the web build.
+Follow-ups for 7.8. Done: the layered block's outer colour now matches a
+plain block of the same colour (the 0.85 darkening of Module 46 is
+removed); the joker icons are 145 units, clear of the count pill; the
+third-party art no longer shown is removed by a reference-checking
+editor command, Lilita One sits in `Assets/ThirdParty/Fonts/LilitaOne`
+with its OFL licence, and the Top Bar's leftover cog override is gone.
+
+Still open: the joker's icon on the New Joker card is a little large and
+crowds the card between its title and its line; `RefreshLevelUi` and the
+front end's `RefreshMeta` rewrite every view whenever any field changes,
+once a second while a life regenerates, and format their strings each
+time; Build UI Prefabs rewrites prefabs it did not change, which makes
+every rebuild noisy in review. The last two go with the optimisation on
+a phone, with the frame rate measured in the web build.
 
 ---
 

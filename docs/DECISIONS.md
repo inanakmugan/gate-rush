@@ -1348,6 +1348,11 @@ Android than committed textures.
 License): a single heavy, rounded weight closest to the reference game's
 digits. Its TTF and licence file live under `Assets/Art/Fonts/`.
 
+**Later (7.8).** Lilita One moved to
+`Assets/ThirdParty/Fonts/LilitaOne`, beside Fredoka and Nunito, with its
+OFL licence; the licence had in fact been missing from the project until
+then.
+
 ---
 
 ## D47 — A lock is known by its block's colour
