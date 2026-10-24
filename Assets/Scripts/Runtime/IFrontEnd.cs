@@ -72,6 +72,13 @@ namespace GateRush.Runtime
         /// </summary>
         event Action ButtonPressed;
 
+        /// <summary>
+        /// Raised when a coin of a gold flight lands on the Top Bar's gold, at
+        /// most once per the UI Config's tap interval: the moment for the tap
+        /// sound (Module 47).
+        /// </summary>
+        event Action CoinLanded;
+
         /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
         bool IsOpen { get; }
 
@@ -81,6 +88,21 @@ namespace GateRush.Runtime
         /// missing part and each problem.
         /// </summary>
         string MissingSetup();
+
+        /// <summary>
+        /// The fade between the front end and a level (Module 47), from the
+        /// interface's configuration, which the bootstrap cannot read. Read
+        /// once the setup is known to be complete.
+        /// </summary>
+        ScreenFadeSettings ScreenFadeSettings { get; }
+
+        /// <summary>
+        /// Makes the front end ignore its keys, Back among them, whenever
+        /// <paramref name="isHeld"/> answers true: the screen fade's one query,
+        /// set once by the bootstrap. Pointer input is held by the fade itself.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
+        void HoldInput(Func<bool> isHeld);
 
         /// <summary>Opens the front end on the Home tab with no overlay and no notice, showing <paramref name="state"/>.</summary>
         void Show(FrontEndState state);
@@ -111,6 +133,17 @@ namespace GateRush.Runtime
         /// <summary>Opens the message prompt saying that a purchase failed and nothing was charged.</summary>
         /// <exception cref="InvalidOperationException">The front end is not open.</exception>
         void ShowPurchaseFailed();
+
+        /// <summary>
+        /// Flies <paramref name="amount"/> gold from the Store's card of the
+        /// gold pack <paramref name="productId"/> to the Top Bar's gold, the
+        /// gold held at <paramref name="shownGold"/> until the coins land and
+        /// lifted over any scrim meanwhile (Module 47). With the card not
+        /// shown, the gold shows at once. A tab change, <see cref="Show"/>,
+        /// <see cref="Hide"/> and a disable end the flight and show the
+        /// wallet's value.
+        /// </summary>
+        void FlyPackGold(string productId, int amount, int shownGold, int seed);
 
         /// <summary>
         /// Opens the test purchase sheet for <paramref name="offer"/> over

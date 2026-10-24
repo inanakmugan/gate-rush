@@ -74,7 +74,8 @@ namespace GateRush.UI.Editor
         private const string LogPrefix = "Build UI Prefabs";
 
         // Inputs.
-        private const string UiConfigPath = "Assets/Config/UiConfig.asset";
+        /// <summary>The UI Config every built screen and every press reads.</summary>
+        public const string UiConfigPath = "Assets/Config/UiConfig.asset";
         private const string JokerIconsPath = "Assets/Config/JokerIcons.asset";
         private const string AvatarCatalogPath = "Assets/Config/AvatarCatalog.asset";
 
@@ -185,6 +186,10 @@ namespace GateRush.UI.Editor
         private const string SafeName = "Safe";
         private const string PagesName = "Pages";
         private const string OverlaysName = "Overlays";
+
+        // Module 47: the layer gold flies to its counter in, last under Level
+        // UI's and Front End's roots.
+        private const string CoinFlightName = "Coin Flight";
         private const string IconName = "Icon";
         private const string CoinName = "Coin";
         private const string CoinStackName = "Coin Stack";
@@ -262,6 +267,7 @@ namespace GateRush.UI.Editor
         private const string LifeLostName = "Life Lost";
         private const string NextLifeName = "Next Life";
         private const string LiftName = "Lift";
+        private const string PulseName = "Pulse";
         private const string GlowName = "Glow";
         private const string LockName = "Lock";
         private const string RingName = "Ring";
@@ -1081,6 +1087,15 @@ namespace GateRush.UI.Editor
         private const string BackgroundField = "background";
         private const string PaintingField = "painting";
         private const string PaintingFitField = "paintingFit";
+        private const string CoinFlightField = "coinFlight";
+        private const string CoinSpriteField = "coinSprite";
+        private const string CoinLayerField = "layer";
+        private const string GoldCoinField = "goldCoin";
+
+        // A Canvas's serialized sorting fields, written directly where the
+        // canvas is a root one while it is built (AddCoinFlight).
+        private const string CanvasOverrideSortingProperty = "m_OverrideSorting";
+        private const string CanvasSortingOrderProperty = "m_SortingOrder";
         private const string GoldMedalField = "goldMedal";
         private const string SilverMedalField = "silverMedal";
         private const string BronzeMedalField = "bronzeMedal";
@@ -1122,6 +1137,8 @@ namespace GateRush.UI.Editor
         private const string JokerBarField = "jokerBar";
         private const string GroupField = "group";
         private const string PanelField = "panel";
+        private const string MotionField = "motion";
+        private const string PulseField = "pulse";
         private const string GoldRowField = "goldRow";
         private const string MessageLabelField = "messageLabel";
         private const string LossArtField = "lossArt";
@@ -1841,6 +1858,7 @@ namespace GateRush.UI.Editor
             var background = AddSliced(rect, sources.Panel, PanelColorHex, CardPanelPixelsPerUnitMultiplier);
             background.raycastTarget = true;
             var button = UiBuilder.AddButton(rect, background);
+            AddPressFeedback(root, sources);
 
             var fire = UiBuilder.CreateRect(FireName, rect);
             UiBuilder.Place(fire, new Vector2(AnchorLow, AnchorMid), new Vector2(FireInset, 0f), new Vector2(FireSize, FireSize));
@@ -2084,6 +2102,7 @@ namespace GateRush.UI.Editor
             var iconImage = UiBuilder.AddIcon(icon, sources.AvatarCatalog.SpriteAt(0), ParseColor(IconColorHex));
             iconImage.raycastTarget = true;
             var button = UiBuilder.AddButton(rect, iconImage);
+            AddPressFeedback(root, sources);
 
             // After the icon, so it draws over the disc's rim.
             var selected = UiBuilder.CreateRect(SelectedName, rect);
@@ -2295,6 +2314,13 @@ namespace GateRush.UI.Editor
             var home = NestStretched(sources.HomePage, pages, true);
             var leaderboard = NestStretched(leaderboardAsset, pages, false);
 
+            // Module 47: a new tab's page fades in over the old one through
+            // its group, added to each instance; Home Page's own file is
+            // never written.
+            store.gameObject.AddComponent<CanvasGroup>();
+            home.gameObject.AddComponent<CanvasGroup>();
+            leaderboard.gameObject.AddComponent<CanvasGroup>();
+
             // Added to the Home Page instance, which stays linked; its own file
             // is never written.
             var streakArea = home.Find(StreakAreaName) as RectTransform;
@@ -2331,6 +2357,7 @@ namespace GateRush.UI.Editor
             var winStreak = NestStretched(overlayAssets.WinStreak, overlays, false);
             var streakReward = NestStretched(overlayAssets.StreakReward, overlays, false);
             var profile = NestStretched(overlayAssets.Profile, overlays, false);
+            var coinFlight = AddCoinFlight(root.transform, sources);
 
             var frontEnd = root.AddComponent<FrontEnd>();
             SetReferences(
@@ -2354,7 +2381,8 @@ namespace GateRush.UI.Editor
                 (JokerIconsField, sources.JokerIcons),
                 (AvatarCatalogField, sources.AvatarCatalog),
                 (PaintingField, paintingImage),
-                (PaintingFitField, paintingFit));
+                (PaintingFitField, paintingFit),
+                (CoinFlightField, coinFlight));
 
             root.SetActive(false);
             return root;
@@ -2461,6 +2489,7 @@ namespace GateRush.UI.Editor
             var pillSize = new Vector2(HudPillWidth, HudPillHeight);
             var goldPill = UiBuilder.CreateRect(GoldPillName, pills);
             goldPill.sizeDelta = pillSize;
+            AddPillCanvas(goldPill);
             AddSliced(goldPill, sources.Pill, OwnColorsHex, HudPillPixelsPerUnitMultiplier);
             var coinRight = AddPillIcon(goldPill, CoinName, sources.Coin, PillIconHeightShare);
             var gold = UiBuilder.CreateRect(GoldLabelName, goldPill);
@@ -2568,15 +2597,14 @@ namespace GateRush.UI.Editor
         /// follow-up). Written as a campaign win with gold and the
         /// closing message, the texts from the UI Config; the overlay sets
         /// them all again when it opens, and sizes the panel by the result's
-        /// shape from the four sizes written here (the UI polish pass). A
-        /// CanvasGroup on the root carries the pop's fade.
+        /// shape from the four sizes written here (the UI polish pass). The
+        /// frame's motion opens and closes it (Module 47).
         /// </summary>
         private static GameObject BuildResultOverlay(Scene scene, Sources sources)
         {
             var config = sources.Config;
             var frame = BuildOverlayFrame(
                 scene, sources, ResultOverlayName, config.LevelCompleteTitle, ResultPanelWidth, ResultPanelHeight, false);
-            var group = frame.Root.AddComponent<CanvasGroup>();
 
             // Centred on the panel whatever the amount's width: the fitter
             // sizes the row to the coin and the amount.
@@ -2667,10 +2695,11 @@ namespace GateRush.UI.Editor
             var overlay = frame.Root.AddComponent<ResultOverlay>();
             SetReferences(
                 overlay,
-                (GroupField, group),
+                (MotionField, frame.Motion),
                 (PanelField, frame.Panel),
                 (TitleLabelField, frame.Title),
                 (GoldRowField, gold.gameObject),
+                (GoldCoinField, coin),
                 (GoldLabelField, goldLabel),
                 (MessageLabelField, messageLabel),
                 (LossArtField, lossArt.gameObject),
@@ -2707,15 +2736,14 @@ namespace GateRush.UI.Editor
         /// Primary, green) and Lose a life above it — a Button Primary whose
         /// face is red on this instance only. Written as
         /// Leave level with a streak at risk, the texts from the UI Config; the
-        /// overlay sets them all again when it opens. A CanvasGroup on the
-        /// root carries the pop's fade.
+        /// overlay sets them all again when it opens. The frame's motion opens
+        /// and closes it (Module 47).
         /// </summary>
         private static GameObject BuildConfirmOverlay(Scene scene, Sources sources)
         {
             var config = sources.Config;
             var frame = BuildOverlayFrame(
                 scene, sources, ConfirmOverlayName, config.LeaveLevelTitle, ConfirmPanelWidth, ConfirmPanelHeight, false);
-            var group = frame.Root.AddComponent<CanvasGroup>();
 
             var lineRect = UiBuilder.CreateRect(LineName, frame.Panel);
             TopStretch(lineRect, OverlayTextInset, ConfirmLinePosY, ConfirmLineHeight);
@@ -2749,8 +2777,7 @@ namespace GateRush.UI.Editor
             var overlay = frame.Root.AddComponent<ConfirmOverlay>();
             SetReferences(
                 overlay,
-                (GroupField, group),
-                (PanelField, frame.Panel),
+                (MotionField, frame.Motion),
                 (TitleLabelField, frame.Title),
                 (LineLabelField, line),
                 (LoseLifeButtonField, loseButton),
@@ -2792,6 +2819,9 @@ namespace GateRush.UI.Editor
         /// centred under the button, over its foot, with the coin (hidden)
         /// hanging off its left end and the count (Module 46). The pill is on
         /// the button, so it rises with the lift and pulses with the button.
+        /// The button sits in the pulse rect, stretched over the slot inside
+        /// the lift (Module 47): the mark scales the pulse rect, a press the
+        /// button, the selection raises the lift.
         /// </summary>
         private static JokerBarButton BuildJokerSlot(RectTransform row, Sources sources, JokerKind kind, float x)
         {
@@ -2821,7 +2851,12 @@ namespace GateRush.UI.Editor
             AddTint(ring.gameObject, ringImage, UiColorRole.JokerSelected);
             ring.gameObject.SetActive(false);
 
-            var button = Nest(sources.ButtonPrimary, lift);
+            // Module 47: the mark's pulse scales this rect, stretched over the
+            // slot as the button was, so the button's own scale is its press's.
+            var pulse = UiBuilder.CreateRect(PulseName, lift);
+            UiBuilder.Stretch(pulse);
+
+            var button = Nest(sources.ButtonPrimary, pulse);
             button.name = ButtonName;
             UiBuilder.Stretch(button);
             Record(button);
@@ -2872,6 +2907,7 @@ namespace GateRush.UI.Editor
                 view,
                 (ButtonField, buttonComponent),
                 (LiftField, lift),
+                (PulseField, pulse),
                 (RingField, ring.gameObject),
                 (IconField, iconImage),
                 (LockIconField, lockIcon),
@@ -2918,6 +2954,8 @@ namespace GateRush.UI.Editor
             var testPurchase = NestStretched(overlayAssets.TestPurchase, overlays, false);
             var message = NestStretched(overlayAssets.Message, overlays, false);
 
+            var coinFlight = AddCoinFlight(root.transform, sources);
+
             var levelUi = root.AddComponent<LevelUi>();
             SetReferences(
                 levelUi,
@@ -2929,7 +2967,8 @@ namespace GateRush.UI.Editor
                 (TestPurchaseField, Single<TestPurchaseOverlay>(testPurchase.gameObject, TestPurchaseOverlayName)),
                 (MessageField, Single<MessageOverlay>(message.gameObject, MessageOverlayName)),
                 (ResultOverlayField, Single<ResultOverlay>(result.gameObject, ResultOverlayName)),
-                (ConfirmOverlayField, Single<ConfirmOverlay>(confirm.gameObject, ConfirmOverlayName)));
+                (ConfirmOverlayField, Single<ConfirmOverlay>(confirm.gameObject, ConfirmOverlayName)),
+                (CoinFlightField, coinFlight));
 
             root.SetActive(false);
             return root;
@@ -3035,7 +3074,13 @@ namespace GateRush.UI.Editor
                 closeButton = Single<Button>(close.gameObject, ButtonCloseName);
             }
 
-            return new OverlayFrame(root, panel, closeButton, titleLabel);
+            // Module 47: every overlay's shared open and close, fading the
+            // root's group and scaling the panel.
+            var group = root.AddComponent<CanvasGroup>();
+            var motion = root.AddComponent<OverlayMotion>();
+            SetReferences(motion, (GroupField, group), (PanelField, panel));
+
+            return new OverlayFrame(root, panel, closeButton, titleLabel, motion);
         }
 
         private static GameObject CreateRoot(string name, Scene scene, int layer)
@@ -3057,6 +3102,7 @@ namespace GateRush.UI.Editor
             var path = PrefabPath(outputFolder, root.name);
             try
             {
+                RequirePressFeedback(root, path);
                 ApplyTints(root, sources.Config);
                 var asset = PrefabUtility.SaveAsPrefabAsset(root, path, out var isSaved);
                 if (!isSaved || asset == null)
@@ -3095,10 +3141,110 @@ namespace GateRush.UI.Editor
             }
         }
 
+        /// <summary>
+        /// The Hierarchy path, from <paramref name="root"/>, of every
+        /// <see cref="Button"/> under it, inactive ones included, that has no
+        /// <see cref="PressFeedback"/> on its own object or whose press has no
+        /// configuration (Module 47). Empty when every button answers a press.
+        /// </summary>
+        public static IReadOnlyList<string> ButtonsWithoutPress(GameObject root)
+        {
+            var missing = new List<string>();
+            foreach (var button in root.GetComponentsInChildren<Button>(true))
+            {
+                var press = button.GetComponent<PressFeedback>();
+                if (press == null || press.Config == null)
+                {
+                    missing.Add(HierarchyPath(root.transform, button.transform));
+                }
+            }
+
+            return missing;
+        }
+
+        /// <summary><paramref name="target"/>'s path from <paramref name="root"/>, the root's own name first.</summary>
+        private static string HierarchyPath(Transform root, Transform target)
+        {
+            var path = target.name;
+            var current = target;
+            while (current != root && current.parent != null)
+            {
+                current = current.parent;
+                path = $"{current.name}/{path}";
+            }
+
+            return path;
+        }
+
+        /// <summary>
+        /// Refuses to save <paramref name="root"/> as <paramref name="path"/>
+        /// while any of its buttons has no press (Module 47), naming the prefab
+        /// and each button's path: a new button never slips through silently.
+        /// </summary>
+        private static void RequirePressFeedback(GameObject root, string path)
+        {
+            var missing = ButtonsWithoutPress(root);
+            if (missing.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    $"{path} was not saved: these Buttons have no Press Feedback with a UI Config: {string.Join(", ", missing)}. " +
+                    "Run Gate Rush → Apply Hand-Made Prefab Settings for a hand-made button, or add the press where the builder makes the button.");
+            }
+        }
+
+        /// <summary>A built button's press (Module 47), on <paramref name="owner"/>, the button's own object, reading the UI Config.</summary>
+        private static void AddPressFeedback(GameObject owner, Sources sources)
+        {
+            var press = owner.AddComponent<PressFeedback>();
+            SetReferences(press, (ConfigField, sources.Config));
+        }
+
         private static RectTransform Nest(GameObject prefab, Transform parent)
         {
             var instance = (GameObject)PrefabUtility.InstantiatePrefab(prefab, parent);
             return (RectTransform)instance.transform;
+        }
+
+        /// <summary>
+        /// The layer gold flies to its counter in (Module 47), stretched over
+        /// <paramref name="root"/> and last under it: its own canvas, sorting
+        /// above every overlay — <see cref="CoinFlightView"/> sets the order
+        /// from the screen's canvas at runtime — with no raycaster, so its
+        /// coins take no input; and the view, with the interface's coin.
+        /// </summary>
+        private static CoinFlightView AddCoinFlight(Transform root, Sources sources)
+        {
+            var layer = UiBuilder.CreateRect(CoinFlightName, root);
+            UiBuilder.Stretch(layer);
+            layer.SetAsLastSibling();
+            var canvas = layer.gameObject.AddComponent<Canvas>();
+
+            // Built with no canvas above it, this canvas is a root one, whose
+            // overrideSorting setter does nothing, so the flag is written to
+            // its serialized property: it takes effect once the view sits
+            // under the screen's canvas. CoinFlightView sets both again there.
+            using (var serialized = new SerializedObject(canvas))
+            {
+                Property(serialized, CanvasOverrideSortingProperty).boolValue = true;
+                Property(serialized, CanvasSortingOrderProperty).intValue = sources.Config.CoinFlightSortingOffset;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
+
+            var view = layer.gameObject.AddComponent<CoinFlightView>();
+            SetReferences(view, (ConfigField, sources.Config), (CoinSpriteField, sources.Coin), (CoinLayerField, canvas));
+            return view;
+        }
+
+        /// <summary>
+        /// A canvas of its own on a gold pill (Module 47), sorting with its
+        /// parent until a coin flight lifts it over a scrim: its count and its
+        /// pop rebuild only the pill. The level HUD's pill takes no input, so
+        /// it needs no raycaster.
+        /// </summary>
+        private static void AddPillCanvas(RectTransform pill)
+        {
+            var canvas = pill.gameObject.AddComponent<Canvas>();
+            canvas.overrideSorting = false;
         }
 
         private static RectTransform NestStretched(GameObject prefab, Transform parent, bool isActive)
@@ -3660,12 +3806,13 @@ namespace GateRush.UI.Editor
 
         private readonly struct OverlayFrame
         {
-            public OverlayFrame(GameObject root, RectTransform panel, Button close, TMP_Text title)
+            public OverlayFrame(GameObject root, RectTransform panel, Button close, TMP_Text title, OverlayMotion motion)
             {
                 Root = root;
                 Panel = panel;
                 Close = close;
                 Title = title;
+                Motion = motion;
             }
 
             public GameObject Root { get; }
@@ -3675,6 +3822,9 @@ namespace GateRush.UI.Editor
             public Button Close { get; }
 
             public TMP_Text Title { get; }
+
+            /// <summary>The overlay's shared open and close (Module 47), wired to the root's CanvasGroup and the panel.</summary>
+            public OverlayMotion Motion { get; }
         }
 
         /// <summary>A Settings row's toggle, the Button Round instance with its own icon switched off, its button and its label.</summary>
@@ -3910,7 +4060,34 @@ namespace GateRush.UI.Editor
                 RequireUsableTints(
                     sources.ButtonClose, sources.ButtonPrimary, sources.ButtonRound, sources.ButtonSecondary, sources.HomePage,
                     sources.TabBar, sources.TopBar, sources.LevelButton.gameObject);
+                RequireHandMadePresses(
+                    sources.ButtonClose, sources.ButtonPrimary, sources.ButtonRound, sources.ButtonSecondary, sources.HomePage,
+                    sources.TabBar, sources.TopBar, sources.LevelButton.gameObject);
                 return sources;
+            }
+
+            /// <summary>
+            /// Refuses hand-made prefabs whose buttons have no press yet
+            /// (Module 47), naming each prefab and button, before anything is
+            /// written: Apply Hand-Made Prefab Settings adds them.
+            /// </summary>
+            private static void RequireHandMadePresses(params GameObject[] prefabs)
+            {
+                var missing = new List<string>();
+                foreach (var prefab in prefabs)
+                {
+                    foreach (var button in ButtonsWithoutPress(prefab))
+                    {
+                        missing.Add($"{prefab.name}: {button}");
+                    }
+                }
+
+                if (missing.Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"These hand-made Buttons have no Press Feedback with a UI Config: {string.Join("; ", missing)}. " +
+                        "Run Gate Rush → Apply Hand-Made Prefab Settings first. Nothing was written.");
+                }
             }
 
             /// <summary>

@@ -94,7 +94,8 @@ namespace GateRush.Runtime
     /// Everything a move changed that presentation animates (Module 18): the
     /// clear the move made, and what the player sees change because of it —
     /// thawed blocks, opened gates, shutters and locks, badges that counted
-    /// down, and blocks that spawned with the spawner they came from.
+    /// down, blocks that spawned with the spawner they came from, and
+    /// elevators that finished their waves (Module 47).
     /// </summary>
     /// <remarks>
     /// <para><b>Clears</b> of a move are <see cref="ResolutionDiff"/>'s,
@@ -122,7 +123,8 @@ namespace GateRush.Runtime
             IReadOnlyList<int> openedShutters,
             IReadOnlyList<int> unlockedBlocks,
             IReadOnlyList<CountPop> countPops,
-            IReadOnlyList<BlockSpawn> spawns)
+            IReadOnlyList<BlockSpawn> spawns,
+            IReadOnlyList<int> finishedElevators)
         {
             Clears = clears;
             ThawedBlocks = thawedBlocks;
@@ -131,12 +133,13 @@ namespace GateRush.Runtime
             UnlockedBlocks = unlockedBlocks;
             CountPops = countPops;
             Spawns = spawns;
+            FinishedElevators = finishedElevators;
         }
 
         /// <summary>A move that changed nothing presentation animates.</summary>
         public static MoveChanges None { get; } = new MoveChanges(
             Array.Empty<ClearedBlock>(), Array.Empty<int>(), Array.Empty<int>(), Array.Empty<int>(),
-            Array.Empty<int>(), Array.Empty<CountPop>(), Array.Empty<BlockSpawn>());
+            Array.Empty<int>(), Array.Empty<CountPop>(), Array.Empty<BlockSpawn>(), Array.Empty<int>());
 
         /// <summary>
         /// The clear a move made, exactly as <see cref="ResolutionDiff.Between"/>
@@ -163,10 +166,16 @@ namespace GateRush.Runtime
         /// <summary>Blocks that came onto the board from a generator or an elevator.</summary>
         public IReadOnlyList<BlockSpawn> Spawns { get; }
 
+        /// <summary>
+        /// Elevators shown before the move and not after (M9, Module 47): the
+        /// last wave has cleared. By position in <c>LevelContext.Elevators</c>.
+        /// </summary>
+        public IReadOnlyList<int> FinishedElevators { get; }
+
         /// <summary>True when anything beyond the clear changed: the arrive stage has something to play.</summary>
         public bool HasArrivals =>
             ThawedBlocks.Count > 0 || OpenedGates.Count > 0 || OpenedShutters.Count > 0
-            || UnlockedBlocks.Count > 0 || CountPops.Count > 0 || Spawns.Count > 0;
+            || UnlockedBlocks.Count > 0 || CountPops.Count > 0 || Spawns.Count > 0 || FinishedElevators.Count > 0;
 
         /// <summary>
         /// What <paramref name="move"/> changed between <paramref name="before"/>
@@ -246,6 +255,21 @@ namespace GateRush.Runtime
             IReadOnlyList<CountPop> countPops,
             IReadOnlyList<BlockSpawn> spawns)
         {
+            return Of(clears, thawedBlocks, openedGates, openedShutters, unlockedBlocks, countPops, spawns, Array.Empty<int>());
+        }
+
+        /// <summary>As the other <c>Of</c>, with the elevators that finished.</summary>
+        /// <exception cref="ArgumentNullException">An argument is null.</exception>
+        internal static MoveChanges Of(
+            IReadOnlyList<ClearedBlock> clears,
+            IReadOnlyList<int> thawedBlocks,
+            IReadOnlyList<int> openedGates,
+            IReadOnlyList<int> openedShutters,
+            IReadOnlyList<int> unlockedBlocks,
+            IReadOnlyList<CountPop> countPops,
+            IReadOnlyList<BlockSpawn> spawns,
+            IReadOnlyList<int> finishedElevators)
+        {
             return new MoveChanges(
                 clears ?? throw new ArgumentNullException(nameof(clears)),
                 thawedBlocks ?? throw new ArgumentNullException(nameof(thawedBlocks)),
@@ -253,7 +277,8 @@ namespace GateRush.Runtime
                 openedShutters ?? throw new ArgumentNullException(nameof(openedShutters)),
                 unlockedBlocks ?? throw new ArgumentNullException(nameof(unlockedBlocks)),
                 countPops ?? throw new ArgumentNullException(nameof(countPops)),
-                spawns ?? throw new ArgumentNullException(nameof(spawns)));
+                spawns ?? throw new ArgumentNullException(nameof(spawns)),
+                finishedElevators ?? throw new ArgumentNullException(nameof(finishedElevators)));
         }
 
         private static void RequireArguments(LevelContext ctx, BoardState before, BoardState after)
@@ -406,7 +431,16 @@ namespace GateRush.Runtime
                 }
             }
 
-            return new MoveChanges(clears, thawed, openedGates, openedShutters, unlocked, pops, spawns);
+            var finished = new List<int>();
+            for (var e = 0; e < ctx.Elevators.Count; e++)
+            {
+                if (visibility.ElevatorPresent(before, e) && !visibility.ElevatorPresent(after, e))
+                {
+                    finished.Add(e);
+                }
+            }
+
+            return new MoveChanges(clears, thawed, openedGates, openedShutters, unlocked, pops, spawns, finished);
         }
 
         /// <summary>

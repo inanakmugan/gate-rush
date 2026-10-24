@@ -7,7 +7,7 @@ namespace GateRush.Editor
     /// <summary>
     /// The colours <see cref="ArtPainter"/> paints into the mechanics' sprites
     /// whose colour never varies (Module 46, pass 2): gold, silver, metal,
-    /// glass, the shutter's and the elevator's. They stay in
+    /// glass, the shutter's and the elevator's, and Module 47's ice shards. They stay in
     /// <see cref="RuntimeConfig"/> and are read from it when the art is
     /// generated, so changing one means running <i>Gate Rush → Generate Art</i>
     /// again. What varies — a block's colour, a gem's, a badge's — stays grey
@@ -42,6 +42,7 @@ namespace GateRush.Editor
             ElevatorRecess = Linear.Of(config.ElevatorRecessColor);
             ElevatorDoor = Linear.Of(config.ElevatorPanelColor);
             ElevatorHandle = Linear.Of(config.ElevatorHandleColor);
+            Shard = Linear.Of(config.ShardColor);
         }
 
         /// <summary>The palette <paramref name="config"/> holds.</summary>
@@ -76,6 +77,9 @@ namespace GateRush.Editor
         internal Linear ElevatorRecess { get; }
         internal Linear ElevatorDoor { get; }
         internal Linear ElevatorHandle { get; }
+
+        /// <summary>The glassy ice of Module 47's shards.</summary>
+        internal Linear Shard { get; }
     }
 
     /// <summary>A colour in linear light, each channel a double: what the painter blends in.</summary>

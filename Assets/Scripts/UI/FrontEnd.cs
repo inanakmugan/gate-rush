@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using DG.Tweening;
 using GateRush.Meta;
 using GateRush.Platform;
 using GateRush.Runtime;
@@ -47,7 +48,16 @@ namespace GateRush.UI
     /// button under the Input System.</para>
     /// <para><b>The painting</b> behind everything (Module 45) follows the
     /// campaign level of every state shown, by the UI Config's list.</para>
-    /// <para>No animation yet: screen transitions are Phase 7.</para>
+    /// <para><b>Motion (Module 47).</b> What is shown changes at once in the
+    /// navigation; only the look follows. A new tab's page fades in over the
+    /// old one (<see cref="TabPages"/>), its tween carrying this front end as
+    /// its id, and the Tab Bar's newly selected tab pops once. Every overlay
+    /// opens with the shared pop and closes with its short reverse
+    /// (<see cref="OverlayMotion"/>). <see cref="Show"/> shows everything at
+    /// once; a disable ends a page fade.</para>
+    /// <para><b>Held input.</b> While the screen fade holds input
+    /// (<see cref="HoldInput"/>) Back is ignored; the fade itself takes every
+    /// press.</para>
     /// </remarks>
     public sealed class FrontEnd : MonoBehaviour, IFrontEnd
     {
@@ -97,7 +107,29 @@ namespace GateRush.UI
         [Tooltip("Envelops the screen with the painting, cropped and centred, never stretched; its ratio follows the painting's sprite.")]
         [SerializeField] private AspectRatioFitter paintingFit;
 
+        [Tooltip("The coins bought gold flies to the Top Bar's gold in (Module 47), on their own canvas above every overlay.")]
+        [SerializeField] private CoinFlightView coinFlight;
+
         private readonly UiNavigation navigation = new UiNavigation();
+        private readonly TabPages pages = new TabPages();
+
+        // The screen fade's query (Module 47): while it answers true, Back is
+        // ignored. Null until the bootstrap sets it.
+        private Func<bool> inputHold;
+
+        // The front end's overlays, in the order of their motions.
+        private readonly UiOverlay[] frontEndOverlays =
+        {
+            UiOverlay.Settings, UiOverlay.Levels, UiOverlay.Lives, UiOverlay.NotEnoughGold, UiOverlay.Message,
+            UiOverlay.TestPurchase, UiOverlay.WinStreak, UiOverlay.StreakReward, UiOverlay.Profile
+        };
+
+        // Each overlay's shared open and close, and each page's group, read
+        // once; MissingSetup reports any that is missing.
+        private OverlayMotion[] motions;
+        private CanvasGroup storeGroup;
+        private CanvasGroup homeGroup;
+        private CanvasGroup leaderboardGroup;
 
         // The tab the notice belongs to: the notice goes when the tab changes.
         private UiTab shownTab = UiTab.Home;
@@ -146,6 +178,9 @@ namespace GateRush.UI
         public event Action ButtonPressed;
 
         /// <inheritdoc />
+        public event Action CoinLanded;
+
+        /// <inheritdoc />
         public bool IsOpen => gameObject.activeSelf;
 
         /// <inheritdoc />
@@ -172,6 +207,11 @@ namespace GateRush.UI
             UiParts.AddIfMissing(missing, avatarCatalog, nameof(FrontEnd), nameof(avatarCatalog));
             UiParts.AddIfMissing(missing, painting, nameof(FrontEnd), nameof(painting));
             UiParts.AddIfMissing(missing, paintingFit, nameof(FrontEnd), nameof(paintingFit));
+            UiParts.AddIfMissing(missing, coinFlight, nameof(FrontEnd), nameof(coinFlight));
+            if (coinFlight != null)
+            {
+                coinFlight.AddMissing(missing);
+            }
 
             if (store != null)
             {
@@ -248,6 +288,19 @@ namespace GateRush.UI
                 streakBar.AddMissing(missing);
             }
 
+            OverlayMotion.AddMissingOn(missing, settings, nameof(settings));
+            OverlayMotion.AddMissingOn(missing, levels, nameof(levels));
+            OverlayMotion.AddMissingOn(missing, lives, nameof(lives));
+            OverlayMotion.AddMissingOn(missing, notEnoughGold, nameof(notEnoughGold));
+            OverlayMotion.AddMissingOn(missing, message, nameof(message));
+            OverlayMotion.AddMissingOn(missing, testPurchase, nameof(testPurchase));
+            OverlayMotion.AddMissingOn(missing, winStreak, nameof(winStreak));
+            OverlayMotion.AddMissingOn(missing, streakReward, nameof(streakReward));
+            OverlayMotion.AddMissingOn(missing, profile, nameof(profile));
+            AddPageGroupMissing(missing, store, nameof(store));
+            AddPageGroupMissing(missing, home, nameof(home));
+            AddPageGroupMissing(missing, leaderboard, nameof(leaderboard));
+
             var tints = GetComponentsInChildren<UiTint>(true);
             for (var i = 0; i < tints.Length; i++)
             {
@@ -286,13 +339,23 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public ScreenFadeSettings ScreenFadeSettings => config.CreateScreenFadeSettings();
+
+        /// <inheritdoc />
+        public void HoldInput(Func<bool> isHeld)
+        {
+            inputHold = isHeld ?? throw new ArgumentNullException(nameof(isHeld));
+        }
+
+        /// <inheritdoc />
         public void Show(FrontEndState state)
         {
             gameObject.SetActive(true);
             UiTint.ApplyAll(this, config);
+            EndGoldFlight();
             navigation.Reset();
             shownTab = navigation.Tab;
-            ApplyNavigation();
+            ApplyNavigation(false);
             home.ClearNotice();
             Refresh(state);
         }
@@ -415,10 +478,39 @@ namespace GateRush.UI
         }
 
         /// <inheritdoc />
+        public void FlyPackGold(string productId, int amount, int shownGold, int seed)
+        {
+            if (!store.TryGetShownPackCard(productId, out var card))
+            {
+                EndGoldFlight();
+                return;
+            }
+
+            coinFlight.Fly(
+                card, topBar.GoldTarget, CoinFlight.Layout(amount, config.CreateCoinFlightSettings(), seed), 0f, topBar.GoldCounter,
+                shownGold, topBar.GoldCanvas);
+        }
+
+        /// <inheritdoc />
         public void Hide()
         {
+            EndGoldFlight();
             gameObject.SetActive(false);
             AnswerPending(false);
+        }
+
+        /// <summary>Ends a gold flight, if any, so the Top Bar shows the wallet's value at once.</summary>
+        private void EndGoldFlight()
+        {
+            if (coinFlight != null)
+            {
+                coinFlight.Stop();
+            }
+
+            if (topBar != null)
+            {
+                topBar.GoldCounter.Release();
+            }
         }
 
         private void OnEnable()
@@ -428,13 +520,28 @@ namespace GateRush.UI
 
         private void OnDisable()
         {
+            // Pages are not switched from inside a disable; the next Show
+            // shows the right one at once.
+            DOTween.Kill(this);
+            pages.Finish();
+            RestPageAlphas();
             Unsubscribe();
+        }
+
+        private void OnDestroy()
+        {
+            DOTween.Kill(this);
         }
 
         private void Update()
         {
             var keyboard = Keyboard.current;
-            if (keyboard != null && keyboard[BackKey].wasPressedThisFrame && navigation.Back())
+            if (keyboard == null || !keyboard[BackKey].wasPressedThisFrame || (inputHold != null && inputHold()))
+            {
+                return;
+            }
+
+            if (navigation.Back())
             {
                 ButtonPressed?.Invoke();
             }
@@ -500,28 +607,140 @@ namespace GateRush.UI
         /// <summary>
         /// Shows the selected tab's page and the tab bar's selection, and the
         /// open overlays alone, stacked by sibling order with the newest last.
+        /// With <paramref name="isAnimated"/> a new page fades in over the old
+        /// one, the newly selected tab pops, and overlays pop open or close
+        /// with the short reverse beneath the open ones; otherwise all at once.
         /// </summary>
-        private void ApplyNavigation()
+        private void ApplyNavigation(bool isAnimated)
         {
+            CacheParts();
             var tab = navigation.Tab;
-            store.gameObject.SetActive(tab == UiTab.Store);
-            home.gameObject.SetActive(tab == UiTab.Home);
-            leaderboard.gameObject.SetActive(tab == UiTab.Leaderboard);
-            tabBar.ShowSelected(tab);
+            ApplyPages(tab, isAnimated);
+            tabBar.ShowSelected(tab, isAnimated, config);
 
             var open = navigation.Overlays;
-            settings.gameObject.SetActive(Contains(open, UiOverlay.Settings));
-            levels.gameObject.SetActive(Contains(open, UiOverlay.Levels));
-            lives.gameObject.SetActive(Contains(open, UiOverlay.Lives));
-            notEnoughGold.gameObject.SetActive(Contains(open, UiOverlay.NotEnoughGold));
-            message.gameObject.SetActive(Contains(open, UiOverlay.Message));
-            testPurchase.gameObject.SetActive(Contains(open, UiOverlay.TestPurchase));
-            winStreak.gameObject.SetActive(Contains(open, UiOverlay.WinStreak));
-            streakReward.gameObject.SetActive(Contains(open, UiOverlay.StreakReward));
-            profile.gameObject.SetActive(Contains(open, UiOverlay.Profile));
+            for (var i = 0; i < frontEndOverlays.Length; i++)
+            {
+                OverlayMotion.Apply(motions[i], Contains(open, frontEndOverlays[i]), isAnimated, config);
+            }
+
             for (var i = 0; i < open.Count; i++)
             {
                 OverlayObject(open[i]).transform.SetAsLastSibling();
+            }
+        }
+
+        /// <summary>Reads each overlay's motion and each page's group once; <see cref="MissingSetup"/> reports one missing.</summary>
+        private void CacheParts()
+        {
+            if (motions != null)
+            {
+                return;
+            }
+
+            motions = new OverlayMotion[frontEndOverlays.Length];
+            for (var i = 0; i < frontEndOverlays.Length; i++)
+            {
+                motions[i] = OverlayObject(frontEndOverlays[i]).GetComponent<OverlayMotion>();
+            }
+
+            storeGroup = store.GetComponent<CanvasGroup>();
+            homeGroup = home.GetComponent<CanvasGroup>();
+            leaderboardGroup = leaderboard.GetComponent<CanvasGroup>();
+        }
+
+        /// <summary>
+        /// Shows <paramref name="tab"/>'s page (<see cref="TabPages"/>): a fade
+        /// already bringing it in runs on; any other fade is finished first;
+        /// then, with <paramref name="isAnimated"/>, the page fades in over the
+        /// one shown, drawn above it, or is shown at once.
+        /// </summary>
+        private void ApplyPages(UiTab tab, bool isAnimated)
+        {
+            if (pages.IsFading && isAnimated && pages.Incoming == tab)
+            {
+                return;
+            }
+
+            EndPageFade();
+            var fades = pages.Select(tab, isAnimated);
+            ShowActivePages();
+            if (!fades)
+            {
+                return;
+            }
+
+            var page = PageGroup(tab);
+            page.transform.SetAsLastSibling();
+            page.alpha = 0f;
+            DOTween.To(() => page.alpha, alpha => page.alpha = alpha, 1f, config.TabFadeSeconds)
+                .SetEase(config.TabFadeEase)
+                .SetUpdate(true)
+                .SetId(this)
+                .OnComplete(EndPageFade);
+        }
+
+        /// <summary>Finishes a page fade at once, if any: the incoming page fully shown, the old one gone. Parts may be missing during teardown.</summary>
+        private void EndPageFade()
+        {
+            DOTween.Kill(this);
+            if (!pages.IsFading)
+            {
+                return;
+            }
+
+            pages.Finish();
+            RestPageAlphas();
+            ShowActivePages();
+        }
+
+        /// <summary>Every page opaque. The groups may be missing during teardown.</summary>
+        private void RestPageAlphas()
+        {
+            if (storeGroup != null)
+            {
+                storeGroup.alpha = 1f;
+            }
+
+            if (homeGroup != null)
+            {
+                homeGroup.alpha = 1f;
+            }
+
+            if (leaderboardGroup != null)
+            {
+                leaderboardGroup.alpha = 1f;
+            }
+        }
+
+        private void ShowActivePages()
+        {
+            store.gameObject.SetActive(pages.IsActive(UiTab.Store));
+            home.gameObject.SetActive(pages.IsActive(UiTab.Home));
+            leaderboard.gameObject.SetActive(pages.IsActive(UiTab.Leaderboard));
+        }
+
+        private CanvasGroup PageGroup(UiTab tab)
+        {
+            switch (tab)
+            {
+                case UiTab.Store:
+                    return storeGroup;
+                case UiTab.Home:
+                    return homeGroup;
+                case UiTab.Leaderboard:
+                    return leaderboardGroup;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(tab), tab, "Not a front end tab.");
+            }
+        }
+
+        /// <summary>Adds a page with no CanvasGroup on its root, which its fade needs, to <paramref name="missing"/>.</summary>
+        private static void AddPageGroupMissing(List<string> missing, Component page, string field)
+        {
+            if (page != null && page.GetComponent<CanvasGroup>() == null)
+            {
+                missing.Add($"a CanvasGroup on the root of '{field}', for its fade");
             }
         }
 
@@ -575,11 +794,12 @@ namespace GateRush.UI
             if (isSubscribed || store == null || home == null || leaderboard == null || topBar == null || tabBar == null
                 || settings == null || levels == null || lives == null
                 || notEnoughGold == null || message == null || testPurchase == null
-                || winStreak == null || streakReward == null || profile == null || streakBar == null)
+                || winStreak == null || streakReward == null || profile == null || streakBar == null || coinFlight == null)
             {
                 return;
             }
 
+            coinFlight.CoinLanded += OnCoinLanded;
             navigation.Changed += OnNavigationChanged;
             home.PlayRequested += OnPlayRequested;
             store.GoldPackRequested += OnGoldPackRequested;
@@ -622,6 +842,7 @@ namespace GateRush.UI
 
             // Unsubscribing from a C# event of a destroyed view is safe, so
             // this runs during teardown as well.
+            coinFlight.CoinLanded -= OnCoinLanded;
             navigation.Changed -= OnNavigationChanged;
             home.PlayRequested -= OnPlayRequested;
             store.GoldPackRequested -= OnGoldPackRequested;
@@ -664,10 +885,11 @@ namespace GateRush.UI
         /// </summary>
         private void OnNavigationChanged()
         {
-            ApplyNavigation();
+            ApplyNavigation(true);
             if (navigation.Tab != shownTab)
             {
                 shownTab = navigation.Tab;
+                EndGoldFlight();
                 home.ClearNotice();
                 if (shownTab == UiTab.Leaderboard)
                 {
@@ -717,6 +939,8 @@ namespace GateRush.UI
             RequestLeaderboard();
             ButtonPressed?.Invoke();
         }
+
+        private void OnCoinLanded() => CoinLanded?.Invoke();
 
         private void OnPlayRequested()
         {

@@ -482,6 +482,143 @@ namespace GateRush.Tests
             Assert.IsNull(unknown);
         }
 
+        // ----- Module 47, pass 2: gold flying to its counter --------------
+
+        [TestCase("Coin Flight")]
+        [TestCase("Coin Tap")]
+        [TestCase("Gold Pop")]
+        [TestCase("Gold Lift")]
+        [TestCase("Result Title Pop")]
+        [TestCase("Result Coin Spin")]
+        public void Problems_DefaultGoldFlightValues_ReportNothingAboutThem(string shownName)
+        {
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("coinFlightStartSpreadUnits", -1f, "Coin Flight Start Spread Units")]
+        [TestCase("coinFlightMaxDelaySeconds", 2f, "Coin Flight Max Delay Seconds")]
+        [TestCase("coinFlightSizeUnits", 0f, "Coin Flight Size Units")]
+        [TestCase("coinFlightEndScale", 0f, "Coin Flight End Scale")]
+        [TestCase("coinFlightWinDelaySeconds", 3f, "Coin Flight Win Delay Seconds")]
+        [TestCase("coinTapMinIntervalSeconds", -0.1f, "Coin Tap Min Interval Seconds")]
+        [TestCase("goldPopScale", 0.9f, "Gold Pop Scale")]
+        [TestCase("goldPopSeconds", 0f, "Gold Pop Seconds")]
+        [TestCase("resultTitlePopScale", 2f, "Result Title Pop Scale")]
+        [TestCase("resultTitlePopSeconds", 0f, "Result Title Pop Seconds")]
+        [TestCase("resultCoinSpinSeconds", 0f, "Result Coin Spin Seconds")]
+        [TestCase("resultCoinSpinDegrees", -1f, "Result Coin Spin Degrees")]
+        public void Problems_GoldFlightFloatOutOfRange_IsReportedByName(string field, float value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase("coinFlightCap", 0, "Coin Flight Cap")]
+        [TestCase("coinFlightGoldPerCoin", 0, "Coin Flight Gold Per Coin")]
+        [TestCase("goldLiftSortingOffset", 0, "Gold Lift Sorting Offset")]
+        [TestCase("coinFlightSortingOffset", 10, "Coin Flight Sorting Offset")]
+        public void Problems_GoldFlightCountOutOfRange_IsReportedByName(string field, int value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).intValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        // ----- Module 47, pass 3: presses, tabs, overlay close, screen fade ----
+
+        [Test]
+        public void Problems_DefaultMotion_ReportsNothingAboutIt()
+        {
+            var problems = config.Problems();
+
+            foreach (var shownName in new[] { "Press Scale", "Press Seconds", "Release", "Tab Fade", "Tab Pop", "Overlay Close", "Screen Fade" })
+            {
+                Assert.That(problems, Has.None.Contains(shownName), string.Join(" | ", problems));
+            }
+        }
+
+        [TestCase("pressScale", 1f, "Press Scale")]
+        [TestCase("pressScale", 0.7f, "Press Scale")]
+        [TestCase("pressSeconds", 0f, "Press Seconds")]
+        [TestCase("pressSeconds", 0.5f, "Press Seconds")]
+        [TestCase("releaseSeconds", 0f, "Release Seconds")]
+        [TestCase("releaseSeconds", 0.6f, "Release Seconds")]
+        [TestCase("releaseOvershoot", -0.1f, "Release Overshoot")]
+        [TestCase("releaseOvershoot", 4f, "Release Overshoot")]
+        [TestCase("tabFadeSeconds", 0f, "Tab Fade Seconds")]
+        [TestCase("tabPopScale", 0.9f, "Tab Pop Scale")]
+        [TestCase("tabPopScale", 1.5f, "Tab Pop Scale")]
+        [TestCase("tabPopSeconds", 0f, "Tab Pop Seconds")]
+        [TestCase("overlayCloseSeconds", 0f, "Overlay Close Seconds")]
+        [TestCase("overlayCloseSeconds", 0.6f, "Overlay Close Seconds")]
+        [TestCase("overlayCloseScale", 0.7f, "Overlay Close Scale")]
+        [TestCase("overlayCloseScale", 1.1f, "Overlay Close Scale")]
+        [TestCase("screenFadeInSeconds", 0f, "Screen Fade In Seconds")]
+        [TestCase("screenFadeInSeconds", 1.5f, "Screen Fade In Seconds")]
+        [TestCase("screenFadeOutSeconds", 0f, "Screen Fade Out Seconds")]
+        [TestCase("screenFadeOutSeconds", float.NaN, "Screen Fade Out Seconds")]
+        public void Problems_MotionFloatOutOfRange_IsReportedByName(string field, float value, string shownName)
+        {
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty(field).floatValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains(shownName), string.Join(" | ", problems));
+        }
+
+        [TestCase(11)]
+        [TestCase(1001)]
+        public void Problems_ScreenFadeSortingOffsetOutOfRange_IsReportedByName(int offset)
+        {
+            // The default coin flight offset is 11: the fade must sort above it.
+            var serialized = new SerializedObject(config);
+            serialized.FindProperty("screenFadeSortingOffset").intValue = offset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Screen Fade Sorting Offset"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void Problems_ScreenFadeAtOrBelowTheCoins_IsReportedEvenWhenTheCoinsMove()
+        {
+            var serialized = new SerializedObject(config);
+            var fadeOffset = serialized.FindProperty("screenFadeSortingOffset").intValue;
+            serialized.FindProperty("coinFlightSortingOffset").intValue = fadeOffset;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+
+            var problems = config.Problems();
+
+            Assert.That(problems, Has.Some.Contains("Screen Fade Sorting Offset"), string.Join(" | ", problems));
+        }
+
+        [Test]
+        public void CreateCoinFlightSettings_Default_IsTheConfigsValues()
+        {
+            var serialized = new SerializedObject(config);
+
+            var settings = config.CreateCoinFlightSettings();
+
+            Assert.AreEqual(serialized.FindProperty("coinFlightCap").intValue, settings.Cap);
+            Assert.AreEqual(serialized.FindProperty("coinFlightGoldPerCoin").intValue, settings.GoldPerCoin);
+            Assert.AreEqual(serialized.FindProperty("coinFlightSeconds").vector2Value.x, settings.SecondsMin);
+            Assert.AreEqual(serialized.FindProperty("coinFlightArcUnits").vector2Value.y, settings.ArcMaxUnits);
+        }
+
         private void SetRibbons(params (string id, string text)[] ribbons)
         {
             var serialized = new SerializedObject(config);

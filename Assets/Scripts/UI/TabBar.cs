@@ -18,12 +18,21 @@ namespace GateRush.UI
         /// <summary>Raised with the tab whose button was pressed.</summary>
         public event Action<UiTab> TabSelected;
 
-        /// <summary>Draws <paramref name="tab"/> raised and the others as icons.</summary>
-        public void ShowSelected(UiTab tab)
+        // The tab last drawn raised: only a change of it pops.
+        private UiTab shownTab = UiTab.Home;
+
+        /// <summary>
+        /// Draws <paramref name="tab"/> raised and the others as icons. With
+        /// <paramref name="isAnimated"/>, a tab that was not raised before pops
+        /// once (Module 47); the front end draws at once on Show.
+        /// </summary>
+        public void ShowSelected(UiTab tab, bool isAnimated, UiConfig config)
         {
-            storeTab.ShowSelected(tab == UiTab.Store);
-            homeTab.ShowSelected(tab == UiTab.Home);
-            leaderboardTab.ShowSelected(tab == UiTab.Leaderboard);
+            var pops = isAnimated && tab != shownTab;
+            shownTab = tab;
+            storeTab.ShowSelected(tab == UiTab.Store, pops, config);
+            homeTab.ShowSelected(tab == UiTab.Home, pops, config);
+            leaderboardTab.ShowSelected(tab == UiTab.Leaderboard, pops, config);
         }
 
         /// <summary>Adds each unassigned part, the tabs' own included, to <paramref name="missing"/>.</summary>

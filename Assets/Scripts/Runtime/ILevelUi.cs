@@ -56,6 +56,13 @@ namespace GateRush.Runtime
         /// </summary>
         event Action ButtonPressed;
 
+        /// <summary>
+        /// Raised when a coin of a gold flight lands on the HUD's gold pill, at
+        /// most once per the UI Config's tap interval: the moment for the tap
+        /// sound (Module 47).
+        /// </summary>
+        event Action CoinLanded;
+
         /// <summary>Raised when the player presses Next on the result panel.</summary>
         event Action NextRequested;
 
@@ -93,6 +100,15 @@ namespace GateRush.Runtime
         /// missing part and each problem.
         /// </summary>
         string MissingSetup();
+
+        /// <summary>
+        /// Makes the level's interface ignore its keys, Back among them,
+        /// whenever <paramref name="isHeld"/> answers true: the screen fade's
+        /// one query (Module 47), set once by the bootstrap. Pointer input is
+        /// held by the fade itself.
+        /// </summary>
+        /// <exception cref="ArgumentNullException"><paramref name="isHeld"/> is null.</exception>
+        void HoldInput(Func<bool> isHeld);
 
         /// <summary>
         /// Opens the HUD and the joker bar for a level, with no overlay, no
@@ -160,8 +176,39 @@ namespace GateRush.Runtime
         /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
         void ShowLoss(LevelResult result);
 
-        /// <summary>Hides the result panel, stopping its pop. Does nothing when it is not open.</summary>
+        /// <summary>
+        /// Closes the result panel with the overlays' short close (Module 47),
+        /// stopping its pop; it takes no input from the start of the close.
+        /// Does nothing when it is not open. A gold flight from it stops, and
+        /// the HUD's gold shows the wallet's value at once.
+        /// </summary>
         void HideResult();
+
+        /// <summary>
+        /// Holds the HUD's gold at <paramref name="shownGold"/> however the
+        /// wallet changes, until a flight lands on it or the level's interface
+        /// releases it (Module 47): for a campaign win, from the moment its
+        /// gold is credited until its coins fly.
+        /// </summary>
+        void HoldGold(int shownGold);
+
+        /// <summary>
+        /// Flies <paramref name="amount"/> gold from the result panel's gold
+        /// coin to the HUD's gold pill, after the panel's pop, the pill held at
+        /// <paramref name="shownGold"/> until the coins land and lifted over
+        /// the panel's scrim meanwhile (Module 47). Releases the gold at once
+        /// when the panel is not open.
+        /// </summary>
+        void FlyWinGold(int amount, int shownGold, int seed);
+
+        /// <summary>
+        /// Flies <paramref name="amount"/> gold from the card of the gold pack
+        /// <paramref name="productId"/> to the HUD's gold pill, the pill held
+        /// at <paramref name="shownGold"/> until the coins land and lifted over
+        /// the overlays' scrim meanwhile (Module 47). With the card not shown,
+        /// the gold shows at once.
+        /// </summary>
+        void FlyPackGold(string productId, int amount, int shownGold, int seed);
 
         /// <summary>
         /// Opens the confirmation that <paramref name="kind"/> will cost a life,
@@ -171,7 +218,11 @@ namespace GateRush.Runtime
         /// <exception cref="InvalidOperationException">The level's interface is not open.</exception>
         void ShowConfirm(ConfirmKind kind, int streakAtRisk);
 
-        /// <summary>Hides the confirmation, stopping its pop. Does nothing when it is not open.</summary>
+        /// <summary>
+        /// Closes the confirmation with the overlays' short close (Module 47),
+        /// stopping its pop; <see cref="IsConfirmOpen"/> is false from the start
+        /// of the close. Does nothing when it is not open.
+        /// </summary>
         void HideConfirm();
 
         /// <summary>

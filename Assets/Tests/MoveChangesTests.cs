@@ -42,6 +42,7 @@ namespace GateRush.Tests
             Assert.IsEmpty(changes.UnlockedBlocks);
             Assert.IsEmpty(changes.CountPops);
             Assert.IsEmpty(changes.Spawns);
+            Assert.IsEmpty(changes.FinishedElevators);
             Assert.IsFalse(changes.HasArrivals);
         }
 
@@ -239,6 +240,75 @@ namespace GateRush.Tests
             CollectionAssert.AreEqual(
                 new[] { new BlockSpawn(1, SpawnerKind.Elevator, 0), new BlockSpawn(2, SpawnerKind.Elevator, 0) },
                 changes.Spawns);
+        }
+
+        [Test]
+        public void Between_ClearOfAnElevatorsLastWave_ReportsItFinished()
+        {
+            // One wave (slot 0): a red 1x2 over a red gate as wide as the
+            // region; clearing it leaves the elevator nothing to bring (M9).
+            var ctx = Ctx(2, 1,
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 2, BlockColor.Red) },
+                elevators: new[]
+                {
+                    Elevator(1, new Coord(0, 0), new Coord(1, 0), new[] { Spawned(cells: Horizontal1x2, regionOrigin: new Coord(0, 0)) })
+                });
+            var before = BoardState.CreateInitial(ctx);
+            var move = new Move(0, new Coord(0, 0));
+            Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, before, move, out var after, out _));
+
+            var changes = MoveChanges.Between(ctx, before, after, move, Direction.Down);
+
+            CollectionAssert.AreEqual(new[] { 0 }, changes.FinishedElevators);
+            Assert.IsTrue(changes.HasArrivals, "the arrive stage has the elevator to sink");
+        }
+
+        [Test]
+        public void Between_ClearThatBringsAnElevatorsNextWave_DoesNotReportItFinished()
+        {
+            // As Between_ClearThatBringsAnElevatorsNextWave_…: wave 1 follows.
+            var ctx = Ctx(2, 1,
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 2, BlockColor.Red) },
+                elevators: new[]
+                {
+                    Elevator(1, new Coord(0, 0), new Coord(1, 0),
+                        new[] { Spawned(cells: Horizontal1x2, regionOrigin: new Coord(0, 0)) },
+                        new[]
+                        {
+                            Spawned(colors: new[] { BlockColor.Blue }, regionOrigin: new Coord(0, 0)),
+                            Spawned(colors: new[] { BlockColor.Green }, regionOrigin: new Coord(1, 0))
+                        })
+                });
+            var before = BoardState.CreateInitial(ctx);
+            var move = new Move(0, new Coord(0, 0));
+            Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, before, move, out var after, out _));
+
+            var changes = MoveChanges.Between(ctx, before, after, move, Direction.Down);
+
+            Assert.IsEmpty(changes.FinishedElevators);
+            Assert.IsNotEmpty(changes.Spawns, "its next wave came instead");
+        }
+
+        [Test]
+        public void Between_PlainMoveBesideAnElevator_ReportsNoElevatorFinished()
+        {
+            // A blue block (slot 0) slides along the row past an elevator
+            // whose one wave (slot 1) stands in its region.
+            var ctx = Ctx(5, 1,
+                blocks: new[] { Block(1, new Coord(3, 0), colors: new[] { BlockColor.Blue }) },
+                gates: new[] { Gate(1, BoardEdge.Bottom, 0, 2, BlockColor.Red) },
+                elevators: new[]
+                {
+                    Elevator(1, new Coord(0, 0), new Coord(1, 0), new[] { Spawned(cells: Horizontal1x2, regionOrigin: new Coord(0, 0)) })
+                });
+            var before = BoardState.CreateInitial(ctx);
+            var move = new Move(0, new Coord(4, 0));
+            Assert.IsTrue(new MoveResolver().TryApplyMove(ctx, before, move, out var after, out _));
+
+            var changes = MoveChanges.Between(ctx, before, after, move, push: null);
+
+            Assert.IsEmpty(changes.FinishedElevators);
+            Assert.IsFalse(changes.HasArrivals);
         }
 
         [Test]

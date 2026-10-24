@@ -28,7 +28,13 @@ namespace GateRush.Runtime
         /// A block a joker destroyed breaking apart where it stands (Module
         /// 34). Last, so the kinds before it keep their seeds.
         /// </summary>
-        Break
+        Break,
+
+        /// <summary>
+        /// The sparkles over a block a joker destroyed (Module 47). Last, so
+        /// the kinds before it keep their seeds.
+        /// </summary>
+        BreakSparkle
     }
 
     /// <summary>One piece of a burst, in cell units: where it starts, how far it goes, and how it looks.</summary>
@@ -138,8 +144,26 @@ namespace GateRush.Runtime
         /// <exception cref="ArgumentNullException"><paramref name="areas"/> or <paramref name="settings"/> is null.</exception>
         /// <exception cref="ArgumentException"><paramref name="areas"/> is empty, or <paramref name="outward"/> is zero.</exception>
         public static IReadOnlyList<BurstPiece> Pieces(
-            IReadOnlyList<Rect> areas, Vector2? outward, Vector2 centre, int seed, BurstSettings settings)
+            IReadOnlyList<Rect> areas, Vector2? outward, Vector2 centre, int seed, BurstSettings settings) =>
+            Pieces(areas, outward, centre, seed, settings, int.MaxValue);
+
+        /// <summary>
+        /// As the other <c>Pieces</c>, but at most <paramref name="limit"/>
+        /// pieces: the burst's own count, capped, and no more than its share
+        /// of a cap over several bursts (<see cref="ShareCap"/>). The pieces
+        /// are the first of the uncapped burst's, so a lower limit drops
+        /// pieces and never moves the rest.
+        /// </summary>
+        /// <param name="limit">The most pieces to give. At least 0.</param>
+        /// <exception cref="ArgumentOutOfRangeException"><paramref name="limit"/> is negative.</exception>
+        public static IReadOnlyList<BurstPiece> Pieces(
+            IReadOnlyList<Rect> areas, Vector2? outward, Vector2 centre, int seed, BurstSettings settings, int limit)
         {
+            if (limit < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(limit), limit, "A burst gives at least no pieces.");
+            }
+
             if (areas == null)
             {
                 throw new ArgumentNullException(nameof(areas));
@@ -161,7 +185,7 @@ namespace GateRush.Runtime
             }
 
             var random = new System.Random(seed);
-            var count = Math.Min(settings.CountPerArea * areas.Count, settings.Cap);
+            var count = Math.Min(Math.Min(settings.CountPerArea * areas.Count, settings.Cap), limit);
             var pieces = new BurstPiece[count];
 
             for (var i = 0; i < count; i++)
@@ -176,6 +200,89 @@ namespace GateRush.Runtime
             }
 
             return pieces;
+        }
+
+        /// <summary>
+        /// How many pieces of a <paramref name="total"/> cap each of several
+        /// bursts gets, when each <paramref name="wanted"/> some: all it wants
+        /// while the wants fit the cap; otherwise its proportional share,
+        /// rounded down, and the pieces left over one each to the bursts in
+        /// order whose share fell furthest below its exact part, ties to the
+        /// earlier. So the shares never pass the cap or what a burst wants, and
+        /// fill the cap when the wants exceed it (Module 47: a Broom's breaks
+        /// start together, within one cap).
+        /// </summary>
+        /// <param name="wanted">How many pieces each burst wants, in order. Each at least 0.</param>
+        /// <param name="total">The cap over all of them. At least 0.</param>
+        /// <exception cref="ArgumentNullException"><paramref name="wanted"/> is null.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">A want or <paramref name="total"/> is negative.</exception>
+        public static int[] ShareCap(IReadOnlyList<int> wanted, int total)
+        {
+            if (wanted == null)
+            {
+                throw new ArgumentNullException(nameof(wanted));
+            }
+
+            if (total < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(total), total, "A cap is at least 0.");
+            }
+
+            long sum = 0;
+            for (var i = 0; i < wanted.Count; i++)
+            {
+                if (wanted[i] < 0)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(wanted), wanted[i], $"Burst {i} wants fewer than no pieces.");
+                }
+
+                sum += wanted[i];
+            }
+
+            var shares = new int[wanted.Count];
+            if (sum <= total)
+            {
+                for (var i = 0; i < shares.Length; i++)
+                {
+                    shares[i] = wanted[i];
+                }
+
+                return shares;
+            }
+
+            // Exact parts in whole arithmetic: share = floor(want · total / sum),
+            // and what each falls short by is its remainder.
+            var remainders = new long[shares.Length];
+            var given = 0;
+            for (var i = 0; i < shares.Length; i++)
+            {
+                var exact = (long)wanted[i] * total;
+                shares[i] = (int)(exact / sum);
+                remainders[i] = exact % sum;
+                given += shares[i];
+            }
+
+            for (var left = total - given; left > 0; left--)
+            {
+                var best = -1;
+                for (var i = 0; i < shares.Length; i++)
+                {
+                    if (shares[i] < wanted[i] && (best < 0 || remainders[i] > remainders[best]))
+                    {
+                        best = i;
+                    }
+                }
+
+                if (best < 0)
+                {
+                    break;
+                }
+
+                shares[best]++;
+                remainders[best] = -1;
+            }
+
+            return shares;
         }
 
         /// <summary>

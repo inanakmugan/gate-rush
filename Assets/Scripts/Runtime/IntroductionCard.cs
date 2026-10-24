@@ -400,9 +400,11 @@ namespace GateRush.Runtime
         }
 
         /// <summary>
-        /// A press on the backdrop or the close button: the card fades out,
-        /// then the next one opens or the callback runs. A press while a card
-        /// is already fading does nothing.
+        /// A press on the backdrop or the close button: the card fades out
+        /// while it shrinks a little to <see cref="RuntimeConfig.IntroCloseScale"/>,
+        /// as every overlay's close does (Module 47), then the next one opens
+        /// or the callback runs. A press while a card is already fading does
+        /// nothing.
         /// </summary>
         private void OnCloseClicked()
         {
@@ -420,6 +422,10 @@ namespace GateRush.Runtime
                 .SetUpdate(true)
                 .SetId(this)
                 .OnComplete(OnClosed);
+            card.DOScale(config.IntroCloseScale, config.IntroCloseSeconds)
+                .SetEase(config.IntroCloseEase)
+                .SetUpdate(true)
+                .SetId(this);
 
             ButtonPressed?.Invoke();
         }

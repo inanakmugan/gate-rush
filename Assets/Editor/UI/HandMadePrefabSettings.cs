@@ -19,12 +19,18 @@ namespace GateRush.UI.Editor
     /// <para>So far: Button Round's icon sits in a smaller, centred glyph box;
     /// in Top Bar the plus buttons' icons follow it, the lives count takes
     /// the HUD's font size, the heart sits close to the coin's size and the
-    /// avatar fills its frame inside a thin rim (Module 45 follow-ups); in
+    /// avatar fills its frame inside a thin rim (Module 45 follow-ups), and
+    /// the gold has a canvas and a raycaster of its own (Module 47); in
     /// Tab Bar the selected tabs' labels share the largest size at which
     /// "Leaderboard" fits its tile; in Home Page the Play button sits just
     /// above the tab bar with the notice above it (the interface review).
-    /// Button Round and Top Bar run first, then Tab Bar and Home Page, which
-    /// depend on neither.</para>
+    /// Every hand-made button answers a press (Module 47): Button Primary,
+    /// Button Round and Level Button carry a PressFeedback on their root,
+    /// which Button Secondary and Button Close, their variants, and every
+    /// nested instance follow; the three tabs and the Top Bar's avatar carry
+    /// their own. Button Primary, Button Round and Level Button run first,
+    /// then Top Bar, then Tab Bar and Home Page, which depend on none of
+    /// them.</para>
     /// <para>Every object is found by its exact Hierarchy path. Each value is
     /// compared before it is set, so a run over prefabs that already hold
     /// every value changes nothing and saves nothing; a prefab is saved only
@@ -92,6 +98,12 @@ namespace GateRush.UI.Editor
         public const string ButtonRoundPath = "Assets/Prefabs/UI/Button Round.prefab";
 
         /// <inheritdoc cref="ButtonRoundPath"/>
+        public const string ButtonPrimaryPath = "Assets/Prefabs/UI/Button Primary.prefab";
+
+        /// <inheritdoc cref="ButtonRoundPath"/>
+        public const string LevelButtonPath = "Assets/Prefabs/UI/Level Button.prefab";
+
+        /// <inheritdoc cref="ButtonRoundPath"/>
         public const string TopBarPath = "Assets/Prefabs/UI/Top Bar.prefab";
 
         /// <inheritdoc cref="ButtonRoundPath"/>
@@ -111,6 +123,9 @@ namespace GateRush.UI.Editor
 
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string HeartPath = "Top Bar/Lives/Heart";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string TopBarGoldPath = "Top Bar/Gold";
 
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string LivesCountPath = "Top Bar/Lives/Heart/Lives Count";
@@ -139,30 +154,72 @@ namespace GateRush.UI.Editor
         /// <inheritdoc cref="ButtonRoundIconPath"/>
         public const string NoticePath = "Home Page/Notice";
 
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string ButtonRoundRootPath = "Button Round";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string ButtonPrimaryRootPath = "Button Primary";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string LevelButtonRootPath = "Level Button";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string HomeTabPath = "Tab Bar/Home Tab";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string StoreTabPath = "Tab Bar/Store Tab";
+
+        /// <inheritdoc cref="ButtonRoundIconPath"/>
+        public const string LeaderboardTabPath = "Tab Bar/LeaderBoard Tab";
+
         /// <summary>The selected tabs' labels; the Leaderboard's, the longest, sets their one size.</summary>
         public static IReadOnlyList<string> TabLabelPaths { get; } = Array.AsReadOnly(new[] { HomeTabLabelPath, StoreTabLabelPath, LeaderboardTabLabelPath });
+
+        /// <summary>The three tabs, each a Button on its own object, which a press scales (Module 47).</summary>
+        public static IReadOnlyList<string> TabPaths { get; } = Array.AsReadOnly(new[] { HomeTabPath, StoreTabPath, LeaderboardTabPath });
 
         // The smallest step the tab labels' font is searched in: whole sizes.
         private const float FontSizeStep = 1f;
 
         private const string LogPrefix = "Apply Hand-Made Prefab Settings";
+
+        // A Canvas's saved Override Sorting flag, read and written directly
+        // where the canvas is a root one in the prefab's contents.
+        private const string CanvasOverrideSortingProperty = "m_OverrideSorting";
         private const char PathSeparator = '/';
 
-        /// <summary>Applies the settings to Button Round, then to Top Bar, and logs one line for each.</summary>
+        // PressFeedback's serialized configuration.
+        private const string PressConfigField = "config";
+
+        /// <summary>
+        /// Applies the settings to Button Primary, Button Round and Level
+        /// Button, then to Top Bar, Tab Bar and Home Page, and logs one line
+        /// for each. Without the UI Config, which every press reads, nothing is
+        /// applied.
+        /// </summary>
         [MenuItem("Gate Rush/Apply Hand-Made Prefab Settings")]
         public static void ApplyFromMenu()
         {
-            var isButtonRoundUsable = Apply(ButtonRoundPath, SetButtonRound);
+            var config = AssetDatabase.LoadAssetAtPath<UiConfig>(UiPrefabBuilder.UiConfigPath);
+            if (config == null)
+            {
+                Debug.LogError($"{LogPrefix}: {UiPrefabBuilder.UiConfigPath} is missing; the presses read it. Nothing was applied.");
+                return;
+            }
+
+            Apply(ButtonPrimaryPath, (root, changes) => SetRootPress(root, ButtonPrimaryRootPath, config, changes));
+            var isButtonRoundUsable = Apply(ButtonRoundPath, (root, changes) => SetButtonRound(root, config, changes));
+            Apply(LevelButtonPath, (root, changes) => SetRootPress(root, LevelButtonRootPath, config, changes));
             if (isButtonRoundUsable)
             {
-                Apply(TopBarPath, SetTopBar);
+                Apply(TopBarPath, (root, changes) => SetTopBar(root, config, changes));
             }
             else
             {
                 Debug.LogError($"{LogPrefix}: {TopBarPath} refused: Button Round was refused, and its plus icons follow Button Round.");
             }
 
-            Apply(TabBarPath, SetTabBar);
+            Apply(TabBarPath, (root, changes) => SetTabBar(root, config, changes));
             Apply(HomePagePath, SetHomePage);
         }
 
@@ -250,33 +307,90 @@ namespace GateRush.UI.Editor
             }
         }
 
-        /// <summary>Button Round's steps: its icon in the glyph box. Returns the refusal, or null.</summary>
-        private static string SetButtonRound(GameObject root, List<string> changes)
+        /// <summary>Button Round's steps: its icon in the glyph box, and its press (Module 47). Returns the refusal, or null.</summary>
+        private static string SetButtonRound(GameObject root, UiConfig config, List<string> changes)
         {
             var icon = FindByPath(root, ButtonRoundIconPath) as RectTransform;
-            if (icon == null)
+            var button = FindButton(root, ButtonRoundRootPath);
+            var missing = new List<string>();
+            AddIfMissing(missing, icon, $"a RectTransform at '{ButtonRoundIconPath}'");
+            AddIfMissing(missing, button, $"a Button at '{ButtonRoundRootPath}'");
+            if (missing.Count > 0)
             {
-                return $"no RectTransform at '{ButtonRoundIconPath}'";
+                return $"it needs {string.Join(", ", missing)}";
             }
 
             SetAnchoredBox(icon, GlyphAnchorMin, GlyphAnchorMax, ButtonRoundIconPath, changes);
+            SetPress(button, ButtonRoundRootPath, config, changes);
             return null;
         }
 
         /// <summary>
-        /// Top Bar's steps: the plus icons, the lives count, the heart and the
-        /// avatar. Everything is found before anything is changed, so a
+        /// The steps of a button whose root is its face — Button Primary, and
+        /// with it Button Secondary, its variant; Level Button — its press
+        /// (Module 47). Returns the refusal, or null.
+        /// </summary>
+        private static string SetRootPress(GameObject root, string path, UiConfig config, List<string> changes)
+        {
+            var button = FindButton(root, path);
+            if (button == null)
+            {
+                return $"it needs a Button at '{path}'";
+            }
+
+            SetPress(button, path, config, changes);
+            return null;
+        }
+
+        /// <summary>The Button on the object at <paramref name="path"/>; null when either is missing.</summary>
+        private static Button FindButton(GameObject root, string path)
+        {
+            var found = FindByPath(root, path);
+            return found == null ? null : found.GetComponent<Button>();
+        }
+
+        /// <summary>
+        /// Gives <paramref name="button"/>'s object a <see cref="PressFeedback"/>
+        /// reading <paramref name="config"/> (Module 47), noting each change:
+        /// on the button's own object, whose rect is the face a press scales.
+        /// </summary>
+        private static void SetPress(Button button, string path, UiConfig config, List<string> changes)
+        {
+            var press = button.GetComponent<PressFeedback>();
+            if (press == null)
+            {
+                press = button.gameObject.AddComponent<PressFeedback>();
+                changes.Add($"{path} Press Feedback added");
+            }
+
+            using (var serialized = new SerializedObject(press))
+            {
+                var field = serialized.FindProperty(PressConfigField);
+                if (field.objectReferenceValue != config)
+                {
+                    field.objectReferenceValue = config;
+                    serialized.ApplyModifiedPropertiesWithoutUndo();
+                    changes.Add($"{path} Press Feedback reads {UiPrefabBuilder.UiConfigPath}");
+                }
+            }
+        }
+
+        /// <summary>
+        /// Top Bar's steps: the plus icons, the lives count, the heart, the
+        /// avatar and its press (Module 47). Everything is found before anything is changed, so a
         /// refusal leaves the contents as they were loaded. Returns the
         /// refusal, or null.
         /// </summary>
-        private static string SetTopBar(GameObject root, List<string> changes)
+        private static string SetTopBar(GameObject root, UiConfig config, List<string> changes)
         {
+            var avatarButton = FindButton(root, AvatarPath);
             var goldPlusIcon = FindByPath(root, GoldPlusIconPath) as RectTransform;
             var livesPlusIcon = FindByPath(root, LivesPlusIconPath) as RectTransform;
             var heart = FindByPath(root, HeartPath);
             var livesCount = FindByPath(root, LivesCountPath);
             var frame = FindByPath(root, AvatarFramePath);
             var avatar = FindByPath(root, AvatarPath) as RectTransform;
+            var goldPill = FindByPath(root, TopBarGoldPath);
 
             var heartLayout = heart == null ? null : heart.GetComponent<LayoutElement>();
             var countText = livesCount == null ? null : livesCount.GetComponent<TMP_Text>();
@@ -289,6 +403,8 @@ namespace GateRush.UI.Editor
             AddIfMissing(missing, countText, $"a TextMeshPro text at '{LivesCountPath}'");
             AddIfMissing(missing, frameLayout, $"a Layout Element at '{AvatarFramePath}'");
             AddIfMissing(missing, avatar, $"a RectTransform at '{AvatarPath}'");
+            AddIfMissing(missing, goldPill, $"an object at '{TopBarGoldPath}'");
+            AddIfMissing(missing, avatarButton, $"a Button at '{AvatarPath}'");
             if (goldPlusIcon != null && !PrefabUtility.IsPartOfPrefabInstance(goldPlusIcon))
             {
                 missing.Add($"'{GoldPlusIconPath}' to be part of a Button Round instance");
@@ -329,19 +445,71 @@ namespace GateRush.UI.Editor
                 changes.Add($"{AvatarPath} Layout Element removed");
             }
 
+            SetGoldPillCanvas(goldPill.gameObject, changes);
+
+            // The plus and settings buttons are Button Round instances and
+            // follow its press; the avatar's button is the bar's own.
+            SetPress(avatarButton, AvatarPath, config, changes);
             return null;
+        }
+
+        /// <summary>
+        /// The Top Bar's gold gets a canvas of its own (Module 47), sorting with
+        /// its parent until a coin flight lifts it over a scrim, so its count
+        /// and its pop rebuild only the pill; and a raycaster, since a nested
+        /// canvas's graphics are raycast by its own and the gold's "+" must
+        /// stay pressable. Noting each change.
+        /// </summary>
+        private static void SetGoldPillCanvas(GameObject goldPill, List<string> changes)
+        {
+            var canvas = goldPill.GetComponent<Canvas>();
+            if (canvas == null)
+            {
+                goldPill.AddComponent<Canvas>();
+                changes.Add($"{TopBarGoldPath} Canvas added, sorting with its parent");
+            }
+            else
+            {
+                // The saved flag, not the getter: in the prefab's contents this
+                // is a root canvas, whose overrideSorting reads false and
+                // ignores a write whatever is saved.
+                using (var serialized = new SerializedObject(canvas))
+                {
+                    var overrideSorting = serialized.FindProperty(CanvasOverrideSortingProperty);
+                    if (overrideSorting.boolValue)
+                    {
+                        overrideSorting.boolValue = false;
+                        serialized.ApplyModifiedPropertiesWithoutUndo();
+                        changes.Add($"{TopBarGoldPath} Canvas sorting with its parent");
+                    }
+                }
+            }
+
+            if (goldPill.GetComponent<GraphicRaycaster>() == null)
+            {
+                goldPill.AddComponent<GraphicRaycaster>();
+                changes.Add($"{TopBarGoldPath} Graphic Raycaster added");
+            }
         }
 
         /// <summary>
         /// Tab Bar's steps: the three selected tabs' labels share one fixed
         /// size, the largest at which "Leaderboard" fits its tile's face with
-        /// the margin, on one line, their rects inset to that room. Returns
-        /// the refusal, or null.
+        /// the margin, on one line, their rects inset to that room; and each
+        /// tab answers a press (Module 47). Returns the refusal, or null.
         /// </summary>
-        private static string SetTabBar(GameObject root, List<string> changes)
+        private static string SetTabBar(GameObject root, UiConfig config, List<string> changes)
         {
             var labels = new List<TMP_Text>();
             var missing = new List<string>();
+            var tabs = new List<Button>();
+            foreach (var path in TabPaths)
+            {
+                var tab = FindButton(root, path);
+                AddIfMissing(missing, tab, $"a Button at '{path}'");
+                tabs.Add(tab);
+            }
+
             foreach (var path in TabLabelPaths)
             {
                 var found = FindByPath(root, path);
@@ -386,6 +554,11 @@ namespace GateRush.UI.Editor
                 {
                     changes.Add($"{TabLabelPaths[i]} font size {size}, no auto-size, one line, {room} wide");
                 }
+            }
+
+            for (var i = 0; i < tabs.Count; i++)
+            {
+                SetPress(tabs[i], TabPaths[i], config, changes);
             }
 
             return null;

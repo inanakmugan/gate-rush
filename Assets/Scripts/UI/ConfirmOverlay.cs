@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using DG.Tweening;
 using GateRush.Runtime;
 using TMPro;
 using UnityEngine;
@@ -19,18 +18,17 @@ namespace GateRush.UI
     /// <remarks>
     /// <para>It holds no rules: the bootstrap opens it, stops and resumes the
     /// countdown, and reports the loss.</para>
-    /// <para><b>Open and closed.</b> <see cref="Show"/> and <see cref="Hide"/>
-    /// switch this overlay's own GameObject; it opens with the result panel's
-    /// pop (<see cref="OverlayPop"/>), carrying this view as its id, which
-    /// <see cref="Hide"/>, a disable and a destroy stop.</para>
+    /// <para><b>Open and closed.</b> It opens and closes with every overlay's
+    /// motion (<see cref="OverlayMotion"/>, Module 47): <see cref="Show"/> pops
+    /// it in, <see cref="Hide"/> closes it with the short reverse and
+    /// <see cref="HideNow"/> at once. <see cref="IsOpen"/> is false from the
+    /// start of a close, so the level resumes at once and the closing panel
+    /// takes no input.</para>
     /// </remarks>
     public sealed class ConfirmOverlay : MonoBehaviour
     {
-        [Tooltip("On the overlay's root: the pop fades it in.")]
-        [SerializeField] private CanvasGroup group;
-
-        [Tooltip("The grey panel: the pop grows it.")]
-        [SerializeField] private RectTransform panel;
+        [Tooltip("On the overlay's root: its shared open and close (Module 47).")]
+        [SerializeField] private OverlayMotion motion;
 
         [SerializeField] private TMP_Text titleLabel;
 
@@ -53,8 +51,8 @@ namespace GateRush.UI
         /// <summary>Raised when "Keep playing" is pressed.</summary>
         public event Action KeepPlayingRequested;
 
-        /// <summary>True from <see cref="Show"/> until <see cref="Hide"/>.</summary>
-        public bool IsOpen => gameObject.activeSelf;
+        /// <summary>True from <see cref="Show"/> until <see cref="Hide"/> or <see cref="HideNow"/>; false from the start of a close.</summary>
+        public bool IsOpen => motion != null && motion.IsOpen;
 
         /// <summary>
         /// Opens the confirmation for <paramref name="kind"/>, naming
@@ -67,22 +65,30 @@ namespace GateRush.UI
             loseLifeLabel.text = config.LoseLifeLabel;
             keepPlayingLabel.text = config.KeepPlayingLabel;
 
-            gameObject.SetActive(true);
-            OverlayPop.Play(this, group, panel, config);
+            motion.Open(config);
         }
 
-        /// <summary>Closes the confirmation, stopping its pop.</summary>
-        public void Hide()
+        /// <summary>Closes the confirmation with the overlays' short close. Does nothing when it is not open.</summary>
+        public void Hide(UiConfig config)
         {
-            OverlayPop.Rest(this, group, panel);
-            gameObject.SetActive(false);
+            motion.Close(config);
+        }
+
+        /// <summary>Closes the confirmation at once: the level's interface is being shown afresh or hidden.</summary>
+        public void HideNow()
+        {
+            motion.ShowAt(false);
         }
 
         /// <summary>Adds each unassigned part to <paramref name="missing"/>.</summary>
         public void AddMissing(List<string> missing)
         {
-            UiParts.AddIfMissing(missing, group, nameof(ConfirmOverlay), nameof(group));
-            UiParts.AddIfMissing(missing, panel, nameof(ConfirmOverlay), nameof(panel));
+            UiParts.AddIfMissing(missing, motion, nameof(ConfirmOverlay), nameof(motion));
+            if (motion != null)
+            {
+                motion.AddMissing(missing);
+            }
+
             UiParts.AddIfMissing(missing, titleLabel, nameof(ConfirmOverlay), nameof(titleLabel));
             UiParts.AddIfMissing(missing, lineLabel, nameof(ConfirmOverlay), nameof(lineLabel));
             UiParts.AddIfMissing(missing, loseLifeButton, nameof(ConfirmOverlay), nameof(loseLifeButton));
@@ -99,14 +105,8 @@ namespace GateRush.UI
 
         private void OnDisable()
         {
-            OverlayPop.Rest(this, group, panel);
             UiParts.Unlisten(loseLifeButton, OnLoseLifeClicked);
             UiParts.Unlisten(keepPlayingButton, OnKeepPlayingClicked);
-        }
-
-        private void OnDestroy()
-        {
-            DOTween.Kill(this);
         }
 
         private void OnLoseLifeClicked() => LoseLifeRequested?.Invoke();

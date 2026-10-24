@@ -34,6 +34,9 @@ namespace GateRush.UI
         /// <summary>Raised when the price button is pressed, with the product id last shown.</summary>
         public event Action<string> BuyRequested;
 
+        /// <summary>The product id last shown; null before the first <see cref="Show"/>.</summary>
+        public string ProductId => productId;
+
         /// <summary>
         /// Shows <paramref name="offer"/>, with <paramref name="ribbonText"/>
         /// on the ribbon, or no ribbon when it is null or empty.

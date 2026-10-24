@@ -1030,7 +1030,16 @@ namespace GateRush.Editor
         /// recipe's light, y down, with the body's ambient and diffuse and
         /// <paramref name="finish"/>'s highlight.
         /// </summary>
-        private static Lit LightOf(ArtRecipe recipe, Raster raster, double[] height, LitFinish finish, bool wrapX, bool wrapY)
+        private static Lit LightOf(ArtRecipe recipe, Raster raster, double[] height, LitFinish finish, bool wrapX, bool wrapY) =>
+            LightOf(recipe, raster, height, finish, recipe.Ambient, recipe.Diffuse, wrapX, wrapY);
+
+        /// <summary>
+        /// As the other <c>LightOf</c>, with the part's own
+        /// <paramref name="ambient"/> and <paramref name="diffuse"/> instead of
+        /// the body's: glass is lit brighter and flatter (Module 47's shards).
+        /// </summary>
+        private static Lit LightOf(
+            ArtRecipe recipe, Raster raster, double[] height, LitFinish finish, double ambient, double diffuse, bool wrapX, bool wrapY)
         {
             var width = raster.Width;
             var rows = raster.Height;
@@ -1090,9 +1099,9 @@ namespace GateRush.Editor
                     var nx = -gx / normal;
                     var ny = -gy / normal;
                     var nz = 1.0 / normal;
-                    var diffuse = Clamp01(nx * lx + ny * ly + nz * lz);
+                    var lambert = Clamp01(nx * lx + ny * ly + nz * lz);
                     var mirror = Clamp01(nx * hx + ny * hy + nz * hz);
-                    shade[j * width + i] = recipe.Ambient + recipe.Diffuse * diffuse;
+                    shade[j * width + i] = ambient + diffuse * lambert;
                     specular[j * width + i] = finish.Specular * StablePow(mirror, finish.Shininess);
                 }
             }
@@ -1207,16 +1216,24 @@ namespace GateRush.Editor
         private static ArtImage Encode(int width, int height, Premultiplied[] pixels, double scale, Vector4 border)
         {
             var colours = new Color32[pixels.Length];
-            var alphas = new byte[pixels.Length];
             for (var i = 0; i < pixels.Length; i++)
             {
-                alphas[i] = ToByte(pixels[i].A);
                 var straight = pixels[i].Straight;
                 colours[i] = new Color32(
                     ToByte(EncodeSrgb(straight.R / scale)), ToByte(EncodeSrgb(straight.G / scale)), ToByte(EncodeSrgb(straight.B / scale)),
-                    alphas[i]);
+                    ToByte(pixels[i].A));
             }
 
+            return new ArtImage(width, height, FilledClear(colours, width, height), border);
+        }
+
+        /// <summary>
+        /// <paramref name="colours"/> with every pixel of no alpha given the
+        /// colour of a neighbour that has some, still at no alpha, so filtering
+        /// never pulls a dark fringe into an edge.
+        /// </summary>
+        private static Color32[] FilledClear(Color32[] colours, int width, int height)
+        {
             // The order a transparent pixel looks for a neighbour's colour in.
             var neighbours = new[] { (-1, 0), (1, 0), (0, -1), (0, 1) };
             var filled = new Color32[colours.Length];
@@ -1226,7 +1243,7 @@ namespace GateRush.Editor
                 {
                     var index = j * width + i;
                     filled[index] = colours[index];
-                    if (alphas[index] > 0)
+                    if (colours[index].a > 0)
                     {
                         continue;
                     }
@@ -1235,7 +1252,7 @@ namespace GateRush.Editor
                     {
                         var x = i + di;
                         var y = j + dj;
-                        if (x >= 0 && x < width && y >= 0 && y < height && alphas[y * width + x] > 0)
+                        if (x >= 0 && x < width && y >= 0 && y < height && colours[y * width + x].a > 0)
                         {
                             var from = colours[y * width + x];
                             filled[index] = new Color32(from.r, from.g, from.b, 0);
@@ -1245,7 +1262,7 @@ namespace GateRush.Editor
                 }
             }
 
-            return new ArtImage(width, height, filled, border);
+            return filled;
         }
 
         /// <summary>A part's shade and its highlight, pixel by pixel.</summary>
@@ -1349,6 +1366,9 @@ namespace GateRush.Editor
                     Over(i, colour, alpha[i]);
                 }
             }
+
+            /// <summary>White added to the highlight kept apart at pixel <paramref name="index"/>, for the specular material.</summary>
+            public void AddHighlight(int index, double amount) => highlight[index] += amount;
 
             /// <summary>Black laid over every pixel at its <paramref name="amount"/>: the script's darkening multiply.</summary>
             public void Darken(double[] amount) => Over(Linear.Black, amount);

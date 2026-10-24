@@ -110,7 +110,10 @@ namespace GateRush.Editor
         ElevatorHazardRight,
         ElevatorDoor,
         ElevatorHandle,
-        RoundGlow
+        RoundGlow,
+        CubeHighlight,
+        Shard2,
+        Shard3
     }
 
     /// <summary>One painted sprite: its pixels, bottom row first, and its 9-slice border.</summary>
@@ -144,7 +147,7 @@ namespace GateRush.Editor
     }
 
     /// <summary>
-    /// Paints every generated sprite of Modules 15, 16, 17, 18, 19 and 46 from an
+    /// Paints every generated sprite of Modules 15, 16, 17, 18, 19, 46 and 47 from an
     /// <see cref="ArtRecipe"/>, in greyscale plus alpha for the runtime to
     /// tint where a colour varies (D46), and in an <see cref="ArtPalette"/>'s
     /// colours where it never does (Module 46, pass 2).
@@ -224,7 +227,8 @@ namespace GateRush.Editor
             || sprite == ArtSprite.BonusCoin || sprite == ArtSprite.ShutterRim || sprite == ArtSprite.ShutterCylinders
             || sprite == ArtSprite.MachineBody || sprite == ArtSprite.MachineScreen || sprite == ArtSprite.MachineButton
             || sprite == ArtSprite.ElevatorRim || sprite == ArtSprite.ElevatorHazardLeft
-            || sprite == ArtSprite.ElevatorHazardRight || sprite == ArtSprite.ElevatorDoor || sprite == ArtSprite.ElevatorHandle;
+            || sprite == ArtSprite.ElevatorHazardRight || sprite == ArtSprite.ElevatorDoor || sprite == ArtSprite.ElevatorHandle
+            || sprite == ArtSprite.Shard || sprite == ArtSprite.Shard2 || sprite == ArtSprite.Shard3;
 
         /// <summary>
         /// Paints <paramref name="sprite"/> from <paramref name="recipe"/>, in
@@ -333,9 +337,13 @@ namespace GateRush.Editor
                 case ArtSprite.Restart:
                     return PaintRestart(recipe);
                 case ArtSprite.Cube:
-                    return PaintCube(recipe);
+                    return PaintCube(recipe, LitLayer.Face);
+                case ArtSprite.CubeHighlight:
+                    return PaintCube(recipe, LitLayer.Specular);
                 case ArtSprite.Shard:
-                    return PaintShard(recipe);
+                case ArtSprite.Shard2:
+                case ArtSprite.Shard3:
+                    return PaintShard(recipe, palette, ShardIndexOf(sprite));
                 case ArtSprite.GateGlow:
                     return PaintGateGlow(recipe);
                 case ArtSprite.Sparkle:
@@ -844,86 +852,6 @@ namespace GateRush.Editor
         }
 
         /// <summary>
-        /// One cube of a destroyed block's burst: a rounded box with a light
-        /// bevel inside its edge, easing into the face, and a soft highlight
-        /// toward its top left, like a stud's gloss.
-        /// </summary>
-        private static ArtImage PaintCube(ArtRecipe recipe)
-        {
-            var half = recipe.CubePixels / 2.0;
-            var extent = half - recipe.AntiAliasPixels;
-            var highlightX = half + recipe.CubeHighlightOffsetPixels.x;
-            var highlightY = half + recipe.CubeHighlightOffsetPixels.y;
-            var highlightRadius = recipe.CubeHighlightDiameterPixels / 2.0;
-            var softness = Math.Max(recipe.CubeHighlightSoftnessPixels, recipe.AntiAliasPixels);
-
-            return Paint(recipe.CubePixels, recipe.CubePixels, Vector4.zero, (x, y) =>
-            {
-                var sd = SdRoundedBox(x - half, y - half, extent, extent, recipe.CubeCornerPixels);
-                var intoFace = recipe.CubeRimPixels > 0.0 ? Clamp01(-sd / recipe.CubeRimPixels) : 1.0;
-                var tone = Lerp(recipe.CubeRimTone, recipe.CubeFaceTone, Smooth(intoFace));
-                var highlight = Clamp01(0.5 + (highlightRadius - Length(x - highlightX, y - highlightY)) / softness);
-                return (Lerp(tone, recipe.CubeHighlightTone, highlight), Coverage(recipe, sd));
-            });
-        }
-
-        /// <summary>
-        /// One ice shard: a convex four-cornered splinter with a lighter frost
-        /// streak from its first corner to its third. Its signed distance is the
-        /// largest distance past any of its edges — exact along the edges,
-        /// which is all anti-aliasing reads.
-        /// </summary>
-        private static ArtImage PaintShard(ArtRecipe recipe)
-        {
-            double size = recipe.ShardPixels;
-            var points = recipe.ShardPoints;
-            var xs = new double[points.Count];
-            var ys = new double[points.Count];
-            for (var i = 0; i < points.Count; i++)
-            {
-                xs[i] = points[i].x * size;
-                ys[i] = points[i].y * size;
-            }
-
-            var halfStreak = recipe.ShardStreakWidthPixels / 2.0;
-
-            return Paint(recipe.ShardPixels, recipe.ShardPixels, Vector4.zero, (x, y) =>
-            {
-                var sd = double.NegativeInfinity;
-                for (var i = 0; i < xs.Length; i++)
-                {
-                    var j = (i + 1) % xs.Length;
-                    var dx = xs[j] - xs[i];
-                    var dy = ys[j] - ys[i];
-
-                    // Counter-clockwise, so the outward normal is (dy, −dx).
-                    sd = Math.Max(sd, ((x - xs[i]) * dy - (y - ys[i]) * dx) / Length(dx, dy));
-                }
-
-                var toStreak = DistanceToSegment(x, y, xs[0], ys[0], xs[2], ys[2]);
-                var streak = Clamp01(halfStreak - toStreak + 0.5);
-                return (Lerp(recipe.ShardFaceTone, recipe.ShardStreakTone, streak), Coverage(recipe, sd));
-            });
-        }
-
-        /// <summary>
-        /// The glow inside a gate a block is passing: white, opaque along its
-        /// bottom rows for the held fraction of its height, then easing to
-        /// nothing at its top. Only the height varies, so it is as narrow as the
-        /// background ramp and stretched along the gate.
-        /// </summary>
-        private static ArtImage PaintGateGlow(ArtRecipe recipe)
-        {
-            double height = recipe.GateGlowPixels;
-            double hold = recipe.GateGlowHold;
-            return Paint(RampWidthPixels, recipe.GateGlowPixels, Vector4.zero, (x, y) =>
-            {
-                var intoFade = Clamp01((y / height - hold) / (1.0 - hold));
-                return (1.0, 1.0 - Smooth(intoFade));
-            });
-        }
-
-        /// <summary>
         /// The interface's round glow, behind a marked joker button: white,
         /// opaque out to the held fraction of its radius, then easing to
         /// nothing at the circle, which ends the anti-aliasing width inside
@@ -939,35 +867,6 @@ namespace GateRush.Editor
             {
                 var intoFade = Clamp01((Length(x - center, y - center) / radius - hold) / (1.0 - hold));
                 return (1.0, 1.0 - Smooth(intoFade));
-            });
-        }
-
-        /// <summary>
-        /// A sparkle, in white: a four-point star with its tips on the axes,
-        /// the anti-aliased edge inside the sprite, and its inner corners on
-        /// the diagonals. The star is the same in all eight octants, so a
-        /// pixel is folded into the one below the diagonal on the right, where
-        /// the star's outline is a single edge from a tip to an inner corner;
-        /// the distance past that edge's line is exact along the outline,
-        /// which is all anti-aliasing reads.
-        /// </summary>
-        private static ArtImage PaintSparkle(ArtRecipe recipe)
-        {
-            double size = recipe.SparklePixels;
-            var center = size / 2.0;
-            var tip = center - recipe.AntiAliasPixels;
-            var waist = recipe.SparkleWaist * size;
-            var edgeLength = Length(waist, tip - waist);
-
-            return Paint(recipe.SparklePixels, recipe.SparklePixels, Vector4.zero, (x, y) =>
-            {
-                var along = Math.Max(Math.Abs(x - center), Math.Abs(y - center));
-                var across = Math.Min(Math.Abs(x - center), Math.Abs(y - center));
-
-                // The edge runs from (tip, 0) to (waist, waist); its outward
-                // normal is (waist, tip − waist).
-                var sd = ((along - tip) * waist + across * (tip - waist)) / edgeLength;
-                return (1.0, Coverage(recipe, sd));
             });
         }
 

@@ -146,6 +146,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 3498695290987485308}
+  - component: {fileID: 1162356728536325768}
+  - component: {fileID: 6375938381880632256}
   - component: {fileID: 7677869997839178802}
   m_Layer: 5
   m_Name: Message Overlay
@@ -175,6 +177,32 @@ RectTransform:
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!225 &1162356728536325768
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2380408578793222591}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &6375938381880632256
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2380408578793222591}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86af0a77b7f211d4ba96b15b032fda87, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GateRush.UI::GateRush.UI.OverlayMotion
+  group: {fileID: 1162356728536325768}
+  panel: {fileID: 1586921851678231207}
 --- !u!114 &7677869997839178802
 MonoBehaviour:
   m_ObjectHideFlags: 0

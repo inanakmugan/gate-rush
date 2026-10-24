@@ -82,7 +82,10 @@ MonoBehaviour:
   shutterSlatsSprite: {fileID: 21300000, guid: 18041f29213268c43a9bf2f689c5a938, type: 3}
   clockSprite: {fileID: 21300000, guid: dd8716c6174b2bc4d981bce0856be4fc, type: 3}
   cubeSprite: {fileID: 21300000, guid: 37dd6b6b58c871e4b9a8596eb9eb91ab, type: 3}
+  cubeHighlightSprite: {fileID: 21300000, guid: 429f5c222bbd1194b8f31e5e889523e9, type: 3}
   shardSprite: {fileID: 21300000, guid: f9efff3a6a10d7e4d8e4c4e166140569, type: 3}
+  shard2Sprite: {fileID: 21300000, guid: 46ad815d8bfc1764ea79ecfd43327fc3, type: 3}
+  shard3Sprite: {fileID: 21300000, guid: 2122285028ed2d84b990346c902aad44, type: 3}
   gateGlowSprite: {fileID: 21300000, guid: 5c6de48fd20565048a09c934e317d494, type: 3}
   sparkleSprite: {fileID: 21300000, guid: 955b1f1454c91ff4685f474613823b93, type: 3}
   iceOuterTopLeftSprite: {fileID: 21300000, guid: 1ba5e6d163d699a4dae8c15ebe868939, type: 3}
@@ -160,6 +163,7 @@ MonoBehaviour:
   chainEndInsetCells: 0.1
   padlockSizeCells: 0.62
   keySizeCells: 0.6
+  keyScale: 0.8333333
   keyRotationDegrees: 35
   frozenMarkRaiseCells: 0.3
   timeBonusMarkFormat: +{0}
@@ -239,6 +243,26 @@ MonoBehaviour:
   shardSeconds: 0.35
   shardMaxDelaySeconds: 0.03
   shardEase: 6
+  shardColor: {r: 0.65882355, g: 0.8862745, b: 1, a: 1}
+  drawCubeHighlights: 0
+  breakFlashStrength: 0.6
+  breakFlashSeconds: 0.08
+  breakCubeCountPerCell: 4
+  breakCubeCap: 16
+  breakCubeMoveCap: 48
+  breakCubeTravelCells: {x: 0.4, y: 1.2}
+  breakCubeSpreadDegrees: 25
+  breakCubeMaxDelaySeconds: 0.03
+  breakSparkleCount: 2
+  breakSparkleMoveCap: 6
+  breakSparkleSizeCells: {x: 0.35, y: 0.5}
+  breakSparkleTravelCells: {x: 0.1, y: 0.3}
+  breakSparkleSeconds: 0.35
+  breakSparkleEndScale: 0
+  debrisPoolSize: 112
+  elevatorSinkSeconds: 0.35
+  elevatorSinkEndScale: 0.2
+  elevatorSinkEase: 5
   shutterLiftSeconds: 0.3
   shutterLiftEase: 5
   lockOpenSeconds: 0.25

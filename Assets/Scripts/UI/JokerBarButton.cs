@@ -19,9 +19,15 @@ namespace GateRush.UI
     /// what a press does is the bootstrap's.
     /// </summary>
     /// <remarks>
-    /// The pulse runs on unscaled time, carries this component as its id, and
-    /// is killed when the mark goes and when this component is disabled or
-    /// destroyed; a button still marked when enabled again pulses again.
+    /// <para>The pulse runs on unscaled time, carries this component as its
+    /// id, and is killed when the mark goes and when this component is
+    /// disabled or destroyed; a button still marked when enabled again pulses
+    /// again.</para>
+    /// <para>Each motion has a transform of its own (Module 47): the selection
+    /// raises the lift, the mark scales the pulse rect inside it, and a press
+    /// scales the button inside that (<see cref="PressFeedback"/>), so none
+    /// fights another. The pulse rect is stretched over the slot exactly as the
+    /// button was, so the mark looks as before.</para>
     /// </remarks>
     public sealed class JokerBarButton : MonoBehaviour
     {
@@ -31,8 +37,11 @@ namespace GateRush.UI
 
         [SerializeField] private Button button;
 
-        [Tooltip("Holds the glow, the ring and the button; raised by Selected Raise while the joker is selected.")]
+        [Tooltip("Holds the glow, the ring and the pulse; raised by Selected Raise while the joker is selected.")]
         [SerializeField] private RectTransform lift;
+
+        [Tooltip("Between the lift and the button, stretched over the slot: the mark's pulse scales it, so the button's own scale is left to its press (Module 47).")]
+        [SerializeField] private RectTransform pulse;
 
         [Tooltip("The ring around the button, shown while the joker is selected.")]
         [SerializeField] private GameObject ring;
@@ -113,6 +122,7 @@ namespace GateRush.UI
         {
             UiParts.AddIfMissing(missing, button, nameof(JokerBarButton), nameof(button));
             UiParts.AddIfMissing(missing, lift, nameof(JokerBarButton), nameof(lift));
+            UiParts.AddIfMissing(missing, pulse, nameof(JokerBarButton), nameof(pulse));
             UiParts.AddIfMissing(missing, ring, nameof(JokerBarButton), nameof(ring));
             UiParts.AddIfMissing(missing, icon, nameof(JokerBarButton), nameof(icon));
             UiParts.AddIfMissing(missing, lockIcon, nameof(JokerBarButton), nameof(lockIcon));
@@ -166,9 +176,9 @@ namespace GateRush.UI
         {
             DOTween.Kill(this);
             isPulsing = false;
-            if (button != null)
+            if (pulse != null)
             {
-                button.transform.localScale = Vector3.one * RestScale;
+                pulse.localScale = Vector3.one * RestScale;
             }
 
             if (glow != null)
@@ -180,7 +190,7 @@ namespace GateRush.UI
         private void ApplyPulse(float strength)
         {
             var scale = Mathf.Lerp(RestScale, pulseConfig.MarkedPulseScale, strength);
-            button.transform.localScale = new Vector3(scale, scale, RestScale);
+            pulse.localScale = new Vector3(scale, scale, RestScale);
 
             var color = pulseConfig.MarkedGlowColor;
             color.a *= Mathf.Lerp(pulseConfig.MarkedGlowMinAlpha, OpaqueAlpha, strength);
