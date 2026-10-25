@@ -2538,3 +2538,34 @@ destroying a GameObject per piece, as Phase 2 did: avoidable garbage on
 every exit.
 
 ---
+
+## D82 — The web build is the release, and Phase 8 closes the project
+
+**Decision.** Gate Rush ships as its WebGL build on itch.io and nothing
+else: no Android or iOS build is made. Phase 8 publishes the finished
+game, rewrites its itch.io page and README, and closes the project; work
+moves to the next portfolio project.
+
+**Why.** The game is a portfolio piece, and its readers open a link. A
+browser build reaches them on a desktop or a phone without an install,
+and the code, the documents and the tests are where the engineering
+shows. A phone build would bring the optimisation deferred at the end of
+Phase 7, native haptics and a store's requirements, for little a
+reviewer would see.
+
+**Consequences.**
+- The README and the itch.io page name the web as the only target; the
+  README's mention of Android is removed.
+- The phone optimisation stays deferred, with its list in the roadmap's
+  Phase 7, should a phone build ever be made.
+- Native haptics, which Module 25 left for Phase 8, are not built; the
+  browser's Vibration API remains the only vibration.
+- Sound is checked in the web build itself, since the web encodes clips
+  differently from the Editor (Module 25).
+
+**Rejected.** An Android build for the portfolio: an APK is harder for a
+reviewer to open than a link, and it would add the phone work above.
+More polish before release: Phase 7 delivered what the mentor's review
+asked for.
+
+---

@@ -285,3 +285,15 @@ plays only Drop.
   shortened to 60 ms and lowered by 6 dB), both at volume 0.3 with a
   slight pitch spread. Sounds that play on every move are judged over a
   whole level, not one move; they should be felt more than heard.
+  *Later (Phase 8).* In the web build UiTap and Lift were silent and Drop
+  faint. Unity encodes a web build's clips as AAC, which needs at least
+  1024 samples (about 23 ms) and can alter the first 1024: `click_003` and
+  `lift_soft` were 10 ms, and `drop_soft`'s attack fell in that span. The
+  three are now WAV files of 100 ms: 1024 samples of silence, the sound
+  unchanged, then silence; their old .meta files were renamed, so the
+  references hold. A padded clip re-encoded as Vorbis crackled after the
+  sound, so the three are imported as PCM, which the importer does not
+  normalize, in the Editor or on the web. Their volumes were set again by
+  ear: Lift 0.55, Drop 0.35, UiTap 0.20. Measured in the build, they play
+  at the same level on the web as in the Editor. Native haptics were not
+  built: the web is the only target (D82).

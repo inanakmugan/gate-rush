@@ -422,9 +422,22 @@ calls matter.
 
 ## Phase 8 — Release
 
-itch.io upload, README with a play link, architecture summary, and pointers into
-`docs/`. The itch.io page and the README's play link came early, with
-Phase 3.
+*Status: done.* The finished game is published on itch.io as a WebGL build
+(Brotli without fallback, an 18 MB ZIP) and is the only target; no phone build
+is planned (D82).
+
+The itch.io page was rewritten for the finished game: a new cover and five
+screenshots, a description with the jokers, the meta game, what is new since
+the Phase 3 build, the credits and the privacy text of Module 49, release
+status Released, no payments, and the AI disclosure extended to graphics. The
+README gained a Screens section, a new gameplay GIF of level 30 and a new
+Level Editor image, and its status now describes the finished game.
+
+Found in the first web build of Phase 8: the button tap and the block's lift
+sounds did not play, and the drop sounded faint. The web build encodes clips
+as AAC, which needs at least 1024 samples and can alter the first 1024; those
+three clips were shorter or had their attack there. They are now padded,
+uncompressed WAV files, and their volumes were set again by ear (Module 25).
 
 ---
 
