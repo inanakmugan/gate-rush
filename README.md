@@ -50,6 +50,16 @@ is a countdown. Nine more mechanics layer on top: count-gated gates and
 blocks, layered colour stacks, shutters, block generators, elevators, axis
 restrictions, lock-and-key pairs, and time bonuses.
 
+## Screens
+
+<p align="center">
+  <img src="docs/media/screens/01-home.png" alt="Home: the town painting, the top bar and the win streak" width="150">
+  <img src="docs/media/screens/02-level.png" alt="A late level with keys, a lock, a shutter, ice and a time bonus" width="150">
+  <img src="docs/media/screens/03-card.png" alt="The introduction card for layered blocks" width="150">
+  <img src="docs/media/screens/04-win.png" alt="Level Complete, with gold flying to its counter" width="150">
+  <img src="docs/media/screens/05-store.png" alt="The Store's gold packs, bought through a simulated purchase service" width="150">
+</p>
+
 ## What is interesting about it
 
 **The rules do not know Unity exists.** Board logic, search and the
@@ -98,8 +108,8 @@ older versions forward.
 Every mechanic is authored in one editor window: blocks, gates, shutters,
 walls, generators and elevator waves. Warnings update live as the level is
 built, and **Validate** runs the solver off the main thread. The footer above
-reads *solvable in 26, shortest*, with the states explored, the time taken and
-the countdown the level should get.
+reads *solvable in 32, shortest* for level 29, with the states explored, the
+time taken and the countdown the level should get.
 
 <p align="center">
   <img src="docs/media/editor-warnings.png" alt="The level editor's live warnings on a level with authoring mistakes">
