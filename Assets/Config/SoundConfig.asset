@@ -22,19 +22,19 @@ MonoBehaviour:
   - cue: 1
     clips:
     - {fileID: 8300000, guid: 4f49eca0370fa3d429d3c78794636c55, type: 3}
-    volume: 0.45
+    volume: 0.5
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 2
     clips:
     - {fileID: 8300000, guid: 0168063a71b470a4a8a26bcac8b70526, type: 3}
-    volume: 0.4
+    volume: 0.26
     pitchMin: 0.97
     pitchMax: 1.03
   - cue: 3
     clips:
     - {fileID: 8300000, guid: 92cfad0dc3e5e0b438bab09cdd3cdeb8, type: 3}
-    volume: 0.35
+    volume: 0.25
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 4
@@ -44,13 +44,13 @@ MonoBehaviour:
     - {fileID: 8300000, guid: ca00963d4acf8214b87d5878917a5bcb, type: 3}
     - {fileID: 8300000, guid: 08e0a9946d47bba49a8653151829732f, type: 3}
     - {fileID: 8300000, guid: c4d1706c4c7d84d489e01357db4e1bcf, type: 3}
-    volume: 0.5
+    volume: 0.6
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 5
     clips:
     - {fileID: 8300000, guid: 58035a6f6f41ef6428ef462cf539ed02, type: 3}
-    volume: 0.6
+    volume: 0.58
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 6
@@ -62,43 +62,43 @@ MonoBehaviour:
   - cue: 7
     clips:
     - {fileID: 8300000, guid: 30d34c0219c2ec743bf80e83a8a71792, type: 3}
-    volume: 0.4
+    volume: 0.41
     pitchMin: 0.97
     pitchMax: 1.03
   - cue: 8
     clips:
     - {fileID: 8300000, guid: 95cbcb5f1af4a494f9f0556abbdc261c, type: 3}
-    volume: 0.5
+    volume: 0.65
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 9
     clips:
     - {fileID: 8300000, guid: d8c557c76d1f74d4d8ce61bec95b8752, type: 3}
-    volume: 0.45
+    volume: 0.3
     pitchMin: 1
     pitchMax: 1
   - cue: 10
     clips:
     - {fileID: 8300000, guid: 8a5103e22452f3647b3166cd0781562d, type: 3}
-    volume: 0.6
+    volume: 0.54
     pitchMin: 1
     pitchMax: 1
   - cue: 11
     clips:
     - {fileID: 8300000, guid: 1d9669cdafcc1304e9993d54f335bf67, type: 3}
-    volume: 0.5
+    volume: 0.23
     pitchMin: 1
     pitchMax: 1
   - cue: 12
     clips:
     - {fileID: 8300000, guid: 67ce48ab5ae2d9345a379f1871be1583, type: 3}
-    volume: 0.5
+    volume: 0.22
     pitchMin: 1
     pitchMax: 1
   - cue: 13
     clips:
     - {fileID: 8300000, guid: 8eea53d8a3e8f9342a4c3b0f3a256c8f, type: 3}
-    volume: 0.5
+    volume: 0.45
     pitchMin: 1
     pitchMax: 1
   masterVolume: 1
