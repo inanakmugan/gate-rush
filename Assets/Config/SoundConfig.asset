@@ -16,13 +16,13 @@ MonoBehaviour:
   - cue: 0
     clips:
     - {fileID: 8300000, guid: 763041c098dcaf94fb572784df7349c1, type: 3}
-    volume: 0.8
+    volume: 0.55
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 1
     clips:
     - {fileID: 8300000, guid: 4f49eca0370fa3d429d3c78794636c55, type: 3}
-    volume: 0.5
+    volume: 0.35
     pitchMin: 0.95
     pitchMax: 1.05
   - cue: 2
@@ -98,7 +98,7 @@ MonoBehaviour:
   - cue: 13
     clips:
     - {fileID: 8300000, guid: 8eea53d8a3e8f9342a4c3b0f3a256c8f, type: 3}
-    volume: 0.45
+    volume: 0.2
     pitchMin: 1
     pitchMax: 1
   masterVolume: 1
