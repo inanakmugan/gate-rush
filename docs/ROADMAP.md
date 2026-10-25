@@ -369,7 +369,7 @@ sounds. Each spec is written when the module before it is merged.
 | 7.4 | Interface art: a style guide and generated sprites, thirty avatars, the town backgrounds, the larger joker bar (D77, D78) | `Modules/45-interface-art.md` | Done |
 | 7.5 | Board art: the blocks, gates, frame and mechanics shaded by a lit model in the new interface's style; the floor and frame kept across moves (D79, D80) | `Modules/46-board-art.md` | Done |
 | 7.6 | Effects and transitions: the board's debris in the lit model from one pool, joker clears and a finished elevator's exit, gold flying to its counter, button presses, the screen fade, tab and overlay transitions; the win is the panel and the gold (D81) | `Modules/47-effects.md` | Done |
-| 7.7 | Sound balance: a volume per cue, missing and loud cues fixed, after the owner listens through the finished game | `Modules/48-sound-balance.md` | Planned |
+| 7.7 | Sound balance: a volume per cue, set from measured loudness and the owner's listening; no new cues | no module; values in `SoundConfig.asset`, recorded in `Modules/25-sound-and-haptics.md` | Done |
 | 7.8 | The rest: privacy text, the end-of-content screen, optimisation on a phone, removing the third-party art no longer shown | `Modules/49-privacy-and-end-of-content.md` for the privacy text and the end of content; the rest as follow-ups below | Done |
 
 Between 7.5 and 7.6 two small jobs landed on their own. Levels 28 and 29
@@ -398,6 +398,15 @@ Kept as is unless players say otherwise: the New Joker card shares the
 introduction card's size, so with one icon in its 720-unit illustration
 area it reads large; the fix, if needed, is a shorter illustration area
 for joker cards only (about 480 units).
+
+Sound balance (7.7) needed no module: the cue volumes in
+`SoundConfig.asset` were reset from measured loudness (LUFS, which
+accounts for a sound's length) and then by ear. The event cues sit
+within about 3 dB of each other, the win and loss jingles about 4 dB
+below them because they play in a quiet moment, the small frequent cues
+4 to 7 dB below the events, and the lift and drop well in the
+background. No cue was added; the effects of 7.6 stay silent beyond the
+cues they already raise.
 
 Deferred to a phone build: the optimisation on a phone is set aside
 while the web build is the only target and no phone build is planned. If

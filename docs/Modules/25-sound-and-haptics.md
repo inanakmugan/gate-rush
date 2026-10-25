@@ -272,6 +272,12 @@ plays only Drop.
   thuds (around 100 Hz) were left out because phone speakers barely play
   them. Per-cue volumes were set from measured loudness so the cues sit at
   similar levels.
+  *Later (7.7).* The volumes were set again for the finished game, by
+  LUFS and by ear: Exit 0.26, Peel 0.25, TimeBonus 0.30, IceBreak 0.60,
+  ShutterOpen 0.58, Spawn 0.41, Unlock 1.0 (events, within about 3 dB);
+  Win 0.23 and Loss 0.22 (about 4 dB under the events, since they play
+  in a quiet moment); CountPop 0.65, TimerTick 0.54, UiTap 0.45; Lift
+  0.80 and Drop 0.50.
 - **Lift and Drop.** Pack sounds for both grew tiresome within a level,
   because they are the only sounds that play on every move. They were
   replaced by sounds made for the game: `lift_soft` (a button click with
