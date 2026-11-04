@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Scripts/Solver unchanged, as Unity does for GateRush.Solver.asmdef. -->
+  <PropertyGroup>
+    <AssemblyName>GateRush.Solver</AssemblyName>
+    <RootNamespace>GateRush.Solver</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)Assets/Scripts/Solver/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../GateRush.Core/GateRush.Core.csproj" />
+  </ItemGroup>
+</Project>
