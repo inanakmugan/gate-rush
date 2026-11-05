@@ -18,27 +18,41 @@ namespace GateRush.Meta
     /// <para><b>Every member that takes nowUtc settles, the queries
     /// included.</b> It first adds the lives that came back by
     /// <c>nowUtc</c> and moves the wait's start forward by the whole intervals
-    /// they took, so the part of an interval already waited is kept. A
-    /// <c>nowUtc</c> earlier than the wait's start gives no life and restarts
-    /// the wait at <c>nowUtc</c> (D20's guard): setting the clock back can cost
-    /// part of an interval, never gain a life. So <see cref="CountAt"/>,
-    /// <see cref="IsFullAt"/> and <see cref="UntilNextLifeAt"/> may change
-    /// <see cref="StoredCount"/> and <see cref="RegenStartUtc"/>. They must:
-    /// a player whose clock ran ahead and who then lost every life could
-    /// otherwise never restart the wait, since nothing that changes the lives
-    /// can run at 0, and would be locked out until the old start came round
-    /// again.</para>
+    /// they took, so the part of an interval already waited is kept. So
+    /// <see cref="CountAt"/>, <see cref="IsFullAt"/> and
+    /// <see cref="UntilNextLifeAt"/> may change <see cref="StoredCount"/> and
+    /// <see cref="RegenStartUtc"/>. They must: a player at 0 lives has nothing
+    /// else that settles.</para>
+    /// <para><b>Only real elapsed time gives a life (D20's guard).</b> Time is
+    /// counted on a clock of its own, kept in memory, that never runs ahead
+    /// of real time while the device clock does not: a reading at or after
+    /// it moves it to that reading; a reading earlier than it — the device
+    /// clock set back — moves it only by the time since the previous reading,
+    /// when that moved forward. A clock set back and restored therefore counts
+    /// only the time that really passed, and a clock left behind still counts
+    /// the time between its readings, so a player at 0 lives is never locked
+    /// out. The saved <see cref="RegenStartUtc"/> is a time on that clock and
+    /// never moves back; a new instance starts its clock there. A clock set
+    /// forward gives what it reads: without a trusted clock nothing can tell
+    /// it from time really passed.</para>
     /// <para><b>At the cap no life is coming back</b>, and
-    /// <see cref="RegenStartUtc"/> means nothing until a life is lost, which
-    /// starts the wait then.</para>
+    /// <see cref="RegenStartUtc"/> holds the latest time counted until a life
+    /// is lost, which starts the wait there — not at an earlier reading of a
+    /// clock set back.</para>
     /// </remarks>
     public sealed class Lives
     {
-        // The wait start of full lives: never read while the lives are full,
-        // and a valid UTC time so that it saves and restores like any other.
+        // The start of a new player's full lives: earlier than any reading, so
+        // the first one becomes the latest time counted, and a valid UTC time
+        // so that it saves and restores like any other.
         private static readonly DateTime FullRegenStartUtc = DateTime.SpecifyKind(DateTime.MinValue, DateTimeKind.Utc);
 
         private readonly MetaRules rules;
+
+        // The clock time is counted on, and the last reading of the device
+        // clock: null until the first member taking nowUtc. In memory only.
+        private DateTime? countedUtc;
+        private DateTime lastReadingUtc;
 
         /// <summary>
         /// Lives as a save restores them: <paramref name="count"/> held, with
@@ -71,7 +85,8 @@ namespace GateRush.Meta
 
         /// <summary>
         /// When the wait for the next life started, as last settled, for the
-        /// codec. Meaningless while <see cref="StoredCount"/> is at the cap.
+        /// codec, as a time on the counted clock (see the class remarks); while
+        /// <see cref="StoredCount"/> is at the cap, the latest time counted.
         /// Always of <see cref="DateTimeKind.Utc"/>.
         /// </summary>
         public DateTime RegenStartUtc { get; private set; }
@@ -102,10 +117,9 @@ namespace GateRush.Meta
 
         /// <summary>
         /// How long after <paramref name="nowUtc"/> the next life comes back,
-        /// after settling at it; null when the lives are full. Exact to the
-        /// tick: never negative and never above one interval, which is what a
-        /// wait restarted at <paramref name="nowUtc"/> gives. Rounding is for
-        /// whoever shows it.
+        /// after settling at it, by the counted clock; null when the lives are
+        /// full. Exact to the tick: never negative and never above one
+        /// interval. Rounding is for whoever shows it.
         /// </summary>
         /// <exception cref="ArgumentException"><paramref name="nowUtc"/> is not of <see cref="DateTimeKind.Utc"/>.</exception>
         public TimeSpan? UntilNextLifeAt(DateTime nowUtc)
@@ -115,17 +129,18 @@ namespace GateRush.Meta
                 return null;
             }
 
-            // Settled below the cap, the start is never after nowUtc and less
-            // than one interval before it.
+            // Settled below the cap, the start is never after the counted time
+            // and less than one interval before it.
             var intervalTicks = rules.LifeRegenInterval.Ticks;
-            var waitedTicks = (nowUtc - RegenStartUtc).Ticks;
+            var waitedTicks = (countedUtc.Value - RegenStartUtc).Ticks;
             return TimeSpan.FromTicks(intervalTicks - waitedTicks % intervalTicks);
         }
 
         /// <summary>
         /// Loses one life at <paramref name="nowUtc"/>, after settling at it.
-        /// Losing one at the cap starts the wait at <paramref name="nowUtc"/>;
-        /// below the cap the running wait is kept. False, with nothing but the
+        /// Losing one at the cap starts the wait at the counted time, which is
+        /// <paramref name="nowUtc"/> unless the clock was set back; below the
+        /// cap the running wait is kept. False, with nothing but the
         /// settling changed, when there is no life to lose.
         /// </summary>
         /// <exception cref="ArgumentException"><paramref name="nowUtc"/> is not of <see cref="DateTimeKind.Utc"/>.</exception>
@@ -137,11 +152,7 @@ namespace GateRush.Meta
                 return false;
             }
 
-            if (StoredCount >= rules.LifeCap)
-            {
-                RegenStartUtc = nowUtc;
-            }
-
+            // Settling at the cap left the counted time in the start.
             StoredCount--;
             return true;
         }
@@ -152,36 +163,68 @@ namespace GateRush.Meta
         {
             Settle(nowUtc);
             StoredCount = rules.LifeCap;
+            RegenStartUtc = countedUtc.Value;
         }
 
         /// <summary>
-        /// Adds the lives that came back by <paramref name="nowUtc"/> and moves
-        /// the wait's start forward by the whole intervals they took, or
-        /// restarts the wait at <paramref name="nowUtc"/> when the clock reads
-        /// earlier than its start. Nothing changes at the cap.
+        /// Moves the counted clock by <paramref name="nowUtc"/>, then adds the
+        /// lives that came back by the counted time and moves the wait's start
+        /// forward by the whole intervals they took. At the cap the start
+        /// keeps the counted time instead.
         /// </summary>
         private void Settle(DateTime nowUtc)
         {
             ThrowIfNotUtc(nowUtc, nameof(nowUtc));
+            var counted = Count(nowUtc);
             if (StoredCount >= rules.LifeCap)
             {
-                return;
-            }
-
-            if (nowUtc < RegenStartUtc)
-            {
-                RegenStartUtc = nowUtc;
+                RegenStartUtc = counted;
                 return;
             }
 
             var intervalTicks = rules.LifeRegenInterval.Ticks;
-            var wholeIntervals = (nowUtc - RegenStartUtc).Ticks / intervalTicks;
+            var wholeIntervals = (counted - RegenStartUtc).Ticks / intervalTicks;
             var gained = (int)Math.Min(wholeIntervals, rules.LifeCap - StoredCount);
 
             // gained is at most wholeIntervals, so the step lands at or before
-            // nowUtc and cannot leave DateTime's range.
+            // the counted time and cannot leave DateTime's range.
             StoredCount += gained;
-            RegenStartUtc = RegenStartUtc.AddTicks(gained * intervalTicks);
+            RegenStartUtc = StoredCount >= rules.LifeCap ? counted : RegenStartUtc.AddTicks(gained * intervalTicks);
+        }
+
+        /// <summary>
+        /// The counted time after reading <paramref name="nowUtc"/>: never
+        /// before <see cref="RegenStartUtc"/>, and moved forward only by a
+        /// reading after it or by the real time between two readings before it.
+        /// </summary>
+        private DateTime Count(DateTime nowUtc)
+        {
+            DateTime counted;
+            if (!countedUtc.HasValue)
+            {
+                // The first reading: the saved start is the latest time known.
+                counted = nowUtc > RegenStartUtc ? nowUtc : RegenStartUtc;
+            }
+            else if (nowUtc >= countedUtc.Value)
+            {
+                counted = nowUtc;
+            }
+            else if (nowUtc > lastReadingUtc)
+            {
+                // The clock reads behind the counted time and moved forward:
+                // that much real time passed. Held at DateTime's end, which
+                // only a clock once set there can reach.
+                var stepTicks = Math.Min((nowUtc - lastReadingUtc).Ticks, (DateTime.MaxValue - countedUtc.Value).Ticks);
+                counted = countedUtc.Value.AddTicks(stepTicks);
+            }
+            else
+            {
+                counted = countedUtc.Value;
+            }
+
+            countedUtc = counted;
+            lastReadingUtc = nowUtc;
+            return counted;
         }
 
         private static void ThrowIfNotUtc(DateTime time, string paramName)
