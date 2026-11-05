@@ -441,6 +441,47 @@ uncompressed WAV files, and their volumes were set again by ear (Module 25).
 
 ---
 
+## After release
+
+*Status: open.* Work after the published build, none of it changing the
+itch.io version until it is rebuilt.
+
+Done:
+- CI: the engine-free assemblies and their Edit Mode tests build on plain
+  .NET 8 and run on GitHub Actions on every push, with line coverage in the
+  job summary (about 94 percent); README badge.
+- Fixes from the code review (D83, Module 30): lives ignore a clock set back
+  and restored (B1), and an unreadable save is kept aside instead of being
+  overwritten (B3), each with regression tests.
+
+Open, from the code review (`docs/portfolio/CODE-REVIEW.md`) and the
+performance analysis (`Claude outputs/perf-analysis/`):
+- The countdown keeps running through pause, focus loss and long frames
+  (B2): clamp the delta from `RuntimeConfig` and stop on focus loss, with
+  `CountdownTests` for a large delta.
+- Performance: the board rebuilt on every move, the uncompressed atlas,
+  objects created per grab, canvas rebuilds, stripping and HDR settings.
+- Level Editor: closing it discards unsaved edits without asking (B4, set
+  `hasUnsavedChanges`); false shutter-coverage warning for elevators and
+  generators under a shutter (B8); the threshold warning's bound too loose
+  (B9); editor tooling that can half-write or overwrite assets (B12).
+- Input and presentation: a missed release leaves a block drawn where the
+  rules do not have it (B5); a winning move can show a time bonus (B10);
+  Escape while editing the profile name closes the whole Profile (B11).
+- Level loading: a missing nullable field becomes a real id (B6, initialise
+  the DTO sentinels to -1); a missing top-level array loads as empty (B7).
+- Core: the corner push direction (D43) is checked only in Runtime (B13); a
+  push direction on `Move`, validated in the resolver.
+- Project rules: Runtime writes the save outside `MetaGame` (R1); CLAUDE.md
+  still names Android as a target (R2, D82); colours baked into
+  `UiPrefabBuilder` constants (R3); serialised tunables nothing reads (R4);
+  the remaining items R5-R8 and the dead code of D4 in the review.
+- Design: split `LevelBootstrap` into a plain-C# `LevelFlow` state machine
+  with tests, plus store, profile and camera parts (D1); split
+  `RuntimeConfig`, `LevelEditorWindow` and `UiPrefabBuilder` (D2).
+
+---
+
 ## Working rhythm
 
 One module per session. Plan, approve, implement, test, review, commit. Update
