@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Scripts/Core unchanged, as Unity does for GateRush.Core.asmdef. -->
+  <PropertyGroup>
+    <AssemblyName>GateRush.Core</AssemblyName>
+    <RootNamespace>GateRush.Core</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)Assets/Scripts/Core/**/*.cs" />
+  </ItemGroup>
+
+</Project>

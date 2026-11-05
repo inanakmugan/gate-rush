@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Scripts/Meta unchanged, as Unity does for GateRush.Meta.asmdef. -->
+  <PropertyGroup>
+    <AssemblyName>GateRush.Meta</AssemblyName>
+    <RootNamespace>GateRush.Meta</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)Assets/Scripts/Meta/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../GateRush.Platform/GateRush.Platform.csproj" />
+  </ItemGroup>
+</Project>

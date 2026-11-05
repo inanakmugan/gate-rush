@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Compiles Assets/Scripts/Platform unchanged, as Unity does for GateRush.Platform.asmdef. -->
+  <PropertyGroup>
+    <AssemblyName>GateRush.Platform</AssemblyName>
+    <RootNamespace>GateRush.Platform</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)Assets/Scripts/Platform/**/*.cs" />
+  </ItemGroup>
+
+</Project>

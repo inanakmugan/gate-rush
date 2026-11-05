@@ -79,3 +79,10 @@ crashlytics-build.properties
 
 # Claude working output, not project content
 /Claude outputs/
+# Unity-free test project (ci/): build output and coverage are generated,
+# the project files are kept despite the *.csproj rule above
+/ci/**/bin/
+/ci/**/obj/
+/ci/coverage/
+/ci/TestResults/
+!/ci/**/*.csproj
