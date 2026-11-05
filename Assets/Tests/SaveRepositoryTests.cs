@@ -20,7 +20,7 @@ namespace GateRush.Tests
     /// save with a refused name is still loaded, with one problem naming the
     /// field, and a carried-over save gets a new player's profile with haptics on.
     /// </summary>
-    public class SaveRepositoryTests
+    public partial class SaveRepositoryTests
     {
         private const string Unreadable = "garbage";
 
@@ -163,6 +163,24 @@ namespace GateRush.Tests
             Assert.AreEqual(1, load.Problems.Count);
             StringAssert.Contains(SaveRepository.SaveKey, load.Problems[0], "the problem names the key it could not read");
             AssertStoredUnchanged(store, Unreadable);
+        }
+
+        [Test]
+        public void Save_AfterCorruptSave_KeepsTheCorruptTextUnderTheBackupKey()
+        {
+            var store = new MemorySaveStore();
+            const string corrupt = "{\"formatVersion\":4,\"completedLevelIds\":[0,1],\"gold\":-5";
+            store.Seed(SaveRepository.SaveKey, corrupt);
+            var repository = Repository(store);
+            var load = repository.Load();
+
+            repository.Save(load.Data);
+
+            Assert.AreEqual(SaveLoadOutcome.Unreadable, load.Outcome);
+            Assert.IsTrue(store.TryLoad(SaveRepository.BackupKeyPrefix, out var backup), "the corrupt save was kept");
+            Assert.AreEqual(corrupt, backup);
+            CollectionAssert.AreEqual(new[] { SaveRepository.BackupKeyPrefix, SaveRepository.SaveKey }, store.SavedKeys, "the backup is written first");
+            Assert.AreEqual(SaveLoadOutcome.Loaded, Repository(store).Load().Outcome, "the new save reads");
         }
 
         [Test]
