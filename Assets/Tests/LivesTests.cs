@@ -9,8 +9,12 @@ namespace GateRush.Tests
     /// <see cref="ManualClock"/>, with rules of cap 5 and 20 minutes: lives come
     /// back from timestamps, one per full interval, up to the cap; a wait
     /// running is never restarted by losing another; a clock set back gives
-    /// nothing and restarts the wait, the queries included, so a player at 0
-    /// lives is never locked out; and invalid counts and non-UTC times throw.
+    /// nothing, and put right again counts only the real time waited (D20),
+    /// saved or not, while one left behind still counts the time between its
+    /// readings,
+    /// so a player at 0 lives is never locked out; a clock set forward gives
+    /// what it reads and nothing more once corrected; and invalid counts and
+    /// non-UTC times throw.
     /// </summary>
     public class LivesTests
     {
@@ -182,6 +186,150 @@ namespace GateRush.Tests
 
             Assert.IsNotNull(untilNext);
             Assert.That(untilNext.Value, Is.GreaterThan(TimeSpan.Zero).And.LessThanOrEqualTo(Interval));
+        }
+
+        [Test]
+        public void CountAt_ClockSetBackThenRestored_GivesOnlyTheRealTimeWaited()
+        {
+            // The review's case: 1 life, 30 minutes an interval; the clock is
+            // set back 3 hours and read, then put right; 10 real minutes in all.
+            var halfHour = TimeSpan.FromMinutes(30);
+            var halfHourRules = MetaRulesFixture.Build(lifeCap: Cap, lifeRegenInterval: halfHour, startingGold: StartingGold);
+            var lives = new Lives(halfHourRules, 1, Noon);
+            lives.CountAt(clock.UtcNow);
+
+            clock.Advance(-TimeSpan.FromHours(3));
+            var countWhenSetBack = lives.CountAt(clock.UtcNow);
+            clock.Advance(TimeSpan.FromHours(3) + TimeSpan.FromMinutes(10));
+            var countWhenRestored = lives.CountAt(clock.UtcNow);
+
+            Assert.AreEqual(1, countWhenSetBack);
+            Assert.AreEqual(1, countWhenRestored, "10 real minutes give no life");
+            Assert.AreEqual(TimeSpan.FromMinutes(20), lives.UntilNextLifeAt(clock.UtcNow), "only the 10 real minutes count");
+        }
+
+        [Test]
+        public void TryLose_AtCapWithClockSetBackThenRestored_GivesNoLife()
+        {
+            var lives = Lives.Full(rules);
+            lives.CountAt(clock.UtcNow);
+            clock.Advance(-TimeSpan.FromHours(3));
+
+            lives.TryLose(clock.UtcNow);
+            clock.Advance(TimeSpan.FromHours(3) + TimeSpan.FromMinutes(10));
+
+            Assert.AreEqual(Cap - 1, lives.CountAt(clock.UtcNow), "the wait starts at the latest time seen, not the earlier reading");
+            Assert.AreEqual(Interval - TimeSpan.FromMinutes(10), lives.UntilNextLifeAt(clock.UtcNow), "only the 10 real minutes count");
+        }
+
+        [Test]
+        public void TryLose_AfterRefillWithClockSetBackThenRestored_GivesNoLife()
+        {
+            var lives = new Lives(rules, 1, Noon - TimeSpan.FromMinutes(5));
+            lives.Refill(clock.UtcNow);
+            clock.Advance(-TimeSpan.FromHours(1));
+
+            lives.TryLose(clock.UtcNow);
+            clock.Advance(TimeSpan.FromHours(1) + OneSecond);
+
+            Assert.AreEqual(Cap - 1, lives.CountAt(clock.UtcNow), "the refill's time is the latest seen");
+        }
+
+        [Test]
+        public void CountAt_ClockSetBackSavedThenRestored_GivesNoLife()
+        {
+            var lives = new Lives(rules, 1, Noon);
+            clock.Advance(-TimeSpan.FromHours(3));
+            lives.CountAt(clock.UtcNow);
+
+            var restored = new Lives(rules, lives.StoredCount, lives.RegenStartUtc);
+            clock.Advance(TimeSpan.FromHours(3) + TimeSpan.FromMinutes(10));
+
+            Assert.AreEqual(Noon, lives.RegenStartUtc, "the start never moves back to the earlier reading");
+            Assert.AreEqual(1, restored.CountAt(clock.UtcNow));
+        }
+
+        [Test]
+        public void CountAt_RealTimePassing_GivesOneLifePerIntervalKeepingThePartOne()
+        {
+            var lives = new Lives(rules, 1, Noon);
+            var partial = TimeSpan.FromMinutes(7);
+
+            clock.Advance(Interval);
+            var afterOne = lives.CountAt(clock.UtcNow);
+            clock.Advance(Interval + partial);
+            var afterTwo = lives.CountAt(clock.UtcNow);
+
+            Assert.AreEqual(2, afterOne);
+            Assert.AreEqual(3, afterTwo);
+            Assert.AreEqual(Interval - partial, lives.UntilNextLifeAt(clock.UtcNow));
+        }
+
+        [Test]
+        public void CountAt_ClockJumpedForward_GivesWhatItReadsAndNothingMoreOnceCorrected()
+        {
+            var lives = new Lives(rules, 1, Noon);
+
+            clock.Advance(TimeSpan.FromHours(1));
+            var countWhenAhead = lives.CountAt(clock.UtcNow);
+            clock.Advance(-TimeSpan.FromHours(1) + TimeSpan.FromMinutes(10));
+            var countWhenCorrected = lives.CountAt(clock.UtcNow);
+            clock.Advance(Interval);
+            var countOneIntervalLater = lives.CountAt(clock.UtcNow);
+
+            Assert.AreEqual(4, countWhenAhead, "a clock set forward reads as time passed: three intervals");
+            Assert.AreEqual(4, countWhenCorrected, "nothing is taken back, nothing is added");
+            Assert.AreEqual(5, countOneIntervalLater, "the corrected clock still counts real time: no lockout");
+        }
+
+        [Test]
+        public void CountAt_ClockSetBackAndLeftThere_GivesALifePerIntervalOfReadings()
+        {
+            var lives = new Lives(rules, 0, Noon);
+            clock.Advance(-TimeSpan.FromHours(3));
+            lives.CountAt(clock.UtcNow);
+
+            clock.Advance(Interval + Interval - OneSecond);
+            var count = lives.CountAt(clock.UtcNow);
+
+            Assert.AreEqual(1, count);
+            Assert.AreEqual(OneSecond, lives.UntilNextLifeAt(clock.UtcNow));
+            Assert.AreEqual(Noon + Interval, lives.RegenStartUtc, "the saved start moved forward by the life's interval, never back");
+        }
+
+        [Test]
+        public void CountAt_AnyClockSetBackAndRestored_NeverExceedsTheRealClock()
+        {
+            // A property over random readings: the device clock is set back by
+            // a random amount, read for a while, and restored, again and again;
+            // lives are lost only while it is right. The lives read through it
+            // may never exceed those read through the real clock.
+            var random = new System.Random(20261105);
+            for (var run = 0; run < 200; run++)
+            {
+                var start = random.Next(0, Cap);
+                var device = new Lives(rules, start, Noon);
+                var real = new Lives(rules, start, Noon);
+                var realNow = Noon;
+                var behind = TimeSpan.Zero;
+                for (var step = 0; step < 30; step++)
+                {
+                    realNow += TimeSpan.FromMinutes(random.Next(0, 15));
+                    if (random.Next(4) == 0)
+                    {
+                        behind = behind == TimeSpan.Zero ? TimeSpan.FromMinutes(random.Next(1, 600)) : TimeSpan.Zero;
+                    }
+
+                    var deviceNow = realNow - behind;
+                    if (behind == TimeSpan.Zero && random.Next(6) == 0 && device.CountAt(deviceNow) > 0 && real.CountAt(realNow) > 0)
+                    {
+                        device.TryLose(deviceNow);
+                        real.TryLose(realNow);
+                    }
+
+                    Assert.LessOrEqual(device.CountAt(deviceNow), real.CountAt(realNow), $"run {run}, step {step}");
+                }
+            }
         }
 
         [Test]

@@ -19,7 +19,7 @@ namespace GateRush.Meta
     /// default because its value broke a rule (a refused name, an empty avatar
     /// id) is still loaded, with one problem naming it. One that cannot be read gives the
     /// defaults and <see cref="SaveLoadOutcome.Unreadable"/>, and nothing is
-    /// written, so its text stays until the next change replaces it.</item>
+    /// written; its text is kept aside, as the next <see cref="Save"/> shows.</item>
     /// <item>Otherwise the old keys, <see cref="CompletedLevels.LegacySaveKey"/>
     /// and <see cref="SoundSetting.LegacySaveKey"/>, are read when either
     /// exists. One that cannot be read gives its default and a problem; the
@@ -31,6 +31,16 @@ namespace GateRush.Meta
     /// <item>Otherwise the defaults and <see cref="SaveLoadOutcome.Fresh"/>,
     /// and nothing is written.</item>
     /// </list>
+    /// <para><b>An unreadable save is never lost.</b> The first
+    /// <see cref="Save"/> after <see cref="Load"/> met one first copies its
+    /// text to a backup key, <see cref="BackupKeyPrefix"/>, and only then
+    /// writes the new save. A backup key that already holds other text — a
+    /// save made unreadable before — is never replaced: the copy goes under
+    /// the first of <c>.2</c>, <c>.3</c> and on after the prefix that is free
+    /// or already holds the same text. When the copy fails, the store's
+    /// exception reaches the caller and nothing is written under
+    /// <see cref="SaveKey"/>; the next <see cref="Save"/> tries the copy
+    /// again.</para>
     /// <para>Once a save exists under <see cref="SaveKey"/> the old keys are
     /// never read again, whatever they hold. They are not deleted:
     /// <see cref="ISaveStore"/> has no delete.</para>
@@ -47,9 +57,23 @@ namespace GateRush.Meta
         /// <summary>The one key the whole save is kept under.</summary>
         public const string SaveKey = "GateRush.Save";
 
+        /// <summary>
+        /// The key an unreadable save is copied to before anything replaces
+        /// it; later ones take <c>.2</c>, <c>.3</c> and on after it.
+        /// </summary>
+        public const string BackupKeyPrefix = "GateRush.Save.Unreadable";
+
+        // Each further backup key is tried in turn; this many cover any
+        // number of unreadable saves a player could meet, and bound the loop.
+        private const int MaxBackupKeys = 1000;
+
         private readonly ISaveStore store;
         private readonly ISaveCodec codec;
         private readonly MetaRules rules;
+
+        // The text of an unreadable save Load met, until a Save has copied it
+        // to a backup key; null otherwise.
+        private string unreadableText;
 
         /// <summary>
         /// A repository keeping the save in <paramref name="store"/>, as text
@@ -71,6 +95,7 @@ namespace GateRush.Meta
         /// </summary>
         public SaveLoad Load()
         {
+            unreadableText = null;
             if (store.TryLoad(SaveKey, out var text))
             {
                 return Decode(text);
@@ -88,8 +113,10 @@ namespace GateRush.Meta
 
         /// <summary>
         /// Writes the whole of <paramref name="data"/> under
-        /// <see cref="SaveKey"/>, in one <see cref="ISaveStore.Save"/>. What
-        /// the store throws reaches the caller.
+        /// <see cref="SaveKey"/>, in one <see cref="ISaveStore.Save"/> — after
+        /// copying an unreadable save <see cref="Load"/> met to its backup key,
+        /// the first time (see the class remarks). What the store throws
+        /// reaches the caller.
         /// </summary>
         /// <exception cref="ArgumentNullException"><paramref name="data"/> is null.</exception>
         public void Save(SaveData data)
@@ -99,7 +126,41 @@ namespace GateRush.Meta
                 throw new ArgumentNullException(nameof(data));
             }
 
-            store.Save(SaveKey, codec.Encode(data));
+            var text = codec.Encode(data);
+            if (unreadableText != null)
+            {
+                BackUp(unreadableText);
+                unreadableText = null;
+            }
+
+            store.Save(SaveKey, text);
+        }
+
+        /// <summary>
+        /// The backup key an unreadable save with <paramref name="text"/> goes
+        /// under: the first that is free or holds that text already.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Every backup key holds other text.</exception>
+        private void BackUp(string text)
+        {
+            for (var i = 1; i <= MaxBackupKeys; i++)
+            {
+                var key = i == 1 ? BackupKeyPrefix : $"{BackupKeyPrefix}.{i}";
+                if (!store.TryLoad(key, out var existing))
+                {
+                    store.Save(key, text);
+                    return;
+                }
+
+                if (existing == text)
+                {
+                    return;
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"The unreadable save cannot be kept: all {MaxBackupKeys} backup keys after '{BackupKeyPrefix}' hold other saves, " +
+                $"so nothing is written under '{SaveKey}'.");
         }
 
         private SaveLoad Decode(string text)
@@ -119,8 +180,9 @@ namespace GateRush.Meta
             var problems = new[]
             {
                 $"The save under '{SaveKey}' cannot be read: {problem} The defaults of a new player are used; " +
-                "the saved text is left as it is until the next change replaces it.",
+                $"the saved text is copied under '{BackupKeyPrefix}', or a numbered key after it, before the next change replaces it.",
             };
+            unreadableText = text;
             return new SaveLoad(SaveData.CreateDefault(rules), SaveLoadOutcome.Unreadable, problems);
         }
 

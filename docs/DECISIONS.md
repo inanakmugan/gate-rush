@@ -2569,3 +2569,33 @@ More polish before release: Phase 7 delivered what the mentor's review
 asked for.
 
 ---
+
+## D83 — Lives ignore a clock set back and restored; an unreadable save is kept
+
+**Decision.** `Lives` keeps its own clock in memory that only moves
+forward by the real time between readings, and the saved wait start
+never moves back; regeneration still runs on real time while the game is
+closed (D20). An unreadable save is copied to a backup key before the
+first new save replaces it, and a different backup is never overwritten.
+
+**Why.** An independent code review reproduced two faults: setting the
+device clock back and then restoring it refilled every life (one life
+and ten real minutes became five), breaking D20's guard; and an
+unreadable save was silently replaced by a new player's save on the next
+win or loss.
+
+**Consequences.**
+- Module 30's lives rules and its Resolved section describe the new
+  rule; 14 tests cover both fixes, including 200 seeded set-back and
+  restore sequences.
+- A clock set forward still gives the lives it reads; without a trusted
+  clock this cannot be prevented, and D20 only guards the backward
+  direction.
+- The level countdown running through a paused or hidden tab is a
+  separate finding and is not changed here.
+
+**Rejected.** Keeping the old rule that restarted the wait at the earlier
+time (the fault itself); resetting the save to defaults without a backup
+(loses progress on a single bad field).
+
+---
