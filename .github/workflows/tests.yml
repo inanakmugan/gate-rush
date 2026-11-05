@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Engine-free tests (.NET 8)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore ci/tests/GateRush.Tests/GateRush.Tests.csproj
+
+      - name: Test with coverage
+        run: >
+          dotnet test ci/tests/GateRush.Tests/GateRush.Tests.csproj
+          --no-restore
+          --configuration Release
+          --settings ci/coverage.runsettings
+          --collect "XPlat Code Coverage"
+          --results-directory ci/coverage
+          --logger "trx;LogFileName=results.trx"
+          --logger "console;verbosity=normal"
+
+      - name: Coverage summary
+        if: always()
+        run: |
+          shopt -s nullglob
+          reports=(ci/coverage/*/coverage.cobertura.xml)
+          if [ ${#reports[@]} -eq 0 ]; then
+            echo "No coverage report was produced." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 -I ci/coverage_summary.py "${reports[@]}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: ci/coverage
+          if-no-files-found: ignore

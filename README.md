@@ -1,5 +1,7 @@
 # Gate Rush
 
+[![Tests](https://github.com/inanakmugan/gate-rush/actions/workflows/tests.yml/badge.svg)](https://github.com/inanakmugan/gate-rush/actions/workflows/tests.yml)
+
 A sliding-block puzzle game built in Unity as a portfolio project, with an
 emphasis on engine-independent game logic, solver-verified level design, and a
 documented architecture.
@@ -146,6 +148,19 @@ Unity → Window → General → Test Runner → Edit Mode → Run All
 3,385 Edit Mode tests. None of the suites needs a scene: `Core`, `Solver`,
 `Meta`, `Serialization`, the editor's logic and the plain parts of `Runtime`
 are all tested headless.
+
+### Running the tests without Unity
+
+The engine-free assemblies (`Core`, `Platform`, `Meta`, `Solver`) and the
+Edit Mode tests that use only them also build on plain .NET 8, straight
+from `Assets/`. The `Tests` workflow runs them on every push and pull
+request and reports line coverage per assembly in the job summary (about
+94 percent of their lines).
+
+    dotnet test ci/tests/GateRush.Tests/GateRush.Tests.csproj
+
+The tests that need the engine (`Runtime`, `Serialization`, `Editor`, `UI`)
+run only in the Unity Test Runner. `ci/README.md` lists them.
 
 ## Credits
 

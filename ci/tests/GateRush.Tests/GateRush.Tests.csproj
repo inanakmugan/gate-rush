@@ -1,0 +1,82 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Edit Mode tests that build without Unity, compiled unchanged from
+    Assets/Tests. The list is explicit: a test file is added here only once it
+    compiles against the four engine-free assemblies and NUnit alone.
+    ci/README.md lists the files left out and why.
+  -->
+  <PropertyGroup>
+    <AssemblyName>GateRush.Tests</AssemblyName>
+    <RootNamespace>GateRush.Tests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/GateRush.Core/GateRush.Core.csproj" />
+    <ProjectReference Include="../../src/GateRush.Platform/GateRush.Platform.csproj" />
+    <ProjectReference Include="../../src/GateRush.Meta/GateRush.Meta.csproj" />
+    <ProjectReference Include="../../src/GateRush.Solver/GateRush.Solver.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="$(RepoRoot)Assets/Tests/AStarStrategyTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BlockDefinitionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BlockReachabilityTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BlockShapeTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BlockSymmetryTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BoardStateTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/BreadthFirstStrategyTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/CampaignProgressTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ClearMonotonicityTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/CompletedLevelsTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/CoordTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/Corpus.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ElevatorDefinitionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ElevatorTilingTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ExitCandidatesTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/Fixture.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/GateDefinitionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/GeneratorDefinitionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/HapticsSettingTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/IllegalMoveGenerator.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/JokerAmountsTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/JokerInventoryTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/LeaderboardResultTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/LegacyExitCandidates.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/LevelContextTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/LivesTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ManualClock.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MemorySaveStore.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MetaGameTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MetaRulesFixture.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MetaRulesTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MoveGeneratorTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MoveResolverJokerTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MoveResolverSpawningTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/MoveResolverTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/NearestNextClearStrategyTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/NextClearAbstractionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/PlayerProfileTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ProgressVectorTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/RandomBoards.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SaveDataTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SaveFixture.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SearchBudgetTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SearchCorpus.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/ShutterDefinitionTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/Solve.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SolveResultTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SoundSettingTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/SpawnedBlockTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/StreakRewardTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/StubLeaderboardService.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/UnlockConditionsTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/WalletTests.cs" />
+    <Compile Include="$(RepoRoot)Assets/Tests/WinStreakTests.cs" />
+  </ItemGroup>
+</Project>
