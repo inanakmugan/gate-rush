@@ -125,9 +125,12 @@ codec builds missing sections from the rules, is not.
   the part of an interval already waited is kept.
 - `TryLose` at the cap starts the wait at `nowUtc`; below the cap it
   leaves the wait running. At 0 it returns false and changes nothing.
-- A `nowUtc` earlier than the wait's start gives no life, and settling
-  then starts the wait again at `nowUtc`. Setting the clock back never
-  gains a life.
+- A `nowUtc` earlier than the wait's start gives no life. `Lives` keeps
+  its own in-memory clock that only moves forward by the real time
+  between readings, and the saved wait start never moves back, so
+  setting the clock back and then restoring it never gains a life (D83).
+  A clock that stays set back still counts real time, so a player at 0
+  still gets a life after one interval.
 - `Refill` sets the count to the cap.
 - A restored count above the cap reads as the cap; a negative one throws.
 
@@ -220,8 +223,10 @@ codec builds missing sections from the rules, is not.
 - The roadmap's case: win three (lives untouched), lose one, wait forty
   minutes: full again, and no more than full. (The central decision: lives
   come back from timestamps against a moved clock.)
-- A clock set back an hour gives no life, and the wait then runs from the
-  earlier time.
+- A clock set back an hour gives no life; real time keeps counting.
+- The review case (D83): 1 life, the clock set back three hours and read,
+  then restored, 10 real minutes: still 1 life with 20 minutes to go,
+  also across a save and reload.
 - `TryLose` at 0 is false and changes nothing; `Refill` gives the cap.
 - A restored count above the cap reads as the cap; a negative one throws;
   a non-UTC time throws.
@@ -277,6 +282,13 @@ codec builds missing sections from the rules, is not.
   still settles before returning false.
 - **Unreadable save.** The problem now says the defaults of a new player
   are used, so it stays true as sections are added.
+- **Later fixes from the code review (Nov 2026, D83).** The set-back rule
+  above replaced the first one ("settling restarts the wait at
+  `nowUtc`"), which let a clock set back and then restored refill every
+  life. An unreadable save is no longer lost: the first save after an
+  unreadable load copies the old text to `GateRush.Save.Unreadable`
+  (then `.2`, `.3` and so on, never replacing a different backup) before
+  writing; if the copy fails nothing is written.
 - **No time provider on the bootstrap yet.** A field assigned and never
   read would raise warning CS0414. `SystemTimeProvider` and its test
   exist; Module 32 creates it where lives are shown and spent.
